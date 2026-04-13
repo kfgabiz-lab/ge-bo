@@ -44,11 +44,12 @@ export const RowHeader = ({
             {/* Row 드래그 핸들 */}
             {dragHandleProps && (
                 <span
-                    {...(dragHandleProps as React.HTMLAttributes<HTMLSpanElement>)}
+                    ref={dragHandleProps.ref as React.Ref<HTMLSpanElement>}
+                    {...Object.fromEntries(Object.entries(dragHandleProps).filter(([k]) => k !== 'ref')) as React.HTMLAttributes<HTMLSpanElement>}
                     onClick={e => e.stopPropagation()}
-                    className="cursor-grab active:cursor-grabbing touch-none"
+                    className="cursor-grab active:cursor-grabbing touch-none px-1 py-1 rounded hover:bg-slate-100"
                 >
-                    <GripVertical className="w-3 h-3 text-slate-300" />
+                    <GripVertical className="w-4 h-4 text-slate-400" />
                 </span>
             )}
             {/* 접기 화살표 — onToggleCollapse 있을 때만 표시 */}

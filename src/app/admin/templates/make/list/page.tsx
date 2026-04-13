@@ -15,7 +15,7 @@ import {
     Plus, Trash2, GripVertical, Copy, Check, Eye, Code,
     ChevronUp, ChevronDown, X, Search, RotateCcw,
     Calendar, Pencil, Wand2, TableProperties, PanelLeftOpen, ArrowUpDown,
-    Save, Zap, Loader2, MousePointerClick, Database, Sparkles,
+    Save, Zap, Loader2, MousePointerClick,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SearchForm, SearchRow, SearchField } from '@/components/search';
@@ -23,7 +23,7 @@ import LayerPopupRenderer from '@/components/layer/LayerPopupRenderer';
 import api from '@/lib/api';
 /* ── 공통 모듈 ── */
 import { inputCls, selectCls } from '../_shared/styles';
-import { CodeGroupDef, TemplateItem, ButtonConfig, ButtonType, ButtonAction, ButtonPosition, DisplayMode } from '../_shared/types';
+import { CodeGroupDef, TemplateItem, ButtonConfig, ButtonType, ButtonAction, ButtonPosition, DisplayMode, CellType, CellOption, TableColumnConfig } from '../_shared/types';
 import { parseOpt, needsOptions as sharedNeedsOptions, toSlug, createIdGenerator, varName, showValidationError } from '../_shared/utils';
 import { SelectArrow } from '../_shared/components/SelectArrow';
 import { RowHeader } from '../_shared/components/RowHeader';
@@ -32,11 +32,10 @@ import { CodeGroupSelector } from '../_shared/components/CodeGroupSelector';
 import { ValidationSection, ValidationValues } from '../_shared/components/ValidationSection';
 import { FieldPickerTypeList } from '../_shared/components/FieldPickerTypeList';
 import { SaveModal, GenerateModal } from '../_shared/components/TemplateModals';
-import { useDatabaseStore } from '@/store/useDatabaseStore';
-import { DndContext, closestCenter } from '@dnd-kit/core';
+import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableRows } from '../_shared/hooks/useSortableRows';
-import { SortableRowWrapper, SortableFieldWrapper } from '../_shared/components/DndWrappers';
+import { SortableRowWrapper, SortableFieldWrapper, EmptyFieldDropZone } from '../_shared/components/DndWrappers';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -73,36 +72,7 @@ interface SearchRowConfig {
     fields: SearchFieldConfig[];
 }
 
-/** 셀 렌더링 타입 */
-type CellType = 'text' | 'badge' | 'boolean' | 'actions';
-
-/** 셀 옵션 (badge/status/priority용) */
-interface CellOption {
-    text: string;
-    value: string;
-    color: string;
-}
-
-/** 테이블 컬럼 설정 */
-interface TableColumnConfig {
-    id: string;
-    header: string;
-    accessor: string;
-    width?: number;
-    widthUnit?: 'px' | '%';
-    align: 'left' | 'center' | 'right';
-    sortable: boolean;
-    cellType: CellType;
-    cellOptions?: CellOption[];        // badge 옵션
-    showIcon?: boolean;                // badge 아이콘(●) 표시
-    badgeShape?: 'round' | 'square';   // badge 모양 (둥근/각진)
-    trueText?: string;                 // boolean 타입 true 텍스트
-    falseText?: string;                // boolean 타입 false 텍스트
-    actions?: ('edit' | 'detail' | 'delete')[]; // 프리셋 액션 버튼
-    customActions?: { id: string; label: string; color: string }[]; // 커스텀 버튼
-    editPopupSlug?: string;   // 수정 버튼에 연결된 LAYER 팝업 slug
-    detailPopupSlug?: string; // 상세 버튼에 연결된 LAYER 팝업 slug
-}
+/* CellType, CellOption, TableColumnConfig → _shared/types.ts 에서 import */
 
 /* ── 셀 타입 메타 ── */
 const CELL_TYPES: { type: CellType; label: string; desc: string }[] = [
@@ -132,22 +102,12 @@ const FIELD_TYPES: { type: FieldType; label: string; desc: string; defaultColSpa
     { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)', defaultColSpan: 2 },
     { type: 'radio', label: 'Radio', desc: '라디오 단일선택', defaultColSpan: 1 },
     { type: 'checkbox', label: 'Checkbox', desc: '체크박스 복수선택', defaultColSpan: 1 },
-    { type: 'quickDate', label: 'Quick Date', desc: '빠른 선택 버튼', defaultColSpan: 1 },
+    { type: 'quickDate', label: 'Button', desc: '선택 버튼', defaultColSpan: 1 },
 ];
 
 /* ── ID 생성 ── */
 const uid = createIdGenerator('f');
 const caUid = createIdGenerator('ca'); // 커스텀 액션 버튼 ID 생성
-
-/* ── DB 연동: 자동 적용 시 제외할 시스템 컬럼 목록 ── */
-const SYSTEM_COLUMNS = new Set([
-    'reg_dt', 'mdf_dt', 'reg_user_id', 'mdf_user_id', 'reg_id', 'mdf_id',
-    'reg_date', 'mdf_date', 'reg_user', 'mdf_user',
-    'created_at', 'updated_at', 'created_by', 'updated_by',
-    'create_dt', 'modify_dt', 'create_date', 'modify_date',
-    'ins_dt', 'upd_dt', 'ins_user', 'upd_user', 'ins_user_id', 'upd_user_id',
-    'insert_dt', 'update_dt', 'insert_user', 'update_user',
-]);
 
 /* ── 커스텀 액션 버튼 색상 맵 (Tailwind 동적 클래스 purge 방지) ── */
 const CUSTOM_ACTION_COLORS: { value: string; label: string; cls: string }[] = [
@@ -263,10 +223,14 @@ const FieldPreview = ({ field, value, onChange, codeGroups = [] }: {
                     })}
                 </div>
             );
-        case 'quickDate':
+        case 'quickDate': {
+            /* 공통코드 or 수동 옵션 결정 */
+            const btnOpts = field.codeGroupCode
+                ? (codeGroups.find(g => g.groupCode === field.codeGroupCode)?.details.filter(d => d.active).map(d => `${d.name}:${d.code}`) || [])
+                : (field.options || ['오늘:today', '1주:1week', '1개월:1month', '3개월:3month', '전체:all']);
             return (
                 <div className="flex items-center gap-1.5">
-                    {(field.options || ['오늘:today', '1주:1week', '1개월:1month', '3개월:3month', '전체:all']).map(opt => {
+                    {btnOpts.map(opt => {
                         const { text, value: val } = parseOpt(opt);
                         const isActive = value === val;
                         return (
@@ -275,6 +239,7 @@ const FieldPreview = ({ field, value, onChange, codeGroups = [] }: {
                     })}
                 </div>
             );
+        }
         default:
             return null;
     }
@@ -510,10 +475,17 @@ const generateSearchCode = (rows: SearchRowConfig[], collapsible: boolean): stri
                 break;
             case 'quickDate':
                 fl.push(`${ind(depth + 1)}<div className="flex items-center gap-1.5">`);
-                (f.options || []).forEach(opt => {
-                    const { text, value } = parseOpt(opt);
-                    fl.push(`${ind(depth + 2)}<button type="button" onClick={() => ${setter}('${value}')} className={\`px-3 py-2 text-xs font-medium rounded-md border transition-all \${${name} === '${value}' ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 border-slate-200 hover:bg-slate-100'}\`}>${text}</button>`);
-                });
+                if (f.codeGroupCode) {
+                    /* 공통코드 연동 — 런타임에 groups에서 옵션 읽기 */
+                    fl.push(`${ind(depth + 2)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => (`);
+                    fl.push(`${ind(depth + 3)}<button key={d.code} type="button" onClick={() => ${setter}(d.code)} className={\`px-2.5 py-2 text-xs font-medium rounded-md border transition-all \${${name} === d.code ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 border-slate-200 hover:bg-slate-100'}\`}>{d.name}</button>`);
+                    fl.push(`${ind(depth + 2)}))}`);
+                } else {
+                    (f.options || []).forEach(opt => {
+                        const { text, value } = parseOpt(opt);
+                        fl.push(`${ind(depth + 2)}<button type="button" onClick={() => ${setter}('${value}')} className={\`px-3 py-2 text-xs font-medium rounded-md border transition-all \${${name} === '${value}' ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 border-slate-200 hover:bg-slate-100'}\`}>${text}</button>`);
+                    });
+                }
                 fl.push(`${ind(depth + 1)}</div>`);
                 break;
         }
@@ -585,12 +557,19 @@ const buildTsxFile = (
     /* actions 컬럼 존재 여부 */
     const hasActionsCol = columns.some(c => c.cellType === 'actions');
     /* LAYER 팝업 연결 여부 (테이블 컬럼) */
-    const hasPopup = columns.some(c => c.editPopupSlug || c.detailPopupSlug);
+    const hasPopup = columns.some(c => c.editPopupSlug || c.detailPopupSlug || c.editFileLayerSlug || c.detailFileLayerSlug);
+    const hasPathPopup = columns.some(c => c.editFileLayerSlug || c.detailFileLayerSlug);
     /* 버튼 분석 */
     const hasBtns = buttons.length > 0;
-    const hasBtnPopup = buttons.some(b => b.popupSlug);
-    /* toast 필요 여부 — excel 또는 register+popupSlug 없음 버튼이 있을 때 */
-    const needsToast = buttons.some(b => b.action === 'excel' || (b.action === 'register' && !b.popupSlug));
+    const hasBtnPopup = buttons.some(b => b.popupSlug || b.fileLayerSlug);
+    const hasBtnPathPopup = buttons.some(b => b.fileLayerSlug);
+    /* 개발자방식 — 버튼 + actions 컬럼의 fileLayerSlug 중복 제거 후 import/POPUP_MAP 대상 목록 */
+    const fileLayerSlugs = [...new Set([
+        ...buttons.map(b => b.fileLayerSlug),
+        ...columns.map(c => c.editFileLayerSlug),
+        ...columns.map(c => c.detailFileLayerSlug),
+    ].filter(Boolean) as string[])];
+    /* toast는 slug 미설정 알림 등에 항상 필요하므로 조건 없이 import */
     const lucideIcons = [
         ...(needsCalendar ? ['Calendar'] : []),
         ...(needsChevron ? ['ChevronDown'] : []),
@@ -626,24 +605,80 @@ const buildTsxFile = (
     /* ── 파일 시작 ── */
     lines.push("'use client';");
     lines.push('');
-    /* 스크롤 모드면 useEffect, useRef 추가 */
+    /* 스크롤 모드면 useRef 추가, useEffect는 fetchData 초기 로드에 항상 필요 */
     const needsScrollImports = displayMode === 'scroll';
-    lines.push(`import React, { useState${needsScrollImports ? ', useEffect, useRef' : ''} } from 'react';`);;
+    /* fileLayerSlug 있으면 React.ComponentType 사용을 위해 React도 import */
+    const needsReact = fileLayerSlugs.length > 0;
+    lines.push(`import ${needsReact ? 'React, { ' : '{ '}useState, useEffect${needsScrollImports ? ', useRef' : ''}${needsReact ? ' }' : ' }'} from 'react';`);
     if (lucideIcons.length > 0) lines.push(`import { ${lucideIcons.join(', ')} } from 'lucide-react';`);
     lines.push("import { SearchForm, SearchRow, SearchField } from '@/components/search';");
     if (hasCodeGroup) lines.push("import { useCodeStore } from '@/store/useCodeStore';");
     /* 팝업 연결 컬럼 또는 버튼 팝업이 있을 때 LayerPopupRenderer import */
     if (hasPopup || hasBtnPopup) lines.push("import LayerPopupRenderer from '@/components/layer/LayerPopupRenderer';");
-    /* 버튼 toast 필요 시 import */
-    if (needsToast) lines.push("import { toast } from 'sonner';");
+    /* toast — 항상 필요 (slug 미설정 알림 포함) */
+    lines.push("import { toast } from 'sonner';");
+    lines.push("import api from '@/lib/api';");
+    lines.push("import { usePathname } from 'next/navigation';");
+    lines.push("import { useMenuStore, MenuItem } from '@/store/useMenuStore';");
+    /* 개발자방식 — fileLayerSlug 로컬 컴포넌트 import */
+    fileLayerSlugs.forEach(slug => {
+        lines.push(`import ${slug} from './${slug}';`);
+    });
     lines.push('');
+
+    /* ── JSDoc + findMenuSlug 함수 ── */
+    lines.push('/**');
+    lines.push(' * [자동생성 파일 — List Builder]');
+    lines.push(' *');
+    lines.push(' * ✅ 메뉴에 slug를 등록하면 아래 API로 자동 CRUD 동작합니다.');
+    lines.push(' *    (api baseURL: /api/v1 포함 — 실제 요청 경로는 /api/v1/page-data/{slug})');
+    lines.push(' *    - 목록 조회 : GET    /page-data/{slug}');
+    lines.push(' *    - 등록     : POST   /page-data/{slug}');
+    lines.push(' *    - 수정     : PUT    /page-data/{slug}/{id}');
+    lines.push(' *    - 삭제     : DELETE /page-data/{slug}/{id}');
+    lines.push(' *');
+    lines.push(' * ⚠️  다른 API 경로로 커스터마이징하는 경우 (slug 방식 미사용)');
+    lines.push(' *    1. fetchData / onSave / 삭제 핸들러의 URL을 원하는 경로로 직접 수정하세요.');
+    lines.push(' *    2. slug 가드 코드를 함께 제거하세요.');
+    lines.push(' */');
+    lines.push('');
+    lines.push('/** 메뉴 트리에서 현재 경로와 일치하는 메뉴의 slug를 재귀 탐색합니다. */');
+    lines.push('function findMenuSlug(menus: MenuItem[], path: string): string | undefined {');
+    lines.push(`${ind(1)}for (const m of menus) {`);
+    lines.push(`${ind(2)}if (m.url === path) return m.slug;`);
+    lines.push(`${ind(2)}if (m.children) {`);
+    lines.push(`${ind(3)}const found = findMenuSlug(m.children, path);`);
+    lines.push(`${ind(3)}if (found !== undefined) return found;`);
+    lines.push(`${ind(2)}}`);
+    lines.push(`${ind(1)}}`);
+    lines.push(`${ind(1)}return undefined;`);
+    lines.push('}');
+    lines.push('');
+
+    /* 개발자방식 — POPUP_MAP 생성 (fileLayerSlug가 있을 때만) */
+    if (fileLayerSlugs.length > 0) {
+        lines.push('/** POPUP_MAP — fileLayerSlug 값으로 로컬 컴포넌트를 조회합니다. */');
+        lines.push(`const POPUP_MAP: Record<string, React.ComponentType<{ isOpen: boolean; onClose: () => void; onSave: (data: Record<string, unknown>) => Promise<void> }>> = {`);
+        fileLayerSlugs.forEach(slug => {
+            lines.push(`${ind(1)}'${slug}': ${slug},`);
+        });
+        lines.push('};');
+        lines.push('');
+    }
 
     /* ── 컴포넌트 시작 ── */
     lines.push('export default function GeneratedPage() {');
     if (hasCodeGroup) {
-        lines.push(`${ind(1)}const { groups } = useCodeStore();`);
+        lines.push(`${ind(1)}/* ── 공통코드 그룹 ── */`);
+        lines.push(`${ind(1)}const { groups, fetchGroups } = useCodeStore();`);
+        lines.push(`${ind(1)}useEffect(() => { fetchGroups(); }, [fetchGroups]);`);
         lines.push('');
     }
+    lines.push(`${ind(1)}/* 현재 경로와 매칭된 메뉴의 slug — 메뉴 관리에서 설정한 값 */`);
+    lines.push(`${ind(1)}const pathname = usePathname();`);
+    lines.push(`${ind(1)}const { navMenus } = useMenuStore();`);
+    lines.push(`${ind(1)}const menuSlug = findMenuSlug(navMenus, pathname) ?? '';`);
+    lines.push('');
 
     /* ── State 선언 ── */
     lines.push(`${ind(1)}/* ── 검색 필드 State ── */`);
@@ -672,16 +707,13 @@ const buildTsxFile = (
         lines.push(`${ind(1)}const [page, setPage] = useState(0);`);
         lines.push(`${ind(1)}const observerRef = useRef<HTMLDivElement>(null);`);
     }
-    /* 팝업 State — 팝업 연결 컬럼이 있을 때만 생성 */
+    /* 팝업 State — type: slug(관리자방식) | path(개발자방식), editId: 수정 대상 행 ID */
     if (hasPopup) {
-        lines.push(`${ind(1)}const [popupOpen, setPopupOpen] = useState(false);`);
-        lines.push(`${ind(1)}const [popupSlug, setPopupSlug] = useState('');`);
-        lines.push(`${ind(1)}const [popupData, setPopupData] = useState<Record<string, unknown>>({});`);
+        lines.push(`${ind(1)}const [tablePopup, setTablePopup] = useState<{ type: 'slug' | 'path'; value: string; editId?: number } | null>(null);`);
     }
-    /* 버튼 팝업 State — 버튼 중 popupSlug가 있는 버튼이 있을 때만 생성 */
+    /* 버튼 팝업 State */
     if (hasBtnPopup) {
-        lines.push(`${ind(1)}const [btnPopupOpen, setBtnPopupOpen] = useState(false);`);
-        lines.push(`${ind(1)}const [btnPopupSlug, setBtnPopupSlug] = useState('');`);
+        lines.push(`${ind(1)}const [activePopup, setActivePopup] = useState<{ type: 'slug' | 'path'; value: string } | null>(null);`);
     }
     lines.push('');
 
@@ -716,19 +748,18 @@ const buildTsxFile = (
         }
     });
     lines.push(`${ind(2)}if (errors.length > 0) { alert(errors.join('\\n')); return; }`);
-    lines.push(`${ind(2)}// TODO: API 호출 후 setData(응답결과)`);
+    lines.push(`${ind(2)}fetchData(0, true);`);
     lines.push(`${ind(1)}};`);
     lines.push('');
 
     /* 버튼 클릭 핸들러 — 버튼이 있을 때만 생성 */
     if (hasBtns) {
-        lines.push(`${ind(1)}/** 버튼 바 클릭 핸들러 */`);
-        lines.push(`${ind(1)}const handleButtonClick = (action: string, popupSlug?: string) => {`);
-        lines.push(`${ind(2)}if (action === 'register' || action === 'custom') {`);
-        lines.push(`${ind(3)}if (popupSlug) { setBtnPopupSlug(popupSlug); setBtnPopupOpen(true); }`);
-        lines.push(`${ind(3)}else if (action === 'register') { ${needsToast ? "toast.info('등록 페이지 연동이 설정되지 않았습니다.');" : "/* TODO: 등록 처리 */"} }`);
+        lines.push(`${ind(1)}/** 버튼 바 클릭 핸들러 — popupType: 'slug'(DB) | 'path'(로컬파일) */`);
+        lines.push(`${ind(1)}const handleButtonClick = (action: string, popupType?: 'slug' | 'path', popupValue?: string) => {`);
+        lines.push(`${ind(2)}if ((action === 'register' || action === 'custom') && popupType && popupValue) {`);
+        lines.push(`${ind(3)}setActivePopup({ type: popupType, value: popupValue });`);
         lines.push(`${ind(2)}} else if (action === 'excel') {`);
-        lines.push(`${ind(3)}${needsToast ? "toast.info('엑셀 다운로드는 추후 연동 예정입니다.');" : "/* TODO: 엑셀 다운로드 */"}`);
+        lines.push(`${ind(3)}/* TODO: 엑셀 다운로드 */`);
         lines.push(`${ind(2)}}`);
         lines.push(`${ind(1)}};`);
         lines.push('');
@@ -749,16 +780,55 @@ const buildTsxFile = (
         lines.push(`${ind(3)}<div className="flex items-center justify-end gap-2">`);
         buttons.forEach(btn => {
             const cls = BTN_CLS[btn.type] || BTN_CLS.secondary;
+            /* popupSlug(관리자방식) > fileLayerSlug(개발자방식) > 기본 동작 순서로 처리 */
             const handler = btn.popupSlug
-                ? `handleButtonClick('${btn.action}', '${btn.popupSlug}')`
-                : `handleButtonClick('${btn.action}')`;
+                ? `handleButtonClick('${btn.action}', 'slug', '${btn.popupSlug}')`
+                : btn.fileLayerSlug
+                    ? `handleButtonClick('${btn.action}', 'path', '${btn.fileLayerSlug}')`
+                    : `handleButtonClick('${btn.action}')`;
             lines.push(`${ind(4)}<button onClick={() => ${handler}} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${cls}">${btn.label}</button>`);
         });
         lines.push(`${ind(3)}</div>`);
     };
 
+    /* ── fetchData ── */
+    const searchParams = allFields.map(f => {
+        if (f.type === 'dateRange') return `, ${fieldVar(f)}, ${varName(f.label2 || '')}`;
+        return `, ${fieldVar(f)}`;
+    }).join('');
+    lines.push(`${ind(1)}/** menuSlug 기반으로 목록을 조회합니다. page는 0-based. notify=true 이면 slug 미설정 시 toast를 표시합니다. */`);
+    lines.push(`${ind(1)}const fetchData = async (page: number, notify = false) => {`);
+    lines.push(`${ind(2)}/* 메뉴에 slug가 설정되지 않으면 조회 불가 — notify=true 일 때만 사용자에게 toast 알림 */`);
+    lines.push(`${ind(2)}if (!menuSlug) { if (notify) toast.error('메뉴에 slug를 설정해주세요.'); return; }`);
+    lines.push(`${ind(2)}try {`);
+    lines.push(`${ind(3)}const res = await api.get('/page-data/' + menuSlug, {`);
+    lines.push(`${ind(4)}params: { page, size: 10${searchParams} },`);
+    lines.push(`${ind(3)}});`);
+    lines.push(`${ind(3)}const items = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])`);
+    lines.push(`${ind(4)}.map(item => ({ id: item.id, ...item.dataJson }));`);
+    lines.push(`${ind(3)}setData(items);`);
+    lines.push(`${ind(3)}setTotalElements(res.data.totalElements ?? items.length);`);
+    if (displayMode === 'pagination') {
+        lines.push(`${ind(3)}setTotalPages(res.data.totalPages ?? 1);`);
+        lines.push(`${ind(3)}setCurrentPage(page);`);
+    } else {
+        /* 스크롤 모드 — 현재 페이지가 마지막 페이지가 아니면 hasMore = true */
+        lines.push(`${ind(3)}setHasMore(page < (res.data.totalPages - 1));`);
+    }
+    lines.push(`${ind(2)}} catch (err) {`);
+    lines.push(`${ind(3)}console.error('데이터 조회 오류:', err);`);
+    lines.push(`${ind(2)}}`);
+    lines.push(`${ind(1)}};`);
+    lines.push('');
+
+    /* ── useEffect ── */
+    lines.push(`${ind(1)}/* menuSlug 로드 완료 시 목록 조회 (빈 값이면 스킵) */`);
+    lines.push(`${ind(1)}useEffect(() => { fetchData(0); }, [menuSlug]);`);
+    lines.push('');
+
     /* ── return JSX ── */
     lines.push(`${ind(1)}return (`);
+    lines.push(`${ind(2)}<>`);
     lines.push(`${ind(2)}<div className="space-y-5">`);
 
     /* 버튼 바 — above: 검색폼 위 */
@@ -788,7 +858,7 @@ const buildTsxFile = (
                         lines.push(`${ind(7)}<select value={${n}} onChange={e => ${setter}(e.target.value)} className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white">`);
                         lines.push(`${ind(8)}<option value="">전체</option>`);
                         if (f.codeGroupCode) {
-                            lines.push(`${ind(8)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <option key={d.code} value={d.code}>{'{'}d.name{'}'}</option>)}`);
+                            lines.push(`${ind(8)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <option key={d.code} value={d.code}>{d.name}</option>)}`);
                         } else {
                             (f.options || []).forEach(opt => {
                                 const { text, value } = parseOpt(opt);
@@ -818,7 +888,7 @@ const buildTsxFile = (
                     case 'radio':
                         lines.push(`${ind(6)}<div className="flex items-center gap-4">`);
                         if (f.codeGroupCode) {
-                            lines.push(`${ind(7)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className="flex items-center gap-2 cursor-pointer"><input type="radio" name="${n}" value={d.code} checked={${n} === d.code} onChange={() => ${setter}(d.code)} className="w-4 h-4" /><span className="text-sm">{'{'}d.name{'}'}</span></label>)}`);
+                            lines.push(`${ind(7)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className="flex items-center gap-2 cursor-pointer"><input type="radio" name="${n}" value={d.code} checked={${n} === d.code} onChange={() => ${setter}(d.code)} className="w-4 h-4" /><span className="text-sm">{d.name}</span></label>)}`);
                         } else {
                             (f.options || []).forEach(opt => {
                                 const { text, value } = parseOpt(opt);
@@ -830,7 +900,7 @@ const buildTsxFile = (
                     case 'checkbox':
                         lines.push(`${ind(6)}<div className="flex items-center gap-4">`);
                         if (f.codeGroupCode) {
-                            lines.push(`${ind(7)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" value={d.code} checked={${n}.includes(d.code)} onChange={() => ${setter}(${n}.includes(d.code) ? ${n}.filter(v => v !== d.code) : [...${n}, d.code])} className="w-4 h-4" /><span className="text-sm">{'{'}d.name{'}'}</span></label>)}`);
+                            lines.push(`${ind(7)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" value={d.code} checked={${n}.includes(d.code)} onChange={() => ${setter}(${n}.includes(d.code) ? ${n}.filter(v => v !== d.code) : [...${n}, d.code])} className="w-4 h-4" /><span className="text-sm">{d.name}</span></label>)}`);
                         } else {
                             (f.options || []).forEach(opt => {
                                 const { text, value } = parseOpt(opt);
@@ -841,10 +911,17 @@ const buildTsxFile = (
                         break;
                     case 'quickDate':
                         lines.push(`${ind(6)}<div className="flex items-center gap-1.5">`);
-                        (f.options || ['오늘:today', '1주:1week', '1개월:1month', '3개월:3month', '전체:all']).forEach(opt => {
-                            const { text, value } = parseOpt(opt);
-                            lines.push(`${ind(7)}<button type="button" onClick={() => ${setter}('${value}')} className={\`px-2.5 py-2 text-xs font-medium rounded-md border transition-all \${${n} === '${value}' ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 border-slate-200 hover:bg-slate-100'}\`}>${text}</button>`);
-                        });
+                        if (f.codeGroupCode) {
+                            /* 공통코드 연동 — 런타임에 groups에서 옵션 읽기 */
+                            lines.push(`${ind(7)}{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => (`);
+                            lines.push(`${ind(8)}<button key={d.code} type="button" onClick={() => ${setter}(d.code)} className={\`px-2.5 py-2 text-xs font-medium rounded-md border transition-all \${${n} === d.code ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 border-slate-200 hover:bg-slate-100'}\`}>{d.name}</button>`);
+                            lines.push(`${ind(7)}))}`);
+                        } else {
+                            (f.options || ['오늘:today', '1주:1week', '1개월:1month', '3개월:3month', '전체:all']).forEach(opt => {
+                                const { text, value } = parseOpt(opt);
+                                lines.push(`${ind(7)}<button type="button" onClick={() => ${setter}('${value}')} className={\`px-2.5 py-2 text-xs font-medium rounded-md border transition-all \${${n} === '${value}' ? 'bg-slate-900 text-white border-slate-900' : 'text-slate-500 border-slate-200 hover:bg-slate-100'}\`}>${text}</button>`);
+                            });
+                        }
                         lines.push(`${ind(6)}</div>`);
                         break;
                 }
@@ -887,7 +964,15 @@ const buildTsxFile = (
             lines.push(`${ind(9)}<td className="px-4 py-3 text-slate-700 whitespace-nowrap" style={{ textAlign: '${col.align}'${w} }}>`);
             switch (col.cellType) {
                 case 'text':
-                    lines.push(`${ind(10)}<span>{String(row['${col.accessor}'] ?? '')}</span>`);
+                    if (col.codeGroupCode && col.displayAs !== 'value') {
+                        /* 공통코드 연동 — 코드값을 이름(text)으로 변환하여 표시 */
+                        lines.push(`${ind(10)}<span>{groups.find(g => g.groupCode === '${col.codeGroupCode}')?.details.find(d => d.code === String(row['${col.accessor}'] ?? ''))?.name ?? String(row['${col.accessor}'] ?? '')}</span>`);
+                    } else if (col.codeGroupCode && col.displayAs === 'value') {
+                        /* 공통코드 연동 — 코드값 그대로 표시 */
+                        lines.push(`${ind(10)}<span>{String(row['${col.accessor}'] ?? '')}</span>`);
+                    } else {
+                        lines.push(`${ind(10)}<span>{String(row['${col.accessor}'] ?? '')}</span>`);
+                    }
                     break;
                 case 'badge': {
                     /* 배지 색상을 코드 생성 시점에 정적 클래스로 resolve */
@@ -916,17 +1001,23 @@ const buildTsxFile = (
                     /* 프리셋 버튼 — 팝업 slug가 있으면 팝업 열기, 없으면 TODO */
                     (col.actions || []).forEach(action => {
                         if (action === 'edit') {
+                            /* popupSlug(관리자방식) > fileLayerSlug(개발자방식) > TODO 순서 */
                             const handler = col.editPopupSlug
-                                ? `{ setPopupSlug('${col.editPopupSlug}'); setPopupData(row); setPopupOpen(true); }`
-                                : `{ /* TODO: 수정 처리 */ }`;
+                                ? `{ setTablePopup({ type: 'slug', value: '${col.editPopupSlug}', editId: row.id as number }); }`
+                                : col.editFileLayerSlug
+                                    ? `{ setTablePopup({ type: 'path', value: '${col.editFileLayerSlug}', editId: row.id as number }); }`
+                                    : `{ /* TODO: 수정 처리 */ }`;
                             lines.push(`${ind(11)}<button onClick={() => ${handler}} className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-all" title="수정"><Pencil className="w-3.5 h-3.5" /></button>`);
                         } else if (action === 'detail') {
+                            /* popupSlug(관리자방식) > fileLayerSlug(개발자방식) > TODO 순서 */
                             const handler = col.detailPopupSlug
-                                ? `{ setPopupSlug('${col.detailPopupSlug}'); setPopupData(row); setPopupOpen(true); }`
-                                : `{ /* TODO: 상세 처리 */ }`;
+                                ? `{ setTablePopup({ type: 'slug', value: '${col.detailPopupSlug}' }); }`
+                                : col.detailFileLayerSlug
+                                    ? `{ setTablePopup({ type: 'path', value: '${col.detailFileLayerSlug}' }); }`
+                                    : `{ /* TODO: 상세 처리 */ }`;
                             lines.push(`${ind(11)}<button onClick={() => ${handler}} className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-all" title="상세"><Eye className="w-3.5 h-3.5" /></button>`);
                         } else if (action === 'delete') {
-                            lines.push(`${ind(11)}<button onClick={() => { if (window.confirm('삭제하시겠습니까?')) { /* TODO: 삭제 처리 */ } }} className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button>`);
+                            lines.push(`${ind(11)}<button onClick={async () => { if (!menuSlug) { toast.error('메뉴에 slug를 설정해주세요.'); return; } if (window.confirm('삭제하시겠습니까?')) { await api.delete('/page-data/' + menuSlug + '/' + (row.id as number)); fetchData(0); } }} className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button>`);
                         }
                     });
                     /* 커스텀 버튼 */
@@ -941,7 +1032,7 @@ const buildTsxFile = (
             lines.push(`${ind(9)}</td>`);
         });
         lines.push(`${ind(8)}</tr>`);
-        lines.push(`${ind(7)})}`);
+        lines.push(`${ind(7)}))`  + `}`);
         lines.push(`${ind(6)}</tbody>`);
         lines.push(`${ind(5)}</table>`);
         lines.push(`${ind(4)}</div>`);
@@ -971,16 +1062,72 @@ const buildTsxFile = (
 
     lines.push(`${ind(2)}</div>`);
 
-    /* 테이블 팝업 — 팝업 연결 컬럼이 있을 때만 */
+    /* 테이블 팝업 — 관리자방식 (LayerPopupRenderer, DB slug) */
     if (hasPopup) {
-        lines.push(`${ind(2)}{/* 레이어 팝업 — slug와 행 데이터를 받아 동적으로 팝업 렌더링 */}`);
-        lines.push(`${ind(2)}<LayerPopupRenderer open={popupOpen} onClose={() => setPopupOpen(false)} slug={popupSlug} initialData={popupData} />`);
+        lines.push(`${ind(2)}{tablePopup?.type === 'slug' && (`);
+        lines.push(`${ind(3)}<LayerPopupRenderer`);
+        lines.push(`${ind(4)}open`);
+        lines.push(`${ind(4)}onClose={() => setTablePopup(null)}`);
+        lines.push(`${ind(4)}slug={tablePopup.value}`);
+        lines.push(`${ind(4)}listSlug={menuSlug}`);
+        lines.push(`${ind(4)}editId={tablePopup.editId}`);
+        lines.push(`${ind(4)}onSaved={() => { setTablePopup(null); fetchData(0); }}`);
+        lines.push(`${ind(3)}/>`);
+        lines.push(`${ind(2)})}`);
     }
-    /* 버튼 팝업 — popupSlug 있는 버튼이 있을 때만 */
+    /* 테이블 팝업 — 개발자방식 (로컬 파일, POPUP_MAP 조회) */
+    if (hasPathPopup) {
+        lines.push(`${ind(2)}{tablePopup?.type === 'path' && (() => {`);
+        lines.push(`${ind(3)}const P = POPUP_MAP[tablePopup.value];`);
+        lines.push(`${ind(3)}if (!P) return null;`);
+        lines.push(`${ind(3)}return (`);
+        lines.push(`${ind(4)}<P`);
+        lines.push(`${ind(5)}isOpen`);
+        lines.push(`${ind(5)}onClose={() => setTablePopup(null)}`);
+        lines.push(`${ind(5)}onSave={async (data) => {`);
+        lines.push(`${ind(6)}if (!menuSlug) { toast.error('메뉴에 slug를 설정해주세요.'); return; }`);
+        lines.push(`${ind(6)}if (tablePopup.editId != null) {`);
+        lines.push(`${ind(7)}await api.put('/page-data/' + menuSlug + '/' + tablePopup.editId, { dataJson: data });`);
+        lines.push(`${ind(6)}} else {`);
+        lines.push(`${ind(7)}await api.post('/page-data/' + menuSlug, { dataJson: data });`);
+        lines.push(`${ind(6)}}`);
+        lines.push(`${ind(6)}setTablePopup(null); fetchData(0);`);
+        lines.push(`${ind(5)}}}`);
+        lines.push(`${ind(4)}/>`);
+        lines.push(`${ind(3)});`);
+        lines.push(`${ind(2)}})()}`);
+    }
+    /* 버튼 팝업 — 관리자방식 (LayerPopupRenderer, DB slug) */
     if (hasBtnPopup) {
-        lines.push(`${ind(2)}{/* 버튼 바 팝업 */}`);
-        lines.push(`${ind(2)}<LayerPopupRenderer open={btnPopupOpen} onClose={() => setBtnPopupOpen(false)} slug={btnPopupSlug} />`);
+        lines.push(`${ind(2)}{activePopup?.type === 'slug' && (`);
+        lines.push(`${ind(3)}<LayerPopupRenderer`);
+        lines.push(`${ind(4)}open`);
+        lines.push(`${ind(4)}onClose={() => setActivePopup(null)}`);
+        lines.push(`${ind(4)}slug={activePopup.value}`);
+        lines.push(`${ind(4)}listSlug={menuSlug}`);
+        lines.push(`${ind(4)}onSaved={() => { setActivePopup(null); fetchData(0); }}`);
+        lines.push(`${ind(3)}/>`);
+        lines.push(`${ind(2)})}`);
     }
+    /* 버튼 팝업 — 개발자방식 (로컬 파일, POPUP_MAP 조회) */
+    if (hasBtnPathPopup) {
+        lines.push(`${ind(2)}{activePopup?.type === 'path' && (() => {`);
+        lines.push(`${ind(3)}const P = POPUP_MAP[activePopup.value];`);
+        lines.push(`${ind(3)}if (!P) return null;`);
+        lines.push(`${ind(3)}return (`);
+        lines.push(`${ind(4)}<P`);
+        lines.push(`${ind(5)}isOpen`);
+        lines.push(`${ind(5)}onClose={() => setActivePopup(null)}`);
+        lines.push(`${ind(5)}onSave={async (data) => {`);
+        lines.push(`${ind(6)}if (!menuSlug) { toast.error('메뉴에 slug를 설정해주세요.'); return; }`);
+        lines.push(`${ind(6)}await api.post('/page-data/' + menuSlug, { dataJson: data });`);
+        lines.push(`${ind(6)}setActivePopup(null); fetchData(0);`);
+        lines.push(`${ind(5)}}}`);
+        lines.push(`${ind(4)}/>`);
+        lines.push(`${ind(3)});`);
+        lines.push(`${ind(2)}})()}`);
+    }
+    lines.push(`${ind(2)}</>`);
     lines.push(`${ind(1)});`);
     lines.push('}');
     return lines.join('\n');
@@ -996,11 +1143,6 @@ export default function MakeListPage() {
     const [copied, setCopied] = useState(false);
     const [panelOpen, setPanelOpen] = useState(true);
 
-    /* ── 데이터 소스 선택 (공통 JSON / DB 연동) ── */
-    const [dataSource, setDataSource] = useState<'json' | 'db'>('json');
-    const [dbTableSearch, setDbTableSearch] = useState('');
-    const { tables, selectedTable, selectTable, isLoading: isDbLoading, isColumnsLoading, fetchTables } = useDatabaseStore();
-
     /* ── 검색 필드 값 관리 (미리보기용) ── */
     const [searchValues, setSearchValues] = useState<Record<string, string>>({});
     const updateSearchValue = (key: string, val: string) => setSearchValues(prev => ({ ...prev, [key]: val }));
@@ -1008,13 +1150,11 @@ export default function MakeListPage() {
 
     /* ── 검색폼 설정 ── */
     const [fieldRows, setFieldRows] = useState<SearchRowConfig[]>([]);
-
-    /* ── Drag & Drop — 공통 훅 사용 ── */
-    const { sensors, handleDragStart, handleDragOver, handleDragEnd } = useSortableRows(fieldRows, setFieldRows);
-
     const [collapsible, setCollapsible] = useState(false);
     /** 접힌 행 ID 집합 — Row 헤더 클릭으로 토글 */
     const [collapsedRows, setCollapsedRows] = useState<Set<string>>(new Set());
+    /* ── Drag & Drop — 공통 훅 사용 ── */
+    const { sensors, collisionDetection, handleDragStart, handleDragOver, handleDragEnd } = useSortableRows(fieldRows, setFieldRows);
     const toggleRowCollapse = (id: string) =>
         setCollapsedRows(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
     /* ── 표시 방식 설정 ── */
@@ -1069,121 +1209,6 @@ export default function MakeListPage() {
     const [pendingOptionMode, setPendingOptionMode] = useState<'manual' | 'code'>('manual');
     const [pendingCodeGroupCode, setPendingCodeGroupCode] = useState('');
 
-    /* ── DB 연동: 컬럼 자동 적용 ── */
-    const handleDbAutoApply = useCallback(() => {
-        if (!selectedTable || selectedTable.columns.length === 0) return;
-
-        /* 시스템 컬럼 제외 후 적용 대상 컬럼 필터링 */
-        const targetCols = selectedTable.columns.filter(
-            col => !SYSTEM_COLUMNS.has(col.columnName.toLowerCase())
-        );
-
-        /* 검색 필드 생성 (PK 제외) — 각 필드 객체 먼저 생성 */
-        const searchFields: SearchFieldConfig[] = targetCols
-            .filter(col => !col.isPrimaryKey)
-            .map(col => {
-                const dt = col.dataType.toLowerCase();
-                const label = col.comment || col.columnName;
-                const key = col.columnName;
-
-                /* DB 타입 → 검색 필드 타입 매핑 */
-                let fieldType: FieldType = 'input';
-                let colSpan: 1 | 2 | 3 | 4 | 5 = 1;
-                let options: string[] | undefined;
-
-                if (dt === 'boolean' || (dt.includes('tinyint') && col.length === 1)) {
-                    fieldType = 'select';
-                    options = ['전체:', 'Y:Y', 'N:N'];
-                } else if (dt.includes('datetime') || dt.includes('timestamp')) {
-                    fieldType = 'dateRange';
-                    colSpan = 2;
-                } else if (dt === 'date') {
-                    fieldType = 'date';
-                } else if (dt.includes('select') || dt === 'enum') {
-                    fieldType = 'select';
-                } else {
-                    fieldType = 'input';
-                }
-
-                return {
-                    id: uid(),
-                    type: fieldType,
-                    label,
-                    fieldKey: key,
-                    placeholder: fieldType === 'select' ? '전체' : fieldType === 'input' ? '입력하세요' : '',
-                    colSpan,
-                    options,
-                };
-            });
-
-        /* 4 colSpan 기준으로 row 패킹 — 남은 공간 부족 시 다음 row로 */
-        const ROW_COLS = 4 as const;
-        const newFieldRows: SearchRowConfig[] = [];
-        let currentFields: SearchFieldConfig[] = [];
-        let remaining = ROW_COLS;
-
-        for (const field of searchFields) {
-            if (field.colSpan > remaining) {
-                /* 현재 row 저장 후 새 row 시작 */
-                if (currentFields.length > 0) {
-                    newFieldRows.push({ id: uid(), cols: ROW_COLS, fields: currentFields });
-                }
-                currentFields = [field];
-                remaining = ROW_COLS - field.colSpan;
-            } else {
-                currentFields.push(field);
-                remaining -= field.colSpan;
-            }
-            /* row가 꽉 찼으면 즉시 마감 */
-            if (remaining === 0) {
-                newFieldRows.push({ id: uid(), cols: ROW_COLS, fields: currentFields });
-                currentFields = [];
-                remaining = ROW_COLS;
-            }
-        }
-        /* 마지막 row 잔여 필드 처리 */
-        if (currentFields.length > 0) {
-            newFieldRows.push({ id: uid(), cols: ROW_COLS, fields: currentFields });
-        }
-
-        /* 목록 컬럼 생성 (PK 포함, 첫 번째로 배치) */
-        const newTableColumns: TableColumnConfig[] = targetCols.map(col => {
-            const dt = col.dataType.toLowerCase();
-            const label = col.comment || col.columnName;
-
-            let cellType: CellType = 'text';
-            let trueText: string | undefined;
-            let falseText: string | undefined;
-
-            if (dt === 'boolean' || (dt.includes('tinyint') && col.length === 1)) {
-                cellType = 'boolean';
-                trueText = 'Y';
-                falseText = 'N';
-            } else if (dt === 'enum') {
-                cellType = 'badge';
-            }
-
-            return {
-                id: uid(),
-                header: label,
-                accessor: col.columnName,
-                width: 150,
-                widthUnit: 'px' as const,
-                align: 'left' as const,
-                sortable: false,
-                cellType,
-                trueText,
-                falseText,
-            };
-        });
-
-        /* 기존 설정 교체 후 검색 탭으로 포커스 */
-        setFieldRows(newFieldRows);
-        setTableColumns(newTableColumns);
-        setActiveTab('search');
-        toast.success(`"${selectedTable.tableName}" 자동 적용 완료 (검색 ${newFieldRows.length}개, 컬럼 ${newTableColumns.length}개)`);
-    }, [selectedTable, setFieldRows, setTableColumns, setActiveTab]);
-
     /* ── LAYER 팝업 연결용 템플릿 목록 ── */
     const [layerTemplateList, setLayerTemplateList] = useState<TemplateItem[]>([]);
     const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
@@ -1210,6 +1235,7 @@ export default function MakeListPage() {
     /* 템플릿 선택 드롭다운 */
     const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
     const [templateList, setTemplateList] = useState<TemplateItem[]>([]);
+    const [templateSearchQuery, setTemplateSearchQuery] = useState(''); // 템플릿 검색어
     const [isLoadingList, setIsLoadingList] = useState(false);
     /* 템플릿 인라인 편집 상태 */
     const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
@@ -1217,9 +1243,16 @@ export default function MakeListPage() {
     const [editingTemplateSlug, setEditingTemplateSlug] = useState('');
     const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
     const [isDuplicatingId, setIsDuplicatingId] = useState<number | null>(null);
+    /* 생성 이력 드롭다운 */
+    const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+    const [historyList, setHistoryList] = useState<{ id: number; name: string; folderName: string; fileName: string; createdAt: string }[]>([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [isDeletingHistoryId, setIsDeletingHistoryId] = useState<number | null>(null);
     /* 생성 모달 */
     const [showGenerateModal, setShowGenerateModal] = useState(false);
+    const [generateName, setGenerateName] = useState('');
     const [generateSlug, setGenerateSlug] = useState('');
+    const [generateFileName, setGenerateFileName] = useState('page');
     const [isGenerating, setIsGenerating] = useState(false);
     /* 미리보기 팝업 — slug 연결된 액션 버튼 클릭 시 즉시 오픈 */
     const [previewPopupOpen, setPreviewPopupOpen] = useState(false);
@@ -1386,8 +1419,10 @@ export default function MakeListPage() {
     const allFields = fieldRows.flatMap(r => r.fields);
     const totalFieldCount = allFields.length;
 
-    /* LIST 타입 템플릿만 필터링 (templateType 없는 구버전도 포함) */
-    const listTypeTemplates = templateList.filter(t => !t.templateType || t.templateType === 'LIST');
+    /* LIST 타입 템플릿만 필터링 (templateType 없는 구버전도 포함) + 검색어 필터 */
+    const listTypeTemplates = templateList
+        .filter(t => !t.templateType || t.templateType === 'LIST')
+        .filter(t => !templateSearchQuery || t.name.toLowerCase().includes(templateSearchQuery.toLowerCase()));
 
     /* 컴포넌트 레벨 key 헬퍼 (드롭다운 렌더링용) */
     const getFieldKey = (f: SearchFieldConfig) => f.fieldKey || varName(f.label);
@@ -1590,8 +1625,12 @@ export default function MakeListPage() {
         }
     };
 
-    /* ── 템플릿 드롭다운 토글 ── */
-    const toggleTemplateDropdown = () => setShowTemplateDropdown(prev => !prev);
+    /* ── 템플릿 드롭다운 토글 (열 때 이력 드롭다운 닫기, 닫을 때 검색어 초기화) ── */
+    const toggleTemplateDropdown = () => {
+        setShowHistoryDropdown(false);
+        setTemplateSearchQuery(''); // 열고 닫을 때 검색어 초기화
+        setShowTemplateDropdown(prev => !prev);
+    };
 
     /** 템플릿 불러오기 — 선택 후 드롭다운 닫기 */
     const handleLoadSelect = (tpl: TemplateItem) => {
@@ -1622,6 +1661,50 @@ export default function MakeListPage() {
             toast.error('삭제 중 오류가 발생했습니다.');
         } finally {
             setIsDeletingId(null);
+        }
+    };
+
+    /* ── 생성 이력 드롭다운 토글 (열 때 API 호출 + 템플릿 드롭다운 닫기) ── */
+    const toggleHistoryDropdown = async () => {
+        setShowTemplateDropdown(false);
+        if (!showHistoryDropdown) {
+            setIsLoadingHistory(true);
+            try {
+                const res = await api.get('/tsx-generation', { params: { templateType: 'LIST', size: 50 } });
+                setHistoryList(res.data.content);
+            } catch {
+                toast.error('생성 이력 로딩 중 오류가 발생했습니다.');
+            } finally {
+                setIsLoadingHistory(false);
+            }
+        }
+        setShowHistoryDropdown(prev => !prev);
+    };
+
+    /** 생성 이력 선택 — configJson을 빌더에 복원 */
+    const handleHistorySelect = async (id: number, name: string) => {
+        try {
+            const res = await api.get(`/tsx-generation/${id}`);
+            restoreFromConfigJson(res.data.configJson);
+            setShowHistoryDropdown(false);
+            toast.success(`"${name}" 이력을 불러왔습니다.`);
+        } catch {
+            toast.error('이력 불러오기 중 오류가 발생했습니다.');
+        }
+    };
+
+    /** 생성 이력 삭제 */
+    const handleDeleteHistory = async (id: number) => {
+        if (!window.confirm('이력을 삭제하시겠습니까?')) return;
+        setIsDeletingHistoryId(id);
+        try {
+            await api.delete(`/tsx-generation/${id}`);
+            setHistoryList(prev => prev.filter(h => h.id !== id));
+            toast.success('이력이 삭제되었습니다.');
+        } catch {
+            toast.error('삭제 중 오류가 발생했습니다.');
+        } finally {
+            setIsDeletingHistoryId(null);
         }
     };
 
@@ -1670,45 +1753,47 @@ export default function MakeListPage() {
         }
     };
 
-    /* ── 생성 핸들러 (TSX 파일 생성) ── */
+    /* ── 생성 핸들러 (TSX 파일 생성 + 이력 저장) ── */
     const handleGenerateOpen = () => {
+        setGenerateName(saveModalName || '');
         setGenerateSlug(saveModalSlug || '');
+        setGenerateFileName('page');
         setShowGenerateModal(true);
     };
 
     const handleGenerateConfirm = async () => {
-        if (!generateSlug.trim()) return;
+        if (!generateName.trim() || !generateSlug.trim() || !generateFileName.trim()) return;
         setIsGenerating(true);
-        const configJson = JSON.stringify({ fieldRows, tableColumns, collapsible, buttons, buttonPosition, displayMode, pageSize });
+        /* layerTemplateList에 없는 slug는 stale 값으로 간주 — 생성 시 제거 */
+        const validLayerSlugs = new Set(layerTemplateList.map(t => t.slug));
+        const sanitizedColumns = tableColumns.map(col => ({
+            ...col,
+            editPopupSlug:   col.editPopupSlug   && validLayerSlugs.has(col.editPopupSlug)   ? col.editPopupSlug   : undefined,
+            detailPopupSlug: col.detailPopupSlug && validLayerSlugs.has(col.detailPopupSlug) ? col.detailPopupSlug : undefined,
+        }));
+        const configJson = JSON.stringify({ fieldRows, tableColumns: sanitizedColumns, collapsible, buttons, buttonPosition, displayMode, pageSize });
         try {
-            const tsxCode = buildTsxFile(fieldRows, tableColumns, collapsible, buttons, buttonPosition, displayMode, pageSize);
-            if (currentTemplateId) {
-                /* 기존 템플릿 → PUT으로 파일 재생성 */
-                const res = await api.put(`/page-templates/${currentTemplateId}`, {
-                    name: currentTemplateName,
-                    slug: generateSlug,
-                    description: '',
-                    configJson,
-                    tsxCode,
-                    collapsible,
-                });
-                toast.success(`TSX 파일 생성 완료! → ${res.data.pageUrl}`);
-            } else {
-                /* 미저장 → POST로 DB + 파일 동시 생성 */
-                const name = saveModalName || generateSlug;
-                const res = await api.post('/page-templates', {
-                    name,
-                    slug: generateSlug,
-                    description: '',
-                    configJson,
-                    tsxCode,
-                    collapsible,
-                });
-                setCurrentTemplateId(res.data.id);
-                setCurrentTemplateName(res.data.name);
-                setSaveModalSlug(res.data.slug);
-                toast.success(`TSX 파일 생성 완료! → ${res.data.pageUrl}`);
-            }
+            const tsxCode = buildTsxFile(fieldRows, sanitizedColumns, collapsible, buttons, buttonPosition, displayMode, pageSize);
+
+            /* 1. TSX 파일만 생성 (page_template DB 저장 없음) */
+            const fileRes = await api.post('/page-templates/generate', {
+                slug: generateSlug,
+                fileName: generateFileName,
+                tsxCode,
+                templateType: 'LIST',
+            });
+
+            /* 2. 생성 이력 저장 (tsx_generation 테이블) */
+            await api.post('/tsx-generation', {
+                name: generateName,
+                folderName: generateSlug,
+                fileName: generateFileName + '.tsx',
+                templateType: 'LIST',
+                configJson,
+                tsxCode,
+            });
+
+            toast.success(`TSX 파일 생성 완료! → ${fileRes.data.pageUrl}`);
             setShowGenerateModal(false);
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -1765,8 +1850,28 @@ export default function MakeListPage() {
                             {/* 드롭다운 목록 */}
                             {showTemplateDropdown && (
                                 <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
+                                    {/* 검색 입력 */}
+                                    <div className="px-2 py-1.5 border-b border-slate-100">
+                                        <div className="flex items-center gap-1.5 px-2 py-1 border border-slate-200 rounded-md bg-slate-50 focus-within:border-slate-400 focus-within:bg-white transition-all">
+                                            <Search className="w-3 h-3 text-slate-400 shrink-0" />
+                                            <input
+                                                autoFocus
+                                                value={templateSearchQuery}
+                                                onChange={e => setTemplateSearchQuery(e.target.value)}
+                                                placeholder="템플릿 검색..."
+                                                className="flex-1 text-xs bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                                            />
+                                            {templateSearchQuery && (
+                                                <button onClick={() => setTemplateSearchQuery('')} className="text-slate-300 hover:text-slate-500">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
                                     {listTypeTemplates.length === 0 ? (
-                                        <div className="py-5 text-center text-xs text-slate-400">저장된 템플릿이 없습니다.</div>
+                                        <div className="py-5 text-center text-xs text-slate-400">
+                                            {templateSearchQuery ? '검색 결과가 없습니다.' : '저장된 템플릿이 없습니다.'}
+                                        </div>
                                     ) : (
                                         <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
                                             {listTypeTemplates.map(tpl => (
@@ -1859,124 +1964,56 @@ export default function MakeListPage() {
                             )}
                         </div>
                     </div>
-                    {/* 데이터 소스 선택 탭 */}
-                    <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30 flex items-center gap-1">
-                        <button
-                            onClick={() => setDataSource('json')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-md border transition-all ${
-                                dataSource === 'json'
-                                    ? 'bg-slate-900 text-white border-slate-900'
-                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'
-                            }`}
-                        >
-                            <Code className="w-3 h-3" />
-                            공통(JSON)
-                        </button>
-                        <button
-                            onClick={() => { setDataSource('db'); if (tables.length === 0) fetchTables(); }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-md border transition-all ${
-                                dataSource === 'db'
-                                    ? 'bg-blue-600 text-white border-blue-600'
-                                    : 'bg-white text-slate-500 border-slate-200 hover:border-blue-400 hover:text-blue-600'
-                            }`}
-                        >
-                            <Database className="w-3 h-3" />
-                            DB 연동
-                        </button>
-                    </div>
-
-                    {/* DB 연동 모드: 테이블 선택 패널 */}
-                    {dataSource === 'db' && (
-                        <div className="border-b border-slate-100 bg-blue-50/30">
-                            {/* 테이블 검색 */}
-                            <div className="px-3 pt-2.5 pb-1.5">
-                                <div className="relative">
-                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        value={dbTableSearch}
-                                        onChange={e => setDbTableSearch(e.target.value)}
-                                        placeholder="테이블명 / 설명 검색"
-                                        className="w-full pl-7 pr-3 py-1.5 text-[11px] border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
-                                    />
-                                </div>
-                            </div>
-                            {/* 테이블 목록 */}
-                            <div className="max-h-[160px] overflow-y-auto px-1.5 pb-1.5 space-y-0.5">
-                                {isDbLoading ? (
-                                    <div className="flex items-center justify-center py-4 gap-2 text-slate-400">
-                                        <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-                                        <span className="text-[11px]">불러오는 중...</span>
-                                    </div>
-                                ) : tables.filter(t =>
-                                    t.tableName.toLowerCase().includes(dbTableSearch.toLowerCase()) ||
-                                    (t.comment ?? '').toLowerCase().includes(dbTableSearch.toLowerCase())
-                                ).length === 0 ? (
-                                    <div className="py-4 text-center text-[11px] text-slate-400">
-                                        {dbTableSearch ? '검색 결과가 없습니다.' : '테이블이 없습니다.'}
-                                    </div>
-                                ) : (
-                                    tables
-                                        .filter(t =>
-                                            t.tableName.toLowerCase().includes(dbTableSearch.toLowerCase()) ||
-                                            (t.comment ?? '').toLowerCase().includes(dbTableSearch.toLowerCase())
-                                        )
-                                        .map(table => {
-                                            const isSelected = selectedTable?.tableName === table.tableName;
-                                            return (
-                                                <button
-                                                    key={table.tableName}
-                                                    onClick={() => selectTable(isSelected ? null : table)}
-                                                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-left transition-all ${
-                                                        isSelected
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'hover:bg-blue-50 text-slate-700'
-                                                    }`}
-                                                >
-                                                    {/* 주 텍스트: comment 우선, 없으면 tableName */}
-                                                    <div className="flex flex-col flex-1 min-w-0 mr-1.5">
-                                                        <span className="text-[11px] font-medium truncate">
-                                                            {table.comment || table.tableName}
-                                                        </span>
-                                                        {table.comment && (
-                                                            <span className={`text-[10px] font-mono truncate ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
-                                                                {table.tableName}
-                                                            </span>
-                                                        )}
+                    {/* 생성 이력 드롭다운 */}
+                    <div className="px-3 pb-2 border-b border-slate-100 bg-slate-50/30">
+                        <div className="relative">
+                            <button
+                                onClick={toggleHistoryDropdown}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 border rounded-md text-xs transition-all ${showHistoryDropdown ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white hover:border-slate-400'}`}
+                            >
+                                <span className="text-slate-400">생성 이력...</span>
+                                {isLoadingHistory
+                                    ? <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin" />
+                                    : <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showHistoryDropdown ? 'rotate-180' : ''}`} />
+                                }
+                            </button>
+                            {showHistoryDropdown && (
+                                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
+                                    {historyList.length === 0 ? (
+                                        <div className="py-5 text-center text-xs text-slate-400">생성 이력이 없습니다.</div>
+                                    ) : (
+                                        <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+                                            {historyList.map(h => (
+                                                <div key={h.id} className="group px-3 py-2 hover:bg-slate-50 transition-all">
+                                                    <div className="flex items-center gap-1">
+                                                        {/* 이름 클릭 → 빌더 복원 */}
+                                                        <button
+                                                            onClick={() => handleHistorySelect(h.id, h.name)}
+                                                            className="flex-1 text-left min-w-0"
+                                                        >
+                                                            <span className="text-[11px] font-medium text-slate-800 truncate block">{h.name}</span>
+                                                            <p className="text-[10px] text-slate-400 font-mono truncate">{h.folderName}/{h.fileName}</p>
+                                                        </button>
+                                                        {/* 삭제 버튼 — hover 시 표시 */}
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); handleDeleteHistory(h.id); }}
+                                                            disabled={isDeletingHistoryId === h.id}
+                                                            className="p-1 rounded opacity-0 group-hover:opacity-100 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all disabled:opacity-50 shrink-0"
+                                                            title="삭제"
+                                                        >
+                                                            {isDeletingHistoryId === h.id
+                                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                                : <Trash2 className="w-3 h-3" />}
+                                                        </button>
                                                     </div>
-                                                    <span className={`text-[10px] shrink-0 ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
-                                                        {table.columnCount}
-                                                    </span>
-                                                </button>
-                                            );
-                                        })
-                                )}
-                            </div>
-                            {/* 자동 적용 버튼 */}
-                            <div className="px-3 py-2 border-t border-blue-100/60">
-                                <button
-                                    disabled={!selectedTable || isColumnsLoading}
-                                    onClick={handleDbAutoApply}
-                                    className={`w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold rounded-md transition-all ${
-                                        selectedTable && !isColumnsLoading
-                                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                            : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    }`}
-                                >
-                                    {isColumnsLoading
-                                        ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                        : <Sparkles className="w-3 h-3" />
-                                    }
-                                    {isColumnsLoading
-                                        ? '컬럼 로딩 중...'
-                                        : selectedTable
-                                            ? `"${selectedTable.tableName}" 자동 적용`
-                                            : '테이블을 선택하세요'
-                                    }
-                                </button>
-                            </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
 
                     {/* 패널 헤더: 탭 + 닫기 버튼 */}
                     <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
@@ -2014,14 +2051,8 @@ export default function MakeListPage() {
                                 </div>
 
                                 {/* 행 기반 필드 목록 */}
-                                <DndContext
-                                    sensors={sensors}
-                                    collisionDetection={closestCenter}
-                                    onDragStart={handleDragStart}
-                                    onDragOver={handleDragOver}
-                                    onDragEnd={handleDragEnd}
-                                >
-                                <SortableContext items={fieldRows.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                                <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} accessibility={{ announcements: { onDragStart() { return ''; }, onDragOver() { return ''; }, onDragEnd() { return ''; }, onDragCancel() { return ''; } }, screenReaderInstructions: { draggable: '' } }}>
+                                    <SortableContext items={fieldRows.map(r => r.id)} strategy={verticalListSortingStrategy}>
                                 {fieldRows.map((row, ri) => (
                                     <SortableRowWrapper key={row.id} id={row.id}>
                                     {(rowHandleProps) => (
@@ -2042,17 +2073,19 @@ export default function MakeListPage() {
                                         {/* 행 안의 필드 목록 — 접힘 시 숨김 */}
                                         {!collapsedRows.has(row.id) && (
                                         <div className="p-2 space-y-1.5">
-                                            <SortableContext items={row.fields.map(f => f.id)} strategy={verticalListSortingStrategy}>
-                                            {row.fields.map((field, fi) => (
+                                            <SortableContext id={`rc-${row.id}`} items={row.fields.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                                            {row.fields.length > 0 ? row.fields.map((field, fi) => (
                                                 <SortableFieldWrapper key={field.id} id={field.id}>
                                                 {(fieldHandleProps) => (
                                                 <div className={`border rounded-md transition-all ${editingField === field.id ? 'border-slate-900 bg-slate-50' : 'border-slate-100'}`}>
                                                     <div className="flex items-center gap-1.5 px-2 py-1.5">
                                                         <span
-                                                            {...(fieldHandleProps as React.HTMLAttributes<HTMLSpanElement>)}
-                                                            className="cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
+                                                            ref={fieldHandleProps.ref as React.Ref<HTMLSpanElement>}
+                                                            {...Object.fromEntries(Object.entries(fieldHandleProps).filter(([k]) => k !== 'ref')) as React.HTMLAttributes<HTMLSpanElement>}
+                                                            onClick={e => e.stopPropagation()}
+                                                            className="cursor-grab active:cursor-grabbing touch-none flex-shrink-0 px-1 rounded hover:bg-slate-100"
                                                         >
-                                                            <GripVertical className="w-3 h-3 text-slate-300" />
+                                                            <GripVertical className="w-3 h-3 text-slate-400" />
                                                         </span>
                                                         <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">{field.type}</span>
                                                         <span className="text-[11px] font-medium text-slate-700 truncate flex-1">{field.type === 'dateRange' ? `${field.label} ~ ${field.label2 || ''}` : field.label}</span>
@@ -2109,14 +2142,12 @@ export default function MakeListPage() {
                                                             )}
                                                             {(field.type === 'select' || field.type === 'radio' || field.type === 'checkbox' || field.type === 'quickDate') && (
                                                                 <div className="space-y-1.5">
-                                                                    {/* 수동입력/공통코드 탭 (quickDate 제외) */}
-                                                                    {field.type !== 'quickDate' && (
-                                                                        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
-                                                                            <button type="button" onClick={() => updateSearchField(field.id, { codeGroupCode: undefined })} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${field.codeGroupCode === undefined ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>수동 입력</button>
-                                                                            <button type="button" onClick={() => updateSearchField(field.id, { codeGroupCode: '' })} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${field.codeGroupCode !== undefined ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>공통코드</button>
-                                                                        </div>
-                                                                    )}
-                                                                    {field.codeGroupCode !== undefined && field.type !== 'quickDate' ? (
+                                                                    {/* 수동입력/공통코드 탭 */}
+                                                                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
+                                                                        <button type="button" onClick={() => updateSearchField(field.id, { codeGroupCode: undefined })} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${field.codeGroupCode === undefined ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>수동 입력</button>
+                                                                        <button type="button" onClick={() => updateSearchField(field.id, { codeGroupCode: '' })} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${field.codeGroupCode !== undefined ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>공통코드</button>
+                                                                    </div>
+                                                                    {field.codeGroupCode !== undefined ? (
                                                                         /* 공통코드 선택 UI — 공통 컴포넌트 */
                                                                         <CodeGroupSelector
                                                                             codeGroups={codeGroups}
@@ -2167,7 +2198,9 @@ export default function MakeListPage() {
                                                 </div>
                                                 )}
                                                 </SortableFieldWrapper>
-                                            ))}
+                                            )) : (
+                                                <EmptyFieldDropZone rowId={row.id} />
+                                            )}
                                             </SortableContext>
                                             {/* 행 안에 필드 추가 버튼 */}
                                             {showFieldPicker === ri ? (
@@ -2208,14 +2241,12 @@ export default function MakeListPage() {
                                                             {/* 옵션 (select/radio/checkbox/quickDate) */}
                                                             {needsOptions(pendingType) && (
                                                                 <div className="space-y-1.5">
-                                                                    {/* 수동입력/공통코드 탭 (select/radio/checkbox만) */}
-                                                                    {(pendingType === 'select' || pendingType === 'radio' || pendingType === 'checkbox') && (
-                                                                        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
-                                                                            <button type="button" onClick={() => { setPendingOptionMode('manual'); setPendingCodeGroupCode(''); setPendingOptions([{ text: '', value: '' }]); }} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${pendingOptionMode === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>수동 입력</button>
-                                                                            <button type="button" onClick={() => setPendingOptionMode('code')} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${pendingOptionMode === 'code' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>공통코드</button>
-                                                                        </div>
-                                                                    )}
-                                                                    {pendingOptionMode === 'code' && (pendingType === 'select' || pendingType === 'radio' || pendingType === 'checkbox') ? (
+                                                                    {/* 수동입력/공통코드 탭 */}
+                                                                    <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
+                                                                        <button type="button" onClick={() => { setPendingOptionMode('manual'); setPendingCodeGroupCode(''); setPendingOptions([{ text: '', value: '' }]); }} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${pendingOptionMode === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>수동 입력</button>
+                                                                        <button type="button" onClick={() => setPendingOptionMode('code')} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${pendingOptionMode === 'code' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>공통코드</button>
+                                                                    </div>
+                                                                    {pendingOptionMode === 'code' ? (
                                                                         /* 공통코드 선택 UI — 공통 컴포넌트 */
                                                                         <CodeGroupSelector
                                                                             codeGroups={codeGroups}
@@ -2290,7 +2321,7 @@ export default function MakeListPage() {
                                     )}
                                     </SortableRowWrapper>
                                 ))}
-                                </SortableContext>
+                                    </SortableContext>
                                 </DndContext>
 
                                 {/* 행 추가 버튼 */}
@@ -2361,7 +2392,7 @@ export default function MakeListPage() {
                                                         <input type="text" value={col.header} onChange={e => updateTableColumn(col.id, { header: e.target.value })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">accessor</label>
+                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key</label>
                                                         <input type="text" value={col.accessor} onChange={e => updateTableColumn(col.id, { accessor: e.target.value })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
                                                     </div>
                                                     <div>
@@ -2415,6 +2446,24 @@ export default function MakeListPage() {
                                                         <button onClick={() => updateTableColumn(col.id, { cellOptions: [...(col.cellOptions || []), { text: '', value: '', color: 'slate' }] })} className="w-full flex items-center justify-center gap-1 py-1 border border-dashed border-slate-200 rounded text-[10px] font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"><Plus className="w-3 h-3" />옵션 추가</button>
                                                     </div>
                                                 )}
+                                                {/* text 타입 — 공통코드 연동 */}
+                                                {col.cellType === 'text' && (
+                                                    <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                                                        <span className="text-[10px] font-semibold text-slate-400 uppercase">공통코드 연동</span>
+                                                        <CodeGroupSelector
+                                                            codeGroups={codeGroups}
+                                                            codeGroupsLoading={codeGroupsLoading}
+                                                            value={col.codeGroupCode || ''}
+                                                            onChange={code => updateTableColumn(col.id, { codeGroupCode: code || undefined, displayAs: code ? (col.displayAs ?? 'text') : undefined })}
+                                                        />
+                                                        {col.codeGroupCode && (
+                                                            <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
+                                                                <button type="button" onClick={() => updateTableColumn(col.id, { displayAs: 'text' })} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${(col.displayAs ?? 'text') === 'text' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>이름 표시</button>
+                                                                <button type="button" onClick={() => updateTableColumn(col.id, { displayAs: 'value' })} className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${col.displayAs === 'value' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>코드값 표시</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 {/* boolean 설정 */}
                                                 {col.cellType === 'boolean' && (
                                                     <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
@@ -2442,9 +2491,10 @@ export default function MakeListPage() {
                                                                     }} className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900" />
                                                                     <span className="text-[11px] text-slate-600">{{ edit: '수정', detail: '상세', delete: '삭제' }[action]}</span>
                                                                 </label>
-                                                                {/* 수정/상세에 팝업 연결 드롭다운 */}
+                                                                {/* 수정/상세에 연결팝업 또는 연결경로 */}
                                                                 {action !== 'delete' && (col.actions || []).includes(action) && (
-                                                                    <div className="ml-5">
+                                                                    <div className="ml-5 space-y-1">
+                                                                        {/* 관리자방식 — DB slug */}
                                                                         <select
                                                                             value={action === 'edit' ? (col.editPopupSlug || '') : (col.detailPopupSlug || '')}
                                                                             onChange={e => updateTableColumn(col.id, action === 'edit' ? { editPopupSlug: e.target.value || undefined } : { detailPopupSlug: e.target.value || undefined })}
@@ -2453,6 +2503,14 @@ export default function MakeListPage() {
                                                                             <option value="">팝업 없음</option>
                                                                             {layerTemplateList.map(t => <option key={t.id} value={t.slug}>{t.name}</option>)}
                                                                         </select>
+                                                                        {/* 개발자방식 — 로컬 컴포넌트명 */}
+                                                                        <input
+                                                                            type="text"
+                                                                            value={action === 'edit' ? (col.editFileLayerSlug || '') : (col.detailFileLayerSlug || '')}
+                                                                            onChange={e => updateTableColumn(col.id, action === 'edit' ? { editFileLayerSlug: e.target.value || undefined } : { detailFileLayerSlug: e.target.value || undefined })}
+                                                                            placeholder="연결 경로 (예: LayerPopup)"
+                                                                            className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
+                                                                        />
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2498,7 +2556,7 @@ export default function MakeListPage() {
                                                             <input type="text" value={pendingColHeader} onChange={e => setPendingColHeader(e.target.value)} placeholder="예: 상태, 분류..." className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" autoFocus />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[10px] font-medium text-slate-500 mb-1 block">accessor (키)</label>
+                                                            <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key</label>
                                                             <input type="text" value={pendingColAccessor} onChange={e => setPendingColAccessor(e.target.value)} placeholder="예: status" className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
                                                         </div>
                                                     </div>
@@ -2506,7 +2564,7 @@ export default function MakeListPage() {
                                                 {/* 검색 필드 key 연결 (actions 타입 제외, 검색 필드가 1개 이상일 때만 표시) */}
                                                 {pendingCellType !== 'actions' && allFields.length > 0 && (
                                                     <div>
-                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">검색 필드 연결 <span className="text-slate-400 font-normal">(선택 시 accessor 자동 입력)</span></label>
+                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">검색 필드 연결 <span className="text-slate-400 font-normal">(선택 시 Key 자동 입력)</span></label>
                                                         <div className="relative">
                                                             <select
                                                                 value={allFields.find(f => getFieldKey(f) === pendingColAccessor)?.id || ''}
@@ -2733,28 +2791,45 @@ export default function MakeListPage() {
                                                 </select>
                                             </div>
                                         </div>
-                                        {/* action=register/custom 시 팝업 연결 select 노출 */}
+                                        {/* action=register/custom 시 팝업 연결 옵션 노출 */}
                                         {(btn.action === 'register' || btn.action === 'custom') && (
-                                            <div>
-                                                <label className="text-[10px] font-medium text-slate-500 mb-1 block">
-                                                    연결 팝업 <span className="text-slate-400 font-normal">(선택 — 없으면 기본 동작)</span>
-                                                </label>
-                                                <select
-                                                    value={btn.popupSlug || ''}
-                                                    onChange={e => updateButton(btn.id, { popupSlug: e.target.value || undefined })}
-                                                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900"
-                                                >
-                                                    <option value="">— 팝업 없음 —</option>
-                                                    {layerTemplateList.map(tpl => (
-                                                        <option key={tpl.id} value={tpl.slug}>
-                                                            {tpl.name} ({tpl.slug})
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {layerTemplateList.length === 0 && (
-                                                    <p className="text-[10px] text-slate-400 mt-1">등록된 LAYER 팝업이 없습니다.</p>
-                                                )}
-                                            </div>
+                                            <>
+                                                {/* 관리자방식 — DB 저장 레이어 팝업 slug */}
+                                                <div>
+                                                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+                                                        연결팝업 또는 연결경로 <span className="text-slate-400 font-normal">(관리자방식 — DB slug)</span>
+                                                    </label>
+                                                    <select
+                                                        value={btn.popupSlug || ''}
+                                                        onChange={e => updateButton(btn.id, { popupSlug: e.target.value || undefined })}
+                                                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900"
+                                                    >
+                                                        <option value="">— 팝업 없음 —</option>
+                                                        {layerTemplateList.map(tpl => (
+                                                            <option key={tpl.id} value={tpl.slug}>
+                                                                {tpl.name} ({tpl.slug})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {layerTemplateList.length === 0 && (
+                                                        <p className="text-[10px] text-slate-400 mt-1">등록된 LAYER 팝업이 없습니다.</p>
+                                                    )}
+                                                </div>
+                                                {/* 개발자방식 — 생성된 로컬 파일 컴포넌트명 (예: LayerPopup) */}
+                                                <div>
+                                                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+                                                        연결 경로 <span className="text-slate-400 font-normal">(개발자방식 — 로컬 컴포넌트명)</span>
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={btn.fileLayerSlug || ''}
+                                                        onChange={e => updateButton(btn.id, { fileLayerSlug: e.target.value || undefined })}
+                                                        placeholder="예: LayerPopup"
+                                                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                                                    />
+                                                    <p className="text-[10px] text-slate-400 mt-1">Layer Builder로 생성한 파일명 (확장자 제외)</p>
+                                                </div>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -3034,11 +3109,14 @@ export default function MakeListPage() {
             <GenerateModal
                 show={showGenerateModal}
                 onClose={() => setShowGenerateModal(false)}
+                name={generateName}
                 slug={generateSlug}
+                fileName={generateFileName}
                 isGenerating={isGenerating}
+                onNameChange={setGenerateName}
                 onSlugChange={setGenerateSlug}
+                onFileNameChange={setGenerateFileName}
                 onConfirm={handleGenerateConfirm}
-                fileHint="ListPage.tsx"
             />
 
             {/* 미리보기 팝업 — slug 연결된 액션 버튼 클릭 시 즉시 오픈 */}

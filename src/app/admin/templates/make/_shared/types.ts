@@ -36,6 +36,50 @@ export interface CodeGroupDef {
     details: { code: string; name: string; active: boolean }[];
 }
 
+/* ── 테이블 컬럼 관련 타입 ── */
+
+/** 셀 렌더링 타입 */
+export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file';
+
+/** 셀 옵션 (badge용) */
+export interface CellOption {
+    text: string;
+    value: string;
+    color: string;
+}
+
+/**
+ * 테이블 컬럼 설정
+ * - list/page.tsx(빌더), [slug]/page.tsx(렌더러) 공통 사용
+ */
+export interface TableColumnConfig {
+    id: string;
+    header: string;
+    accessor: string;
+    width?: number;
+    widthUnit?: 'px' | '%';
+    align: 'left' | 'center' | 'right';
+    sortable: boolean;
+    cellType: CellType;
+    cellOptions?: CellOption[];         // badge 옵션
+    showIcon?: boolean;                 // badge 아이콘(●) 표시
+    badgeShape?: 'round' | 'square';    // badge 모양
+    isNumber?: boolean;                 // 숫자 포맷 여부
+    trueText?: string;                  // boolean 타입 true 텍스트
+    falseText?: string;                 // boolean 타입 false 텍스트
+    actions?: ('edit' | 'detail' | 'delete')[]; // 프리셋 액션 버튼
+    customActions?: { id: string; label: string; color: string }[]; // 커스텀 버튼
+    editPopupSlug?: string;             // 수정 버튼 연결 LAYER slug (관리자방식)
+    detailPopupSlug?: string;           // 상세 버튼 연결 LAYER slug (관리자방식)
+    editFileLayerSlug?: string;         // 수정 버튼 연결 로컬 컴포넌트명 (개발자방식)
+    detailFileLayerSlug?: string;       // 상세 버튼 연결 로컬 컴포넌트명 (개발자방식)
+    fileLayerSlug?: string;             // file 타입 — 파일 뷰어 LAYER slug
+    /** 공통코드 연동 — text 셀에서 코드값을 이름으로 변환 */
+    codeGroupCode?: string;
+    /** 공통코드 연동 시 표시 방식: 'text'=이름 표시(기본), 'value'=코드값 표시 */
+    displayAs?: 'text' | 'value';
+}
+
 /** 불러오기 목록 아이템 */
 export interface TemplateItem {
     id: number;
@@ -72,5 +116,7 @@ export interface ButtonConfig {
     label: string;
     type: ButtonType;
     action: ButtonAction;
-    popupSlug?: string;  // action이 'register'이고 팝업 연동 시
+    popupSlug?: string;          // DB 저장 레이어 팝업 연동 slug
+    fileLayerSlug?: string;      // 생성 파일용 직접 import slug (./LayerPopup)
+    excelFormat?: 'xlsx' | 'csv';  // action이 'excel'일 때 파일 형식
 }

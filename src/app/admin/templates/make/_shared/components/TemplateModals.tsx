@@ -79,8 +79,8 @@ export const SaveModal = ({
                             value={name}
                             onChange={e => {
                                 onNameChange(e.target.value);
-                                /* toSlug 제공 시, 사용자가 slug를 직접 수정하지 않은 경우에만 자동 갱신 */
-                                if (toSlug && !slugManuallyEdited.current) onSlugChange(toSlug(e.target.value));
+                                /* 신규 저장 모드에서만 slug 자동 갱신 — 수정 모드에서는 기존 slug 유지 */
+                                if (!isEdit && toSlug && !slugManuallyEdited.current) onSlugChange(toSlug(e.target.value));
                             }}
                             placeholder="예: 회원 등록 팝업"
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
@@ -115,7 +115,7 @@ export const SaveModal = ({
                         </div>
                         {slug && (
                             <p className="text-[10px] text-slate-400 mt-1">
-                                URL: /admin/templates/generated/{slug}
+                                URL: /admin/generated/{slug}
                             </p>
                         )}
                     </div>
@@ -240,24 +240,29 @@ export const LoadModal = ({
 interface GenerateModalProps {
     show: boolean;
     onClose: () => void;
+    /** 이력 식별 이름 */
+    name: string;
+    /** 폴더명 (generated/ 하위 경로) */
     slug: string;
+    /** 파일명 (확장자 제외, 예: page, ListPage) */
+    fileName: string;
     isGenerating: boolean;
+    onNameChange: (v: string) => void;
     onSlugChange: (v: string) => void;
+    onFileNameChange: (v: string) => void;
     onConfirm: () => void;
-    /** 생성 파일명 힌트 (예: "LayerPopup.tsx") */
-    fileHint?: string;
 }
 
 /**
- * TSX 파일 생성 모달
+ * TSX 파일 생성 모달 — 폴더명 + 파일명 분리 입력
  * @example
  * <GenerateModal show={showGenerateModal} onClose={() => setShowGenerateModal(false)}
- *   slug={generateSlug} isGenerating={isGenerating}
- *   onSlugChange={setGenerateSlug} onConfirm={handleGenerateConfirm}
- *   fileHint="LayerPopup.tsx" />
+ *   slug={generateSlug} fileName={generateFileName} isGenerating={isGenerating}
+ *   onSlugChange={setGenerateSlug} onFileNameChange={setGenerateFileName}
+ *   onConfirm={handleGenerateConfirm} />
  */
 export const GenerateModal = ({
-    show, onClose, slug, isGenerating, onSlugChange, onConfirm, fileHint,
+    show, onClose, name, slug, fileName, isGenerating, onNameChange, onSlugChange, onFileNameChange, onConfirm,
 }: GenerateModalProps) => {
     if (!show) return null;
     return (
@@ -276,26 +281,61 @@ export const GenerateModal = ({
 
                 {/* 내용 */}
                 <div className="px-6 py-5 space-y-4">
-                    <p className="text-sm text-slate-600">
-                        입력한 Slug로{' '}
-                        {fileHint && (
-                            <code className="text-xs bg-slate-100 rounded px-1 py-0.5">{fileHint}</code>
-                        )}{' '}
-                        파일을 생성합니다.
-                    </p>
+                    {/* 이름 입력 */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
-                            Slug <span className="text-red-500">*</span>
+                            이름 <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
-                            value={slug}
-                            onChange={e => onSlugChange(e.target.value)}
-                            placeholder="예: member-register-popup"
-                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                            value={name}
+                            onChange={e => onNameChange(e.target.value)}
+                            placeholder="예: 게시판 목록"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
                             autoFocus
                         />
                     </div>
+                    {/* 폴더명 + 파일명 한 줄 입력 */}
+                    <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                            <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
+                                폴더명 <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={slug}
+                                onChange={e => onSlugChange(e.target.value)}
+                                placeholder="예: board"
+                                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                            />
+                        </div>
+                        <span className="text-slate-400 pb-2 text-sm">/</span>
+                        <div className="flex-1">
+                            <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
+                                파일명 <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex items-center border border-slate-200 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-slate-900/10 focus-within:border-slate-900 transition-all">
+                                <input
+                                    type="text"
+                                    value={fileName}
+                                    onChange={e => onFileNameChange(e.target.value)}
+                                    placeholder="예: page"
+                                    className="flex-1 px-3 py-2 text-sm font-mono focus:outline-none bg-white"
+                                />
+                                <span className="px-2 py-2 text-xs text-slate-400 bg-slate-50 border-l border-slate-200 select-none">.tsx</span>
+                            </div>
+                        </div>
+                    </div>
+                    {/* 생성 경로 미리보기 */}
+                    {(slug || fileName) && (
+                        <p className="text-[10px] text-slate-400">
+                            생성 경로: generated/
+                            <span className="text-slate-600 font-medium">{slug || '폴더명'}</span>
+                            /
+                            <span className="text-slate-600 font-medium">{fileName || 'page'}</span>
+                            .tsx
+                        </p>
+                    )}
                 </div>
 
                 {/* 푸터 버튼 */}
@@ -303,7 +343,7 @@ export const GenerateModal = ({
                     <button onClick={onClose} className={btnSecondary}>취소</button>
                     <button
                         onClick={onConfirm}
-                        disabled={isGenerating || !slug.trim()}
+                        disabled={isGenerating || !name.trim() || !slug.trim() || !fileName.trim()}
                         className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-semibold rounded-md shadow-sm transition-all"
                     >
                         {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}

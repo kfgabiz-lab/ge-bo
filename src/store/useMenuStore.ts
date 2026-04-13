@@ -15,6 +15,8 @@ export interface MenuItem {
     sortOrder: number;
     visible: boolean;
     isCategory?: boolean;
+    /** page-data API 식별 슬러그 (메뉴에 설정된 경우) */
+    slug?: string;
     children?: MenuItem[];
 }
 
@@ -55,6 +57,8 @@ interface MenuStore {
     deleteMenu: (id: number) => Promise<void>;
     moveMenu: (id: number, direction: 'up' | 'down') => void;
     updateRoleMenuMapping: (menuId: number, roleId: number, hasAccess: boolean) => Promise<void>;
+    localUpdateMenuTree: (newMenus: MenuItem[]) => void;
+    __syncQueryMenus: (serverMenus: MenuItem[], queryRoles: any[], isNav?: boolean) => void;
 }
 
 /* ── API 경로 ── */
@@ -90,44 +94,14 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     cancelCreate: () => set({ isCreating: false, createParentId: null, createMaxDepth: 0 }),
 
     /* ══════════════════════════════════════ */
-    /*  조회                                  */
+    /*  조회 (React Query로 위임됨)              */
     /* ══════════════════════════════════════ */
 
-    fetchNavMenus: async () => {
-        try {
-            const res = await api.get(`${API_PATH}?type=BO`);
-            set({ navMenus: res.data });
-        } catch {
-            // 네비게이션 메뉴 로딩 실패 시 무시
-        }
-    },
-
-    fetchMenus: async () => {
-        set({ isLoading: true });
-        try {
-            const res = await api.get(`${API_PATH}?type=${get().activeTab}`);
-            set({ menus: res.data });
-        } catch {
-            toast.error('메뉴 목록을 불러오는 중 오류가 발생했습니다.');
-        } finally {
-            set({ isLoading: false });
-        }
-    },
-
-    fetchRoles: async () => {
-        try {
-            const res = await api.get(ROLES_PATH);
-            /* BE Role 엔티티: { id, code, displayName, ... } */
-            const roles = res.data.map((r: { id: number; code: string; displayName: string }) => ({
-                id: r.id,
-                name: r.code,
-                displayName: r.displayName,
-            }));
-            set({ roles });
-        } catch {
-            toast.error('역할 목록을 불러오는 중 오류가 발생했습니다.');
-        }
-    },
+    // 기존 직접 페칭 로직들은 React Query로 책임을 넘겼으므로 빈 함수로 남겨둡니다.
+    // 기존 코드와의 의존성 하위 호환을 위해 함수명만 유지합니다. (향후 완전 제거 권장)
+    fetchNavMenus: async () => { },
+    fetchMenus: async () => { },
+    fetchRoles: async () => { },
 
     fetchRoleMenuMappings: async (menuId) => {
         try {
@@ -153,6 +127,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
                 sortOrder: menu.sortOrder,
                 visible: menu.visible,
                 isCategory: menu.isCategory || false,
+                slug: menu.slug || null,
             });
             get().fetchMenus();
         } catch (err: unknown) {
@@ -179,6 +154,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
                 sortOrder: updates.sortOrder ?? menu.sortOrder,
                 visible: updates.visible ?? menu.visible,
                 isCategory: updates.isCategory ?? menu.isCategory ?? false,
+                slug: updates.slug !== undefined ? (updates.slug || null) : (menu.slug || null),
             });
             get().fetchMenus();
             /* 선택된 메뉴 갱신 */
@@ -278,4 +254,18 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
             throw new Error('매핑 변경 실패');
         }
     },
+
+    /* ══════════════════════════════════════ */
+    /*  디버그 / 로컬 트리 조작용 / 동기화 브릿지 */
+    /* ══════════════════════════════════════ */
+    localUpdateMenuTree: (newMenus) => set({ menus: newMenus }),
+
+    // React Query에서 받은 데이터를 스토어의 로컬 상태(메뉴 구동용)로 주입하는 브릿지 메서드
+    __syncQueryMenus: (serverMenus: MenuItem[], queryRoles: any[], isNav = false) => {
+        if (isNav) {
+            set({ navMenus: serverMenus || [] });
+        } else {
+            set({ menus: serverMenus || [], roles: queryRoles || [] });
+        }
+    }
 }));

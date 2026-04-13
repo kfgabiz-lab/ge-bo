@@ -63,3 +63,21 @@ export const createIdGenerator = (prefix: string) => {
 export const showValidationError = (errors: string[]): void => {
     toast.error(`입력 오류 (${errors.length}건): ${errors.join(', ')}`);
 };
+
+/**
+ * key 목록에서 중복된 key를 찾아 반환합니다.
+ * @param keys 검사할 key 목록
+ * @returns 중복된 key 목록 (중복 제거된 상태)
+ * @example
+ * findDuplicateKeys(['a', 'b', 'a', 'c', 'b']) // → ['a', 'b']
+ */
+export const findDuplicateKeys = (keys: string[]): string[] => {
+    // 앞뒤 공백 제거 후 빈 값 제외
+    const cleanKeys = keys.map(k => k.trim()).filter(k => k !== '');
+
+    // 같은 값이 두 번 이상 나오는 key만 추출
+    const duplicated = cleanKeys.filter((key, index) => cleanKeys.indexOf(key) !== index);
+
+    // 중복 제거 후 반환 (예: ['a', 'a'] → ['a'])
+    return [...new Set(duplicated)];
+};

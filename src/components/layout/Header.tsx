@@ -2,9 +2,11 @@
 
 import { Bell, Settings, LogOut, ChevronRight, Home } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
+import { useNavMenusQuery } from '@/hooks/useMenuQueries';
 
 const BREADCRUMB_MAP: Record<string, string> = {
     'admin': '관리자',
@@ -60,6 +62,16 @@ export function Header() {
     const pathname = usePathname();
     const logout = useAuthStore((state) => state.logout);
     const navMenus = useMenuStore((state) => state.navMenus);
+    const __syncQueryMenus = useMenuStore((state) => state.__syncQueryMenus);
+
+    // React Query 기반 네비게이션 메뉴 캐싱 연동
+    const { data: serverNavMenus } = useNavMenusQuery();
+
+    useEffect(() => {
+        if (serverNavMenus) {
+            __syncQueryMenus(serverNavMenus, [], true); // isNav = true
+        }
+    }, [serverNavMenus, __syncQueryMenus]);
 
     /* 메뉴 트리에서 현재 경로 조회 → 없으면 URL 세그먼트 폴백 */
     const menuCrumbs = findMenuBreadcrumb(navMenus, pathname || '');
@@ -86,8 +98,8 @@ export function Header() {
             {/* 브레드크럼 */}
             <nav className="flex items-center gap-1.5 text-sm">
                 <Home className="w-3.5 h-3.5 text-gray-400" />
-                {crumbs.map((crumb) => (
-                    <span key={crumb.href} className="flex items-center gap-1.5">
+                {crumbs.map((crumb, i) => (
+                    <span key={`${crumb.href}-${i}`} className="flex items-center gap-1.5">
                         <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
                         {crumb.isLast ? (
                             <span className="font-semibold text-slate-900 tracking-tight">{crumb.label}</span>

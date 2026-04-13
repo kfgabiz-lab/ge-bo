@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Calendar, ArrowUpDown, Loader2, AlertCircle, Pencil, Trash2, Eye } from 'lucide-react';
+import { Calendar, ChevronUp, ChevronDown, ChevronsUpDown, Loader2, AlertCircle, Pencil, Trash2, Eye, Paperclip } from 'lucide-react';
 import { SearchForm, SearchRow, SearchField } from '@/components/search';
 import LayerPopupRenderer from '@/components/layer/LayerPopupRenderer';
 import api from '@/lib/api';
@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { useCodeStore } from '@/store/useCodeStore';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { usePathname } from 'next/navigation';
+import { useMenuPageSlug } from '@/hooks/useMenuPageSlug';
+import { CellType, CellOption, TableColumnConfig, ButtonConfig, ButtonType, ButtonAction, ButtonPosition } from '@/app/admin/templates/make/_shared/types';
 
 /** 메뉴 트리 재귀 탐색으로 현재 URL의 메뉴명 반환 */
 function findMenuName(menus: MenuItem[], pathname: string): string | null {
@@ -27,7 +29,7 @@ function findMenuName(menus: MenuItem[], pathname: string): string | null {
 /* ══════════════════════════════════════════ */
 
 type FieldType = 'input' | 'select' | 'date' | 'dateRange' | 'radio' | 'checkbox' | 'quickDate';
-type CellType = 'text' | 'badge' | 'boolean' | 'actions';
+/* CellType, CellOption, TableColumnConfig, ButtonConfig, ButtonType, ButtonAction, ButtonPosition → _shared/types.ts import */
 
 interface SearchFieldConfig {
     id: string;
@@ -57,41 +59,7 @@ interface SearchRowConfig {
     fields: SearchFieldConfig[];
 }
 
-interface CellOption { text: string; value: string; color: string; }
-
-interface TableColumnConfig {
-    id: string;
-    header: string;
-    accessor: string;
-    width?: number;
-    widthUnit?: 'px' | '%';
-    align: 'left' | 'center' | 'right';
-    sortable: boolean;
-    cellType: CellType;
-    cellOptions?: CellOption[];
-    showIcon?: boolean;
-    badgeShape?: 'round' | 'square';
-    trueText?: string;
-    falseText?: string;
-    actions?: ('edit' | 'detail' | 'delete')[];
-    /** 커스텀 액션 버튼 (label + color) */
-    customActions?: { id: string; label: string; color: string }[];
-    editPopupSlug?: string;
-    detailPopupSlug?: string;
-}
-
-/* ── 버튼 영역 타입 (v2) ── */
-type ButtonType = 'primary' | 'secondary' | 'blue' | 'success' | 'danger';
-type ButtonAction = 'register' | 'excel' | 'custom';
-type ButtonPosition = 'above' | 'between';
-
-interface ButtonConfig {
-    id: string;
-    label: string;
-    type: ButtonType;
-    action: ButtonAction;
-    popupSlug?: string;
-}
+/* CellOption, TableColumnConfig, ButtonConfig, ButtonType, ButtonAction, ButtonPosition → _shared/types.ts import */
 
 interface ConfigJson {
     fieldRows: SearchRowConfig[];
@@ -268,11 +236,20 @@ function FieldRenderer({ field, value, onChange, codeGroups }: {
 /*  메인 페이지                                */
 /* ══════════════════════════════════════════ */
 
+/** 정렬 방향 아이콘 — demo/page1 동일 디자인 */
+const SortIcon = ({ sorted }: { sorted: false | 'asc' | 'desc' }) => {
+    if (sorted === 'asc')  return <ChevronUp className="w-3.5 h-3.5 text-blue-500" />;
+    if (sorted === 'desc') return <ChevronDown className="w-3.5 h-3.5 text-blue-500" />;
+    return <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />;
+};
+
 export default function GeneratedPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = React.use(params);
     const pathname = usePathname();
     const navMenus = useMenuStore((state) => state.navMenus);
     const menuName = findMenuName(navMenus, pathname || '');
+    /* 메뉴에 SLUG가 설정된 경우 그것을 사용, 없으면 URL slug 사용 */
+    const dataSlug = useMenuPageSlug(slug);
 
     /* 템플릿 로딩 상태 */
     const [loading, setLoading] = useState(true);
@@ -306,11 +283,16 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const searchValuesRef = useRef<Record<string, string>>({});
     const configRef = useRef<ConfigJson | null>(null);
 
+    /* 정렬 상태 */
+    const [sortKey, setSortKey] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
     /* 팝업 상태 — 등록(editId=null) / 수정(editId=number) 공용 */
     const [popupOpen, setPopupOpen] = useState(false);
     const [popupSlug, setPopupSlug] = useState('');
     const [editId, setEditId] = useState<number | null>(null);
     const [editRowData, setEditRowData] = useState<Record<string, unknown>>({});
+
 
     /* 공통코드 */
     const { groups: codeGroups, fetchGroups } = useCodeStore();
@@ -327,10 +309,15 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         sv?: Record<string, string>,
         cfg?: ConfigJson | null,
         append = false,
+        sk?: string | null,
+        sd?: 'asc' | 'desc',
     ) => {
         /* stale 클로저 방지 — 인자 미전달 시 refs에서 최신값 사용 */
         const resolvedSv  = sv  ?? searchValuesRef.current;
         const resolvedCfg = cfg !== undefined ? cfg : configRef.current;
+        /* sort: 인자 미전달 시 현재 state 사용 */
+        const resolvedSk = sk !== undefined ? sk : sortKey;
+        const resolvedSd = sd ?? sortDir;
 
         /* ref 기반 중복 호출 방지 — state보다 즉각적으로 반영됨 */
         if (isLoadingRef.current) return;
@@ -344,6 +331,10 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 page: String(page),
                 size: String(size),
             };
+            /* 정렬 조건 */
+            if (resolvedSk) {
+                params.sort = `${resolvedSk},${resolvedSd}`;
+            }
             /* 검색 조건: fieldKey → accessor → label 순으로 파라미터 키 결정 */
             if (resolvedCfg) {
                 resolvedCfg.fieldRows.flatMap(r => r.fields).forEach(f => {
@@ -352,7 +343,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     if (paramKey && val && val.trim()) params[paramKey] = val;
                 });
             }
-            const res = await api.get(`/page-data/${slug}`, { params });
+            const res = await api.get(`/page-data/${dataSlug}`, { params });
             /* 각 행: { _id: number, ...dataJson } 형태로 평탄화 */
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
                 .map(item => ({ _id: item.id, ...item.dataJson }));
@@ -470,7 +461,42 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 toast.info('등록 페이지 연동이 설정되지 않았습니다.');
             }
         } else if (btn.action === 'excel') {
-            toast.info('엑셀 다운로드는 추후 연동 예정입니다.');
+            handleExcelDownload(btn.excelFormat ?? 'xlsx');
+        }
+    };
+
+    /** 엑셀 다운로드 — BE /export API 호출 후 Blob 다운로드 */
+    const handleExcelDownload = async (format: string) => {
+        /* actions 컬럼 제외, accessor가 있는 컬럼만 포함 */
+        const exportCols = config?.tableColumns.filter(c => c.cellType !== 'actions' && c.accessor) ?? [];
+        const headers = encodeURIComponent(exportCols.map(c => c.header).join(','));
+        const keys    = encodeURIComponent(exportCols.map(c => c.accessor).join(','));
+
+        /* 현재 검색 조건을 쿼리 파라미터로 구성 */
+        const params = new URLSearchParams({ format, headers, keys });
+        Object.entries(searchValuesRef.current).forEach(([k, v]) => {
+            if (v) params.set(k, v);
+        });
+
+        try {
+            const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8002/api/v1';
+            const res = await fetch(`${apiBase}/page-data/${dataSlug}/export?${params.toString()}`, {
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error('다운로드 실패');
+
+            const blob = await res.blob();
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            /* Content-Disposition 헤더에서 파일명 추출 */
+            const disposition = res.headers.get('Content-Disposition') ?? '';
+            const match = disposition.match(/filename\*?=(?:UTF-8'')?(.+)/i);
+            a.download = match ? decodeURIComponent(match[1].replace(/"/g, '')) : `export.${format}`;
+            a.href = url;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('엑셀 다운로드 중 오류가 발생했습니다.');
         }
     };
 
@@ -507,11 +533,23 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         setPopupOpen(true);
     };
 
+    /** 파일 셀 클릭 — LayerPopupRenderer로 해당 행 데이터 표시 */
+    const handleFileClick = (col: TableColumnConfig, row: Record<string, unknown>) => {
+        if (!col.fileLayerSlug) {
+            toast.info('파일 뷰어 팝업이 설정되지 않았습니다.');
+            return;
+        }
+        setEditId(row._id as number);
+        setEditRowData(row);
+        setPopupSlug(col.fileLayerSlug);
+        setPopupOpen(true);
+    };
+
     /** 삭제 버튼 클릭 — DELETE /api/v1/page-data/{slug}/{id} */
     const handleDeleteClick = async (id: number) => {
         if (!confirm('삭제하시겠습니까?')) return;
         try {
-            await api.delete(`/page-data/${slug}/${id}`);
+            await api.delete(`/page-data/${dataSlug}/${id}`);
             toast.success('삭제되었습니다.');
             /* 현재 페이지 데이터 새로고침 */
             fetchData(currentPage);
@@ -577,8 +615,38 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     </div>
                 );
             }
-            default: /* text */
-                return <span className="text-sm text-slate-700">{String(value ?? '')}</span>;
+            case 'file': {
+                /* 파일 ID 배열 — 비어있으면 "-" 표시 */
+                const ids = Array.isArray(value) ? value : [];
+                const count = ids.length;
+                if (count === 0) {
+                    return <span className="text-sm text-slate-400">-</span>;
+                }
+                return (
+                    <button
+                        onClick={() => handleFileClick(col, row)}
+                        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                        <Paperclip className="w-3.5 h-3.5" />
+                        {count}
+                    </button>
+                );
+            }
+            default: /* text */ {
+                const strVal = String(value ?? '');
+                /* 공통코드 연동 — displayAs !== 'value' 이면 이름으로 변환 */
+                if (col.codeGroupCode && col.displayAs !== 'value') {
+                    const name = codeGroups
+                        .find(g => g.groupCode === col.codeGroupCode)
+                        ?.details.find(d => d.code === strVal)?.name ?? strVal;
+                    return <span className="text-sm text-slate-700">{name}</span>;
+                }
+                /* isNumber: true이고 실제 숫자인 경우에만 3자리 콤마 적용 */
+                const displayVal = col.isNumber && strVal !== '' && !isNaN(Number(strVal))
+                    ? Number(strVal).toLocaleString()
+                    : strVal;
+                return <span className="text-sm text-slate-700">{displayVal}</span>;
+            }
         }
     };
 
@@ -691,14 +759,29 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                                             key={col.id}
                                             className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
                                             style={{
-                                                textAlign: col.align,
+                                                textAlign: 'center',
                                                 width: col.width ? `${col.width}${col.widthUnit || 'px'}` : undefined,
                                             }}
                                         >
-                                            <span className="flex items-center gap-1" style={{ justifyContent: col.align === 'center' ? 'center' : col.align === 'right' ? 'flex-end' : 'flex-start' }}>
-                                                {col.header}
-                                                {col.sortable && <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />}
-                                            </span>
+                                            {col.sortable ? (
+                                                <button
+                                                    onClick={() => {
+                                                        /* 같은 컬럼 재클릭 시 방향 토글, 다른 컬럼 클릭 시 asc로 초기화 */
+                                                        const nextDir = sortKey === col.accessor && sortDir === 'asc' ? 'desc' : 'asc';
+                                                        setSortKey(col.accessor);
+                                                        setSortDir(nextDir);
+                                                        fetchData(0, undefined, undefined, false, col.accessor, nextDir);
+                                                    }}
+                                                    className="flex items-center justify-center gap-1 w-full hover:text-slate-900 transition-colors"
+                                                >
+                                                    {col.header}
+                                                    <SortIcon sorted={sortKey === col.accessor ? sortDir : false} />
+                                                </button>
+                                            ) : (
+                                                <span className="flex items-center justify-center gap-1">
+                                                    {col.header}
+                                                </span>
+                                            )}
                                         </th>
                                     ))}
                                 </tr>
@@ -818,10 +901,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 onClose={handlePopupClose}
                 slug={popupSlug}
                 initialData={editRowData}
-                listSlug={slug}
+                listSlug={dataSlug}
                 editId={editId}
                 onSaved={() => fetchData(currentPage)}
             />
+
         </div>
     );
 }

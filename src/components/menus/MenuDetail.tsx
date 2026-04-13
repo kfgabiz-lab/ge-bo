@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Save, Trash2, Settings2, FolderOpen, Folder, FileText, Plus, X, Wand2, ChevronDown, Loader2 } from 'lucide-react';
+import { Save, Trash2, Settings2, FolderOpen, Folder, FileText, Plus, X, Wand2, ChevronDown, Loader2, Pencil, AlertTriangle } from 'lucide-react';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
+import { useQueryClient } from '@tanstack/react-query';
 import { MenuRoleMatrix } from './MenuRoleMatrix';
 import { toast } from 'sonner';
 import { NAME_REGEX, URL_REGEX, XSS_CHARS, ERROR_MESSAGES } from './constants';
@@ -10,7 +11,7 @@ import { IconPicker } from './IconPicker';
 import api from '@/lib/api';
 
 /* ── 페이지 템플릿 연동 버튼 ── */
-function TemplateUrlPicker({ onSelect }: { onSelect: (url: string) => void }) {
+function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string) => void }) {
     const [open, setOpen] = useState(false);
     const [list, setList] = useState<{ id: number; name: string; slug: string; pageUrl: string }[]>([]);
     const [loading, setLoading] = useState(false);
@@ -70,7 +71,7 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string) => void }) {
                                 <li key={tpl.id}>
                                     <button
                                         type="button"
-                                        onClick={() => { onSelect(tpl.pageUrl); setOpen(false); }}
+                                        onClick={() => { onSelect(tpl.pageUrl, tpl.name); setOpen(false); }}
                                         className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors"
                                     >
                                         <p className="text-xs font-medium text-slate-700">{tpl.name}</p>
@@ -97,14 +98,18 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
     onCreated: () => Promise<void>;
     addMenu: (menu: Omit<MenuItem, 'id' | 'children'>) => Promise<void>;
 }) {
+    const queryClient = useQueryClient();
     const [menuKind, setMenuKind] = useState<'folder' | 'program'>(parentDepth >= 2 ? 'program' : 'folder');
     const [name, setName] = useState('');
     const [url, setUrl] = useState('');
+    const [slug, setSlug] = useState('');
     const [icon, setIcon] = useState('Folder');
     const [sortOrder, setSortOrder] = useState(1);
     const [nameError, setNameError] = useState('');
     const [urlError, setUrlError] = useState('');
+    const [slugError, setSlugError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [linkedTemplateName, setLinkedTemplateName] = useState(''); // 연결된 페이지 템플릿명
     const nameRef = useRef<HTMLInputElement>(null);
 
     /* 자동 포커싱 */
@@ -115,6 +120,14 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
 
     const canSelectFolder = parentDepth < 2;
     const depthLabel = parentId === null ? '1depth' : parentDepth === 1 ? '2depth' : '3depth';
+
+    /* slug 유효성 검사 (CreateMenuForm용) */
+    const validateSlugLocal = (value: string): string => {
+        if (!value) return '';
+        if (!/^[a-zA-Z0-9\-_]+$/.test(value)) return '슬러그는 영문, 숫자, -, _만 사용 가능합니다.';
+        if (value.length > 100) return '슬러그는 100자 이하로 입력해주세요.';
+        return '';
+    };
 
     const handleSubmit = async () => {
         if (isSubmitting) return;
@@ -136,6 +149,9 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
             setUrlError('');
         }
 
+        const sle = validateSlugLocal(slug);
+        if (sle) { setSlugError(sle); valid = false; } else setSlugError('');
+
         if (!valid) { if (nameError || !trimmed) nameRef.current?.focus(); return; }
 
         setIsSubmitting(true);
@@ -143,6 +159,7 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
             await addMenu({
                 name: trimmed,
                 url: menuKind === 'program' ? url.trim() : '',
+                slug: slug.trim() || undefined,
                 icon,
                 parentId,
                 menuType,
@@ -151,6 +168,8 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
                 isCategory: false,
             });
             toast.success(`'${trimmed}' 메뉴가 추가되었습니다.`);
+            // React Query 캐시 무효화 → 메뉴 트리 자동 갱신
+            await queryClient.invalidateQueries({ queryKey: ['menus', menuType] });
             await onCreated();
         } catch {
             /* store에서 에러 토스트 처리 */
@@ -217,19 +236,44 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-xs font-medium text-slate-600">URL <span className="text-red-500">*</span></label>
-                            <TemplateUrlPicker onSelect={v => { setUrl(v); setUrlError(''); }} />
+                            <TemplateUrlPicker onSelect={(v, n) => { setUrl(v); setUrlError(''); setLinkedTemplateName(n); }} />
                         </div>
                         <input
                             type="text"
                             value={url}
-                            onChange={e => { setUrl(e.target.value); if (urlError) setUrlError(''); }}
+                            onChange={e => { setUrl(e.target.value); setLinkedTemplateName(''); if (urlError) setUrlError(''); }}
                             onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
                             className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 transition-all ${urlError ? 'border-red-400 focus:ring-red-200' : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-900'}`}
                             placeholder="/admin/..."
                         />
+                        {/* 연결된 템플릿명 표시 */}
+                        {linkedTemplateName && (
+                            <p className="flex items-center gap-1 text-[11px] text-blue-600 mt-1">
+                                <Wand2 className="w-3 h-3" />
+                                연결된 템플릿: <span className="font-semibold">{linkedTemplateName}</span>
+                            </p>
+                        )}
                         {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
                     </div>
                 )}
+
+                {/* SLUG — page-data API 식별자 */}
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                        SLUG
+                        <span className="ml-1.5 text-[10px] text-slate-400 font-normal">데이터 저장/조회 식별자</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={slug}
+                        onChange={e => { setSlug(e.target.value); if (slugError) setSlugError(validateSlugLocal(e.target.value)); }}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
+                        className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 transition-all ${slugError ? 'border-red-400 focus:ring-red-200' : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-900'}`}
+                        placeholder="예) user-list"
+                        maxLength={100}
+                    />
+                    {slugError && <p className="text-[11px] text-red-500 mt-1">{slugError}</p>}
+                </div>
 
                 {/* 아이콘 */}
                 <div>
@@ -301,18 +345,24 @@ const inputCls = (error: string) =>
 
 /* ── 메뉴 상세 편집 패널 ── */
 export function MenuDetail() {
-    const { selectedMenu, updateMenu, deleteMenu, setIsDirty: setStoreDirty, isCreating, createParentId, createMaxDepth, cancelCreate, addMenu, activeTab, fetchMenus } = useMenuStore();
+    const { selectedMenu, updateMenu, deleteMenu, setIsDirty: setStoreDirty, isCreating, createParentId, createMaxDepth, cancelCreate, addMenu, activeTab } = useMenuStore();
+    const queryClient = useQueryClient();
 
     /* 로컬 편집 상태 */
     const [name, setName] = useState('');
     const [url, setUrl] = useState('');
+    const [slug, setSlug] = useState('');
+    const [slugLocked, setSlugLocked] = useState(false); // slug 값이 있으면 잠금 상태
     const [icon, setIcon] = useState('');
     const [sortOrder, setSortOrder] = useState<number | string>(1);
     const [visible, setVisible] = useState(true);
+    const [linkedTemplateName, setLinkedTemplateName] = useState(''); // 연결된 페이지 템플릿명
+    const templatesCache = useRef<{ pageUrl: string; name: string }[]>([]); // 템플릿 목록 캐시
 
     /* 에러 상태 */
     const [nameError, setNameError] = useState('');
     const [urlError, setUrlError] = useState('');
+    const [slugError, setSlugError] = useState('');
     const [sortOrderError, setSortOrderError] = useState('');
 
     /* 변경사항 추적 */
@@ -327,13 +377,39 @@ export function MenuDetail() {
         if (selectedMenu) {
             setName(selectedMenu.name);
             setUrl(selectedMenu.url || '');
+            setSlug(selectedMenu.slug || '');
+            setSlugLocked(!!selectedMenu.slug); // slug 값이 있으면 잠금
             setIcon(selectedMenu.icon);
             setSortOrder(selectedMenu.sortOrder);
             setVisible(selectedMenu.visible);
             setNameError('');
             setUrlError('');
+            setSlugError('');
             setSortOrderError('');
             setIsDirty(false);
+
+            /* URL이 있으면 연결된 템플릿명 조회 */
+            const currentUrl = selectedMenu.url || '';
+            if (currentUrl) {
+                const fetchAndMatch = async () => {
+                    try {
+                        /* 캐시 없으면 API 조회 */
+                        if (templatesCache.current.length === 0) {
+                            const res = await api.get('/page-templates');
+                            templatesCache.current = (res.data as { pageUrl: string; name: string }[]).filter(
+                                (t: { templateType?: string }) => t.templateType === 'LIST'
+                            );
+                        }
+                        const matched = templatesCache.current.find(t => t.pageUrl === currentUrl);
+                        setLinkedTemplateName(matched ? matched.name : '');
+                    } catch {
+                        setLinkedTemplateName('');
+                    }
+                };
+                fetchAndMatch();
+            } else {
+                setLinkedTemplateName('');
+            }
         }
     }, [selectedMenu]);
 
@@ -352,13 +428,14 @@ export function MenuDetail() {
             const dirty =
                 name !== selectedMenu.name ||
                 url !== selectedMenu.url ||
+                slug !== (selectedMenu.slug || '') ||
                 icon !== selectedMenu.icon ||
                 Number(sortOrder) !== selectedMenu.sortOrder ||
                 visible !== selectedMenu.visible;
             setIsDirty(dirty);
             setStoreDirty(dirty);
         }
-    }, [name, url, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
+    }, [name, url, slug, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
 
     /* ── 생성 모드 ── */
     if (!selectedMenu && isCreating) {
@@ -385,6 +462,7 @@ export function MenuDetail() {
     };
     const handleUrlChange = (v: string) => {
         setUrl(v);
+        setLinkedTemplateName(''); // 직접 수정 시 연결 표시 초기화
         if (urlError) setUrlError(validateUrl(v, isParent));
     };
     const handleSortChange = (v: string) => {
@@ -407,21 +485,30 @@ export function MenuDetail() {
     };
     const handleSortBlur = () => setSortOrderError(validateSortOrder(sortOrder));
 
+    /* slug 유효성 검사 */
+    const validateSlug = (value: string): string => {
+        if (!value) return ''; // 선택 항목
+        if (!/^[a-zA-Z0-9\-_]+$/.test(value)) return '슬러그는 영문, 숫자, -, _만 사용 가능합니다.';
+        if (value.length > 100) return '슬러그는 100자 이하로 입력해주세요.';
+        return '';
+    };
+
     /* 저장 */
     const handleSave = async () => {
         if (isSubmitting) return;
         // validation
         const ne = validateName(name);
         const ue = validateUrl(url, isParent);
+        const sle = validateSlug(slug);
         const se = validateSortOrder(sortOrder);
         setNameError(ne);
         setUrlError(ue);
+        setSlugError(sle);
         setSortOrderError(se);
-        if (ne || ue || se) {
+        if (ne || ue || sle || se) {
             // 첫 에러 필드 포커싱
             if (ne) nameRef.current?.focus();
             else if (ue) urlRef.current?.focus();
-            else if (se) sortRef.current?.focus();
             return;
         }
         if (!isDirty) { toast.info('변경사항이 없습니다.'); return; }
@@ -431,12 +518,15 @@ export function MenuDetail() {
             await updateMenu(selectedMenu.id, {
                 name: name.trim(),
                 url: (url || '').endsWith('/') && (url || '').length > 1 ? (url || '').replace(/\/+$/, '') : (url || ''),
+                slug: slug.trim() || undefined,
                 icon,
                 sortOrder: Number(sortOrder),
                 visible,
             });
             toast.success('메뉴가 저장되었습니다.');
             setIsDirty(false);
+            // React Query 캐시 무효화 → 메뉴 트리 자동 갱신
+            await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg || '저장 중 오류가 발생했습니다.');
@@ -455,6 +545,8 @@ export function MenuDetail() {
         try {
             await deleteMenu(selectedMenu.id);
             toast.success('메뉴가 삭제되었습니다.');
+            // React Query 캐시 무효화 → 메뉴 트리 자동 갱신
+            await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
         } catch (err: unknown) {
             const msg2 = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg2 || '삭제 중 오류가 발생했습니다.');
@@ -568,7 +660,7 @@ export function MenuDetail() {
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-xs font-medium text-slate-600">URL</label>
                             {!selectedMenu.isCategory && (
-                                <TemplateUrlPicker onSelect={v => { handleUrlChange(v); }} />
+                                <TemplateUrlPicker onSelect={(v, n) => { handleUrlChange(v); setLinkedTemplateName(n); }} />
                             )}
                         </div>
                         <input
@@ -580,8 +672,55 @@ export function MenuDetail() {
                             className={`${inputCls(urlError)} font-mono`}
                             placeholder="폴더는 비워두세요. 프로그램은 /admin/..."
                         />
+                        {/* 연결된 템플릿명 표시 */}
+                        {linkedTemplateName && (
+                            <p className="flex items-center gap-1 text-[11px] text-blue-600 mt-1">
+                                <Wand2 className="w-3 h-3" />
+                                연결된 템플릿: <span className="font-semibold">{linkedTemplateName}</span>
+                            </p>
+                        )}
                         {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
                     </div>
+                </div>
+
+                {/* SLUG — page-data API 식별자 */}
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                        SLUG
+                        <span className="ml-1.5 text-[10px] text-slate-400 font-normal">페이지 진입 시 데이터 저장/조회에 사용되는 식별자</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={slug}
+                            disabled={slugLocked}
+                            onChange={e => { setSlug(e.target.value); if (slugError) setSlugError(validateSlug(e.target.value)); }}
+                            onBlur={() => setSlugError(validateSlug(slug))}
+                            className={`flex-1 ${slugLocked ? 'bg-slate-50 text-slate-400 cursor-not-allowed border border-slate-200 rounded-md px-3 py-2 text-sm font-mono' : `${inputCls(slugError)} font-mono`}`}
+                            placeholder="예) user-list  (영문, 숫자, -, _ 만 입력)"
+                            maxLength={100}
+                        />
+                        {slugLocked && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (confirm('⚠️ SLUG를 변경하면 이 메뉴에 저장된 데이터 조회/등록에 영향을 줄 수 있습니다.\n\n기존 SLUG로 저장된 데이터는 새 SLUG로 이관되지 않으므로 데이터가 보이지 않을 수 있습니다.\n\n그래도 수정하시겠습니까?')) {
+                                        setSlugLocked(false);
+                                    }
+                                }}
+                                className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-amber-600 border border-amber-300 rounded-md hover:bg-amber-50 transition-all whitespace-nowrap"
+                            >
+                                <Pencil className="w-3 h-3" />수정
+                            </button>
+                        )}
+                    </div>
+                    {slugLocked && (
+                        <p className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                            SLUG가 설정되어 있습니다. 수정 버튼을 눌러야 변경할 수 있습니다.
+                        </p>
+                    )}
+                    {slugError && <p className="text-[11px] text-red-500 mt-1">{slugError}</p>}
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
