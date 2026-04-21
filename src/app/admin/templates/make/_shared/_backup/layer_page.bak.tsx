@@ -1381,6 +1381,17 @@ export default function MakeLayerPage() {
         });
     };
 
+    /* 필드 라벨/Key 필수 검사 — 저장/생성 전 공통 사용 */
+    const validateFieldRequirements = (): boolean => {
+        const errors: string[] = [];
+        fieldRows.flatMap(r => r.fields).forEach(f => {
+            if (!f.label.trim()) errors.push(`필드 라벨이 비어 있습니다.`);
+            if (!f.fieldKey?.trim()) errors.push(`필드 "${f.label || '?'}"의 Key가 비어 있습니다.`);
+        });
+        if (errors.length > 0) { showValidationError(errors); return false; }
+        return true;
+    };
+
     /* fieldKey 중복 검사 — 저장/생성 전 공통 사용 */
     const checkDuplicateKeys = (): boolean => {
         // 이미 추가된 필드 key 목록
@@ -1399,6 +1410,7 @@ export default function MakeLayerPage() {
 
     /* 저장 열기 */
     const handleSaveOpen = () => {
+        if (!validateFieldRequirements()) return;
         if (!checkDuplicateKeys()) return;
         setSaveModalName(currentTemplateName || '');
         /* 신규 저장일 때만 slug/설명 초기화 — 수정 모드는 기존 값 유지 */
@@ -1685,6 +1697,7 @@ export default function MakeLayerPage() {
 
     /* 생성 열기 */
     const handleGenerateOpen = () => {
+        if (!validateFieldRequirements()) return;
         if (!checkDuplicateKeys()) return;
         setGenerateName(saveModalName || '');
         setGenerateSlug(saveModalSlug || '');
@@ -2334,63 +2347,40 @@ export default function MakeLayerPage() {
                                                                                     {/* ── 인라인 필드 편집 패널 ── */}
                                                                                     {editingField === field.id && (
                                                                                         <div className="px-2 pb-2 pt-1 space-y-2 border-t border-slate-100">
-                                                                                            <div className="grid grid-cols-2 gap-2">
-                                                                                                <div>
-                                                                                                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">라벨</label>
-                                                                                                    <input type="text" value={field.label} onChange={e => updateField(field.id, { label: e.target.value })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
-                                                                                                </div>
-                                                                                                <div>
-                                                                                                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">ColSpan</label>
-                                                                                                    <div className="flex items-center gap-0.5">
-                                                                                                        {Array.from({ length: row.cols }, (_, i) => (i + 1) as 1 | 2 | 3 | 4 | 5).map(n => (
-                                                                                                            <button key={n} onClick={() => updateField(field.id, { colSpan: n })} className={`w-6 h-6 text-[10px] font-semibold rounded transition-all ${field.colSpan === n ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'}`}>{n}</button>
-                                                                                                        ))}
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                {/* RowSpan: textarea 전용 */}
-                                                                                                {field.type === 'textarea' && (
-                                                                                                    <div>
-                                                                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">RowSpan</label>
-                                                                                                        <div className="flex items-center gap-0.5">
-                                                                                                            {([1, 2, 3] as const).map(n => (
-                                                                                                                <button key={n} onClick={() => updateField(field.id, { rowSpan: n > 1 ? n : undefined })} className={`w-6 h-6 text-[10px] font-semibold rounded transition-all ${(field.rowSpan ?? 1) === n ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'}`}>{n}</button>
-                                                                                                            ))}
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                )}
+                                                                                            {/* 라벨 */}
+                                                                                            <div>
+                                                                                                <label className="text-[10px] font-medium text-slate-500 mb-1 block">라벨 <span className="text-red-400">*</span></label>
+                                                                                                <input type="text" value={field.label} onChange={e => updateField(field.id, { label: e.target.value })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
                                                                                             </div>
+                                                                                            {/* Key */}
                                                                                             <div>
                                                                                                 <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key <span className="text-red-400">*</span></label>
                                                                                                 <input type="text" value={field.fieldKey || ''} onChange={e => updateField(field.id, { fieldKey: e.target.value || undefined })} placeholder="예: userName" className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
                                                                                             </div>
+                                                                                            {/* ColSpan */}
+                                                                                            <div className="flex items-center justify-between">
+                                                                                                <span className="text-[10px] font-medium text-slate-500">ColSpan (가로 칸 수)</span>
+                                                                                                <div className="flex items-center gap-0.5">
+                                                                                                    {Array.from({ length: row.cols }, (_, i) => (i + 1) as 1 | 2 | 3 | 4 | 5).map(n => (
+                                                                                                        <button key={n} onClick={() => updateField(field.id, { colSpan: n })} className={`w-5 h-5 text-[10px] font-semibold rounded transition-all ${field.colSpan === n ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'}`}>{n}</button>
+                                                                                                    ))}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            {/* RowSpan: textarea 전용 */}
+                                                                                            {field.type === 'textarea' && (
+                                                                                                <div className="flex items-center justify-between">
+                                                                                                    <span className="text-[10px] font-medium text-slate-500">RowSpan (세로 칸 수)</span>
+                                                                                                    <div className="flex items-center gap-0.5">
+                                                                                                        {([1, 2, 3] as const).map(n => (
+                                                                                                            <button key={n} onClick={() => updateField(field.id, { rowSpan: n > 1 ? n : undefined })} className={`w-5 h-5 text-[10px] font-semibold rounded transition-all ${(field.rowSpan ?? 1) === n ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'}`}>{n}</button>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            )}
                                                                                             {(field.type === 'input' || field.type === 'textarea' || field.type === 'select' || field.type === 'editor') && (
                                                                                                 <div>
                                                                                                     <label className="text-[10px] font-medium text-slate-500 mb-1 block">Placeholder</label>
                                                                                                     <input type="text" value={field.placeholder || ''} onChange={e => updateField(field.id, { placeholder: e.target.value || undefined })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
-                                                                                                </div>
-                                                                                            )}
-                                                                                            {(field.type === 'input' || field.type === 'textarea' || field.type === 'editor') && (
-                                                                                                <div className="grid grid-cols-2 gap-2">
-                                                                                                    <div>
-                                                                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">최소 길이 (Min)</label>
-                                                                                                        <input type="number" min={0} value={field.minLength || ''} onChange={e => updateField(field.id, { minLength: e.target.value ? Number(e.target.value) : undefined })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
-                                                                                                    </div>
-                                                                                                    <div>
-                                                                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">최대 길이 (Max)</label>
-                                                                                                        <input type="number" min={0} value={field.maxLength || ''} onChange={e => updateField(field.id, { maxLength: e.target.value ? Number(e.target.value) : undefined })} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            )}
-                                                                                            {field.type === 'input' && (
-                                                                                                <div className="space-y-2">
-                                                                                                    <div>
-                                                                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">정규식 (Pattern)</label>
-                                                                                                        <input type="text" value={field.pattern || ''} onChange={e => updateField(field.id, { pattern: e.target.value || undefined })} placeholder="예: ^[a-zA-Z]+$" className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none" />
-                                                                                                    </div>
-                                                                                                    <div>
-                                                                                                        <label className="text-[10px] font-medium text-slate-500 mb-1 block">정규식 설명 (Error Msg)</label>
-                                                                                                        <input type="text" value={field.patternDesc || ''} onChange={e => updateField(field.id, { patternDesc: e.target.value || undefined })} placeholder="예: 영문만 입력 가능합니다." className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none" />
-                                                                                                    </div>
                                                                                                 </div>
                                                                                             )}
                                                                                             {field.type === 'textarea' && (
@@ -2579,20 +2569,7 @@ export default function MakeLayerPage() {
                                                                                                     <p className="text-[10px] text-slate-400">허용 형식: jpg, jpeg, png, gif, webp, svg, bmp (고정)</p>
                                                                                                 </div>
                                                                                             )}
-                                                                                            {/* 필수 항목 토글 */}
-                                                                                            <div className="flex items-center justify-between px-1 py-1">
-                                                                                                <span className="text-[10px] font-medium text-slate-500">필수 항목</span>
-                                                                                                <button type="button" onClick={() => updateField(field.id, { required: !field.required || undefined })} className={`relative w-9 h-5 rounded-full transition-colors ${field.required ? 'bg-slate-900' : 'bg-slate-300'}`}>
-                                                                                                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.required ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                                                                                </button>
-                                                                                            </div>
-                                                                                            {/* 읽기 전용 토글 */}
-                                                                                            <div className="flex items-center justify-between px-1 py-1">
-                                                                                                <span className="text-[10px] font-medium text-slate-500">읽기 전용 (Readonly)</span>
-                                                                                                <button type="button" onClick={() => updateField(field.id, { readonly: !field.readonly || undefined })} className={`relative w-9 h-5 rounded-full transition-colors ${field.readonly ? 'bg-slate-900' : 'bg-slate-300'}`}>
-                                                                                                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.readonly ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                                                                                </button>
-                                                                                            </div>
+                                                                                            {/* 옵션 (select / radio / checkbox 전용) */}
                                                                                             {needsOptions(field.type) && (
                                                                                                 <div className="space-y-1.5">
                                                                                                     {/* 수동 입력 / 공통코드 탭 */}
@@ -2620,6 +2597,37 @@ export default function MakeLayerPage() {
                                                                                                     )}
                                                                                                 </div>
                                                                                             )}
+                                                                                            {/* Validation (필수항목 + 타입별 validation) */}
+                                                                                            <ValidationSection
+                                                                                                fieldType={field.type}
+                                                                                                values={{
+                                                                                                    required: field.required || false,
+                                                                                                    minLength: field.minLength,
+                                                                                                    maxLength: field.maxLength,
+                                                                                                    pattern: field.pattern || '',
+                                                                                                    patternDesc: field.patternDesc || '',
+                                                                                                    minSelect: field.minSelect,
+                                                                                                    maxSelect: field.maxSelect,
+                                                                                                }}
+                                                                                                onChange={updates => {
+                                                                                                    const upd: Partial<LayerFieldConfig> = {};
+                                                                                                    if (updates.required !== undefined) upd.required = updates.required || undefined;
+                                                                                                    if ('minLength' in updates) upd.minLength = updates.minLength;
+                                                                                                    if ('maxLength' in updates) upd.maxLength = updates.maxLength;
+                                                                                                    if (updates.pattern !== undefined) upd.pattern = updates.pattern || undefined;
+                                                                                                    if (updates.patternDesc !== undefined) upd.patternDesc = updates.patternDesc || undefined;
+                                                                                                    if ('minSelect' in updates) upd.minSelect = updates.minSelect;
+                                                                                                    if ('maxSelect' in updates) upd.maxSelect = updates.maxSelect;
+                                                                                                    updateField(field.id, upd);
+                                                                                                }}
+                                                                                            />
+                                                                                            {/* 읽기 전용 토글 */}
+                                                                                            <div className="flex items-center justify-between px-1 py-1">
+                                                                                                <span className="text-[10px] font-medium text-slate-500">읽기 전용 (Readonly)</span>
+                                                                                                <button type="button" onClick={() => updateField(field.id, { readonly: !field.readonly || undefined })} className={`relative w-9 h-5 rounded-full transition-colors ${field.readonly ? 'bg-slate-900' : 'bg-slate-300'}`}>
+                                                                                                    <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.readonly ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                                                                </button>
+                                                                                            </div>
                                                                                         </div>
                                                                                     )}
                                                                                 </div>

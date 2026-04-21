@@ -41,8 +41,10 @@ interface MenuStore {
     isCreating: boolean;
     createParentId: number | null;
     createMaxDepth: number; // 선택된 부모의 depth (1~3)
+    isSidebarCollapsed: boolean;
 
     /* 액션 */
+    toggleSidebar: () => void;
     setActiveTab: (tab: 'BO' | 'FO') => void;
     selectMenu: (menu: MenuItem | null) => void;
     setIsDirty: (dirty: boolean) => void;
@@ -78,6 +80,9 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     isCreating: false,
     createParentId: null,
     createMaxDepth: 0,
+    isSidebarCollapsed: false,
+
+    toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 
     setActiveTab: (tab) => {
         if (get().isDirty && !confirm('저장하지 않은 변경사항이 있습니다. 이동하시겠습니까?')) return;

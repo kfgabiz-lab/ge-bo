@@ -52,8 +52,10 @@ export const toSlug = (name: string): string => {
  * @example const uid = createIdGenerator('f'); uid() // "f1", "f2"...
  */
 export const createIdGenerator = (prefix: string) => {
-    let _id = 0;
-    return () => `${prefix}${++_id}`;
+    return () => {
+        const randomStr = Math.random().toString(36).substring(2, 11);
+        return `${prefix}_${randomStr}`;
+    };
 };
 
 /**
@@ -80,4 +82,31 @@ export const findDuplicateKeys = (keys: string[]): string[] => {
 
     // 중복 제거 후 반환 (예: ['a', 'a'] → ['a'])
     return [...new Set(duplicated)];
+};
+
+/**
+ * 유튜브/Vimeo URL → embed URL 변환
+ * @example toEmbedUrl("https://youtube.com/watch?v=...") // "https://www.youtube.com/embed/..."
+ */
+export const toEmbedUrl = (url: string): string | null => {
+    if (!url) return null;
+    const ytWatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (ytWatch) return `https://www.youtube.com/embed/${ytWatch[1]}`;
+    const ytShorts = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (ytShorts) return `https://www.youtube.com/embed/${ytShorts[1]}`;
+    const vimeo = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+    return null;
+};
+
+/**
+ * 모드 및 확장자 목록 기반 accept 문자열 생성
+ * @example getAcceptString('image', []) // ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp"
+ */
+export const getAcceptString = (mode: string, customExts: string[] = []): string => {
+    if (mode === 'doc') return '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.hwp';
+    if (mode === 'image') return '.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp';
+    if (mode === 'video') return '.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v';
+    if (mode === 'custom' && customExts.length > 0) return customExts.join(',');
+    return '';
 };

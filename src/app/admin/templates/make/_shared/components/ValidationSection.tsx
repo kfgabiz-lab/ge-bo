@@ -1,7 +1,7 @@
 'use client';
 
 export interface ValidationValues {
-    required: boolean;
+    required?: boolean;  // _FieldBase에서 처리 — ValidationSection에서는 미사용
     minLength?: number;
     maxLength?: number;
     pattern: string;
@@ -28,18 +28,6 @@ interface ValidationSectionProps {
  */
 export const ValidationSection = ({ fieldType, values, onChange }: ValidationSectionProps) => (
     <div className="space-y-2">
-        {/* 필수 항목 토글 (list 스타일 통일) */}
-        <div className="flex items-center justify-between px-1 py-1">
-            <span className="text-[10px] font-medium text-slate-500">필수 항목</span>
-            <button
-                type="button"
-                onClick={() => onChange({ required: !values.required })}
-                className={`relative w-9 h-5 rounded-full transition-colors ${values.required ? 'bg-slate-900' : 'bg-slate-300'}`}
-            >
-                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${values.required ? 'translate-x-4' : 'translate-x-0.5'}`} />
-            </button>
-        </div>
-
         {/* input 전용: 최소/최대 글자, 정규식 */}
         {fieldType === 'input' && (
             <div className="space-y-1.5 pt-1 border-t border-slate-100">

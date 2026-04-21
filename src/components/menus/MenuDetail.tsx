@@ -11,9 +11,15 @@ import { IconPicker } from './IconPicker';
 import api from '@/lib/api';
 
 /* ── 페이지 템플릿 연동 버튼 ── */
+/* 템플릿 타입별 뱃지 표시 설정 */
+const TEMPLATE_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
+    LIST:  { label: 'List',   cls: 'bg-blue-50 text-blue-600 border border-blue-200' },
+    PAGE:  { label: 'Widget', cls: 'bg-violet-50 text-violet-600 border border-violet-200' },
+};
+
 function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string) => void }) {
     const [open, setOpen] = useState(false);
-    const [list, setList] = useState<{ id: number; name: string; slug: string; pageUrl: string }[]>([]);
+    const [list, setList] = useState<{ id: number; name: string; slug: string; pageUrl: string; templateType?: string }[]>([]);
     const [loading, setLoading] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -24,8 +30,8 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
         setLoading(true);
         try {
             const res = await api.get('/page-templates');
-            /* 메뉴 URL 연동은 LIST 타입만 표시 (LAYER 팝업은 제외) */
-            setList(res.data.filter((t: { templateType?: string }) => t.templateType === 'LIST'));
+            /* LAYER(팝업)는 메뉴 URL로 부적합하므로 제외, LIST·PAGE(Widget) 표시 */
+            setList(res.data.filter((t: { templateType?: string }) => t.templateType !== 'LAYER'));
         } catch {
             toast.error('페이지 템플릿 목록을 불러오지 못했습니다.');
         } finally {
@@ -67,18 +73,32 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
                         <div className="py-4 text-center text-xs text-slate-400">저장된 템플릿이 없습니다.</div>
                     ) : (
                         <ul className="max-h-52 overflow-y-auto divide-y divide-slate-50">
-                            {list.map(tpl => (
-                                <li key={tpl.id}>
-                                    <button
-                                        type="button"
-                                        onClick={() => { onSelect(tpl.pageUrl, tpl.name); setOpen(false); }}
-                                        className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors"
-                                    >
-                                        <p className="text-xs font-medium text-slate-700">{tpl.name}</p>
-                                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">{tpl.pageUrl}</p>
-                                    </button>
-                                </li>
-                            ))}
+                            {list.map(tpl => {
+                                const badge = TEMPLATE_TYPE_BADGE[tpl.templateType || ''];
+                                /* PAGE(Widget) 타입은 위젯 렌더러 경로, LIST는 기존 pageUrl 사용 */
+                                const menuUrl = tpl.templateType === 'PAGE'
+                                    ? `/admin/templates/widget/${tpl.slug}`
+                                    : tpl.pageUrl;
+                                return (
+                                    <li key={tpl.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => { onSelect(menuUrl, tpl.name); setOpen(false); }}
+                                            className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors"
+                                        >
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-xs font-medium text-slate-700 flex-1 truncate">{tpl.name}</p>
+                                                {badge && (
+                                                    <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded ${badge.cls}`}>
+                                                        {badge.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] text-slate-400 font-mono mt-0.5">{menuUrl}</p>
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>

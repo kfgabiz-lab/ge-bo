@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Save, FolderOpen, Zap, Loader2, Pencil } from 'lucide-react';
+import { X, Save, FolderOpen, Zap, Loader2, Pencil, ChevronDown } from 'lucide-react';
 import { TemplateItem } from '../types';
 import { btnSecondary } from '../styles';
+import api from '@/lib/api';
 
 /* ══════════════════════════════════════════ */
 /*  저장 모달                                  */
@@ -41,17 +42,33 @@ export const SaveModal = ({
     show, onClose, isEdit, name, slug, desc, isSaving,
     onNameChange, onSlugChange, onDescChange, onConfirm, toSlug, disabledExtra,
 }: SaveModalProps) => {
-    /* 사용자가 slug 입력란을 직접 수정했는지 추적 — true면 이름 입력 시 자동 갱신 중단 */
-    const slugManuallyEdited = useRef(false);
     /* 수정 모드에서 slug 편집 활성화 여부 */
     const [slugEditEnabled, setSlugEditEnabled] = useState(false);
-    /* 모달이 열릴 때마다 편집 상태 초기화 */
+    /* 신규 모드에서 slug를 수동으로 입력했는지 여부 (자동 갱신 방지용) */
+    const slugManuallyEdited = useRef(false);
+
+    /* 자동완성 — slug-registry PAGE_TEMPLATE 목록 */
+    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
+    const [slugSearch, setSlugSearch] = useState('');
+    const [showSlugDrop, setShowSlugDrop] = useState(false);
+
+    /* 모달이 열릴 때마다 초기화 + slug-registry 목록 로드 */
     useEffect(() => {
-        if (show) {
-            slugManuallyEdited.current = false;
-            setSlugEditEnabled(false);
-        }
+        if (!show) return;
+        setSlugEditEnabled(false);
+        setSlugSearch('');
+        setShowSlugDrop(false);
+        slugManuallyEdited.current = false;
+        api.get('/slug-registry', { params: { type: 'PAGE_TEMPLATE', size: '200', sort: 'slug,asc' } })
+            .then(res => setSlugOptions(res.data?.content || []))
+            .catch(() => { });
     }, [show]);
+
+    /* 검색어로 필터링 */
+    const filteredSlugOptions = slugOptions.filter(o =>
+        o.slug.toLowerCase().includes(slugSearch.toLowerCase()) ||
+        o.name.toLowerCase().includes(slugSearch.toLowerCase())
+    );
 
     if (!show) return null;
     return (
@@ -91,32 +108,110 @@ export const SaveModal = ({
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
                             Slug <span className="text-red-500">*</span>
                         </label>
-                        {/* 수정 모드: 기본 읽기 전용, 편집 버튼 클릭 시 활성화 */}
-                        <div className="flex items-center gap-1.5">
-                            <input
-                                type="text"
-                                value={slug}
-                                readOnly={isEdit && !slugEditEnabled}
-                                onChange={e => { slugManuallyEdited.current = true; onSlugChange(e.target.value); }}
-                                placeholder="예: member-register-popup"
-                                className={`flex-1 border border-slate-200 rounded-md px-3 py-2 text-sm font-mono transition-all ${isEdit && !slugEditEnabled ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900'}`}
-                            />
-                            {/* 수정 모드에서만 편집 활성화 버튼 표시 */}
-                            {isEdit && (
+                        {isEdit ? (
+                            /* 수정 모드: 기본 읽기 전용, 편집 버튼 클릭 시 자동완성 드롭다운 활성화 */
+                            <div className="flex items-center gap-1.5">
+                                {slugEditEnabled ? (
+                                    /* 편집 활성화 시 — 자동완성 드롭다운 (신규 모드와 동일) */
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="text"
+                                            value={showSlugDrop ? slugSearch : slug}
+                                            onChange={e => {
+                                                setSlugSearch(e.target.value);
+                                                setShowSlugDrop(true);
+                                                onSlugChange('');
+                                            }}
+                                            onFocus={() => { setSlugSearch(''); setShowSlugDrop(true); }}
+                                            placeholder="slug 검색 후 선택..."
+                                            className="w-full border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                                        />
+                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+
+                                        {showSlugDrop && (
+                                            <>
+                                                <div className="fixed inset-0 z-10" onClick={() => setShowSlugDrop(false)} />
+                                                <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-44 overflow-y-auto">
+                                                    {filteredSlugOptions.length === 0 ? (
+                                                        <div className="py-3 text-center text-xs text-slate-400">
+                                                            {slugOptions.length === 0 ? '목록 로딩 중...' : '검색 결과 없음'}
+                                                        </div>
+                                                    ) : filteredSlugOptions.map(o => (
+                                                        <button
+                                                            key={o.id}
+                                                            type="button"
+                                                            onClick={() => { onSlugChange(o.slug); setSlugSearch(''); setShowSlugDrop(false); }}
+                                                            className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                                                        >
+                                                            <p className="text-xs font-mono font-medium text-slate-800">{o.slug}</p>
+                                                            <p className="text-[10px] text-slate-400 mt-0.5">{o.name}</p>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ) : (
+                                    /* 편집 비활성화 시 — 읽기 전용 표시 */
+                                    <input
+                                        type="text"
+                                        value={slug}
+                                        readOnly
+                                        className="flex-1 border border-slate-200 rounded-md px-3 py-2 text-sm font-mono bg-slate-50 text-slate-400 cursor-not-allowed transition-all"
+                                    />
+                                )}
                                 <button
                                     type="button"
-                                    onClick={() => setSlugEditEnabled(v => !v)}
+                                    onClick={() => {
+                                        setSlugEditEnabled(v => !v);
+                                        setShowSlugDrop(false);
+                                    }}
                                     title={slugEditEnabled ? 'slug 편집 잠금' : 'slug 편집 활성화'}
                                     className={`p-2 rounded-md border transition-all shrink-0 ${slugEditEnabled ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600'}`}
                                 >
                                     <Pencil className="w-3.5 h-3.5" />
                                 </button>
-                            )}
-                        </div>
-                        {slug && (
-                            <p className="text-[10px] text-slate-400 mt-1">
-                                URL: /admin/generated/{slug}
-                            </p>
+                            </div>
+                        ) : (
+                            /* 신규 저장: slug-registry PAGE_TEMPLATE 목록에서 자동완성 선택 */
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={showSlugDrop ? slugSearch : slug}
+                                    onChange={e => {
+                                        setSlugSearch(e.target.value);
+                                        setShowSlugDrop(true);
+                                        onSlugChange('');
+                                    }}
+                                    onFocus={() => { setSlugSearch(''); setShowSlugDrop(true); }}
+                                    placeholder="slug 검색 후 선택..."
+                                    className="w-full border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                                />
+                                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+
+                                {showSlugDrop && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowSlugDrop(false)} />
+                                        <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-44 overflow-y-auto">
+                                            {filteredSlugOptions.length === 0 ? (
+                                                <div className="py-3 text-center text-xs text-slate-400">
+                                                    {slugOptions.length === 0 ? '목록 로딩 중...' : '검색 결과 없음'}
+                                                </div>
+                                            ) : filteredSlugOptions.map(o => (
+                                                <button
+                                                    key={o.id}
+                                                    type="button"
+                                                    onClick={() => { onSlugChange(o.slug); setSlugSearch(''); setShowSlugDrop(false); }}
+                                                    className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                                                >
+                                                    <p className="text-xs font-mono font-medium text-slate-800">{o.slug}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">{o.name}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         )}
                     </div>
                     <div>

@@ -32,7 +32,7 @@ export function SearchField({ label, required, colSpan = 1, children }: SearchFi
     return (
         <div className={COL_SPAN_MAP[colSpan]}>
             {label && (
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                     {label}
                     {required && <span className="text-red-500 ml-0.5">*</span>}
                 </label>
