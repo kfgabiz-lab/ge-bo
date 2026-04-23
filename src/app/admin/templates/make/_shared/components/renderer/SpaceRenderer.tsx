@@ -31,6 +31,10 @@ interface SpaceRendererProps {
     align?: 'left' | 'center' | 'right';
     /** 전체 그리드 열 수 — 각 아이템의 colSpan 비율 계산에 사용 (기본 5) */
     contentColSpan?: number;
+    /** 영역 테두리 표시 여부 (기본 true) */
+    showBorder?: boolean;
+    /** 영역 바탕색 (기본 white) */
+    bgColor?: string;
     /** Form 버튼 클릭 시 호출 — connectedFormWidgetId + formAction 전달 */
     onFormAction?: (connectedFormWidgetId: string, action: 'save' | 'delete') => void;
     /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
@@ -39,21 +43,28 @@ interface SpaceRendererProps {
     onPopupOpen?: (slug: string) => void;
 }
 
-export function SpaceRenderer({ mode, items, align = 'left', contentColSpan = 5, onFormAction, onClose, onPopupOpen }: SpaceRendererProps) {
+export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onFormAction, onClose, onPopupOpen }: SpaceRendererProps) {
     const router = useRouter();
-    const alignMap = {
-        left: 'justify-start',
-        center: 'justify-center',
-        right: 'justify-end',
+    /* 바탕색 + CSS Grid 스타일
+       - gridTemplateColumns: contentColSpan 칸으로 정확히 분할 (격자 스냅)
+       - 'none' 또는 미설정 시 배경 투명 */
+    const areaStyle: React.CSSProperties = {
+        backgroundColor: (!bgColor || bgColor === 'none') ? 'transparent' : bgColor,
+        gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
     };
-    const justifyCls = alignMap[align] ?? 'justify-start';
 
-    const base = `h-full w-full rounded border bg-white border-slate-300 shadow-sm overflow-hidden p-4 flex flex-wrap items-center content-start gap-4 overflow-auto ${justifyCls}`;
+    /* 테두리 유무에 따라 border 클래스 분기 — CSS Grid 레이아웃 */
+    const base = `h-full w-full rounded shadow-sm overflow-auto grid ${showBorder ? 'border border-slate-300' : ''}`;
 
     if (!items.length) {
         return (
-            <div className={base}>
-                <span className="text-[10px] text-slate-300 italic m-auto">아이템을 추가하세요</span>
+            <div className={base} style={areaStyle}>
+                <span
+                    className="text-[10px] text-slate-300 italic text-center p-4"
+                    style={{ gridColumn: `span ${contentColSpan}` }}
+                >
+                    아이템을 추가하세요
+                </span>
             </div>
         );
     }
@@ -77,18 +88,19 @@ export function SpaceRenderer({ mode, items, align = 'left', contentColSpan = 5,
     };
 
     return (
-        <div className={base}>
+        <div className={base} style={areaStyle}>
             {items.map(field => {
-                /* colSpan 비율로 너비 계산: colSpan/contentColSpan * 100% — 최소 auto */
                 const itemSpan = Math.min(field.colSpan ?? 1, contentColSpan);
-                const widthPct = `${(itemSpan / contentColSpan) * 100}%`;
+                const isButton = field.type === 'action-button';
+                /* 버튼: 셀 가운데 배치 / 텍스트: 셀 전체 너비를 채워 자연스럽게 표시 */
+                const wrapperCls = isButton ? 'flex items-center justify-center py-1' : 'flex items-center py-1';
                 return (
-                    <div key={field.id} style={{ width: widthPct }}>
+                    <div key={field.id} style={{ gridColumn: `span ${itemSpan}` }} className={wrapperCls}>
                         <FieldRenderer
                             mode={mode}
                             field={field}
                             value={field.type === 'textarea' ? (field.content ?? '') : undefined}
-                            onButtonClick={field.type === 'action-button' ? () => handleButtonClick(field) : undefined}
+                            onButtonClick={isButton ? () => handleButtonClick(field) : undefined}
                         />
                     </div>
                 );

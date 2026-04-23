@@ -18,6 +18,8 @@
 
 import React, { useState } from 'react';
 import { AlignLeft, AlignCenter, AlignRight, MousePointerClick, X, GripVertical, Pencil, Plus } from 'lucide-react';
+import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
+import { ToggleRow } from './fields/_ToggleRow';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor,
     useSensor, useSensors,
@@ -34,6 +36,21 @@ import type { SearchFieldConfig, TemplateItem } from '../../types';
 import type { FieldEditValues } from './fields/types';
 
 const uid = createIdGenerator('sp');
+
+/**
+ * 바탕색 옵션 — SPACE_BTN_COLORS와 동일한 색상 계열
+ * value: CSS 색상값 ('none' = 없음/투명)
+ */
+export const BG_COLOR_OPTIONS: { value: string; label: string }[] = [
+    { value: 'none',    label: '없음' },
+    { value: '#0f172a', label: '검정' },
+    { value: '#10b981', label: '초록' },
+    { value: '#3b82f6', label: '파랑' },
+    { value: '#facc15', label: '노랑' },
+    { value: '#ef4444', label: '빨강' },
+    { value: '#94a3b8', label: '회색' },
+    { value: '#f472b4', label: '분홍' },
+];
 
 /** 버튼 색상 옵션 (SpaceRenderer의 SPACE_BTN_CLS와 대응) */
 export const SPACE_BTN_COLORS = [
@@ -207,6 +224,32 @@ export function SpaceBuilder({
                             {a === 'right' && <AlignRight className="w-4 h-4" />}
                         </button>
                     ))}
+                </div>
+            </div>
+
+            {/* 테두리 유무 | 바탕색 — 한 줄 배치 */}
+            <div className="grid grid-cols-2 gap-2 px-0.5">
+                {/* 테두리 유무 */}
+                <div>
+                    <label className={LABEL_CLS}>테두리</label>
+                    <ToggleRow
+                        label={widget.showBorder ?? true ? '표시' : '숨김'}
+                        value={widget.showBorder ?? true}
+                        onChange={v => onChange({ ...widget, showBorder: v })}
+                    />
+                </div>
+                {/* 바탕색 */}
+                <div>
+                    <label className={LABEL_CLS}>바탕색</label>
+                    <select
+                        value={widget.bgColor ?? 'none'}
+                        onChange={e => onChange({ ...widget, bgColor: e.target.value })}
+                        className={INPUT_CLS}
+                    >
+                        {BG_COLOR_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 

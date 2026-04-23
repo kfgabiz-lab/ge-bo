@@ -31,7 +31,7 @@ import { WidgetRenderer } from '../_shared/components/renderer';
 import type { SearchWidget, SpaceWidget, TextWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
-import { createIdGenerator, toSlug } from '../_shared/utils';
+import { createIdGenerator, toSlug, getSpaceGridColumn } from '../_shared/utils';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
 import { TemplateItem } from '../_shared/types';
@@ -180,17 +180,23 @@ const WidgetCellPreview = ({ contents, colSpan }: { contents: PageContentItem[];
                 gridAutoFlow: 'row dense',
             }}
         >
-            {contents.map(c => (
-                <div
-                    key={c.id}
-                    style={{
-                        gridColumn: `span ${Math.min(c.colSpan, colSpan)}`,
-                        gridRow: `span ${c.rowSpan}`,
-                    }}
-                >
-                    <WidgetRenderer mode="preview" widget={c.widget} contentColSpan={c.colSpan} />
-                </div>
-            ))}
+            {contents.map(c => {
+                /* SpaceWidget의 align에 따라 외부 그리드 시작 위치 계산 */
+                const gridCol = c.widget.type === 'space'
+                    ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, colSpan), colSpan)
+                    : `span ${Math.min(c.colSpan, colSpan)}`;
+                return (
+                    <div
+                        key={c.id}
+                        style={{
+                            gridColumn: gridCol,
+                            gridRow: `span ${c.rowSpan}`,
+                        }}
+                    >
+                        <WidgetRenderer mode="preview" widget={c.widget} contentColSpan={c.colSpan} />
+                    </div>
+                );
+            })}
         </div>
     );
 };

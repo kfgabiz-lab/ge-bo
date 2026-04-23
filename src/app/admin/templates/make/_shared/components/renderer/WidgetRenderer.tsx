@@ -661,6 +661,8 @@ export function WidgetRenderer({
                     items={widget.items}
                     align={widget.align}
                     contentColSpan={contentColSpan}
+                    showBorder={widget.showBorder}
+                    bgColor={widget.bgColor}
                     onFormAction={onFormAction}
                     onClose={onClose}
                     onPopupOpen={(slug) => handleInternalPopupOpen(slug, null, dataSlug)}

@@ -40,6 +40,10 @@ export interface SpaceWidget {
     widgetId: string;
     items: SearchFieldConfig[];
     align?: 'left' | 'center' | 'right';
+    /** 영역 테두리 표시 여부 (기본 true) */
+    showBorder?: boolean;
+    /** 영역 바탕색 (기본 'white') */
+    bgColor?: string;
 }
 
 /** 검색 위젯 */

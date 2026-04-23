@@ -85,6 +85,32 @@ export const findDuplicateKeys = (keys: string[]): string[] => {
 };
 
 /**
+ * SpaceWidget의 align 설정에 따라 외부 그리드 컬럼 위치(gridColumn) 계산
+ * - left  : span N (자동 배치, 기본)
+ * - center: 중앙 시작 위치 / span N
+ * - right : 오른쪽 끝 시작 위치 / span N
+ *
+ * @param align  SpaceWidget.align 값 ('left' | 'center' | 'right')
+ * @param colSpan 위젯이 차지하는 칸 수
+ * @param maxCols 외부 그리드 전체 칸 수 (기본 12)
+ * @example getSpaceGridColumn('center', 5, 12) // "4 / span 5"
+ */
+export const getSpaceGridColumn = (
+    align: 'left' | 'center' | 'right' | undefined,
+    colSpan: number,
+    maxCols: number = 12,
+): string => {
+    if (!align || align === 'left') return `span ${colSpan}`;
+    if (align === 'right') {
+        const start = maxCols - colSpan + 1;
+        return `${start} / span ${colSpan}`;
+    }
+    /* center */
+    const start = Math.floor((maxCols - colSpan) / 2) + 1;
+    return `${start} / span ${colSpan}`;
+};
+
+/**
  * 유튜브/Vimeo URL → embed URL 변환
  * @example toEmbedUrl("https://youtube.com/watch?v=...") // "https://www.youtube.com/embed/..."
  */

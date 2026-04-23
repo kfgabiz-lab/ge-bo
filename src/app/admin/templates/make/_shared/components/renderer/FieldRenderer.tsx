@@ -392,7 +392,7 @@ export function FieldRenderer({
                     type="button"
                     disabled={isPreview}
                     onClick={onButtonClick}
-                    className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] w-auto whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
+                    className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] min-w-[72px] w-auto whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
                 >
                     {field.label || '버튼'}
                 </button>

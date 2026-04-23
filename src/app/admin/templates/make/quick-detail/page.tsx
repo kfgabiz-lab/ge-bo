@@ -23,7 +23,7 @@ import { SpaceBuilder } from '../_shared/components/builder/SpaceBuilder';
 import { WidgetRenderer } from '../_shared/components/renderer';
 import type { SpaceWidget } from '../_shared/components/renderer';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
-import { toSlug } from '../_shared/utils';
+import { toSlug, getSpaceGridColumn } from '../_shared/utils';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem, LayerType, LayerWidth } from '../_shared/types';
 import { selectCls, inputCls } from '../_shared/styles';
@@ -266,7 +266,7 @@ export default function QuickDetailBuilderPage() {
                 colSpan: Math.min(prev.colSpan, 2),
                 widget: {
                     ...prev.widget,
-                    fields: prev.widget.fields.map(f => ({ ...f, colSpan: Math.min(f.colSpan, 2) })),
+                    fields: (prev.widget as FormWidget).fields.map(f => ({ ...f, colSpan: Math.min(f.colSpan, 2) })),
                 },
             }));
             setSpaceContent(prev => ({
@@ -274,7 +274,7 @@ export default function QuickDetailBuilderPage() {
                 colSpan: Math.min(prev.colSpan, 2),
                 widget: {
                     ...prev.widget,
-                    items: prev.widget.items.map(i => ({ ...i, colSpan: Math.min(i.colSpan ?? 1, 2) as 1|2|3|4|5 })),
+                    items: (prev.widget as SpaceWidget).items.map(i => ({ ...i, colSpan: Math.min(i.colSpan ?? 1, 2) as 1|2|3|4|5 })),
                 },
             }));
         }
@@ -640,7 +640,8 @@ export default function QuickDetailBuilderPage() {
                                     <div style={{ gridColumn: `span ${formContent.colSpan}`, gridRow: `span ${formContent.rowSpan}` }}>
                                         <WidgetRenderer mode="preview" widget={formContent.widget} contentColSpan={formContent.colSpan} />
                                     </div>
-                                    <div style={{ gridColumn: `span ${spaceContent.colSpan}`, gridRow: `span ${spaceContent.rowSpan}` }}>
+                                    {/* 공간영역 — align에 따라 외부 그리드 시작 위치 계산 */}
+                                    <div style={{ gridColumn: getSpaceGridColumn(spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined, spaceContent.colSpan, 12), gridRow: `span ${spaceContent.rowSpan}` }}>
                                         <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
                                     </div>
                                 </div>

@@ -23,7 +23,7 @@ import { SpaceBuilder } from '../_shared/components/builder/SpaceBuilder';
 import { TableBuilder, TableWidget } from '../_shared/components/builder/TableBuilder';
 import { WidgetRenderer } from '../_shared/components/renderer';
 import type { SpaceWidget, SearchWidget } from '../_shared/components/renderer';
-import { toSlug } from '../_shared/utils';
+import { toSlug, getSpaceGridColumn } from '../_shared/utils';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem } from '../_shared/types';
 import PageLayout from '@/components/layout/PageLayout';
@@ -484,7 +484,7 @@ export default function QuickListBuilderPage() {
 
                     {/* 미리보기 영역 — PageLayout으로 감싸서 실제 페이지 모양 표시 */}
                     <div className="bg-slate-100 rounded-xl min-h-[500px] overflow-y-auto p-6">
-                        <PageLayout title="목록 페이지 미리보기">
+                        <PageLayout>
                             <div
                                 style={{
                                     gridAutoRows: 'minmax(80px, auto)',
@@ -500,8 +500,8 @@ export default function QuickListBuilderPage() {
                                 <div style={{ gridColumn: `span ${searchContent.colSpan}`, gridRow: `span ${searchContent.rowSpan}` }}>
                                     <WidgetRenderer mode="preview" widget={searchContent.widget} />
                                 </div>
-                                {/* 공간영역 */}
-                                <div style={{ gridColumn: `span ${spaceContent.colSpan}`, gridRow: `span ${spaceContent.rowSpan}` }}>
+                                {/* 공간영역 — align에 따라 외부 그리드 시작 위치 계산 */}
+                                <div style={{ gridColumn: getSpaceGridColumn(spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined, spaceContent.colSpan, 12), gridRow: `span ${spaceContent.rowSpan}` }}>
                                     <WidgetRenderer mode="preview" widget={spaceContent.widget} />
                                 </div>
                                 {/* 데이터테이블 */}
