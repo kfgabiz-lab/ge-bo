@@ -24,6 +24,7 @@ import { WidgetRenderer } from '../_shared/components/renderer';
 import type { SpaceWidget } from '../_shared/components/renderer';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { toSlug, getSpaceGridColumn } from '../_shared/utils';
+import { saveTemplate } from '../_shared/templateApi';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem, LayerType, LayerWidth } from '../_shared/types';
 import { selectCls, inputCls } from '../_shared/styles';
@@ -171,8 +172,16 @@ export default function QuickDetailBuilderPage() {
     const handleLoadSelect = (tpl: TemplateItem) => {
         try {
             const config = JSON.parse(tpl.configJson);
-            setFormContent(config.formContent || createFormContent());
-            setSpaceContent(config.spaceContent || createSpaceContent());
+            if (config.widgetItems) {
+                /* 신규 구조: widgetItems[0]=Form, [1]=공간 */
+                const [fi, si] = config.widgetItems;
+                setFormContent(fi?.contents?.[0] || createFormContent());
+                setSpaceContent(si?.contents?.[0] || createSpaceContent());
+            } else {
+                /* 구버전 하위 호환 */
+                setFormContent(config.formContent || createFormContent());
+                setSpaceContent(config.spaceContent || createSpaceContent());
+            }
             setOutputMode(config.outputMode || 'page');
             setLayerType(config.layerType || 'center');
             setLayerTitle(config.layerTitle || '');
@@ -222,27 +231,37 @@ export default function QuickDetailBuilderPage() {
     /* ── 저장 처리 ── */
     const handleSaveConfirm = async () => {
         setIsSaving(true);
-        const configJson = JSON.stringify({ formContent, spaceContent, outputMode, layerType, layerTitle, layerWidth });
         try {
-            if (currentTemplateId) {
-                const res = await api.put(`/page-templates/${currentTemplateId}`, {
-                    name: saveModalName, slug: saveModalSlug, description: saveModalDesc,
-                    configJson, templateType: 'QUICK_DETAIL',
-                });
-                setCurrentTemplateName(res.data.name);
-                setSaveModalSlug(res.data.slug);
-                toast.success('템플릿이 수정되었습니다.');
-            } else {
-                const res = await api.post('/page-templates', {
-                    name: saveModalName, slug: saveModalSlug, description: saveModalDesc,
-                    configJson, templateType: 'QUICK_DETAIL',
-                });
-                setCurrentTemplateId(res.data.id);
-                setCurrentTemplateName(res.data.name);
-                setSaveModalSlug(res.data.slug);
-                toast.success('템플릿이 저장되었습니다.');
-            }
+            /* 빌더 내부 고정 구조 → widgetItems 배열로 변환하여 저장 */
+            const widgetItems = [
+                {
+                    id: 'wi-form',
+                    colSpan: 12,
+                    rowSpan: formContent.rowSpan,
+                    contents: [{ id: formContent.id, colSpan: formContent.colSpan, rowSpan: formContent.rowSpan, widget: formContent.widget as unknown as Record<string, unknown> }],
+                },
+                {
+                    id: 'wi-space',
+                    colSpan: 12,
+                    rowSpan: spaceContent.rowSpan,
+                    contents: [{ id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> }],
+                },
+            ];
+            /* outputMode, layerType 등 팝업 메타는 extra로 병합 */
+            const result = await saveTemplate({
+                id: currentTemplateId,
+                name: saveModalName,
+                slug: saveModalSlug,
+                description: saveModalDesc,
+                templateType: 'QUICK_DETAIL',
+                widgetItems,
+                extra: { outputMode, layerType, layerTitle, layerWidth },
+            });
+            setCurrentTemplateId(result.id);
+            setCurrentTemplateName(result.name);
+            setSaveModalSlug(result.slug);
             setShowSaveModal(false);
+            toast.success(currentTemplateId ? '템플릿이 수정되었습니다.' : '템플릿이 저장되었습니다.');
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg || '저장 중 오류가 발생했습니다.');
@@ -623,28 +642,34 @@ export default function QuickDetailBuilderPage() {
                                 );
                             }
 
-                            /* ── 페이지/중앙팝업: 12컬럼 그리드 ── */
-                            const gridCols = 12;
+                            /* ── 페이지/중앙팝업: PageLayout이 12칸 그리드 + 격자 담당 ── */
                             const grid = (
-                                <div
-                                    style={{
-                                        gridAutoRows: 'minmax(80px, auto)',
-                                        backgroundImage: `
-                                            linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
-                                            linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-                                        `,
-                                        backgroundSize: `calc(100% / ${gridCols}) 80px`,
-                                    }}
-                                    className="grid grid-cols-12 border border-slate-200 rounded-lg overflow-visible bg-slate-50"
-                                >
-                                    <div style={{ gridColumn: `span ${formContent.colSpan}`, gridRow: `span ${formContent.rowSpan}` }}>
-                                        <WidgetRenderer mode="preview" widget={formContent.widget} contentColSpan={formContent.colSpan} />
+                                <PageLayout mode="preview">
+                                    {/* WidgetCellPreview와 동일한 inner sub-grid — 80px 고정 행으로 배경 격자선과 정확히 일치 */}
+                                    <div style={{
+                                        gridColumn: 'span 12',
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(12, 1fr)',
+                                        gridAutoRows: '80px',
+                                        gridAutoFlow: 'row dense',
+                                    }}>
+                                        {/* Form 위젯 */}
+                                        <div style={{ gridColumn: `span ${formContent.colSpan}`, gridRow: `span ${formContent.rowSpan}` }}>
+                                            <WidgetRenderer mode="preview" widget={formContent.widget} contentColSpan={formContent.colSpan} />
+                                        </div>
+                                        {/* 공간영역 */}
+                                        <div style={{
+                                            gridColumn: getSpaceGridColumn(
+                                                spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined,
+                                                spaceContent.colSpan,
+                                                12,
+                                            ),
+                                            gridRow: `span ${spaceContent.rowSpan}`,
+                                        }}>
+                                            <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
+                                        </div>
                                     </div>
-                                    {/* 공간영역 — align에 따라 외부 그리드 시작 위치 계산 */}
-                                    <div style={{ gridColumn: getSpaceGridColumn(spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined, spaceContent.colSpan, 12), gridRow: `span ${spaceContent.rowSpan}` }}>
-                                        <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
-                                    </div>
-                                </div>
+                                </PageLayout>
                             );
 
                             /* LayerPopup 모드(중앙팝업): 팝업 레이아웃 컴포넌트로 감싸서 표시 */
@@ -656,12 +681,10 @@ export default function QuickDetailBuilderPage() {
                                 );
                             }
 
-                            /* Page 모드: PageLayout으로 감싸서 표시 */
+                            /* Page 모드: 그대로 표시 (PageLayout이 내부에 포함됨) */
                             return (
                                 <div className="p-6">
-                                    <PageLayout title="상세 페이지 미리보기">
-                                        {grid}
-                                    </PageLayout>
+                                    {grid}
                                 </div>
                             );
                         })()}

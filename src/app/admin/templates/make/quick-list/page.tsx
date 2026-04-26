@@ -24,6 +24,7 @@ import { TableBuilder, TableWidget } from '../_shared/components/builder/TableBu
 import { WidgetRenderer } from '../_shared/components/renderer';
 import type { SpaceWidget, SearchWidget } from '../_shared/components/renderer';
 import { toSlug, getSpaceGridColumn } from '../_shared/utils';
+import { saveTemplate } from '../_shared/templateApi';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem } from '../_shared/types';
 import PageLayout from '@/components/layout/PageLayout';
@@ -159,9 +160,18 @@ export default function QuickListBuilderPage() {
     const handleLoadSelect = (tpl: TemplateItem) => {
         try {
             const config = JSON.parse(tpl.configJson);
-            setSearchContent(config.searchContent || createSearchContent());
-            setSpaceContent(config.spaceContent   || createSpaceContent());
-            setTableContent(config.tableContent   || createTableContent());
+            if (config.widgetItems) {
+                /* 신규 구조: widgetItems[0]=검색, [1]=공간, [2]=테이블 */
+                const [si, pi, ti] = config.widgetItems;
+                setSearchContent(si?.contents?.[0] || createSearchContent());
+                setSpaceContent(pi?.contents?.[0]  || createSpaceContent());
+                setTableContent(ti?.contents?.[0]  || createTableContent());
+            } else {
+                /* 구버전 하위 호환 */
+                setSearchContent(config.searchContent || createSearchContent());
+                setSpaceContent(config.spaceContent   || createSpaceContent());
+                setTableContent(config.tableContent   || createTableContent());
+            }
             setCurrentTemplateId(tpl.id);
             setCurrentTemplateName(tpl.name);
             setSaveModalSlug(tpl.slug);
@@ -207,27 +217,41 @@ export default function QuickListBuilderPage() {
     /* ── 저장 처리 ── */
     const handleSaveConfirm = async () => {
         setIsSaving(true);
-        const configJson = JSON.stringify({ searchContent, spaceContent, tableContent });
         try {
-            if (currentTemplateId) {
-                const res = await api.put(`/page-templates/${currentTemplateId}`, {
-                    name: saveModalName, slug: saveModalSlug, description: saveModalDesc,
-                    configJson, templateType: 'QUICK_LIST',
-                });
-                setCurrentTemplateName(res.data.name);
-                setSaveModalSlug(res.data.slug);
-                toast.success('템플릿이 수정되었습니다.');
-            } else {
-                const res = await api.post('/page-templates', {
-                    name: saveModalName, slug: saveModalSlug, description: saveModalDesc,
-                    configJson, templateType: 'QUICK_LIST',
-                });
-                setCurrentTemplateId(res.data.id);
-                setCurrentTemplateName(res.data.name);
-                setSaveModalSlug(res.data.slug);
-                toast.success('템플릿이 저장되었습니다.');
-            }
+            /* 빌더 내부 고정 구조 → widgetItems 배열로 변환하여 저장 */
+            const widgetItems = [
+                {
+                    id: 'wi-search',
+                    colSpan: 12,
+                    rowSpan: searchContent.rowSpan,
+                    contents: [{ id: searchContent.id, colSpan: searchContent.colSpan, rowSpan: searchContent.rowSpan, widget: searchContent.widget as unknown as Record<string, unknown> }],
+                },
+                {
+                    id: 'wi-space',
+                    colSpan: 12,
+                    rowSpan: spaceContent.rowSpan,
+                    contents: [{ id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> }],
+                },
+                {
+                    id: 'wi-table',
+                    colSpan: 12,
+                    rowSpan: tableContent.rowSpan,
+                    contents: [{ id: tableContent.id, colSpan: tableContent.colSpan, rowSpan: tableContent.rowSpan, widget: tableContent.widget as unknown as Record<string, unknown> }],
+                },
+            ];
+            const result = await saveTemplate({
+                id: currentTemplateId,
+                name: saveModalName,
+                slug: saveModalSlug,
+                description: saveModalDesc,
+                templateType: 'QUICK_LIST',
+                widgetItems,
+            });
+            setCurrentTemplateId(result.id);
+            setCurrentTemplateName(result.name);
+            setSaveModalSlug(result.slug);
             setShowSaveModal(false);
+            toast.success(currentTemplateId ? '템플릿이 수정되었습니다.' : '템플릿이 저장되었습니다.');
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg || '저장 중 오류가 발생했습니다.');
@@ -482,27 +506,31 @@ export default function QuickListBuilderPage() {
                         </button>
                     </div>
 
-                    {/* 미리보기 영역 — PageLayout으로 감싸서 실제 페이지 모양 표시 */}
+                    {/* 미리보기 영역 — PageLayout이 12칸 그리드 + 격자 가이드라인 담당 */}
                     <div className="bg-slate-100 rounded-xl min-h-[500px] overflow-y-auto p-6">
-                        <PageLayout>
-                            <div
-                                style={{
-                                    gridAutoRows: 'minmax(80px, auto)',
-                                    backgroundImage: `
-                                        linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
-                                        linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-                                    `,
-                                    backgroundSize: `calc(100% / 12) 80px`,
-                                }}
-                                className="grid grid-cols-12 border border-slate-200 rounded-lg overflow-visible bg-slate-50"
-                            >
+                        <PageLayout mode="preview">
+                            {/* WidgetCellPreview와 동일한 inner sub-grid — 80px 고정 행으로 배경 격자선과 정확히 일치 */}
+                            <div style={{
+                                gridColumn: 'span 12',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(12, 1fr)',
+                                gridAutoRows: '80px',
+                                gridAutoFlow: 'row dense',
+                            }}>
                                 {/* 검색 */}
                                 <div style={{ gridColumn: `span ${searchContent.colSpan}`, gridRow: `span ${searchContent.rowSpan}` }}>
                                     <WidgetRenderer mode="preview" widget={searchContent.widget} />
                                 </div>
-                                {/* 공간영역 — align에 따라 외부 그리드 시작 위치 계산 */}
-                                <div style={{ gridColumn: getSpaceGridColumn(spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined, spaceContent.colSpan, 12), gridRow: `span ${spaceContent.rowSpan}` }}>
-                                    <WidgetRenderer mode="preview" widget={spaceContent.widget} />
+                                {/* 공간영역 */}
+                                <div style={{
+                                    gridColumn: getSpaceGridColumn(
+                                        spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined,
+                                        spaceContent.colSpan,
+                                        12,
+                                    ),
+                                    gridRow: `span ${spaceContent.rowSpan}`,
+                                }}>
+                                    <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
                                 </div>
                                 {/* 데이터테이블 */}
                                 <div style={{ gridColumn: `span ${tableContent.colSpan}`, gridRow: `span ${tableContent.rowSpan}` }}>

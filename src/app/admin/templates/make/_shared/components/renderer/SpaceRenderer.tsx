@@ -53,8 +53,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
     };
 
-    /* 테두리 유무에 따라 border 클래스 분기 — CSS Grid 레이아웃 */
-    const base = `h-full w-full rounded shadow-sm overflow-auto grid ${showBorder ? 'border border-slate-300' : ''}`;
+    /* 테두리 유무에 따라 border/shadow 클래스 분기 — CSS Grid 레이아웃 */
+    const base = `h-full w-full rounded overflow-auto grid ${showBorder ? 'border border-slate-300 shadow-sm' : ''}`;
 
     if (!items.length) {
         return (

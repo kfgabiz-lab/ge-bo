@@ -32,6 +32,7 @@ import type { SearchWidget, SpaceWidget, TextWidget } from '../_shared/component
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug, getSpaceGridColumn } from '../_shared/utils';
+import PageLayout from '@/components/layout/PageLayout';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
 import { TemplateItem } from '../_shared/types';
@@ -939,18 +940,8 @@ export default function PageBuilderPage() {
                                 <p className="text-xs text-slate-300 mt-1">좌측 패널에서 위젯을 추가하세요</p>
                             </div>
                         ) : (
-                            /* 12칸 그리드 — 모든 위젯 셀이 순서대로 배치됨 */
-                            <div
-                                style={{
-                                    gridAutoRows: 'minmax(80px, auto)',
-                                    backgroundImage: `
-                                    linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
-                                    linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-                                `,
-                                    backgroundSize: `calc(100% / 12) 80px`,
-                                }}
-                                className="grid grid-cols-12 border border-slate-200 rounded-lg overflow-visible bg-slate-50"
-                            >
+                            /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
+                            <PageLayout mode="preview">
                                 {widgetItems.map((item) => (
                                     <div
                                         key={item.id}
@@ -966,7 +957,7 @@ export default function PageBuilderPage() {
                                         <WidgetCellPreview contents={item.contents} colSpan={item.colSpan} />
                                     </div>
                                 ))}
-                            </div>
+                            </PageLayout>
                         )}
                     </div>
                 </div>

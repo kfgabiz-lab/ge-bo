@@ -24,6 +24,7 @@ import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/re
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
 import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types';
+import { getSpaceGridColumn } from '@/app/admin/templates/make/_shared/utils';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                      */
@@ -483,7 +484,10 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                                     <div
                                         key={c.id}
                                         style={{
-                                            gridColumn: `span ${Math.min(c.colSpan, item.colSpan)}`,
+                                            /* space 위젯: align 기반 그리드 열 위치 계산 (정렬 보장) */
+                                            gridColumn: c.widget.type === 'space'
+                                                ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, item.colSpan), item.colSpan)
+                                                : `span ${Math.min(c.colSpan, item.colSpan)}`,
                                             gridRow: `span ${c.rowSpan}`,
                                         }}
                                     >
