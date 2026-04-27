@@ -13,49 +13,22 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import PageLayout from '@/components/layout/PageLayout';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { useCodeStore } from '@/store/useCodeStore';
-import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
-import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/renderer';
+import { PageGridRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
+import type { AnyWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
 import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types';
-import { getSpaceGridColumn } from '@/app/admin/templates/make/_shared/utils';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                      */
 /* ══════════════════════════════════════════ */
-
-/** 테이블 위젯별 데이터 상태 */
-interface TableData {
-    rows: Record<string, unknown>[];
-    totalElements: number;
-    totalPages: number;
-    currentPage: number;
-    loading: boolean;
-    /* 무한 스크롤 전용 */
-    appendLoading: boolean;  // 기존 데이터 유지 + 하단 스피너
-    hasMore: boolean;        // 다음 페이지 존재 여부
-    nextPage: number;        // 다음에 불러올 페이지 번호
-}
-
-interface PageContentItem {
-    id: string;
-    colSpan: number;
-    rowSpan: number;
-    widget: AnyWidget;
-}
-
-interface PageWidgetItem {
-    id: string;
-    colSpan: number;
-    rowSpan: number;
-    contents: PageContentItem[];
-}
 
 interface WidgetConfig {
     widgetItems: PageWidgetItem[];
@@ -64,13 +37,6 @@ interface WidgetConfig {
 /* ══════════════════════════════════════════ */
 /*  상수 / 유틸                               */
 /* ══════════════════════════════════════════ */
-
-/** 12칸 그리드 colSpan 클래스 */
-const COL_SPAN_CLS: Record<number, string> = {
-    1: 'col-span-1', 2: 'col-span-2', 3: 'col-span-3', 4: 'col-span-4',
-    5: 'col-span-5', 6: 'col-span-6', 7: 'col-span-7', 8: 'col-span-8',
-    9: 'col-span-9', 10: 'col-span-10', 11: 'col-span-11', 12: 'col-span-12',
-};
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -103,14 +69,15 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     const [error, setError] = useState<string | null>(null);
     const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
 
+
     /* 검색 필드 값 — widgetItem 전체 공유 (fieldId 기준 키) */
     const [searchValues, setSearchValues] = useState<Record<string, string>>({});
     const searchValuesRef = useRef<Record<string, string>>({});
 
     /* 테이블별 데이터 상태 — key: tableWidget.widgetId */
-    const [tableDataMap, setTableDataMap] = useState<Record<string, TableData>>({});
+    const [tableDataMap, setPageTableDataMap] = useState<Record<string, PageTableData>>({});
     /* Observer 콜백에서 최신 tableDataMap 참조용 ref */
-    const tableDataMapRef = useRef<Record<string, TableData>>({});
+    const tableDataMapRef = useRef<Record<string, PageTableData>>({});
 
     /* 테이블별 정렬 상태 */
     const [sortKeyMap, setSortKeyMap] = useState<Record<string, string | null>>({});
@@ -149,7 +116,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
      * - sk: 정렬 키
      * - sd: 정렬 방향
      */
-    const fetchTableData = useCallback(async ({
+    const fetchPageTableData = useCallback(async ({
         tableWidget,
         connectedSlug,
         searchFields,
@@ -169,10 +136,10 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         append?: boolean;   // true: 스크롤 추가 로드, false: 전체 교체
     }) => {
         const wid = tableWidget.widgetId;
-        const defaultData: TableData = { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, loading: false, appendLoading: false, hasMore: true, nextPage: 0 };
+        const defaultData: PageTableData = { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, loading: false, appendLoading: false, hasMore: true, nextPage: 0 };
 
         /* 로딩 상태 — append면 기존 데이터 유지 + 하단 스피너, 아니면 전체 로딩 */
-        setTableDataMap(prev => ({
+        setPageTableDataMap(prev => ({
             ...prev,
             [wid]: append
                 ? { ...(prev[wid] ?? defaultData), appendLoading: true }
@@ -200,7 +167,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 .map(item => ({ _id: item.id, ...item.dataJson }));
 
             const hasMore = res.data.last === false; // 백엔드 DTO에 추가된 last 필드 사용
-            setTableDataMap(prev => ({
+            setPageTableDataMap(prev => ({
                 ...prev,
                 [wid]: {
                     /* append면 기존 행 뒤에 추가, 아니면 교체 */
@@ -216,7 +183,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             }));
         } catch {
             toast.error('데이터를 불러오는 중 오류가 발생했습니다.');
-            setTableDataMap(prev => ({
+            setPageTableDataMap(prev => ({
                 ...prev,
                 [wid]: { ...(prev[wid] ?? defaultData), loading: false, appendLoading: false },
             }));
@@ -242,7 +209,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
 
                     /* 연결된 모든 Search 위젯의 필드를 합산 */
                     const searchFields = w.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-                    fetchTableData({ tableWidget: w, connectedSlug, searchFields, sv: {} });
+                    fetchPageTableData({ tableWidget: w, connectedSlug, searchFields, sv: {} });
                 });
             })
             .catch(() => setError('페이지를 불러오는 중 오류가 발생했습니다.'))
@@ -277,9 +244,9 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             const searchFields = w.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
             const sk = sortKeyMap[w.widgetId] ?? undefined;
             const sd = sortDirMap[w.widgetId] ?? 'asc';
-            fetchTableData({ tableWidget: w, connectedSlug, searchFields, sv, page: 0, sk, sd });
+            fetchPageTableData({ tableWidget: w, connectedSlug, searchFields, sv, page: 0, sk, sd });
         });
-    }, [widgetItems, sortKeyMap, sortDirMap, fetchTableData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, sortKeyMap, sortDirMap, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * 초기화 — 검색값 비우고 데이터 재fetch
@@ -295,9 +262,9 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             const connectedSlug = w.connectedSlug;
             if (!connectedSlug) return;
             const searchFields = w.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-            fetchTableData({ tableWidget: w, connectedSlug, searchFields, sv: {}, page: 0 });
+            fetchPageTableData({ tableWidget: w, connectedSlug, searchFields, sv: {}, page: 0 });
         });
-    }, [widgetItems, fetchTableData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * 페이지 이동 — 해당 Table 위젯 데이터 재fetch
@@ -315,8 +282,8 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         const searchFields = tableWidget.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
         const sk = sortKeyMap[tableWidgetId] ?? undefined;
         const sd = sortDirMap[tableWidgetId] ?? 'asc';
-        fetchTableData({ tableWidget, connectedSlug, searchFields, sv, page, sk, sd });
-    }, [widgetItems, sortKeyMap, sortDirMap, fetchTableData]); // eslint-disable-line react-hooks/exhaustive-deps
+        fetchPageTableData({ tableWidget, connectedSlug, searchFields, sv, page, sk, sd });
+    }, [widgetItems, sortKeyMap, sortDirMap, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * 정렬 변경 — 해당 Table 위젯 데이터 재fetch
@@ -335,8 +302,8 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         const connectedSlug = tableWidget.connectedSlug;
         if (!connectedSlug) return;
         const searchFields = tableWidget.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-        fetchTableData({ tableWidget, connectedSlug, searchFields, sv, page: 0, sk: accessor, sd: dir });
-    }, [widgetItems, fetchTableData]); // eslint-disable-line react-hooks/exhaustive-deps
+        fetchPageTableData({ tableWidget, connectedSlug, searchFields, sv, page: 0, sk: accessor, sd: dir });
+    }, [widgetItems, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * Form 필드값 변경 — widgetId별로 독립 관리
@@ -417,7 +384,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         const connectedSlug = tableWidget.connectedSlug;
         if (!connectedSlug) return;
         const searchFields = tableWidget.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-        fetchTableData({
+        fetchPageTableData({
             tableWidget,
             connectedSlug,
             searchFields,
@@ -427,7 +394,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             sd: sortDirMap[tableWidgetId] ?? 'asc',
             append: true,
         });
-    }, [widgetItems, sortKeyMap, sortDirMap, fetchTableData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, sortKeyMap, sortDirMap, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ── 로딩 ── */
     if (loading) {
@@ -449,83 +416,25 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     }
 
     return (
-        <div className="space-y-0">
-            {/* 페이지 제목 */}
-            {menuName && (
-                <h1 className="text-lg font-bold text-slate-900 mb-4">{menuName}</h1>
-            )}
-
-            {/* 12칸 그리드 레이아웃 — 빌더 미리보기와 동일한 행 간격 적용 */}
-            <div
-                className="grid grid-cols-12 gap-3"
-                style={{ gridAutoRows: 'minmax(80px, auto)' }}
-            >
-                {widgetItems.map(item => (
-                    <div
-                        key={item.id}
-                        className={COL_SPAN_CLS[item.colSpan] || 'col-span-12'}
-                        style={{ gridRow: `span ${item.rowSpan}` }}
-                    >
-                        <div
-                            className="h-full w-full p-0.5"
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: `repeat(${item.colSpan}, 1fr)`,
-                                gridAutoRows: '80px',
-                                gridAutoFlow: 'row dense',
-                                gap: '8px',
-                            }}
-                        >
-                            {item.contents.map(c => {
-                                /* text 제외 모든 위젯에 widgetId 있음 — 테이블/검색 props 바인딩 용 */
-                                const wid = (c.widget as { widgetId?: string }).widgetId ?? '';
-                                const td = tableDataMap[wid];
-                                return (
-                                    <div
-                                        key={c.id}
-                                        style={{
-                                            /* space 위젯: align 기반 그리드 열 위치 계산 (정렬 보장) */
-                                            gridColumn: c.widget.type === 'space'
-                                                ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, item.colSpan), item.colSpan)
-                                                : `span ${Math.min(c.colSpan, item.colSpan)}`,
-                                            gridRow: `span ${c.rowSpan}`,
-                                        }}
-                                    >
-                                        <WidgetRenderer
-                                            mode="live"
-                                            widget={c.widget}
-                                            contentColSpan={c.colSpan}
-                                            /* search props */
-                                            searchValues={searchValues}
-                                            onSearchChange={updateSearchValue}
-                                            onSearch={() => handleSearch(wid)}
-                                            onReset={() => handleReset(wid)}
-                                            codeGroups={codeGroups}
-                                            /* form props */
-                                            formValues={formValuesMap[wid] ?? {}}
-                                            onFormValuesChange={(fieldId, value) => updateFormValue(wid, fieldId, value)}
-                                            onFormAction={handleFormAction}
-                                            /* table props — widgetId 바인딩으로 각 테이블 독립 상태 관리 */
-                                            tableData={td?.rows}
-                                            tableLoading={td?.loading}
-                                            sortKey={sortKeyMap[wid] ?? null}
-                                            sortDir={sortDirMap[wid] ?? 'asc'}
-                                            onSort={(accessor, dir) => handleSortChange(wid, accessor, dir)}
-                                            totalElements={td?.totalElements}
-                                            totalPages={td?.totalPages}
-                                            currentPage={td?.currentPage}
-                                            onPageChange={(page) => handlePageChange(wid, page)}
-                                            onLoadMore={() => handleLoadMore(wid)}
-                                            appendLoading={td?.appendLoading}
-                                            hasMore={td?.hasMore ?? true}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
+        <PageLayout mode="live" title={menuName ?? undefined}>
+            <PageGridRenderer
+                mode="live"
+                widgetItems={widgetItems}
+                searchValues={searchValues}
+                onSearchChange={updateSearchValue}
+                onSearch={handleSearch}
+                onReset={handleReset}
+                codeGroups={codeGroups}
+                formValuesMap={formValuesMap}
+                onFormValuesChange={updateFormValue}
+                onFormAction={handleFormAction}
+                tableDataMap={tableDataMap}
+                sortKeyMap={sortKeyMap}
+                sortDirMap={sortDirMap}
+                onSort={handleSortChange}
+                onPageChange={handlePageChange}
+                onLoadMore={handleLoadMore}
+            />
+        </PageLayout>
     );
 }

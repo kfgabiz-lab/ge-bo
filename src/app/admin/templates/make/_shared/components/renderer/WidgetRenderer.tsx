@@ -567,6 +567,7 @@ export function WidgetRenderer({
             <SearchRenderer
                 mode={mode}
                 rows={widget.rows ?? []}
+                displayStyle={widget.displayStyle}
                 values={searchValues}
                 onChangeValues={onSearchChange}
                 onSearch={onSearch}
@@ -639,6 +640,10 @@ export function WidgetRenderer({
             <FormRenderer
                 mode={mode}
                 fields={widget.fields}
+                title={widget.title}
+                description={widget.description}
+                showBorder={widget.showBorder}
+                bgColor={widget.bgColor}
                 contentColSpan={contentColSpan}
                 codeGroups={codeGroups}
                 values={formValues}

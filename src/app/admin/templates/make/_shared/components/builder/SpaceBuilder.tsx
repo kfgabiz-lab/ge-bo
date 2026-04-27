@@ -43,6 +43,7 @@ const uid = createIdGenerator('sp');
  */
 export const BG_COLOR_OPTIONS: { value: string; label: string }[] = [
     { value: 'none',    label: '없음' },
+    { value: '#ffffff', label: '흰색' },
     { value: '#0f172a', label: '검정' },
     { value: '#10b981', label: '초록' },
     { value: '#3b82f6', label: '파랑' },

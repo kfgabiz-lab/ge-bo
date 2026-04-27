@@ -13,7 +13,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     ChevronDown, Save, Loader2, Wand2,
-    Search, AlignLeft, TableProperties,
     FolderOpen, Copy, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,9 +20,11 @@ import api from '@/lib/api';
 import { SearchWidgetBuilder } from '../_shared/components/builder/SearchWidgetBuilder';
 import { SpaceBuilder } from '../_shared/components/builder/SpaceBuilder';
 import { TableBuilder, TableWidget } from '../_shared/components/builder/TableBuilder';
-import { WidgetRenderer } from '../_shared/components/renderer';
-import type { SpaceWidget, SearchWidget } from '../_shared/components/renderer';
-import { toSlug, getSpaceGridColumn } from '../_shared/utils';
+import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
+import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
+import { PageGridRenderer } from '../_shared/components/renderer';
+import type { SpaceWidget, SearchWidget, PageContentItem } from '../_shared/components/renderer';
+import { toSlug } from '../_shared/utils';
 import { saveTemplate } from '../_shared/templateApi';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem } from '../_shared/types';
@@ -40,21 +41,6 @@ interface FixedContentItem<W> {
     rowSpan: number;
     widget: W;
 }
-
-/* ══════════════════════════════════════════ */
-/*  위젯 메타 (좌측 패널 헤더 표시용)           */
-/* ══════════════════════════════════════════ */
-const WIDGET_META: Record<string, { label: string; color: string }> = {
-    search: { label: '검색',        color: 'text-sky-700' },
-    space:  { label: '공간영역',     color: 'text-amber-700' },
-    table:  { label: '데이터테이블', color: 'text-indigo-700' },
-};
-
-const WIDGET_ICON: Record<string, React.ReactNode> = {
-    search: <Search       className="w-3.5 h-3.5" />,
-    space:  <AlignLeft    className="w-3.5 h-3.5" />,
-    table:  <TableProperties className="w-3.5 h-3.5" />,
-};
 
 /* ══════════════════════════════════════════ */
 /*  초기 컨텐츠 생성                           */
@@ -161,11 +147,23 @@ export default function QuickListBuilderPage() {
         try {
             const config = JSON.parse(tpl.configJson);
             if (config.widgetItems) {
-                /* 신규 구조: widgetItems[0]=검색, [1]=공간, [2]=테이블 */
-                const [si, pi, ti] = config.widgetItems;
-                setSearchContent(si?.contents?.[0] || createSearchContent());
-                setSpaceContent(pi?.contents?.[0]  || createSpaceContent());
-                setTableContent(ti?.contents?.[0]  || createTableContent());
+                type C = { widget?: { type?: string } };
+                if (config.widgetItems.length === 1) {
+                    /* 신규 구조: 1개 outer item, contents 배열에서 위젯 타입으로 탐색 */
+                    const contents = (config.widgetItems[0]?.contents ?? []) as C[];
+                    const si = contents.find(c => c.widget?.type === 'search') as FixedContentItem<SearchWidget> | undefined;
+                    const pi = contents.find(c => c.widget?.type === 'space')  as FixedContentItem<SpaceWidget>  | undefined;
+                    const ti = contents.find(c => c.widget?.type === 'table')  as FixedContentItem<TableWidget>  | undefined;
+                    setSearchContent(si || createSearchContent());
+                    setSpaceContent(pi  || createSpaceContent());
+                    setTableContent(ti  || createTableContent());
+                } else {
+                    /* 구버전 구조: 3개 separate outer items (하위 호환) */
+                    const [si, pi, ti] = config.widgetItems;
+                    setSearchContent(si?.contents?.[0] || createSearchContent());
+                    setSpaceContent(pi?.contents?.[0]  || createSpaceContent());
+                    setTableContent(ti?.contents?.[0]  || createTableContent());
+                }
             } else {
                 /* 구버전 하위 호환 */
                 setSearchContent(config.searchContent || createSearchContent());
@@ -218,27 +216,17 @@ export default function QuickListBuilderPage() {
     const handleSaveConfirm = async () => {
         setIsSaving(true);
         try {
-            /* 빌더 내부 고정 구조 → widgetItems 배열로 변환하여 저장 */
-            const widgetItems = [
-                {
-                    id: 'wi-search',
-                    colSpan: 12,
-                    rowSpan: searchContent.rowSpan,
-                    contents: [{ id: searchContent.id, colSpan: searchContent.colSpan, rowSpan: searchContent.rowSpan, widget: searchContent.widget as unknown as Record<string, unknown> }],
-                },
-                {
-                    id: 'wi-space',
-                    colSpan: 12,
-                    rowSpan: spaceContent.rowSpan,
-                    contents: [{ id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> }],
-                },
-                {
-                    id: 'wi-table',
-                    colSpan: 12,
-                    rowSpan: tableContent.rowSpan,
-                    contents: [{ id: tableContent.id, colSpan: tableContent.colSpan, rowSpan: tableContent.rowSpan, widget: tableContent.widget as unknown as Record<string, unknown> }],
-                },
-            ];
+            /* 미리보기와 동일한 1개 outer item 구조로 저장 → 운영 페이지와 완전 일치 */
+            const widgetItems = [{
+                id: 'wi-all',
+                colSpan: 12,
+                rowSpan: searchContent.rowSpan + spaceContent.rowSpan + tableContent.rowSpan,
+                contents: [
+                    { id: searchContent.id, colSpan: searchContent.colSpan, rowSpan: searchContent.rowSpan, widget: searchContent.widget as unknown as Record<string, unknown> },
+                    { id: spaceContent.id,  colSpan: spaceContent.colSpan,  rowSpan: spaceContent.rowSpan,  widget: spaceContent.widget  as unknown as Record<string, unknown> },
+                    { id: tableContent.id,  colSpan: tableContent.colSpan,  rowSpan: tableContent.rowSpan,  widget: tableContent.widget  as unknown as Record<string, unknown> },
+                ],
+            }];
             const result = await saveTemplate({
                 id: currentTemplateId,
                 name: saveModalName,
@@ -276,62 +264,6 @@ export default function QuickListBuilderPage() {
     );
 
     /* ── 공통: 컨텐츠 행 헤더 렌더 ── */
-    const renderContentRow = (
-        id: string,
-        widgetType: string,
-        label: string,
-        colSpan: number,
-        rowSpan: number,
-        onColSpanChange: (v: number) => void,
-        onRowSpanChange: (v: number) => void,
-        children: React.ReactNode,
-    ) => (
-        <div className="border-t border-slate-100">
-            {/* 헤더 (클릭 시 설정 패널 토글) */}
-            <div
-                className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer transition-all ${editingContentId === id ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
-                onClick={() => setEditingContentId(editingContentId === id ? null : id)}
-            >
-                <span className={WIDGET_META[widgetType].color}>{WIDGET_ICON[widgetType]}</span>
-                <span className={`text-[10px] font-semibold flex-1 truncate ${WIDGET_META[widgetType].color}`}>
-                    {label}
-                </span>
-                <span className="text-[9px] text-slate-300 flex-shrink-0 font-mono">{colSpan}×{rowSpan}</span>
-                <span className="text-[9px] text-slate-300 flex-shrink-0">고정</span>
-            </div>
-
-            {/* 설정 패널 */}
-            {editingContentId === id && (
-                <div className="border-t border-slate-100 bg-slate-50/50">
-                    {/* 크기 설정 */}
-                    <div className="px-3 pt-2 pb-1.5 border-b border-slate-100 flex items-center gap-2">
-                        <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">크기</span>
-                        <div className="flex items-center gap-1 flex-1">
-                            <span className="text-[10px] text-slate-400">Col</span>
-                            <input
-                                type="number" min={1} max={12} value={colSpan}
-                                onChange={e => onColSpanChange(Number(e.target.value) || 1)}
-                                className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                            />
-                            <span className="text-[10px] text-slate-300">/ 12</span>
-                        </div>
-                        <div className="flex items-center gap-1 flex-1">
-                            <span className="text-[10px] text-slate-400">Row</span>
-                            <input
-                                type="number" min={1} max={20} value={rowSpan}
-                                onChange={e => onRowSpanChange(Number(e.target.value) || 1)}
-                                className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                            />
-                        </div>
-                    </div>
-                    {/* 위젯 설정 */}
-                    <div className="px-3 pb-2 pt-1">
-                        {children}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
 
     /* ═══════════════════════════════════════ */
     /*  렌더                                    */
@@ -434,56 +366,98 @@ export default function QuickListBuilderPage() {
                             </div>
 
                             {/* ── 검색 컨텐츠 행 ── */}
-                            {renderContentRow(
-                                'fixed-search',
-                                'search',
-                                `검색${searchContent.widget.contentKey ? ` — ${searchContent.widget.contentKey}` : ''}`,
-                                searchContent.colSpan,
-                                searchContent.rowSpan,
-                                v => updateSize(setSearchContent, v, searchContent.rowSpan),
-                                v => updateSize(setSearchContent, searchContent.colSpan, v),
-                                <SearchWidgetBuilder
-                                    widget={searchContent.widget}
-                                    onChange={w => setSearchContent(prev => ({ ...prev, widget: w }))}
-                                />,
-                            )}
+                            <div className="border-t border-slate-100">
+                                <ContentRowHeader
+                                    widgetType="search"
+                                    label={`검색${searchContent.widget.contentKey ? ` — ${searchContent.widget.contentKey}` : ''}`}
+                                    colSpan={searchContent.colSpan}
+                                    rowSpan={searchContent.rowSpan}
+                                    isEditing={editingContentId === 'fixed-search'}
+                                    isFixed
+                                    onToggle={() => setEditingContentId(editingContentId === 'fixed-search' ? null : 'fixed-search')}
+                                />
+                                {editingContentId === 'fixed-search' && (
+                                    <div className="border-t border-slate-100 bg-slate-50/50">
+                                        <SizeSettingPanel
+                                            colSpan={searchContent.colSpan}
+                                            rowSpan={searchContent.rowSpan}
+                                            onColSpanChange={(v: number) => updateSize(setSearchContent, v, searchContent.rowSpan)}
+                                            onRowSpanChange={(v: number) => updateSize(setSearchContent, searchContent.colSpan, v)}
+                                        />
+                                        <div className="px-3 pb-2 pt-1">
+                                            <SearchWidgetBuilder
+                                                widget={searchContent.widget}
+                                                onChange={w => setSearchContent(prev => ({ ...prev, widget: w }))}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* ── 공간영역 컨텐츠 행 ── */}
-                            {renderContentRow(
-                                'fixed-space',
-                                'space',
-                                '공간영역',
-                                spaceContent.colSpan,
-                                spaceContent.rowSpan,
-                                v => updateSize(setSpaceContent, v, spaceContent.rowSpan),
-                                v => updateSize(setSpaceContent, spaceContent.colSpan, v),
-                                <SpaceBuilder
-                                    widget={spaceContent.widget}
-                                    onChange={w => setSpaceContent(prev => ({ ...prev, widget: w }))}
-                                    pageTemplates={pageTemplates}
-                                    actionButtonOnly={true}
-                                />,
-                            )}
+                            <div className="border-t border-slate-100">
+                                <ContentRowHeader
+                                    widgetType="space"
+                                    label="공간영역"
+                                    colSpan={spaceContent.colSpan}
+                                    rowSpan={spaceContent.rowSpan}
+                                    isEditing={editingContentId === 'fixed-space'}
+                                    isFixed
+                                    onToggle={() => setEditingContentId(editingContentId === 'fixed-space' ? null : 'fixed-space')}
+                                />
+                                {editingContentId === 'fixed-space' && (
+                                    <div className="border-t border-slate-100 bg-slate-50/50">
+                                        <SizeSettingPanel
+                                            colSpan={spaceContent.colSpan}
+                                            rowSpan={spaceContent.rowSpan}
+                                            onColSpanChange={(v: number) => updateSize(setSpaceContent, v, spaceContent.rowSpan)}
+                                            onRowSpanChange={(v: number) => updateSize(setSpaceContent, spaceContent.colSpan, v)}
+                                        />
+                                        <div className="px-3 pb-2 pt-1">
+                                            <SpaceBuilder
+                                                widget={spaceContent.widget}
+                                                onChange={w => setSpaceContent(prev => ({ ...prev, widget: w }))}
+                                                pageTemplates={pageTemplates}
+                                                actionButtonOnly={true}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* ── 데이터테이블 컨텐츠 행 ── */}
-                            {renderContentRow(
-                                'fixed-table',
-                                'table',
-                                `데이터테이블${tableContent.widget.contentKey ? ` — ${tableContent.widget.contentKey}` : ''}`,
-                                tableContent.colSpan,
-                                tableContent.rowSpan,
-                                v => updateSize(setTableContent, v, tableContent.rowSpan),
-                                v => updateSize(setTableContent, tableContent.colSpan, v),
-                                <TableBuilder
-                                    widget={tableContent.widget}
-                                    searchWidgets={[{
-                                        widgetId: searchContent.widget.widgetId,
-                                        contentKey: searchContent.widget.contentKey,
-                                    }]}
-                                    slugOptions={slugOptions}
-                                    onChange={w => setTableContent(prev => ({ ...prev, widget: w }))}
-                                />,
-                            )}
+                            <div className="border-t border-slate-100">
+                                <ContentRowHeader
+                                    widgetType="table"
+                                    label={`데이터테이블${tableContent.widget.contentKey ? ` — ${tableContent.widget.contentKey}` : ''}`}
+                                    colSpan={tableContent.colSpan}
+                                    rowSpan={tableContent.rowSpan}
+                                    isEditing={editingContentId === 'fixed-table'}
+                                    isFixed
+                                    onToggle={() => setEditingContentId(editingContentId === 'fixed-table' ? null : 'fixed-table')}
+                                />
+                                {editingContentId === 'fixed-table' && (
+                                    <div className="border-t border-slate-100 bg-slate-50/50">
+                                        <SizeSettingPanel
+                                            colSpan={tableContent.colSpan}
+                                            rowSpan={tableContent.rowSpan}
+                                            onColSpanChange={(v: number) => updateSize(setTableContent, v, tableContent.rowSpan)}
+                                            onRowSpanChange={(v: number) => updateSize(setTableContent, tableContent.colSpan, v)}
+                                        />
+                                        <div className="px-3 pb-2 pt-1">
+                                            <TableBuilder
+                                                widget={tableContent.widget}
+                                                searchWidgets={[{
+                                                    widgetId: searchContent.widget.widgetId,
+                                                    contentKey: searchContent.widget.contentKey,
+                                                }]}
+                                                slugOptions={slugOptions}
+                                                onChange={w => setTableContent(prev => ({ ...prev, widget: w }))}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -506,37 +480,18 @@ export default function QuickListBuilderPage() {
                         </button>
                     </div>
 
-                    {/* 미리보기 영역 — PageLayout이 12칸 그리드 + 격자 가이드라인 담당 */}
+                    {/* 미리보기 영역 — PageLayout + PageGridRenderer로 운영화면과 동일한 함수 사용 */}
                     <div className="bg-slate-100 rounded-xl min-h-[500px] overflow-y-auto p-6">
                         <PageLayout mode="preview">
-                            {/* WidgetCellPreview와 동일한 inner sub-grid — 80px 고정 행으로 배경 격자선과 정확히 일치 */}
-                            <div style={{
-                                gridColumn: 'span 12',
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(12, 1fr)',
-                                gridAutoRows: '80px',
-                                gridAutoFlow: 'row dense',
-                            }}>
-                                {/* 검색 */}
-                                <div style={{ gridColumn: `span ${searchContent.colSpan}`, gridRow: `span ${searchContent.rowSpan}` }}>
-                                    <WidgetRenderer mode="preview" widget={searchContent.widget} />
-                                </div>
-                                {/* 공간영역 */}
-                                <div style={{
-                                    gridColumn: getSpaceGridColumn(
-                                        spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined,
-                                        spaceContent.colSpan,
-                                        12,
-                                    ),
-                                    gridRow: `span ${spaceContent.rowSpan}`,
-                                }}>
-                                    <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
-                                </div>
-                                {/* 데이터테이블 */}
-                                <div style={{ gridColumn: `span ${tableContent.colSpan}`, gridRow: `span ${tableContent.rowSpan}` }}>
-                                    <WidgetRenderer mode="preview" widget={tableContent.widget} />
-                                </div>
-                            </div>
+                            <PageGridRenderer
+                                mode="preview"
+                                widgetItems={[{
+                                    id: 'preview-all',
+                                    colSpan: 12,
+                                    rowSpan: searchContent.rowSpan + spaceContent.rowSpan + tableContent.rowSpan,
+                                    contents: [searchContent, spaceContent, tableContent] as PageContentItem[],
+                                }]}
+                            />
                         </PageLayout>
                     </div>
                 </div>

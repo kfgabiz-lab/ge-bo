@@ -87,23 +87,7 @@ export const SaveModal = ({
 
                 {/* 입력 필드 */}
                 <div className="px-6 py-5 space-y-4">
-                    <div>
-                        <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
-                            템플릿 이름 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={e => {
-                                onNameChange(e.target.value);
-                                /* 신규 저장 모드에서만 slug 자동 갱신 — 수정 모드에서는 기존 slug 유지 */
-                                if (!isEdit && toSlug && !slugManuallyEdited.current) onSlugChange(toSlug(e.target.value));
-                            }}
-                            placeholder="예: 회원 등록 팝업"
-                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
-                            autoFocus
-                        />
-                    </div>
+                    {/* Slug — 먼저 선택, 선택 시 템플릿 이름 자동 입력 */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
                             Slug <span className="text-red-500">*</span>
@@ -112,7 +96,6 @@ export const SaveModal = ({
                             /* 수정 모드: 기본 읽기 전용, 편집 버튼 클릭 시 자동완성 드롭다운 활성화 */
                             <div className="flex items-center gap-1.5">
                                 {slugEditEnabled ? (
-                                    /* 편집 활성화 시 — 자동완성 드롭다운 (신규 모드와 동일) */
                                     <div className="relative flex-1">
                                         <input
                                             type="text"
@@ -127,7 +110,6 @@ export const SaveModal = ({
                                             className="w-full border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
                                         />
                                         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-
                                         {showSlugDrop && (
                                             <>
                                                 <div className="fixed inset-0 z-10" onClick={() => setShowSlugDrop(false)} />
@@ -140,7 +122,13 @@ export const SaveModal = ({
                                                         <button
                                                             key={o.id}
                                                             type="button"
-                                                            onClick={() => { onSlugChange(o.slug); setSlugSearch(''); setShowSlugDrop(false); }}
+                                                            onClick={() => {
+                                                                onSlugChange(o.slug);
+                                                                /* slug 선택 시 별칭을 템플릿 이름에 자동 입력 */
+                                                                onNameChange(o.name);
+                                                                setSlugSearch('');
+                                                                setShowSlugDrop(false);
+                                                            }}
                                                             className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
                                                         >
                                                             <p className="text-xs font-mono font-medium text-slate-800">{o.slug}</p>
@@ -152,7 +140,6 @@ export const SaveModal = ({
                                         )}
                                     </div>
                                 ) : (
-                                    /* 편집 비활성화 시 — 읽기 전용 표시 */
                                     <input
                                         type="text"
                                         value={slug}
@@ -173,7 +160,7 @@ export const SaveModal = ({
                                 </button>
                             </div>
                         ) : (
-                            /* 신규 저장: slug-registry PAGE_TEMPLATE 목록에서 자동완성 선택 */
+                            /* 신규 저장: slug 선택 시 별칭을 템플릿 이름에 자동 입력 */
                             <div className="relative">
                                 <input
                                     type="text"
@@ -185,10 +172,10 @@ export const SaveModal = ({
                                     }}
                                     onFocus={() => { setSlugSearch(''); setShowSlugDrop(true); }}
                                     placeholder="slug 검색 후 선택..."
+                                    autoFocus
                                     className="w-full border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
                                 />
                                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-
                                 {showSlugDrop && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setShowSlugDrop(false)} />
@@ -201,7 +188,13 @@ export const SaveModal = ({
                                                 <button
                                                     key={o.id}
                                                     type="button"
-                                                    onClick={() => { onSlugChange(o.slug); setSlugSearch(''); setShowSlugDrop(false); }}
+                                                    onClick={() => {
+                                                        onSlugChange(o.slug);
+                                                        /* slug 선택 시 별칭을 템플릿 이름에 자동 입력 */
+                                                        onNameChange(o.name);
+                                                        setSlugSearch('');
+                                                        setShowSlugDrop(false);
+                                                    }}
                                                     className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
                                                 >
                                                     <p className="text-xs font-mono font-medium text-slate-800">{o.slug}</p>
@@ -214,6 +207,21 @@ export const SaveModal = ({
                             </div>
                         )}
                     </div>
+
+                    {/* 템플릿 이름 — slug 선택 후 별칭이 자동 입력됨, 수정 가능 */}
+                    <div>
+                        <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
+                            템플릿 이름 <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={e => onNameChange(e.target.value)}
+                            placeholder="예: 회원 등록 팝업"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                        />
+                    </div>
+
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
                             설명 <span className="text-slate-400 font-normal">(선택)</span>

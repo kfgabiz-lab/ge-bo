@@ -27,6 +27,8 @@ import {
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
+import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
+import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
 import { WidgetRenderer } from '../_shared/components/renderer';
 import type { SearchWidget, SpaceWidget, TextWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
@@ -757,65 +759,27 @@ export default function PageBuilderPage() {
                                                                             <div className="border-t border-slate-100">
 
                                                                                 {/* 컨텐츠 헤더 */}
-                                                                                <div
-                                                                                    className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer transition-all ${editingContentId === content.id ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
-                                                                                    onClick={() => setEditingContentId(editingContentId === content.id ? null : content.id)}
-                                                                                >
-                                                                                    {/* 그립 핸들 */}
-                                                                                    <span
-                                                                                        {...handleProps}
-                                                                                        onClick={e => e.stopPropagation()}
-                                                                                        className="cursor-grab text-slate-300 hover:text-slate-500 flex-shrink-0"
-                                                                                    >
-                                                                                        <GripVertical className="w-3 h-3" />
-                                                                                    </span>
-                                                                                    <span className={`flex-shrink-0 ${WIDGET_META[content.widget.type as PageWidgetType]?.color ?? ''}`}>
-                                                                                        {WIDGET_ICON[content.widget.type as PageWidgetType]}
-                                                                                    </span>
-                                                                                    <span className={`text-[10px] font-semibold flex-1 truncate ${WIDGET_META[content.widget.type as PageWidgetType]?.color ?? ''}`}>
-                                                                                        {WIDGET_META[content.widget.type as PageWidgetType]?.label ?? content.widget.type}
-                                                                                        {'contentKey' in content.widget && (content.widget as { contentKey: string }).contentKey
-                                                                                            ? ` — ${(content.widget as { contentKey: string }).contentKey}`
-                                                                                            : ''}
-                                                                                    </span>
-                                                                                    {/* col × row 배지 */}
-                                                                                    <span className="text-[9px] text-slate-300 flex-shrink-0 font-mono">
-                                                                                        {content.colSpan}×{content.rowSpan}
-                                                                                    </span>
-                                                                                    <button
-                                                                                        onClick={e => { e.stopPropagation(); removeContent(item.id, content.id); }}
-                                                                                        className="p-0.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0"
-                                                                                    >
-                                                                                        <X className="w-3 h-3" />
-                                                                                    </button>
-                                                                                </div>
+                                                                                <ContentRowHeader
+                                                                                    widgetType={content.widget.type}
+                                                                                    label={`${WIDGET_META[content.widget.type as PageWidgetType]?.label ?? content.widget.type}${'contentKey' in content.widget && (content.widget as { contentKey: string }).contentKey ? ` — ${(content.widget as { contentKey: string }).contentKey}` : ''}`}
+                                                                                    colSpan={content.colSpan}
+                                                                                    rowSpan={content.rowSpan}
+                                                                                    isEditing={editingContentId === content.id}
+                                                                                    onToggle={() => setEditingContentId(editingContentId === content.id ? null : content.id)}
+                                                                                    onRemove={() => removeContent(item.id, content.id)}
+                                                                                    dragHandleProps={handleProps}
+                                                                                />
 
                                                                                 {/* 컨텐츠 설정 패널 */}
                                                                                 {editingContentId === content.id && (
                                                                                     <div className="border-t border-slate-100 bg-slate-50/50">
-                                                                                        {/* col/row 수정 (부모 위젯 colSpan 기준) */}
-                                                                                        <div className="px-3 pt-2 pb-1.5 border-b border-slate-100 flex items-center gap-2">
-                                                                                            <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">크기</span>
-                                                                                            <div className="flex items-center gap-1 flex-1">
-                                                                                                <span className="text-[10px] text-slate-400">Col</span>
-                                                                                                <input
-                                                                                                    type="number" min={1} max={item.colSpan}
-                                                                                                    value={content.colSpan}
-                                                                                                    onChange={e => updateContentSize(item.id, content.id, Number(e.target.value) || 1, content.rowSpan)}
-                                                                                                    className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                                                                                                />
-                                                                                                <span className="text-[10px] text-slate-300">/ {item.colSpan}</span>
-                                                                                            </div>
-                                                                                            <div className="flex items-center gap-1 flex-1">
-                                                                                                <span className="text-[10px] text-slate-400">Row</span>
-                                                                                                <input
-                                                                                                    type="number" min={1} max={20}
-                                                                                                    value={content.rowSpan}
-                                                                                                    onChange={e => updateContentSize(item.id, content.id, content.colSpan, Number(e.target.value) || 1)}
-                                                                                                    className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                                                                                                />
-                                                                                            </div>
-                                                                                        </div>
+                                                                                        <SizeSettingPanel
+                                                                                            colSpan={content.colSpan}
+                                                                                            rowSpan={content.rowSpan}
+                                                                                            maxColSpan={item.colSpan}
+                                                                                            onColSpanChange={v => updateContentSize(item.id, content.id, v, content.rowSpan)}
+                                                                                            onRowSpanChange={v => updateContentSize(item.id, content.id, content.colSpan, v)}
+                                                                                        />
                                                                                         {/* 위젯 설정 (통합 디스패처 적용) */}
                                                                                         <div className="px-3 pb-2 pt-1">
                                                                                             <CommonBuilderDispatcher

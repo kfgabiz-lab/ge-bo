@@ -33,6 +33,10 @@ import {
     FileField, ImageField, VideoField,
 } from './fields';
 import type { FieldEditValues } from './fields';
+// SpaceBuilder와 동일한 스타일 유틸 재사용
+import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
+import { ToggleRow } from './fields/_ToggleRow';
+import { BG_COLOR_OPTIONS } from './SpaceBuilder';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -49,6 +53,10 @@ export interface FormWidget {
     type: 'form';
     widgetId: string;
     contentKey: string;
+    title?: string;             // 폼 섹션 타이틀 (예: 권한 및 보안)
+    description?: string;       // 타이틀 아래 설명 (예: 필수 입력 항목은 * 로 표시됩니다.)
+    showBorder?: boolean;       // 테두리 표시 여부 (기본 true)
+    bgColor?: string;           // 바탕색 (기본 none)
     connectedSlug?: string;     // 연결 slug (API 엔드포인트 연동 대상)
     fields: FormFieldItem[];
 }
@@ -300,6 +308,54 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                         <option value="">선택</option>
                         {slugOptions.map(s => (
                             <option key={s.id} value={s.slug}>{s.slug} ({s.name})</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* 타이틀 + 설명 — 1행 안에 함께 표시됨 */}
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">타이틀</label>
+                    <input
+                        type="text"
+                        value={widget.title ?? ''}
+                        onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
+                        placeholder="예: 권한 및 보안"
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                    />
+                </div>
+                <div>
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">설명</label>
+                    <input
+                        type="text"
+                        value={widget.description ?? ''}
+                        onChange={e => onChange({ ...widget, description: e.target.value || undefined })}
+                        placeholder="예: 필수 항목은 * 로 표시됩니다."
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                    />
+                </div>
+            </div>
+
+            {/* 테두리 유무 | 바탕색 — SpaceBuilder와 동일 패턴 */}
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className={LABEL_CLS}>테두리</label>
+                    <ToggleRow
+                        label={widget.showBorder ?? true ? '표시' : '숨김'}
+                        value={widget.showBorder ?? true}
+                        onChange={v => onChange({ ...widget, showBorder: v })}
+                    />
+                </div>
+                <div>
+                    <label className={LABEL_CLS}>바탕색</label>
+                    <select
+                        value={widget.bgColor ?? 'none'}
+                        onChange={e => onChange({ ...widget, bgColor: e.target.value })}
+                        className={INPUT_CLS}
+                    >
+                        {BG_COLOR_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                     </select>
                 </div>

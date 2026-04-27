@@ -51,6 +51,7 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
     const areaStyle: React.CSSProperties = {
         backgroundColor: (!bgColor || bgColor === 'none') ? 'transparent' : bgColor,
         gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
+        alignContent: 'center', /* 버튼/텍스트를 격자 셀 세로 가운데 정렬 */
     };
 
     /* 테두리 유무에 따라 border/shadow 클래스 분기 — CSS Grid 레이아웃 */
@@ -93,7 +94,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
                 const itemSpan = Math.min(field.colSpan ?? 1, contentColSpan);
                 const isButton = field.type === 'action-button';
                 /* 버튼: 셀 가운데 배치 / 텍스트: 셀 전체 너비를 채워 자연스럽게 표시 */
-                const wrapperCls = isButton ? 'flex items-center justify-center py-1' : 'flex items-center py-1';
+                /* 버튼: 양쪽 5% 패딩으로 셀 너비의 90% 차지 (비율 고정으로 빌더/운영 동일하게 보임) */
+                const wrapperCls = isButton ? 'flex items-center py-1 px-[5%]' : 'flex items-center py-1';
                 return (
                     <div key={field.id} style={{ gridColumn: `span ${itemSpan}` }} className={wrapperCls}>
                         <FieldRenderer

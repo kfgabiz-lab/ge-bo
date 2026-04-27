@@ -348,8 +348,8 @@ export function TableRenderer({
                 </div>
             )}
 
-            {/* 페이지네이션 (scroll 모드 제외 / preview: 샘플 3페이지 disabled, live: 실제 페이지) */}
-            {!isScroll && (isPreview || totalPages > 1) && (
+            {/* 페이지네이션 (scroll 모드 제외 / preview: 샘플 3페이지 disabled, live: totalPages >= 1이면 항상 표시) */}
+            {!isScroll && (isPreview || totalPages >= 1) && (
                 <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
                     <button
                         disabled={isPreview || currentPage === 0}

@@ -39,13 +39,12 @@ export default function PageLayout({ title, mode = 'live', children }: PageLayou
     /* 격자 표시 여부 — preview는 기본 true, live는 기본 false */
     const [showGrid, setShowGrid] = useState(mode === 'preview');
 
-    /* ctrl+g 격자 가이드라인 토글 */
+    /* g 키로 격자 가이드라인 토글 (input/textarea/select 포커스 중엔 무시) */
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.ctrlKey && e.key === 'g') {
-                e.preventDefault();
-                setShowGrid(prev => !prev);
-            }
+            const tag = (e.target as HTMLElement).tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            if (e.key === 'g' || e.key === 'G') setShowGrid(prev => !prev);
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
@@ -53,8 +52,8 @@ export default function PageLayout({ title, mode = 'live', children }: PageLayou
 
     /* 격자 가이드라인 배경 스타일 (showGrid=true일 때만 적용) */
     const gridStyle: React.CSSProperties = {
-        /* preview: 80px 단위 격자 스냅 / live: 콘텐츠 높이 자동 */
-        gridAutoRows: mode === 'preview' ? 'minmax(80px, auto)' : undefined,
+        /* preview/live 모두 80px 단위 행 높이 */
+        gridAutoRows: 'minmax(80px, auto)',
         ...(showGrid ? {
             backgroundImage: `
                 linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
@@ -66,7 +65,7 @@ export default function PageLayout({ title, mode = 'live', children }: PageLayou
 
     /* preview: 테두리 + 배경 표시 / live: 클린 그리드만 */
     const gridCls = [
-        'grid grid-cols-12',
+        'grid grid-cols-12 gap-3',
         mode === 'preview'
             ? 'border border-slate-200 rounded-lg overflow-visible bg-slate-50'
             : '',

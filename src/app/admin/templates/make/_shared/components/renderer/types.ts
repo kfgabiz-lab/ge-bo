@@ -52,6 +52,8 @@ export interface SearchWidget {
     widgetId: string;
     contentKey: string;
     rows: SearchRowConfig[];
+    /** 검색 레이아웃 스타일 — standard: 그리드(기본), simple: 한 줄 인라인 */
+    displayStyle?: 'standard' | 'simple';
 }
 
 /**

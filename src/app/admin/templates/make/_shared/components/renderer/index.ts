@@ -8,6 +8,7 @@
  * - FormRenderer:        Form 위젯 렌더링 (preview/live)
  * - SpaceRenderer:       공간영역 위젯 렌더링 (preview/live)
  * - WidgetRenderer:      위젯 타입 통합 dispatch (preview/live)
+ * - PageGridRenderer:    widgetItems 배열 → 그리드 렌더링 (preview/live 공통 함수)
  */
 
 export { FieldRenderer }       from './FieldRenderer';
@@ -18,6 +19,7 @@ export { TableRenderer }       from './TableRenderer';
 export { FormRenderer }        from './FormRenderer';
 export { SpaceRenderer }       from './SpaceRenderer';
 export { WidgetRenderer }      from './WidgetRenderer';
+export { PageGridRenderer }    from './PageGridRenderer';
 
 /* 타입 export */
 export type {
@@ -30,3 +32,9 @@ export type {
     TableActionHandlers,
     SearchHandlers,
 } from './types';
+
+export type {
+    PageContentItem,
+    PageWidgetItem,
+    PageTableData,
+} from './PageGridRenderer';

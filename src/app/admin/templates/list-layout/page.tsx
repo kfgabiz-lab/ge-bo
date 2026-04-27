@@ -2,43 +2,149 @@
 
 import React, { useState } from 'react';
 import {
-    Plus, Search, X, RotateCcw, Edit2, Trash2, ChevronDown,
-    Users, UserCheck, UserX, AlertCircle
+    Plus, Search, X, RotateCcw, ChevronDown, ChevronUp, ChevronsUpDown,
+    Users, UserCheck, UserX, AlertCircle,
+    ImageIcon, Link2, BarChart2, Tag, Clock, Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { TableCellRenderer } from '../make/_shared/components/renderer/TableCellRenderer';
+import type { TableColumnConfig } from '../make/_shared/types';
 
-/* ── 샘플 데이터 ── */
-const SAMPLE_DATA = [
-    { id: 1, name: '홍길동', email: 'hong@example.com', department: '개발팀', role: 'ADMIN', roleColor: '#0f172a', active: true, regDate: '2026-01-15' },
-    { id: 2, name: '김철수', email: 'kim@example.com', department: '기획팀', role: 'EDITOR', roleColor: '#10b981', active: true, regDate: '2026-02-20' },
-    { id: 3, name: '이영희', email: 'lee@example.com', department: '디자인팀', role: 'VIEWER', roleColor: '#f59e0b', active: false, regDate: '2026-03-05' },
-    { id: 4, name: '박민수', email: 'park@example.com', department: '개발팀', role: 'ADMIN', roleColor: '#0f172a', active: true, regDate: '2026-03-10' },
-    { id: 5, name: '최지은', email: 'choi@example.com', department: '마케팅팀', role: 'EDITOR', roleColor: '#10b981', active: true, regDate: '2026-03-12' },
+/* ────────────────────────────────────────────────────────── */
+/* 컬럼 정의 — TableColumnConfig 기반, 지원 타입 전부 포함   */
+/* ────────────────────────────────────────────────────────── */
+const COLUMNS: TableColumnConfig[] = [
+    /* text — 기본 텍스트 */
+    {
+        id: 'c-name', header: '이름', accessor: 'name',
+        align: 'left', sortable: true, cellType: 'text',
+    },
+    /* text — 기본 텍스트 */
+    {
+        id: 'c-email', header: '이메일', accessor: 'email',
+        align: 'left', sortable: false, cellType: 'text',
+    },
+    /* text + isNumber — 숫자 포맷 (3자리 콤마) */
+    {
+        id: 'c-salary', header: '급여', accessor: 'salary',
+        align: 'right', sortable: true, cellType: 'text', isNumber: true,
+    },
+    /* badge square — 사각형 모양, 도트 아이콘 없음 */
+    {
+        id: 'c-role', header: '권한', accessor: 'role',
+        align: 'center', sortable: false, cellType: 'badge',
+        badgeShape: 'square', showIcon: false,
+        cellOptions: [
+            { value: 'SUPER_ADMIN', text: 'SUPER', color: 'purple' },
+            { value: 'ADMIN',       text: 'ADMIN', color: 'slate'  },
+            { value: 'EDITOR',      text: 'EDITOR', color: 'blue'  },
+            { value: 'VIEWER',      text: 'VIEWER', color: 'amber' },
+        ],
+    },
+    /* badge round + showIcon — 원형 모양, 도트 아이콘 표시 */
+    {
+        id: 'c-status', header: '상태', accessor: 'status',
+        align: 'center', sortable: false, cellType: 'badge',
+        badgeShape: 'round', showIcon: true,
+        cellOptions: [
+            { value: 'active',   text: '활성',   color: 'emerald' },
+            { value: 'inactive', text: '비활성', color: 'red'     },
+        ],
+    },
+    /* boolean — 참/거짓 텍스트 표시 */
+    {
+        id: 'c-visible', header: '공개여부', accessor: 'visible',
+        align: 'center', sortable: false, cellType: 'boolean',
+        trueText: '공개', falseText: '비공개',
+    },
+    /* file — 첨부파일 수 표시 */
+    {
+        id: 'c-file', header: '첨부파일', accessor: 'fileIds',
+        align: 'center', sortable: false, cellType: 'file',
+    },
+    /* actions — 프리셋(수정/상세/삭제) + 커스텀 버튼 */
+    {
+        id: 'c-actions', header: '관리', accessor: '_id',
+        align: 'center', sortable: false, cellType: 'actions',
+        actions: ['edit', 'detail', 'delete'],
+        customActions: [{ id: 'ca-approve', label: '승인', color: 'green' }],
+    },
 ];
 
-export default function ListLayoutPage() {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterRole, setFilterRole] = useState('');
-    const [showDrawer, setShowDrawer] = useState(false);
+/* ── 샘플 데이터 ── */
+const SAMPLE_DATA: Record<string, unknown>[] = [
+    { _id: 1, name: '홍길동', email: 'hong@example.com', salary: 4500000, role: 'ADMIN',       status: 'active',   visible: true,  fileIds: [1, 2]    },
+    { _id: 2, name: '김철수', email: 'kim@example.com',  salary: 3800000, role: 'EDITOR',      status: 'inactive', visible: false, fileIds: [3]       },
+    { _id: 3, name: '이영희', email: 'lee@example.com',  salary: 5200000, role: 'VIEWER',      status: 'active',   visible: true,  fileIds: []        },
+    { _id: 4, name: '박민수', email: 'park@example.com', salary: 4100000, role: 'SUPER_ADMIN', status: 'inactive', visible: true,  fileIds: [4, 5, 6] },
+    { _id: 5, name: '최지은', email: 'choi@example.com', salary: 3500000, role: 'EDITOR',      status: 'active',   visible: false, fileIds: []        },
+];
 
-    /* ── 통계 카드 데이터 ── */
+/* ── 미지원 패턴 목록 ── */
+const UNSUPPORTED = [
+    { icon: <Users className="w-4 h-4" />,    label: '아바타 + 이름 조합',      desc: '이니셜 원형 아이콘과 이름 텍스트를 한 셀에 함께 표시하는 패턴' },
+    { icon: <ImageIcon className="w-4 h-4" />, label: '이미지 썸네일',           desc: '이미지 파일을 셀 안에서 작은 썸네일로 미리보기하는 패턴' },
+    { icon: <BarChart2 className="w-4 h-4" />, label: '진행률 바 (Progress)',    desc: 'Progress bar로 백분율 수치를 시각적으로 표현하는 패턴' },
+    { icon: <Layers className="w-4 h-4" />,    label: '멀티라인 (제목 + 부제목)', desc: '제목과 부제목을 2줄로 쌓아 표시하는 패턴' },
+    { icon: <Tag className="w-4 h-4" />,       label: '태그 그룹',               desc: '복수의 태그/칩을 한 셀에 인라인으로 나열하는 패턴' },
+    { icon: <Link2 className="w-4 h-4" />,     label: '외부 링크 셀',            desc: '클릭 시 새 탭으로 이동하는 URL 링크 패턴' },
+    { icon: <Clock className="w-4 h-4" />,     label: '상대 시간 표시',          desc: '"3일 전", "방금 전" 형식의 상대적 날짜 표기 패턴' },
+    { icon: <Tag className="w-4 h-4" />,       label: '동적 컬러 배지',          desc: '#hex 코드를 직접 지정하는 배지 — 현재 미리 정의된 8가지 색상명만 지원' },
+];
+
+/* 정렬 아이콘 — 외부 선언으로 리렌더 시 재생성 방지 */
+function SortIcon({ sorted }: { sorted: false | 'asc' | 'desc' }) {
+    if (sorted === 'asc')  return <ChevronUp   className="w-3.5 h-3.5 text-blue-500" />;
+    if (sorted === 'desc') return <ChevronDown className="w-3.5 h-3.5 text-blue-500" />;
+    return <ChevronsUpDown className="w-3.5 h-3.5 text-slate-300" />;
+}
+
+export default function ListLayoutPage() {
+    const [searchTerm, setSearchTerm]   = useState('');
+    const [filterRole, setFilterRole]   = useState('');
+    const [showDrawer, setShowDrawer]   = useState(false);
+    const [sortKey,    setSortKey]      = useState<string | null>(null);
+    const [sortDir,    setSortDir]      = useState<'asc' | 'desc'>('asc');
+
+    /* ── 정렬 핸들러 ── */
+    const handleSort = (accessor: string) => {
+        if (sortKey === accessor) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(accessor);
+            setSortDir('asc');
+        }
+    };
+
+    /* ── 통계 카드 ── */
     const stats = [
-        { label: '전체 계정', value: SAMPLE_DATA.length, icon: <Users className="w-5 h-5" />, color: '#0f172a' },
-        { label: '활성', value: SAMPLE_DATA.filter(d => d.active).length, icon: <UserCheck className="w-5 h-5" />, color: '#059669' },
-        { label: '잠금', value: SAMPLE_DATA.filter(d => !d.active).length, icon: <UserX className="w-5 h-5" />, color: '#dc2626' },
+        { label: '전체 계정', value: SAMPLE_DATA.length,                                    icon: <Users     className="w-5 h-5" />, color: '#0f172a' },
+        { label: '활성',      value: SAMPLE_DATA.filter(d => d.status === 'active').length,   icon: <UserCheck className="w-5 h-5" />, color: '#059669' },
+        { label: '비활성',    value: SAMPLE_DATA.filter(d => d.status === 'inactive').length, icon: <UserX    className="w-5 h-5" />, color: '#dc2626' },
     ];
 
-    /* ── 필터 적용 ── */
-    const filtered = SAMPLE_DATA.filter(item => {
-        const matchSearch = !searchTerm || item.name.includes(searchTerm) || item.email.includes(searchTerm);
+    /* ── 필터 + 정렬 ── */
+    let filtered = SAMPLE_DATA.filter(item => {
+        const matchSearch = !searchTerm
+            || String(item.name).includes(searchTerm)
+            || String(item.email).includes(searchTerm);
         const matchRole = !filterRole || item.role === filterRole;
         return matchSearch && matchRole;
     });
 
-    const resetFilters = () => {
-        setSearchTerm('');
-        setFilterRole('');
-    };
+    if (sortKey) {
+        filtered = [...filtered].sort((a, b) => {
+            const av = a[sortKey], bv = b[sortKey];
+            if (typeof av === 'number' && typeof bv === 'number') {
+                return sortDir === 'asc' ? av - bv : bv - av;
+            }
+            return sortDir === 'asc'
+                ? String(av).localeCompare(String(bv))
+                : String(bv).localeCompare(String(av));
+        });
+    }
+
+    const resetFilters = () => { setSearchTerm(''); setFilterRole(''); };
 
     return (
         <div className="h-full flex flex-col">
@@ -47,7 +153,7 @@ export default function ListLayoutPage() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-xl font-bold text-slate-900">목록형 레이아웃</h1>
-                    <p className="text-sm text-slate-500 mt-0.5">통계 카드 + 검색/필터 툴바 + 테이블 + Drawer 패턴</p>
+                    <p className="text-sm text-slate-500 mt-0.5">TableCellRenderer 공통 컴포넌트 기반 테이블 패턴</p>
                 </div>
                 <button
                     onClick={() => setShowDrawer(true)}
@@ -73,7 +179,7 @@ export default function ListLayoutPage() {
             </div>
 
             {/* ── 테이블 카드 ── */}
-            <div className="flex-1 bg-white rounded-md border border-slate-200 flex flex-col">
+            <div className="bg-white rounded-md border border-slate-200 flex flex-col">
 
                 {/* 툴바 */}
                 <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100">
@@ -94,7 +200,7 @@ export default function ListLayoutPage() {
                         )}
                     </div>
 
-                    {/* 필터 */}
+                    {/* 권한 필터 */}
                     <div className="relative">
                         <select
                             value={filterRole}
@@ -102,6 +208,7 @@ export default function ListLayoutPage() {
                             className="appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white"
                         >
                             <option value="">전체 권한</option>
+                            <option value="SUPER_ADMIN">SUPER</option>
                             <option value="ADMIN">ADMIN</option>
                             <option value="EDITOR">EDITOR</option>
                             <option value="VIEWER">VIEWER</option>
@@ -118,67 +225,86 @@ export default function ListLayoutPage() {
                 </div>
 
                 {/* 테이블 */}
-                <div className="flex-1 overflow-auto">
+                <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="border-b border-slate-100">
-                                <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">이름</th>
-                                <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">이메일</th>
-                                <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">부서</th>
-                                <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">권한</th>
-                                <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">상태</th>
-                                <th className="px-5 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider">등록일</th>
-                                <th className="px-5 py-3 text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider">관리</th>
+                            <tr className="border-b border-slate-100 bg-slate-50/80">
+                                {COLUMNS.map(col => (
+                                    <th
+                                        key={col.id}
+                                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                                        style={{ textAlign: col.align }}
+                                    >
+                                        {col.sortable ? (
+                                            <button
+                                                onClick={() => handleSort(col.accessor)}
+                                                className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors"
+                                            >
+                                                {col.header}
+                                                <SortIcon sorted={sortKey === col.accessor ? sortDir : false} />
+                                            </button>
+                                        ) : (
+                                            <span>{col.header}</span>
+                                        )}
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-5 py-16 text-center">
+                                    <td colSpan={COLUMNS.length} className="px-5 py-16 text-center">
                                         <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                                         <p className="text-sm text-slate-400">검색 결과가 없습니다.</p>
                                     </td>
                                 </tr>
                             ) : (
                                 filtered.map((row) => (
-                                    <tr key={row.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                                        <td className="px-5 py-3.5">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-7 h-7 rounded-full bg-slate-900/10 flex items-center justify-center text-[11px] font-bold text-slate-900">
-                                                    {row.name.substring(0, 1)}
-                                                </div>
-                                                <span className="text-sm font-medium text-slate-900">{row.name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-3.5 text-sm text-slate-500">{row.email}</td>
-                                        <td className="px-5 py-3.5 text-sm text-slate-500">{row.department}</td>
-                                        <td className="px-5 py-3.5">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold" style={{ backgroundColor: `${row.roleColor}20`, color: row.roleColor }}>
-                                                {row.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-3.5">
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${row.active ? 'bg-[#ecfdf5] text-[#059669]' : 'bg-[#fef2f2] text-[#dc2626]'}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${row.active ? 'bg-[#059669]' : 'bg-[#dc2626]'}`} />
-                                                {row.active ? '활성' : '잠금'}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-3.5 text-sm text-slate-500">{row.regDate}</td>
-                                        <td className="px-5 py-3.5 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                <button className="w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all">
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button className="w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </td>
+                                    <tr key={row._id as number} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                        {COLUMNS.map(col => (
+                                            <td
+                                                key={col.id}
+                                                className="px-4 py-3 whitespace-nowrap"
+                                                style={{ textAlign: col.align }}
+                                            >
+                                                <TableCellRenderer
+                                                    mode="live"
+                                                    col={col}
+                                                    row={row}
+                                                    handlers={{
+                                                        onEdit:   (r) => toast.info(`수정: ${r.name}`),
+                                                        onDetail: (r) => toast.info(`상세: ${r.name}`),
+                                                        onDelete: (id) => toast.error(`삭제: ID ${id}`),
+                                                    }}
+                                                />
+                                            </td>
+                                        ))}
                                     </tr>
                                 ))
                             )}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            {/* ── 미지원 패턴 (참고용) ── */}
+            <div className="mt-6 bg-white rounded-md border border-slate-200 p-6 pb-4">
+                <div className="mb-4">
+                    <h3 className="text-sm font-bold text-slate-900">미지원 패턴 (참고용)</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">TableCellRenderer가 지원하지 않는 셀 패턴 — 필요 시 공통 컴포넌트 확장 필요</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    {UNSUPPORTED.map((item, i) => (
+                        <div key={i} className="flex items-start gap-3 py-2.5 px-3 rounded-md bg-slate-50 border border-slate-100">
+                            <div className="w-7 h-7 rounded-md bg-white border border-slate-200 flex items-center justify-center text-slate-400 flex-shrink-0">
+                                {item.icon}
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-slate-700">{item.label}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -203,15 +329,11 @@ export default function ListLayoutPage() {
                                 <input type="email" placeholder="이메일을 입력하세요" className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-700 mb-1.5">부서</label>
-                                <input type="text" placeholder="부서를 입력하세요" className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all" />
-                            </div>
-                            <div>
                                 <label className="block text-xs font-medium text-slate-700 mb-1.5">권한</label>
                                 <select className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white">
-                                    <option>ADMIN</option>
-                                    <option>EDITOR</option>
-                                    <option>VIEWER</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                    <option value="EDITOR">EDITOR</option>
+                                    <option value="VIEWER">VIEWER</option>
                                 </select>
                             </div>
                         </div>

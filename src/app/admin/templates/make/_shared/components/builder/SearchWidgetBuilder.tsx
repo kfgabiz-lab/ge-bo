@@ -14,8 +14,43 @@ interface SearchWidgetBuilderProps {
 }
 
 export function SearchWidgetBuilder({ widget, onChange }: SearchWidgetBuilderProps) {
+    const displayStyle = widget.displayStyle ?? 'standard';
+
     return (
         <div className="space-y-2 pt-1">
+            {/* 레이아웃 스타일 선택 */}
+            <div>
+                <label className="text-[10px] font-medium text-slate-500 mb-1 block">검색 스타일</label>
+                <div className="flex gap-1">
+                    {(['standard', 'simple'] as const).map(style => (
+                        <button
+                            key={style}
+                            onClick={() => {
+                                if (style === 'simple') {
+                                    /* 심플버전 전환: 모든 행의 필드를 1개 행으로 합치기 */
+                                    const allFields = widget.rows.flatMap(r => r.fields);
+                                    const firstRowId = widget.rows[0]?.id ?? `row-${Date.now()}`;
+                                    onChange({
+                                        ...widget,
+                                        displayStyle: 'simple',
+                                        rows: [{ id: firstRowId, cols: 5, fields: allFields }],
+                                    });
+                                } else {
+                                    onChange({ ...widget, displayStyle: style });
+                                }
+                            }}
+                            className={`flex-1 py-1.5 text-[11px] font-medium rounded border transition-all ${
+                                displayStyle === style
+                                    ? 'bg-slate-900 text-white border-slate-900'
+                                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                            }`}
+                        >
+                            {style === 'standard' ? '현재버전' : '심플버전'}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* 컨텐츠 Key */}
             <div>
                 <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key <span className="text-red-400">*</span></label>

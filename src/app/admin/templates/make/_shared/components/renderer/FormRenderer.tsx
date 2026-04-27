@@ -32,6 +32,14 @@ import type { CodeGroupDef, SearchFieldConfig } from '../../types';
 interface FormRendererProps {
     mode: RendererMode;
     fields: FormFieldItem[];
+    /** 폼 섹션 타이틀 — 1행 영역 상단에 표시 (선택) */
+    title?: string;
+    /** 타이틀 아래 설명 — 타이틀과 함께 1행 안에 표시 (선택) */
+    description?: string;
+    /** 테두리 표시 여부 (기본 true) */
+    showBorder?: boolean;
+    /** 바탕색 CSS 값 ('none' 또는 미설정 시 투명) */
+    bgColor?: string;
     /** 부모 위젯 colSpan — 그리드 열 수를 결정 (기본 12) */
     contentColSpan?: number;
     /** 공통코드 그룹 목록 — select 필드 옵션 렌더링에 사용 */
@@ -56,6 +64,10 @@ interface FormRendererProps {
 export function FormRenderer({
     mode,
     fields,
+    title,
+    description,
+    showBorder = true,
+    bgColor,
     contentColSpan = 12,
     codeGroups = [],
     values = {},
@@ -76,50 +88,66 @@ export function FormRenderer({
         );
     }
 
-    return (
-        <div
-            className="w-full p-2"
-            style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
-                gap: '8px',
-                gridAutoRows: '68px',
-            }}
-        >
-            {fields.map(f => (
-                <div
-                    key={f.id}
-                    className="flex flex-col h-full"
-                    style={{
-                        gridColumn: `span ${Math.min(f.colSpan, contentColSpan)}`,
-                        gridRow: `span ${f.rowSpan}`,
-                    }}
-                >
-                    {/* 라벨 */}
-                    {f.label && (
-                        <label className="block text-xs font-semibold text-slate-700 mb-1 flex-shrink-0">
-                            {f.label}
-                            {f.required && <span className="text-red-500 ml-0.5">*</span>}
-                        </label>
-                    )}
+    /* SpaceRenderer와 동일 패턴 — 테두리/바탕색 적용 */
+    const wrapperStyle: React.CSSProperties = {
+        backgroundColor: (!bgColor || bgColor === 'none') ? undefined : bgColor,
+    };
+    /* 폼형 레이아웃 템플릿 FormSection 스타일 기준 */
+    const wrapperCls = `w-full h-full rounded overflow-auto ${showBorder ? 'border border-slate-200' : ''}`;
 
-                    {/* 필드 렌더링 — FieldRenderer 공통 컴포넌트 재사용 */}
-                    <div className="flex-1 min-h-0">
-                        <FieldRenderer
-                            mode={mode}
-                            field={f as unknown as SearchFieldConfig}
-                            codeGroups={codeGroups}
-                            value={values[f.id] ?? ''}
-                            onChange={isPreview ? undefined : v => onChangeValues?.(f.id, v)}
-                            fileList={fileValues?.[f.id]}
-                            existingFileMeta={existingFileMeta?.[f.id]}
-                            imgBlobUrls={imgBlobUrls}
-                            onFileChange={isPreview ? undefined : files => onFileChange?.(f.id, files)}
-                            onRemoveExisting={isPreview ? undefined : fileId => onRemoveExisting?.(f.id, fileId)}
-                        />
-                    </div>
+    return (
+        <div className={wrapperCls} style={wrapperStyle}>
+            {/* 타이틀+설명 — 1행(68px) 고정 높이 안에 세로 중앙 정렬 */}
+            {title && (
+                <div className="px-6 flex flex-col justify-center" style={{ height: '68px' }}>
+                    <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+                    {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
                 </div>
-            ))}
+            )}
+            <div
+                className={`w-full ${title ? 'px-6 pb-6 pt-0' : 'p-6'}`}
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
+                    gap: '8px',
+                    gridAutoRows: '68px',
+                }}
+            >
+                {fields.map(f => (
+                    <div
+                        key={f.id}
+                        className="flex flex-col h-full"
+                        style={{
+                            gridColumn: `span ${Math.min(f.colSpan, contentColSpan)}`,
+                            gridRow: `span ${f.rowSpan}`,
+                        }}
+                    >
+                        {/* 라벨 */}
+                        {f.label && (
+                            <label className="block text-xs font-medium text-slate-700 mb-1 flex-shrink-0">
+                                {f.label}
+                                {f.required && <span className="text-red-500 ml-0.5">*</span>}
+                            </label>
+                        )}
+
+                        {/* 필드 렌더링 — FieldRenderer 공통 컴포넌트 재사용 */}
+                        <div className="flex-1 min-h-0">
+                            <FieldRenderer
+                                mode={mode}
+                                field={f as unknown as SearchFieldConfig}
+                                codeGroups={codeGroups}
+                                value={values[f.id] ?? ''}
+                                onChange={isPreview ? undefined : v => onChangeValues?.(f.id, v)}
+                                fileList={fileValues?.[f.id]}
+                                existingFileMeta={existingFileMeta?.[f.id]}
+                                imgBlobUrls={imgBlobUrls}
+                                onFileChange={isPreview ? undefined : files => onFileChange?.(f.id, files)}
+                                onRemoveExisting={isPreview ? undefined : fileId => onRemoveExisting?.(f.id, fileId)}
+                            />
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

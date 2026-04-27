@@ -12,8 +12,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
-import type { TableActionHandlers, SearchWidget } from '@/app/admin/templates/make/_shared/components/renderer';
+import { WidgetRenderer, PageGridRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
+import type { TableActionHandlers, SearchWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
 import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/renderer';
@@ -25,7 +25,6 @@ import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMenuPageSlug } from '@/hooks/useMenuPageSlug';
 import { TableColumnConfig, ButtonConfig, ButtonPosition, SearchRowConfig } from '@/app/admin/templates/make/_shared/types';
-import { getSpaceGridColumn } from '@/app/admin/templates/make/_shared/utils';
 import PageLayout from '@/components/layout/PageLayout';
 
 /** 메뉴 트리 재귀 탐색으로 현재 URL의 메뉴명 반환 */
@@ -55,53 +54,32 @@ interface ListConfig {
     pageSize?: number;
 }
 
-/** widgetItems 구조 (QUICK_LIST / QUICK_DETAIL / PAGE 공통) */
-interface PageContentItem {
-    id: string;
-    colSpan: number;
-    rowSpan: number;
-    widget: AnyWidget;
-}
 
-interface PageWidgetItem {
-    id: string;
-    colSpan: number;
-    rowSpan: number;
-    contents: PageContentItem[];
-}
-
-/** 테이블 위젯별 데이터 상태 */
-interface TableData {
-    rows: Record<string, unknown>[];
-    totalElements: number;
-    totalPages: number;
-    currentPage: number;
-    loading: boolean;
-    appendLoading: boolean;
-    hasMore: boolean;
-    nextPage: number;
-}
-
-/** 구버전 QUICK_LIST configJson → widgetItems 변환 */
+/** 구버전 QUICK_LIST configJson → widgetItems 변환 (미리보기와 동일한 1개 outer item 구조) */
 function convertLegacyQuickList(cfg: Record<string, unknown>): PageWidgetItem[] {
     const s = cfg.searchContent as PageContentItem;
     const p = cfg.spaceContent  as PageContentItem;
     const t = cfg.tableContent  as PageContentItem;
-    return [
-        { id: 'wi-search', colSpan: 12, rowSpan: s?.rowSpan ?? 2, contents: s ? [s] : [] },
-        { id: 'wi-space',  colSpan: 12, rowSpan: p?.rowSpan ?? 1, contents: p ? [p] : [] },
-        { id: 'wi-table',  colSpan: 12, rowSpan: t?.rowSpan ?? 5, contents: t ? [t] : [] },
-    ];
+    const contents = [s, p, t].filter(Boolean) as PageContentItem[];
+    return [{
+        id: 'wi-all',
+        colSpan: 12,
+        rowSpan: (s?.rowSpan ?? 2) + (p?.rowSpan ?? 1) + (t?.rowSpan ?? 5),
+        contents,
+    }];
 }
 
-/** 구버전 QUICK_DETAIL configJson → widgetItems 변환 */
+/** 구버전 QUICK_DETAIL configJson → widgetItems 변환 (미리보기와 동일한 1개 outer item 구조) */
 function convertLegacyQuickDetail(cfg: Record<string, unknown>): PageWidgetItem[] {
     const f = cfg.formContent  as PageContentItem;
     const s = cfg.spaceContent as PageContentItem;
-    return [
-        { id: 'wi-form',  colSpan: 12, rowSpan: f?.rowSpan ?? 3, contents: f ? [f] : [] },
-        { id: 'wi-space', colSpan: 12, rowSpan: s?.rowSpan ?? 1, contents: s ? [s] : [] },
-    ];
+    const contents = [f, s].filter(Boolean) as PageContentItem[];
+    return [{
+        id: 'wi-all',
+        colSpan: 12,
+        rowSpan: (f?.rowSpan ?? 3) + (s?.rowSpan ?? 1),
+        contents,
+    }];
 }
 
 /* ══════════════════════════════════════════ */
@@ -149,8 +127,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const searchValuesRef = useRef<Record<string, string>>({});
 
     /* ── 테이블별 데이터 상태 (widgetItems 방식) ── */
-    const [tableDataMap,  setTableDataMap]  = useState<Record<string, TableData>>({});
-    const tableDataMapRef = useRef<Record<string, TableData>>({});
+    const [tableDataMap,  setPageTableDataMap]  = useState<Record<string, PageTableData>>({});
+    const tableDataMapRef = useRef<Record<string, PageTableData>>({});
 
     /* ── 테이블별 정렬 ── */
     const [sortKeyMap, setSortKeyMap] = useState<Record<string, string | null>>({});
@@ -160,7 +138,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
 
     /* ── LIST 방식 전용 상태 ── */
-    const [tableData,     setTableData]     = useState<Record<string, unknown>[]>([]);
+    const [tableData,     setPageTableData]     = useState<Record<string, unknown>[]>([]);
     const [dataLoading,   setDataLoading]   = useState(false);
     const [appendLoading, setAppendLoading] = useState(false);
     const [totalElements, setTotalElements] = useState(0);
@@ -212,9 +190,9 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         append?: boolean;
     }) => {
         const wid = tableWidget.widgetId;
-        const defaultData: TableData = { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, loading: false, appendLoading: false, hasMore: true, nextPage: 0 };
+        const defaultData: PageTableData = { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, loading: false, appendLoading: false, hasMore: true, nextPage: 0 };
 
-        setTableDataMap(prev => ({
+        setPageTableDataMap(prev => ({
             ...prev,
             [wid]: append
                 ? { ...(prev[wid] ?? defaultData), appendLoading: true }
@@ -236,7 +214,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 .map(item => ({ _id: item.id, ...item.dataJson }));
             const hasMore = res.data.last === false;
 
-            setTableDataMap(prev => ({
+            setPageTableDataMap(prev => ({
                 ...prev,
                 [wid]: {
                     rows: append ? [...(prev[wid]?.rows ?? []), ...rows] : rows,
@@ -251,7 +229,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             }));
         } catch {
             toast.error('데이터를 불러오는 중 오류가 발생했습니다.');
-            setTableDataMap(prev => ({
+            setPageTableDataMap(prev => ({
                 ...prev,
                 [wid]: { ...(prev[wid] ?? defaultData), loading: false, appendLoading: false },
             }));
@@ -289,7 +267,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             const res = await api.get(`/page-data/${targetSlug}`, { params: reqParams });
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
                 .map(item => ({ _id: item.id, ...item.dataJson }));
-            setTableData(prev => append ? [...prev, ...rows] : rows);
+            setPageTableData(prev => append ? [...prev, ...rows] : rows);
             setTotalElements(res.data.totalElements);
             setTotalPages(res.data.totalPages);
             const more = !res.data.last && rows.length > 0;
@@ -534,7 +512,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         setSearchValues({});
         searchValuesRef.current = {};
         if (config?.displayMode === 'scroll') {
-            setTableData([]);
+            setPageTableData([]);
             setHasMore(true);
             hasMoreRef.current = true;
             nextPageRef.current = 0;
@@ -545,7 +523,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const handleListSearch = () => {
         searchValuesRef.current = searchValues;
         if (config?.displayMode === 'scroll') {
-            setTableData([]);
+            setPageTableData([]);
             setHasMore(true);
             hasMoreRef.current = true;
             nextPageRef.current = 0;
@@ -631,6 +609,22 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         };
     }, [config]);
 
+    /* 팝업 저장에 사용할 dataSlug 사전 계산 (widgetItems 방식 전용) */
+    const resolvedDataSlug = useMemo(() => {
+        const tw = flatWidgets(widgetItems).find(w => w.type === 'table') as TableWidget | undefined;
+        return tw?.connectedSlug ?? dataSlug;
+    }, [widgetItems, dataSlug]);
+
+    /* 팝업 저장 후 테이블 새로고침 콜백 (widgetItems 방식 전용) */
+    const handlePopupSaved = useCallback(() => {
+        const tw = flatWidgets(widgetItems).find(w => w.type === 'table') as TableWidget | undefined;
+        if (tw?.connectedSlug) {
+            const fieldsMap = buildSearchFieldsMap(widgetItems);
+            const searchFields = tw.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
+            fetchTableData({ tableWidget: tw, connectedSlug: tw.connectedSlug, searchFields, sv: searchValuesRef.current, page: 0 });
+        }
+    }, [widgetItems, fetchTableData, buildSearchFieldsMap]); // eslint-disable-line react-hooks/exhaustive-deps
+
     /* ── 로딩 ── */
     if (loading) {
         return (
@@ -658,84 +652,26 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     if (templateType === 'QUICK_LIST' || templateType === 'QUICK_DETAIL' || templateType === 'PAGE') {
         return (
             <PageLayout title={menuName || templateName} mode="live">
-                {widgetItems.map(item => (
-                    <div
-                        key={item.id}
-                        className={`col-span-${item.colSpan}`}
-                        style={{ gridColumn: `span ${item.colSpan}`, gridRow: `span ${item.rowSpan}` }}
-                    >
-                        {/* inner sub-grid — widgettest와 동일한 80px 고정 행 */}
-                        <div
-                            className="h-full w-full"
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: `repeat(${item.colSpan}, 1fr)`,
-                                gridAutoRows: '80px',
-                                gridAutoFlow: 'row dense',
-                                gap: '8px',
-                            }}
-                        >
-                            {item.contents.map(c => {
-                                const wid = (c.widget as { widgetId?: string }).widgetId ?? '';
-                                const td = tableDataMap[wid];
-                                return (
-                                    <div
-                                        key={c.id}
-                                        style={{
-                                            /* space 위젯: align 기반 그리드 열 위치 계산 (정렬 보장) */
-                                            gridColumn: c.widget.type === 'space'
-                                                ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, item.colSpan), item.colSpan)
-                                                : `span ${Math.min(c.colSpan, item.colSpan)}`,
-                                            gridRow: `span ${c.rowSpan}`,
-                                        }}
-                                    >
-                                        <WidgetRenderer
-                                            mode="live"
-                                            widget={c.widget}
-                                            contentColSpan={c.colSpan}
-                                            /* 검색 */
-                                            searchValues={searchValues}
-                                            onSearchChange={updateSearchValue}
-                                            onSearch={() => handleSearch(wid)}
-                                            onReset={() => handleReset(wid)}
-                                            codeGroups={codeGroups}
-                                            /* 폼 */
-                                            formValues={formValuesMap[wid] ?? {}}
-                                            onFormValuesChange={(fieldId, value) => updateFormValue(wid, fieldId, value)}
-                                            onFormAction={handleFormAction}
-                                            /* 테이블 */
-                                            tableData={td?.rows}
-                                            tableLoading={td?.loading}
-                                            sortKey={sortKeyMap[wid] ?? null}
-                                            sortDir={sortDirMap[wid] ?? 'asc'}
-                                            onSort={(accessor, dir) => handleSortChange(wid, accessor, dir)}
-                                            totalElements={td?.totalElements}
-                                            totalPages={td?.totalPages}
-                                            currentPage={td?.currentPage}
-                                            onPageChange={(page) => handlePageChange(wid, page)}
-                                            onLoadMore={() => handleLoadMore(wid)}
-                                            appendLoading={td?.appendLoading}
-                                            hasMore={td?.hasMore ?? true}
-                                            /* space — 팝업 저장 후 테이블 새로고침 */
-                                            dataSlug={(() => {
-                                                const tw = flatWidgets(widgetItems).find(w => w.type === 'table') as TableWidget | undefined;
-                                                return tw?.connectedSlug ?? dataSlug;
-                                            })()}
-                                            onPopupSaved={() => {
-                                                const tw = flatWidgets(widgetItems).find(w => w.type === 'table') as TableWidget | undefined;
-                                                if (tw) {
-                                                    const fieldsMap = buildSearchFieldsMap(widgetItems);
-                                                    const searchFields = tw.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-                                                    fetchTableData({ tableWidget: tw, connectedSlug: tw.connectedSlug ?? '', searchFields, sv: searchValuesRef.current, page: td?.currentPage ?? 0 });
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ))}
+                <PageGridRenderer
+                    mode="live"
+                    widgetItems={widgetItems}
+                    searchValues={searchValues}
+                    onSearchChange={updateSearchValue}
+                    onSearch={handleSearch}
+                    onReset={handleReset}
+                    codeGroups={codeGroups}
+                    formValuesMap={formValuesMap}
+                    onFormValuesChange={updateFormValue}
+                    onFormAction={handleFormAction}
+                    tableDataMap={tableDataMap}
+                    sortKeyMap={sortKeyMap}
+                    sortDirMap={sortDirMap}
+                    onSort={handleSortChange}
+                    onPageChange={handlePageChange}
+                    onLoadMore={handleLoadMore}
+                    dataSlug={resolvedDataSlug}
+                    onPopupSaved={handlePopupSaved}
+                />
             </PageLayout>
         );
     }

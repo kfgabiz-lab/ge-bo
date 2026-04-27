@@ -10,20 +10,22 @@
  * ============================================================
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-    ChevronDown, X, Save, Loader2, Wand2,
-    FileText, AlignLeft, FolderOpen, Copy, Trash2,
+    ChevronDown, Save, Loader2, Wand2,
+    FileText, FolderOpen, Copy, Trash2,
     PanelRight, LayoutTemplate,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
 import { SpaceBuilder } from '../_shared/components/builder/SpaceBuilder';
-import { WidgetRenderer } from '../_shared/components/renderer';
-import type { SpaceWidget } from '../_shared/components/renderer';
+import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
+import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
+import { WidgetRenderer, PageGridRenderer } from '../_shared/components/renderer';
+import type { SpaceWidget, PageContentItem } from '../_shared/components/renderer';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
-import { toSlug, getSpaceGridColumn } from '../_shared/utils';
+import { toSlug } from '../_shared/utils';
 import { saveTemplate } from '../_shared/templateApi';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem, LayerType, LayerWidth } from '../_shared/types';
@@ -58,16 +60,6 @@ const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
     { value: 'xl', label: 'XLarge — 896px' },
 ];
 
-/** Widget 빌더와 동일한 타입 메타 */
-const WIDGET_META: Record<string, { label: string; color: string }> = {
-    form:  { label: 'Form',   color: 'text-violet-700' },
-    space: { label: '공간영역', color: 'text-amber-700' },
-};
-
-const WIDGET_ICON: Record<string, React.ReactNode> = {
-    form:  <FileText  className="w-3.5 h-3.5" />,
-    space: <AlignLeft className="w-3.5 h-3.5" />,
-};
 
 /** 초기 Form 컨텐츠 생성 */
 const createFormContent = (): FixedContentItem => ({
@@ -173,10 +165,20 @@ export default function QuickDetailBuilderPage() {
         try {
             const config = JSON.parse(tpl.configJson);
             if (config.widgetItems) {
-                /* 신규 구조: widgetItems[0]=Form, [1]=공간 */
-                const [fi, si] = config.widgetItems;
-                setFormContent(fi?.contents?.[0] || createFormContent());
-                setSpaceContent(si?.contents?.[0] || createSpaceContent());
+                type C = { widget?: { type?: string } };
+                if (config.widgetItems.length === 1) {
+                    /* 신규 구조: 1개 outer item, contents 배열에서 위젯 타입으로 탐색 */
+                    const contents = (config.widgetItems[0]?.contents ?? []) as C[];
+                    const fi = contents.find(c => c.widget?.type === 'form')  as FixedContentItem | undefined;
+                    const si = contents.find(c => c.widget?.type === 'space') as FixedContentItem | undefined;
+                    setFormContent(fi  || createFormContent());
+                    setSpaceContent(si || createSpaceContent());
+                } else {
+                    /* 구버전 구조: 2개 separate outer items (하위 호환) */
+                    const [fi, si] = config.widgetItems;
+                    setFormContent(fi?.contents?.[0]  || createFormContent());
+                    setSpaceContent(si?.contents?.[0] || createSpaceContent());
+                }
             } else {
                 /* 구버전 하위 호환 */
                 setFormContent(config.formContent || createFormContent());
@@ -232,21 +234,16 @@ export default function QuickDetailBuilderPage() {
     const handleSaveConfirm = async () => {
         setIsSaving(true);
         try {
-            /* 빌더 내부 고정 구조 → widgetItems 배열로 변환하여 저장 */
-            const widgetItems = [
-                {
-                    id: 'wi-form',
-                    colSpan: 12,
-                    rowSpan: formContent.rowSpan,
-                    contents: [{ id: formContent.id, colSpan: formContent.colSpan, rowSpan: formContent.rowSpan, widget: formContent.widget as unknown as Record<string, unknown> }],
-                },
-                {
-                    id: 'wi-space',
-                    colSpan: 12,
-                    rowSpan: spaceContent.rowSpan,
-                    contents: [{ id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> }],
-                },
-            ];
+            /* 미리보기와 동일한 1개 outer item 구조로 저장 → 운영 페이지와 완전 일치 */
+            const widgetItems = [{
+                id: 'wi-all',
+                colSpan: 12,
+                rowSpan: formContent.rowSpan + spaceContent.rowSpan,
+                contents: [
+                    { id: formContent.id,  colSpan: formContent.colSpan,  rowSpan: formContent.rowSpan,  widget: formContent.widget  as unknown as Record<string, unknown> },
+                    { id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> },
+                ],
+            }];
             /* outputMode, layerType 등 팝업 메타는 extra로 병합 */
             const result = await saveTemplate({
                 id: currentTemplateId,
@@ -460,48 +457,26 @@ export default function QuickDetailBuilderPage() {
                                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-slate-400">2개</span>
                             </div>
 
-                            {/* ── Form 컨텐츠 행 — Widget 빌더 컨텐츠 행과 동일한 스타일 ── */}
+                            {/* ── Form 컨텐츠 행 ── */}
                             <div className="border-t border-slate-100">
-                                {/* 컨텐츠 헤더 (클릭 시 설정 패널 토글) */}
-                                <div
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer transition-all ${editingContentId === 'fixed-form' ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
-                                    onClick={() => setEditingContentId(editingContentId === 'fixed-form' ? null : 'fixed-form')}
-                                >
-                                    <span className={WIDGET_META.form.color}>{WIDGET_ICON.form}</span>
-                                    <span className={`text-[10px] font-semibold flex-1 truncate ${WIDGET_META.form.color}`}>
-                                        {WIDGET_META.form.label}
-                                        {formWidgetRef.contentKey ? ` — ${formWidgetRef.contentKey}` : ''}
-                                    </span>
-                                    <span className="text-[9px] text-slate-300 flex-shrink-0 font-mono">{formContent.colSpan}×{formContent.rowSpan}</span>
-                                    {/* 고정 뱃지 (X 버튼 대신) */}
-                                    <span className="text-[9px] text-slate-300 flex-shrink-0">고정</span>
-                                </div>
-
-                                {/* Form 설정 패널 */}
+                                <ContentRowHeader
+                                    widgetType="form"
+                                    label={`Form${formWidgetRef.contentKey ? ` — ${formWidgetRef.contentKey}` : ''}`}
+                                    colSpan={formContent.colSpan}
+                                    rowSpan={formContent.rowSpan}
+                                    isEditing={editingContentId === 'fixed-form'}
+                                    isFixed
+                                    onToggle={() => setEditingContentId(editingContentId === 'fixed-form' ? null : 'fixed-form')}
+                                />
                                 {editingContentId === 'fixed-form' && (
                                     <div className="border-t border-slate-100 bg-slate-50/50">
-                                        {/* 크기 설정 */}
-                                        <div className="px-3 pt-2 pb-1.5 border-b border-slate-100 flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">크기</span>
-                                            <div className="flex items-center gap-1 flex-1">
-                                                <span className="text-[10px] text-slate-400">Col</span>
-                                                <input
-                                                    type="number" min={1} max={outputMode === 'layerpopup' && layerType === 'right' ? 2 : 12} value={formContent.colSpan}
-                                                    onChange={e => updateFormSize(Number(e.target.value) || 1, formContent.rowSpan)}
-                                                    className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                                                />
-                                                <span className="text-[10px] text-slate-300">/ {outputMode === 'layerpopup' && layerType === 'right' ? 2 : 12}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 flex-1">
-                                                <span className="text-[10px] text-slate-400">Row</span>
-                                                <input
-                                                    type="number" min={1} max={20} value={formContent.rowSpan}
-                                                    onChange={e => updateFormSize(formContent.colSpan, Number(e.target.value) || 1)}
-                                                    className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                                                />
-                                            </div>
-                                        </div>
-                                        {/* Form 위젯 설정 */}
+                                        <SizeSettingPanel
+                                            colSpan={formContent.colSpan}
+                                            rowSpan={formContent.rowSpan}
+                                            maxColSpan={isRightDrawer ? 2 : 12}
+                                            onColSpanChange={v => updateFormSize(v, formContent.rowSpan)}
+                                            onRowSpanChange={v => updateFormSize(formContent.colSpan, v)}
+                                        />
                                         <div className="px-3 pb-2 pt-1">
                                             <CommonBuilderDispatcher
                                                 widget={formContent.widget}
@@ -515,43 +490,24 @@ export default function QuickDetailBuilderPage() {
 
                             {/* ── Space 컨텐츠 행 ── */}
                             <div className="border-t border-slate-100">
-                                <div
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer transition-all ${editingContentId === 'fixed-space' ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
-                                    onClick={() => setEditingContentId(editingContentId === 'fixed-space' ? null : 'fixed-space')}
-                                >
-                                    <span className={WIDGET_META.space.color}>{WIDGET_ICON.space}</span>
-                                    <span className={`text-[10px] font-semibold flex-1 truncate ${WIDGET_META.space.color}`}>
-                                        {WIDGET_META.space.label}
-                                    </span>
-                                    <span className="text-[9px] text-slate-300 flex-shrink-0 font-mono">{spaceContent.colSpan}×{spaceContent.rowSpan}</span>
-                                    <span className="text-[9px] text-slate-300 flex-shrink-0">고정</span>
-                                </div>
-
-                                {/* Space 설정 패널 */}
+                                <ContentRowHeader
+                                    widgetType="space"
+                                    label="공간영역"
+                                    colSpan={spaceContent.colSpan}
+                                    rowSpan={spaceContent.rowSpan}
+                                    isEditing={editingContentId === 'fixed-space'}
+                                    isFixed
+                                    onToggle={() => setEditingContentId(editingContentId === 'fixed-space' ? null : 'fixed-space')}
+                                />
                                 {editingContentId === 'fixed-space' && (
                                     <div className="border-t border-slate-100 bg-slate-50/50">
-                                        {/* 크기 설정 */}
-                                        <div className="px-3 pt-2 pb-1.5 border-b border-slate-100 flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">크기</span>
-                                            <div className="flex items-center gap-1 flex-1">
-                                                <span className="text-[10px] text-slate-400">Col</span>
-                                                <input
-                                                    type="number" min={1} max={outputMode === 'layerpopup' && layerType === 'right' ? 2 : 12} value={spaceContent.colSpan}
-                                                    onChange={e => updateSpaceSize(Number(e.target.value) || 1, spaceContent.rowSpan)}
-                                                    className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                                                />
-                                                <span className="text-[10px] text-slate-300">/ {outputMode === 'layerpopup' && layerType === 'right' ? 2 : 12}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 flex-1">
-                                                <span className="text-[10px] text-slate-400">Row</span>
-                                                <input
-                                                    type="number" min={1} max={20} value={spaceContent.rowSpan}
-                                                    onChange={e => updateSpaceSize(spaceContent.colSpan, Number(e.target.value) || 1)}
-                                                    className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
-                                                />
-                                            </div>
-                                        </div>
-                                        {/* Space 위젯 설정 — ActionButton만 */}
+                                        <SizeSettingPanel
+                                            colSpan={spaceContent.colSpan}
+                                            rowSpan={spaceContent.rowSpan}
+                                            maxColSpan={isRightDrawer ? 2 : 12}
+                                            onColSpanChange={v => updateSpaceSize(v, spaceContent.rowSpan)}
+                                            onRowSpanChange={v => updateSpaceSize(spaceContent.colSpan, v)}
+                                        />
                                         <div className="px-3 pb-2 pt-1">
                                             <SpaceBuilder
                                                 widget={spaceContent.widget as SpaceWidget}
@@ -642,33 +598,18 @@ export default function QuickDetailBuilderPage() {
                                 );
                             }
 
-                            /* ── 페이지/중앙팝업: PageLayout이 12칸 그리드 + 격자 담당 ── */
+                            /* ── 페이지/중앙팝업: PageLayout + PageGridRenderer로 운영화면과 동일한 함수 사용 ── */
                             const grid = (
                                 <PageLayout mode="preview">
-                                    {/* WidgetCellPreview와 동일한 inner sub-grid — 80px 고정 행으로 배경 격자선과 정확히 일치 */}
-                                    <div style={{
-                                        gridColumn: 'span 12',
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(12, 1fr)',
-                                        gridAutoRows: '80px',
-                                        gridAutoFlow: 'row dense',
-                                    }}>
-                                        {/* Form 위젯 */}
-                                        <div style={{ gridColumn: `span ${formContent.colSpan}`, gridRow: `span ${formContent.rowSpan}` }}>
-                                            <WidgetRenderer mode="preview" widget={formContent.widget} contentColSpan={formContent.colSpan} />
-                                        </div>
-                                        {/* 공간영역 */}
-                                        <div style={{
-                                            gridColumn: getSpaceGridColumn(
-                                                spaceContent.widget.type === 'space' ? spaceContent.widget.align : undefined,
-                                                spaceContent.colSpan,
-                                                12,
-                                            ),
-                                            gridRow: `span ${spaceContent.rowSpan}`,
-                                        }}>
-                                            <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
-                                        </div>
-                                    </div>
+                                    <PageGridRenderer
+                                        mode="preview"
+                                        widgetItems={[{
+                                            id: 'preview-all',
+                                            colSpan: 12,
+                                            rowSpan: formContent.rowSpan + spaceContent.rowSpan,
+                                            contents: [formContent, spaceContent] as PageContentItem[],
+                                        }]}
+                                    />
                                 </PageLayout>
                             );
 
