@@ -9,23 +9,25 @@ import { ROW_HEIGHT } from './GridCell';
  * 빌더 미리보기 + 실제 생성 페이지 모두에서 동일하게 사용한다.
  * 한 곳만 수정하면 모든 페이지에 동일하게 반영된다.
  *
- * - mode='preview' : 빌더 미리보기용. 격자 기본 표시, 테두리/배경 있음
- * - mode='live'    : 실제 서비스 페이지. 격자 기본 숨김, 테두리/배경 없음
- * - ctrl+g         : 격자 가이드라인 on/off 토글 (preview/live 모두 동작)
+ * - mode='preview' : 빌더 미리보기용. showGrid 기본값 true
+ * - mode='live'    : 실제 서비스 페이지. showGrid 기본값 false
+ * - g 키           : 격자 가이드라인 on/off 토글 (preview/live 모두 동작)
+ * - showGrid=true  : 격자선 + 테두리 + 배경색 표시 (모드 구분 없이 동일)
+ * - showGrid=false : 격자선 없음, 테두리 없음, 배경 없음
  *
  * @example
  * // 빌더 미리보기
  * <PageLayout mode="preview">
- *   <div style={{ gridColumn: 'span 12', gridRow: 'span 2' }}>
+ *   <GridCell colSpan={12} rowSpan={2}>
  *     <WidgetRenderer mode="preview" widget={searchWidget} />
- *   </div>
+ *   </GridCell>
  * </PageLayout>
  *
  * // 실제 페이지
  * <PageLayout title="게시판 목록" mode="live">
- *   <div style={{ gridColumn: 'span 12', gridRow: 'span 2' }}>
+ *   <GridCell colSpan={12} rowSpan={2}>
  *     <WidgetRenderer mode="live" widget={searchWidget} />
- *   </div>
+ *   </GridCell>
  * </PageLayout>
  */
 
@@ -53,7 +55,7 @@ export default function PageLayout({ title, description, mode = 'live', children
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    /* 격자 가이드라인 배경 스타일 (showGrid=true일 때만 적용) */
+    /* showGrid=true일 때 격자선 + 테두리 + 배경색 — 모드 구분 없이 동일하게 적용 */
     const gridStyle: React.CSSProperties = {
         /* GridCell 이 각 셀 height 를 rowSpan × ROW_HEIGHT 로 고정하므로 auto 사용 */
         gridAutoRows: `${ROW_HEIGHT}px`,
@@ -66,12 +68,10 @@ export default function PageLayout({ title, description, mode = 'live', children
         } : {}),
     };
 
-    /* preview: 테두리 + 배경 표시 / live: 클린 그리드만 */
+    /* showGrid 상태가 테두리/배경을 결정 — preview/live 모두 동일한 방식 */
     const gridCls = [
-        'grid grid-cols-12 gap-3 overflow-visible',
-        mode === 'preview'
-            ? 'border border-slate-200 rounded-lg bg-slate-50'
-            : '',
+        'grid grid-cols-12 gap-3',
+        showGrid ? 'border border-slate-200 rounded-lg bg-slate-50' : '',
     ].filter(Boolean).join(' ');
 
     return (
