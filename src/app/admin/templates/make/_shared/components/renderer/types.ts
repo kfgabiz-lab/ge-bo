@@ -57,6 +57,35 @@ export interface SearchWidget {
 }
 
 /**
+ * 카테고리 위젯
+ * - 하나의 위젯 = 하나의 depth (대분류, 중분류, 소분류 각각 독립 위젯)
+ * - dbSlug: page_data 테이블의 template_slug (카테고리 데이터 그룹 식별자)
+ * - depth: 이 위젯이 표시할 depth 번호 (1=대분류, 2=중분류, ...)
+ * - parentWidgetId: 상위 depth 위젯 ID (선택된 값으로 eq_parentId 필터 적용)
+ */
+export interface CategoryWidget {
+    type: 'category';
+    widgetId: string;
+    contentKey: string;
+    /** 연결할 카테고리 데이터 slug (page_data.template_slug) */
+    dbSlug: string;
+    /** 이 위젯의 depth 번호 (1=루트/대분류, 2=중분류, ...) */
+    depth: number;
+    /** 상위 카테고리 위젯 ID — 이 위젯의 선택값을 parentId 필터로 사용 */
+    parentWidgetId?: string;
+    /** 이 depth 레이블 (예: '대분류', '중분류') */
+    label?: string;
+    /** 항목 등록 허용 여부 (기본 true) */
+    allowCreate?: boolean;
+    /** 항목 수정 허용 여부 (기본 true) */
+    allowEdit?: boolean;
+    /** 항목 삭제 허용 여부 (기본 true) */
+    allowDelete?: boolean;
+    /** 테두리 표시 여부 (기본 true) */
+    showBorder?: boolean;
+}
+
+/**
  * WidgetRenderer가 처리하는 모든 위젯 타입 union
  * FormWidget, TableWidget은 각 builder 파일에서 import
  */
@@ -65,7 +94,8 @@ export type AnyWidget =
     | SearchWidget
     | TableWidget
     | FormWidget
-    | SpaceWidget;
+    | SpaceWidget
+    | CategoryWidget;
 
 /* ── 핸들러 타입 ── */
 

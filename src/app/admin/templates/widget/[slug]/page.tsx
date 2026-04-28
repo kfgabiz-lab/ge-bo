@@ -52,6 +52,18 @@ function findMenuName(menus: MenuItem[], pathname: string): string | null {
     return null;
 }
 
+/** 메뉴 트리 재귀 탐색으로 현재 URL의 메뉴 설명 반환 */
+function findMenuDescription(menus: MenuItem[], pathname: string): string | null {
+    for (const item of menus) {
+        if (item.url === pathname) return item.description ?? null;
+        if (item.children?.length) {
+            const found = findMenuDescription(item.children, pathname);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
 
 /* ══════════════════════════════════════════ */
 /*  메인 페이지                                */
@@ -62,6 +74,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     const pathname = usePathname();
     const navMenus = useMenuStore((state) => state.navMenus);
     const menuName = findMenuName(navMenus, pathname || '');
+    const menuDescription = findMenuDescription(navMenus, pathname || '');
     const { groups: codeGroups, fetchGroups } = useCodeStore();
 
     /* 템플릿 로딩 상태 */
@@ -416,7 +429,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     }
 
     return (
-        <PageLayout mode="live" title={menuName ?? undefined}>
+        <PageLayout mode="live" title={menuName ?? undefined} description={menuDescription ?? undefined}>
             <PageGridRenderer
                 mode="live"
                 widgetItems={widgetItems}

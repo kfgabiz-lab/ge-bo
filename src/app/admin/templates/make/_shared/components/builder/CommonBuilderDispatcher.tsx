@@ -5,6 +5,7 @@ import { SearchWidgetBuilder } from './SearchWidgetBuilder';
 import { TableBuilder } from './TableBuilder';
 import { FormBuilder } from './FormBuilder';
 import { SpaceBuilder } from './SpaceBuilder';
+import { CategoryBuilder } from './CategoryBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 
@@ -26,11 +27,13 @@ interface CommonBuilderDispatcherProps {
         formWidgets?: Array<{ widgetId: string; contentKey: string; connectedSlug?: string }>;
         /** 필드 ColSpan 최대값 (기본 12, 우측 드로어 등 좁은 공간에서 2로 제한) */
         maxColSpan?: number;
+        /** 현재 페이지의 카테고리 위젯 목록 — parentWidgetId 선택용 */
+        categoryWidgets?: { widgetId: string; label?: string; depth: number }[];
     };
 }
 
 export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBuilderDispatcherProps) {
-    const { slugOptions, pageTemplates = [], searchWidgets = [], formWidgets = [], maxColSpan } = context;
+    const { slugOptions, pageTemplates = [], searchWidgets = [], formWidgets = [], maxColSpan, categoryWidgets = [] } = context;
 
     switch (widget.type) {
         case 'text':
@@ -81,6 +84,15 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     onChange={w => onChange(w)}
                     pageTemplates={pageTemplates}
                     formWidgets={formWidgets}
+                />
+            );
+
+        case 'category':
+            return (
+                <CategoryBuilder
+                    widget={widget}
+                    onChange={w => onChange(w)}
+                    categoryWidgets={categoryWidgets}
                 />
             );
 

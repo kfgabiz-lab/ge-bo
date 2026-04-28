@@ -19,6 +19,7 @@
  */
 
 import { getSpaceGridColumn } from '../../utils';
+import { GridCell, ROW_HEIGHT } from '@/components/layout/GridCell';
 import { WidgetRenderer } from './WidgetRenderer';
 import type { AnyWidget, RendererMode } from './types';
 import type { CodeGroupDef } from '../../types';
@@ -116,17 +117,15 @@ export function PageGridRenderer({
     return (
         <>
             {widgetItems.map(item => (
-                <div
-                    key={item.id}
-                    style={{ gridColumn: `span ${item.colSpan}`, gridRow: `span ${item.rowSpan}` }}
-                >
-                    {/* inner sub-grid — 80px 고정 행, gap:0으로 배경 격자선과 정확히 일치 */}
+                /* outer 셀 — GridCell 로 colSpan/rowSpan/height 일괄 관리 */
+                <GridCell key={item.id} colSpan={item.colSpan} rowSpan={item.rowSpan}>
+                    {/* inner sub-grid — ROW_HEIGHT 고정 행, gap:0으로 배경 격자선과 정확히 일치 */}
                     <div
                         className="w-full"
                         style={{
                             display: 'grid',
                             gridTemplateColumns: `repeat(${item.colSpan}, 1fr)`,
-                            gridAutoRows: '80px',
+                            gridAutoRows: `${ROW_HEIGHT}px`,
                             gridAutoFlow: 'row dense',
                             gap: 0,
                         }}
@@ -143,11 +142,8 @@ export function PageGridRenderer({
                                             ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, item.colSpan), item.colSpan)
                                             : `span ${Math.min(c.colSpan, item.colSpan)}`,
                                         gridRow: `span ${c.rowSpan}`,
-                                        /* h-full 대신 명시적 높이 — minmax(80px,auto) 트랙은 불확정이라
-                                           자식 h-full이 auto로 해석됨. px 고정으로 SpaceRenderer 등에
-                                           정확한 높이를 전달해 align-content: center 등이 동작하도록 함
-                                           gap:0이므로 rowSpan * 80px만 사용 (gap 기여분 없음) */
-                                        height: `${c.rowSpan * 80}px`,
+                                        /* ROW_HEIGHT 단일 상수 사용 — gap:0이므로 rowSpan × ROW_HEIGHT 만 사용 */
+                                        height: `${c.rowSpan * ROW_HEIGHT}px`,
                                     }}
                                 >
                                     <WidgetRenderer
@@ -185,7 +181,7 @@ export function PageGridRenderer({
                             );
                         })}
                     </div>
-                </div>
+                </GridCell>
             ))}
         </>
     );

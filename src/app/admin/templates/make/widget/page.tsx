@@ -14,7 +14,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Plus, Trash2, ChevronDown, X, Save, Loader2, Wand2,
     Search as SearchIcon, Table2, FileText,
-    AlignLeft, FolderOpen, Copy,
+    AlignLeft, FolderOpen, Copy, Layers,
     GripVertical,
 } from 'lucide-react';
 import {
@@ -30,11 +30,12 @@ import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBui
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
 import { WidgetRenderer } from '../_shared/components/renderer';
-import type { SearchWidget, SpaceWidget, TextWidget } from '../_shared/components/renderer';
+import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug, getSpaceGridColumn } from '../_shared/utils';
 import PageLayout from '@/components/layout/PageLayout';
+import { GridCell, ROW_HEIGHT } from '@/components/layout/GridCell';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
 import { TemplateItem } from '../_shared/types';
@@ -44,13 +45,13 @@ import { TemplateItem } from '../_shared/types';
 /* ══════════════════════════════════════════ */
 
 /** 페이지 위젯 타입 */
-type PageWidgetType = 'search' | 'table' | 'form' | 'space';
+type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category';
 
 /* TextWidget, SearchWidget, SpaceItem, SpaceWidget → renderer/types에서 import */
 /* FormFieldItem, FormWidget → FormBuilder에서 import */
 
 /** 위젯 합집합 타입 */
-type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget;
+type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget;
 
 /**
  * 위젯 셀 안에 배치되는 컨텐츠 아이템
@@ -92,27 +93,23 @@ const WIDGET_META: Record<PageWidgetType, {
     previewBg: string;
     desc: string;
 }> = {
-    search: { label: 'Search', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', previewBg: 'bg-blue-50/50', desc: '검색폼 영역' },
-    table: { label: 'Table', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', previewBg: 'bg-emerald-50/50', desc: '데이터 테이블' },
-    form: { label: 'Form', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200', previewBg: 'bg-violet-50/50', desc: '폼 입력 영역' },
-    space: { label: '공간영역', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', previewBg: 'bg-amber-50/50', desc: 'Text/Button 배치 영역' },
+    search:   { label: 'Search',   color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',   previewBg: 'bg-blue-50/50',   desc: '검색폼 영역' },
+    table:    { label: 'Table',    color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', previewBg: 'bg-emerald-50/50', desc: '데이터 테이블' },
+    form:     { label: 'Form',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200',  previewBg: 'bg-violet-50/50',  desc: '폼 입력 영역' },
+    space:    { label: '공간영역', color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200',   previewBg: 'bg-amber-50/50',   desc: 'Text/Button 배치 영역' },
+    category: { label: '카테고리', color: 'text-cyan-700',   bg: 'bg-cyan-50',    border: 'border-cyan-200',    previewBg: 'bg-cyan-50/50',    desc: '카테고리 계층 관리' },
 };
 
 /** 위젯 타입별 아이콘 컴포넌트 */
 const WIDGET_ICON: Record<PageWidgetType, React.ReactNode> = {
-    search: <SearchIcon className="w-3.5 h-3.5" />,
-    table: <Table2 className="w-3.5 h-3.5" />,
-    form: <FileText className="w-3.5 h-3.5" />,
-    space: <AlignLeft className="w-3.5 h-3.5" />,
+    search:   <SearchIcon className="w-3.5 h-3.5" />,
+    table:    <Table2 className="w-3.5 h-3.5" />,
+    form:     <FileText className="w-3.5 h-3.5" />,
+    space:    <AlignLeft className="w-3.5 h-3.5" />,
+    category: <Layers className="w-3.5 h-3.5" />,
 };
 
 /** 공간영역 버튼 색상 옵션 */
-/** 위젯 colSpan → CSS col-span 클래스 (12칸 기준 그리드) */
-const COL_SPAN_CLS: Record<number, string> = {
-    1: 'col-span-1', 2: 'col-span-2', 3: 'col-span-3', 4: 'col-span-4',
-    5: 'col-span-5', 6: 'col-span-6', 7: 'col-span-7', 8: 'col-span-8',
-    9: 'col-span-9', 10: 'col-span-10', 11: 'col-span-11', 12: 'col-span-12',
-};
 
 /* ══════════════════════════════════════════ */
 /*  헬퍼 함수                                  */
@@ -173,13 +170,13 @@ const WidgetCellPreview = ({ contents, colSpan }: { contents: PageContentItem[];
         );
     }
     return (
-        /* 부모 위젯 col 수를 기준으로 서브 그리드 구성 — gridAutoRows: 80px로 rowSpan 단위 고정 */
+        /* 부모 위젯 col 수를 기준으로 서브 그리드 구성 — ROW_HEIGHT 단위 행 고정 */
         <div
             className="w-full p-0.5"
             style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${colSpan}, 1fr)`,
-                gridAutoRows: '80px',
+                gridAutoRows: `${ROW_HEIGHT}px`,
                 gridAutoFlow: 'row dense',
             }}
         >
@@ -377,10 +374,11 @@ export default function PageBuilderPage() {
         const id = wuid();
         const newWidget: PageWidget = (() => {
             switch (type) {
-                case 'search': return { type: 'search', widgetId: id, contentKey: '', rows: [] } as SearchWidget;
-                case 'table': return { type: 'table', widgetId: id, contentKey: '', columns: [], connectedSearchIds: [], pageSize: 10, displayMode: 'pagination' } as TableWidget;
-                case 'form': return { type: 'form', widgetId: id, contentKey: '', fields: [] } as FormWidget;
-                case 'space': return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
+                case 'search':   return { type: 'search', widgetId: id, contentKey: '', rows: [] } as SearchWidget;
+                case 'table':    return { type: 'table', widgetId: id, contentKey: '', columns: [], connectedSearchIds: [], pageSize: 10, displayMode: 'pagination' } as TableWidget;
+                case 'form':     return { type: 'form', widgetId: id, contentKey: '', fields: [] } as FormWidget;
+                case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
+                case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
             }
         })();
         const parent = widgetItems.find(i => i.id === itemId);
@@ -789,7 +787,8 @@ export default function PageBuilderPage() {
                                                                                                     slugOptions,
                                                                                                     pageTemplates: mainLayerTemplates,
                                                                                                     searchWidgets: (collectWidgets(widgetItems, 'search') as SearchWidget[]).map(w => ({ widgetId: w.widgetId, contentKey: w.contentKey })),
-                                                                                                    formWidgets: (collectWidgets(widgetItems, 'form') as FormWidget[]).map(w => ({ widgetId: w.widgetId, contentKey: w.contentKey, connectedSlug: w.connectedSlug }))
+                                                                                                    formWidgets: (collectWidgets(widgetItems, 'form') as FormWidget[]).map(w => ({ widgetId: w.widgetId, contentKey: w.contentKey, connectedSlug: w.connectedSlug })),
+                                                                                                    categoryWidgets: (collectWidgets(widgetItems, 'category') as CategoryWidget[]).map(w => ({ widgetId: w.widgetId, label: w.label, depth: w.depth })),
                                                                                                 }}
                                                                                             />
                                                                                         </div>
@@ -907,19 +906,21 @@ export default function PageBuilderPage() {
                             /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
                             <PageLayout mode="preview">
                                 {widgetItems.map((item) => (
-                                    <div
+                                    /* GridCell — colSpan/rowSpan/height/overflow 일괄 관리 */
+                                    <GridCell
                                         key={item.id}
+                                        colSpan={item.colSpan}
+                                        rowSpan={item.rowSpan}
                                         onClick={() => {
                                             setShowAddWidget(false);
                                             setAddingContentToItemId(null);
                                             setEditingItemId(editingItemId === item.id ? null : item.id);
                                             setEditingContentId(null);
                                         }}
-                                        style={{ gridRow: `span ${item.rowSpan}` }}
-                                        className={`${COL_SPAN_CLS[item.colSpan] || 'col-span-1'} cursor-pointer transition-all ${editingItemId === item.id ? 'ring-2 ring-inset ring-slate-900' : 'hover:ring-1 hover:ring-inset hover:ring-slate-300'}`}
+                                        className={`cursor-pointer transition-all ${editingItemId === item.id ? 'ring-2 ring-inset ring-slate-900' : 'hover:ring-1 hover:ring-inset hover:ring-slate-300'}`}
                                     >
                                         <WidgetCellPreview contents={item.contents} colSpan={item.colSpan} />
-                                    </div>
+                                    </GridCell>
                                 ))}
                             </PageLayout>
                         )}

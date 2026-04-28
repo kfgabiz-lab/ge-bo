@@ -370,6 +370,7 @@ export function MenuDetail() {
 
     /* 로컬 편집 상태 */
     const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
     const [url, setUrl] = useState('');
     const [slug, setSlug] = useState('');
     const [slugLocked, setSlugLocked] = useState(false); // slug 값이 있으면 잠금 상태
@@ -396,6 +397,7 @@ export function MenuDetail() {
     useEffect(() => {
         if (selectedMenu) {
             setName(selectedMenu.name);
+            setDescription(selectedMenu.description || '');
             setUrl(selectedMenu.url || '');
             setSlug(selectedMenu.slug || '');
             setSlugLocked(!!selectedMenu.slug); // slug 값이 있으면 잠금
@@ -447,6 +449,7 @@ export function MenuDetail() {
         if (selectedMenu) {
             const dirty =
                 name !== selectedMenu.name ||
+                description !== (selectedMenu.description || '') ||
                 url !== selectedMenu.url ||
                 slug !== (selectedMenu.slug || '') ||
                 icon !== selectedMenu.icon ||
@@ -455,7 +458,7 @@ export function MenuDetail() {
             setIsDirty(dirty);
             setStoreDirty(dirty);
         }
-    }, [name, url, slug, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
+    }, [name, description, url, slug, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
 
     /* ── 생성 모드 ── */
     if (!selectedMenu && isCreating) {
@@ -537,6 +540,7 @@ export function MenuDetail() {
         try {
             await updateMenu(selectedMenu.id, {
                 name: name.trim(),
+                description: description.trim() || undefined,
                 url: (url || '').endsWith('/') && (url || '').length > 1 ? (url || '').replace(/\/+$/, '') : (url || ''),
                 slug: slug.trim() || undefined,
                 icon,
@@ -741,6 +745,23 @@ export function MenuDetail() {
                         </p>
                     )}
                     {slugError && <p className="text-[11px] text-red-500 mt-1">{slugError}</p>}
+                </div>
+
+                {/* 메뉴 설명 — 페이지 상단에 표시 */}
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                        메뉴 설명
+                        <span className="ml-1.5 text-[10px] text-slate-400 font-normal">페이지 타이틀 아래에 표시됩니다 (선택)</span>
+                    </label>
+                    <textarea
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        rows={2}
+                        maxLength={500}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none transition-all"
+                        placeholder="페이지에 대한 간략한 설명을 입력하세요"
+                    />
+                    <p className="text-right text-[10px] text-slate-300 mt-0.5">{description.length}/500</p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">

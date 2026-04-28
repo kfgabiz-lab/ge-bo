@@ -8,6 +8,8 @@ import api from '@/lib/api';
 export interface MenuItem {
     id: number;
     name: string;
+    /** 페이지 상단에 표시되는 메뉴 설명 (선택) */
+    description?: string;
     url: string;
     icon: string;
     parentId: number | null;

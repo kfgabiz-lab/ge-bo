@@ -18,6 +18,7 @@ export { TableCellRenderer }   from './TableCellRenderer';
 export { TableRenderer }       from './TableRenderer';
 export { FormRenderer }        from './FormRenderer';
 export { SpaceRenderer }       from './SpaceRenderer';
+export { CategoryRenderer }    from './CategoryRenderer';
 export { WidgetRenderer }      from './WidgetRenderer';
 export { PageGridRenderer }    from './PageGridRenderer';
 
@@ -28,6 +29,7 @@ export type {
     SpaceItem,
     SpaceWidget,
     SearchWidget,
+    CategoryWidget,
     AnyWidget,
     TableActionHandlers,
     SearchHandlers,

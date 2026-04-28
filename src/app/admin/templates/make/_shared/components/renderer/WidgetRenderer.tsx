@@ -41,6 +41,7 @@ import { SearchRenderer } from './SearchRenderer';
 import { TableRenderer } from './TableRenderer';
 import { FormRenderer } from './FormRenderer';
 import { SpaceRenderer } from './SpaceRenderer';
+import { CategoryRenderer } from './CategoryRenderer';
 import CenterPopupLayout from '@/components/layout/popup/CenterPopupLayout';
 import RightDrawerLayout from '@/components/layout/popup/RightDrawerLayout';
 import type { AnyWidget, RendererMode, TableActionHandlers, SpaceWidget } from './types';
@@ -116,6 +117,12 @@ interface WidgetRendererProps {
     appendLoading?: boolean;
     hasMore?: boolean;
 
+    /* ── live 모드 전용 — category ── */
+    /** 카테고리 위젯별 선택된 항목 ID (widgetId → selectedId) */
+    categorySelections?: Record<string, number | null>;
+    /** 카테고리 항목 선택 시 호출 — (widgetId, selectedId) */
+    onCategorySelect?: (widgetId: string, selectedId: number | null) => void;
+
     /* ── live 모드 전용 — 팝업 컨텍스트 ── */
     /**
      * 팝업 내 저장·수정·삭제 API 호출에 사용할 page-data slug.
@@ -172,6 +179,9 @@ export function WidgetRenderer({
     onLoadMore,
     appendLoading,
     hasMore,
+    /* category */
+    categorySelections,
+    onCategorySelect,
     /* 팝업 컨텍스트 */
     dataSlug,
     onPopupSaved,
@@ -675,6 +685,22 @@ export function WidgetRenderer({
                 {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
                 {mode === 'live' && renderPopupOverlay()}
             </>
+        );
+    }
+
+    /* ── Category ── */
+    if (widget.type === 'category') {
+        /* 상위 위젯의 선택값 — parentWidgetId가 있으면 categorySelections에서 조회 */
+        const selectedParentId = widget.parentWidgetId
+            ? (categorySelections?.[widget.parentWidgetId] ?? null)
+            : null;
+        return (
+            <CategoryRenderer
+                mode={mode}
+                widget={widget}
+                selectedParentId={selectedParentId}
+                onSelect={onCategorySelect}
+            />
         );
     }
 

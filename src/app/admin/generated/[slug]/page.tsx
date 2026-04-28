@@ -39,6 +39,18 @@ function findMenuName(menus: MenuItem[], pathname: string): string | null {
     return null;
 }
 
+/** 메뉴 트리 재귀 탐색으로 현재 URL의 메뉴 설명 반환 */
+function findMenuDescription(menus: MenuItem[], pathname: string): string | null {
+    for (const item of menus) {
+        if (item.url === pathname) return item.description ?? null;
+        if (item.children?.length) {
+            const found = findMenuDescription(item.children, pathname);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
 /* ══════════════════════════════════════════ */
@@ -106,7 +118,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const router       = useRouter();
     const searchParams = useSearchParams();
     const navMenus     = useMenuStore((state) => state.navMenus);
-    const menuName     = findMenuName(navMenus, pathname || '');
+    const menuName        = findMenuName(navMenus, pathname || '');
+    const menuDescription = findMenuDescription(navMenus, pathname || '');
     const dataSlug     = useMenuPageSlug(slug);
     const { groups: codeGroups, fetchGroups } = useCodeStore();
 
@@ -651,7 +664,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     /* ══════════════════════════════════════════ */
     if (templateType === 'QUICK_LIST' || templateType === 'QUICK_DETAIL' || templateType === 'PAGE') {
         return (
-            <PageLayout title={menuName || templateName} mode="live">
+            <PageLayout title={menuName || templateName} description={menuDescription ?? undefined} mode="live">
                 <PageGridRenderer
                     mode="live"
                     widgetItems={widgetItems}
@@ -706,7 +719,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     return (
         <>
-            <PageLayout title={menuName || templateName} mode="live">
+            <PageLayout title={menuName || templateName} description={menuDescription ?? undefined} mode="live">
                 {buttonPosition === 'above' && (
                     <div style={{ gridColumn: 'span 12' }}><ButtonBar /></div>
                 )}
