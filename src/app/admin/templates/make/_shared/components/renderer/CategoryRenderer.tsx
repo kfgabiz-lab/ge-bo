@@ -27,10 +27,11 @@
  *   />
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Check, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { RendererContainer } from './RendererContainer';
 import type { CategoryWidget } from './types';
 import type { RendererMode } from './types';
 
@@ -196,11 +197,9 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
         }
     };
 
-    /* ── 래퍼 스타일 ── */
-    const wrapperCls = `h-full w-full rounded overflow-hidden flex flex-col bg-white ${widget.showBorder !== false ? 'border border-slate-200' : ''}`;
-
     return (
-        <div className={wrapperCls}>
+        /* RendererContainer — h-full w-full + 테두리 공통 처리 */
+        <RendererContainer showBorder={widget.showBorder !== false} className="flex flex-col bg-white">
 
             {/* 헤더: 레이블 + 등록 버튼 */}
             <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200 flex-shrink-0">
@@ -366,6 +365,6 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
                     </div>
                 )}
             </div>
-        </div>
+        </RendererContainer>
     );
 }

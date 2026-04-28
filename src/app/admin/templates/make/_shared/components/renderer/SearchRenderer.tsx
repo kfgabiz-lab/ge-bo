@@ -27,11 +27,11 @@
  *   />
  */
 
-import React from 'react';
 import { Search, RotateCcw } from 'lucide-react';
 import { SearchForm, SearchRow, SearchField } from '@/components/search';
 import { SearchRowConfig, CodeGroupDef } from '../../types';
 import { FieldRenderer } from './FieldRenderer';
+import { RendererContainer } from './RendererContainer';
 import type { RendererMode } from './types';
 
 interface SearchRendererProps {
@@ -76,8 +76,8 @@ export function SearchRenderer({
         const GRID_COLS: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5' };
         const COL_SPAN: Record<number, string>  = { 1: 'col-span-1',  2: 'col-span-2',  3: 'col-span-3',  4: 'col-span-4',  5: 'col-span-5'  };
         return (
-            /* SearchForm과 동일한 컨테이너 스타일 + h-full로 그리드 셀 높이 꽉 채움 */
-            <div className="w-full h-full flex items-center gap-3 bg-white rounded-md border border-slate-200 px-4">
+            /* RendererContainer — h-full w-full + 테두리 공통 처리 (simple: flex 인라인) */
+            <RendererContainer className="flex items-center gap-3 bg-white px-4">
                 {/* 필드 영역 — SearchRow와 동일한 grid gap-4 방식 */}
                 <div className={`flex-1 grid ${GRID_COLS[cols] ?? 'grid-cols-5'} gap-4`}>
                     {row.fields.map(field => (
@@ -105,13 +105,13 @@ export function SearchRenderer({
                 >
                     <Search className="w-3 h-3" /> 검색
                 </button>
-            </div>
+            </RendererContainer>
         );
     }
 
-    /* ── 현재버전(standard): 기존 그리드 레이아웃 ── */
+    /* ── 현재버전(standard): SearchForm 자체 스타일 사용 — RendererContainer 불필요 ── */
     return (
-        <div className="w-full">
+        <RendererContainer showBorder={false}>
             <SearchForm
                 /* preview: collapsible 비활성, 핸들러 noop */
                 collapsible={!isPreview && collapsible}
@@ -144,6 +144,6 @@ export function SearchRenderer({
                     </SearchRow>
                 ))}
             </SearchForm>
-        </div>
+        </RendererContainer>
     );
 }

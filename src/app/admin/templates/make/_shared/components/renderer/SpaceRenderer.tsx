@@ -19,9 +19,9 @@
  *   <SpaceRenderer mode="live" items={widget.items} onClose={() => setOpen(false)} />
  */
 
-import React from 'react';
 import { useRouter } from 'next/navigation';
 import { FieldRenderer } from './FieldRenderer';
+import { RendererContainer } from './RendererContainer';
 import type { SearchFieldConfig } from '../../types';
 import type { RendererMode } from './types';
 
@@ -45,28 +45,13 @@ interface SpaceRendererProps {
 
 export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onFormAction, onClose, onPopupOpen }: SpaceRendererProps) {
     const router = useRouter();
-    /* 바탕색 + CSS Grid 스타일
-       - gridTemplateColumns: contentColSpan 칸으로 정확히 분할 (격자 스냅)
-       - 'none' 또는 미설정 시 배경 투명 */
-    const areaStyle: React.CSSProperties = {
-        backgroundColor: (!bgColor || bgColor === 'none') ? 'transparent' : bgColor,
-        gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
-        alignContent: 'center', /* 버튼/텍스트를 격자 셀 세로 가운데 정렬 */
-    };
-
-    /* 테두리 유무에 따라 border/shadow 클래스 분기 — CSS Grid 레이아웃 */
-    const base = `h-full w-full rounded overflow-auto grid ${showBorder ? 'border border-slate-300 shadow-sm' : ''}`;
-
     if (!items.length) {
         return (
-            <div className={base} style={areaStyle}>
-                <span
-                    className="text-[10px] text-slate-300 italic text-center p-4"
-                    style={{ gridColumn: `span ${contentColSpan}` }}
-                >
+            <RendererContainer showBorder={showBorder} bgColor={bgColor} className="flex items-center justify-center">
+                <span className="text-[10px] text-slate-300 italic text-center p-4">
                     아이템을 추가하세요
                 </span>
-            </div>
+            </RendererContainer>
         );
     }
 
@@ -89,24 +74,26 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
     };
 
     return (
-        <div className={base} style={areaStyle}>
-            {items.map(field => {
-                const itemSpan = Math.min(field.colSpan ?? 1, contentColSpan);
-                const isButton = field.type === 'action-button';
-                /* 버튼: 셀 가운데 배치 / 텍스트: 셀 전체 너비를 채워 자연스럽게 표시 */
-                /* 버튼: 양쪽 5% 패딩으로 셀 너비의 90% 차지 (비율 고정으로 빌더/운영 동일하게 보임) */
-                const wrapperCls = isButton ? 'flex items-center py-1 px-[5%]' : 'flex items-center py-1';
-                return (
-                    <div key={field.id} style={{ gridColumn: `span ${itemSpan}` }} className={wrapperCls}>
-                        <FieldRenderer
-                            mode={mode}
-                            field={field}
-                            value={field.type === 'textarea' ? (field.content ?? '') : undefined}
-                            onButtonClick={isButton ? () => handleButtonClick(field) : undefined}
-                        />
-                    </div>
-                );
-            })}
-        </div>
+        /* RendererContainer — grid 배치 공통 처리 (FormRenderer와 동일한 방식) */
+        <RendererContainer showBorder={showBorder} bgColor={bgColor} contentColSpan={contentColSpan}>
+            {/* 각 아이템 — gridColumn/gridRow로 자리만 지정 */}
+            {items.map(field => (
+                <div
+                    key={field.id}
+                    className="flex items-center px-3 min-w-0"
+                    style={{
+                        gridColumn: `span ${Math.min(field.colSpan ?? 1, contentColSpan)}`,
+                        gridRow: `span ${field.rowSpan ?? 1}`,
+                    }}
+                >
+                    <FieldRenderer
+                        mode={mode}
+                        field={field}
+                        value={field.type === 'textarea' ? (field.content ?? '') : undefined}
+                        onButtonClick={field.type === 'action-button' ? () => handleButtonClick(field) : undefined}
+                    />
+                </div>
+            ))}
+        </RendererContainer>
     );
 }

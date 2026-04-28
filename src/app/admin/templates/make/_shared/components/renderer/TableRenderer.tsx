@@ -41,6 +41,7 @@ import { useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import { TableCellRenderer } from './TableCellRenderer';
+import { RendererContainer } from './RendererContainer';
 import type { RendererMode, TableActionHandlers } from './types';
 
 /** preview 샘플 행 기본값 (pageSize prop 미지정 시) */
@@ -182,8 +183,9 @@ export function TableRenderer({
     }
 
     return (
-        /* scroll+live: flex-col + h-full로 내부 스크롤 레이아웃 활성화 */
-        <div className={`w-full bg-white border border-slate-200 rounded-xl overflow-hidden${isScroll && !isPreview ? ' flex flex-col h-full' : ''}`}>
+        /* RendererContainer — h-full w-full + 테두리 공통 처리
+           scroll+live: flex-col 추가로 내부 스크롤 레이아웃 활성화 */
+        <RendererContainer className={`bg-white${isScroll && !isPreview ? ' flex flex-col' : ''}`}>
 
             {/* 총 건수 / 표시 범위 (preview: 샘플값, live: 실제값) */}
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
@@ -392,6 +394,6 @@ export function TableRenderer({
                     </button>
                 </div>
             )}
-        </div>
+        </RendererContainer>
     );
 }
