@@ -26,6 +26,8 @@ interface FieldBaseProps {
     rowSpan?: number;
     rowSpanConfig?: { min: number; max: number };
     autoFocus?: boolean;
+    /** 라벨 선택 입력 여부 — true 시 라벨 입력란의 * 숨김 */
+    labelOptional?: boolean;
     /** 한 줄 배치 모드 (공간영역 등에서 사용) */
     compact?: boolean;
     /** 필수 항목 여부 — 모든 필드 공통 */
@@ -45,7 +47,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, compact, required, isPk, readonly, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, required, isPk, readonly, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -58,7 +60,7 @@ export function FieldBase(props: FieldBaseProps) {
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className={LABEL_CLS}>
-                        {showLabel2 ? '라벨 1' : '라벨'} <span className="text-red-400">*</span>
+                        {showLabel2 ? '라벨 1' : '라벨'} {!labelOptional && <span className="text-red-400">*</span>}
                     </label>
                     <input
                         type="text"

@@ -29,13 +29,12 @@ import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
-import { WidgetRenderer } from '../_shared/components/renderer';
+import { PageGridRenderer } from '../_shared/components/renderer';
 import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
-import { createIdGenerator, toSlug, getSpaceGridColumn } from '../_shared/utils';
+import { createIdGenerator, toSlug } from '../_shared/utils';
 import PageLayout from '@/components/layout/PageLayout';
-import { GridCell, ROW_HEIGHT } from '@/components/layout/GridCell';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
 import { TemplateItem } from '../_shared/types';
@@ -156,50 +155,6 @@ const WidgetTypePicker = ({ onSelect, onCancel, title = '위젯 타입 선택' }
     </div>
 );
 
-/**
- * 위젯 셀 미리보기
- * — 부모 위젯 colSpan 기준 서브 그리드로 컨텐츠 배치
- * — 각 컨텐츠는 content.colSpan / content.rowSpan으로 크기 결정
- */
-const WidgetCellPreview = ({ contents, colSpan }: { contents: PageContentItem[]; colSpan: number }) => {
-    if (contents.length === 0) {
-        return (
-            <div className="h-full w-full flex items-center justify-center">
-                <span className="text-[10px] text-slate-300 italic">컨텐츠 없음</span>
-            </div>
-        );
-    }
-    return (
-        /* 부모 위젯 col 수를 기준으로 서브 그리드 구성 — ROW_HEIGHT 단위 행 고정 */
-        <div
-            className="w-full p-0.5"
-            style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${colSpan}, 1fr)`,
-                gridAutoRows: `${ROW_HEIGHT}px`,
-                gridAutoFlow: 'row dense',
-            }}
-        >
-            {contents.map(c => {
-                /* SpaceWidget의 align에 따라 외부 그리드 시작 위치 계산 */
-                const gridCol = c.widget.type === 'space'
-                    ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, colSpan), colSpan)
-                    : `span ${Math.min(c.colSpan, colSpan)}`;
-                return (
-                    <div
-                        key={c.id}
-                        style={{
-                            gridColumn: gridCol,
-                            gridRow: `span ${c.rowSpan}`,
-                        }}
-                    >
-                        <WidgetRenderer mode="preview" widget={c.widget} contentColSpan={c.colSpan} />
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
 
 /* ══════════════════════════════════════════ */
 /*  메인 컴포넌트                               */
@@ -397,6 +352,25 @@ export default function PageBuilderPage() {
         setAddingContentToItemId(null);
     };
 
+    /* ── 위젯 col/row 수정 ── */
+    const updateWidgetSize = (itemId: string, colSpan: number, rowSpan: number) => {
+        const newCol = Math.max(1, Math.min(12, colSpan));
+        setWidgetItems(prev => prev.map(item =>
+            item.id === itemId
+                ? {
+                    ...item,
+                    colSpan: newCol,
+                    rowSpan: Math.max(1, rowSpan),
+                    /* 컨텐츠 colSpan이 새 위젯 colSpan 초과 시 클램핑 */
+                    contents: item.contents.map(c => ({
+                        ...c,
+                        colSpan: Math.min(c.colSpan, newCol),
+                    })),
+                }
+                : item
+        ));
+    };
+
     /* ── 컨텐츠 col/row 수정 ── */
     const updateContentSize = (itemId: string, contentId: string, colSpan: number, rowSpan: number) => {
         const parent = widgetItems.find(i => i.id === itemId);
@@ -494,7 +468,8 @@ export default function PageBuilderPage() {
             const label = fw.contentKey || '?';
             const fieldKeys: string[] = [];
             fw.fields.forEach(f => {
-                if (!f.label?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
+                /* editor 타입은 라벨 선택 입력 — 다른 타입만 필수 검사 */
+                if (f.type !== 'editor' && !f.label?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
                 if (!f.fieldKey?.trim()) {
                     errors.push(`[Form:${label}] 필드 Key 미입력`);
                 } else {
@@ -740,6 +715,15 @@ export default function PageBuilderPage() {
                                                 {editingItemId === item.id && (
                                                     <div className="bg-white">
 
+                                                        {/* 위젯 크기 설정 — 다른 빌더와 동일한 SizeSettingPanel 사용 */}
+                                                        <SizeSettingPanel
+                                                            colSpan={item.colSpan}
+                                                            rowSpan={item.rowSpan}
+                                                            maxColSpan={12}
+                                                            onColSpanChange={v => updateWidgetSize(item.id, v, item.rowSpan)}
+                                                            onRowSpanChange={v => updateWidgetSize(item.id, item.colSpan, v)}
+                                                        />
+
                                                         {/* 컨텐츠 목록 — DnD 드래그 재정렬 (위젯 목록과 동일 패턴) */}
                                                         <DndContext
                                                             sensors={widgetSensors}
@@ -905,23 +889,18 @@ export default function PageBuilderPage() {
                         ) : (
                             /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
                             <PageLayout mode="preview">
-                                {widgetItems.map((item) => (
-                                    /* GridCell — colSpan/rowSpan/height/overflow 일괄 관리 */
-                                    <GridCell
-                                        key={item.id}
-                                        colSpan={item.colSpan}
-                                        rowSpan={item.rowSpan}
-                                        onClick={() => {
-                                            setShowAddWidget(false);
-                                            setAddingContentToItemId(null);
-                                            setEditingItemId(editingItemId === item.id ? null : item.id);
-                                            setEditingContentId(null);
-                                        }}
-                                        className={`cursor-pointer transition-all ${editingItemId === item.id ? 'ring-2 ring-inset ring-slate-900' : 'hover:ring-1 hover:ring-inset hover:ring-slate-300'}`}
-                                    >
-                                        <WidgetCellPreview contents={item.contents} colSpan={item.colSpan} />
-                                    </GridCell>
-                                ))}
+                                {/* PageGridRenderer — 운영화면과 동일한 렌더링, 빌더 선택 인터랙션 포함 */}
+                                <PageGridRenderer
+                                    mode="preview"
+                                    widgetItems={widgetItems}
+                                    onItemClick={(itemId) => {
+                                        setShowAddWidget(false);
+                                        setAddingContentToItemId(null);
+                                        setEditingItemId(editingItemId === itemId ? null : itemId);
+                                        setEditingContentId(null);
+                                    }}
+                                    selectedItemId={editingItemId}
+                                />
                             </PageLayout>
                         )}
                     </div>

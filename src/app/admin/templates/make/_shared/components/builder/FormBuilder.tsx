@@ -30,7 +30,7 @@ import { createIdGenerator } from '../../utils';
 import {
     InputField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
-    FileField, ImageField, VideoField,
+    EditorField, FileField, ImageField, VideoField,
 } from './fields';
 import type { FieldEditValues } from './fields';
 // SpaceBuilder와 동일한 스타일 유틸 재사용
@@ -67,16 +67,18 @@ export interface FormWidget {
 
 /** Form 위젯 지원 필드 타입 */
 const FORM_FIELD_TYPES: FieldTypeItem[] = [
-    { type: 'input',     label: 'Input',      desc: '텍스트 입력',         defaultColSpan: 1 },
-    { type: 'select',    label: 'Select',     desc: '셀렉트 박스',         defaultColSpan: 1 },
-    { type: 'date',      label: 'Date',       desc: '날짜 단독',           defaultColSpan: 1 },
-    { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)', defaultColSpan: 2 },
-    { type: 'radio',     label: 'Radio',      desc: '라디오 단일선택',     defaultColSpan: 1 },
-    { type: 'checkbox',  label: 'Checkbox',   desc: '체크박스 복수선택',   defaultColSpan: 1 },
-    { type: 'button',    label: 'Button',     desc: '선택 버튼',           defaultColSpan: 1 },
-    { type: 'file',      label: 'File',       desc: '파일 업로드',         defaultColSpan: 2 },
-    { type: 'image',     label: 'Image',      desc: '이미지 등록',         defaultColSpan: 2 },
-    { type: 'video',     label: 'Video',      desc: 'URL · 파일 업로드',   defaultColSpan: 2 },
+    { type: 'input',     label: 'Input',      desc: '텍스트 입력',              defaultColSpan: 1 },
+    { type: 'select',    label: 'Select',     desc: '셀렉트 박스',              defaultColSpan: 1 },
+    { type: 'date',      label: 'Date',       desc: '날짜 단독',                defaultColSpan: 1 },
+    { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)',      defaultColSpan: 2 },
+    { type: 'radio',     label: 'Radio',      desc: '라디오 단일선택',          defaultColSpan: 1 },
+    { type: 'checkbox',  label: 'Checkbox',   desc: '체크박스 복수선택',        defaultColSpan: 1 },
+    { type: 'button',    label: 'Button',     desc: '선택 버튼',                defaultColSpan: 1 },
+    { type: 'editor',    label: 'Editor',     desc: '위지윅 에디터',            defaultColSpan: 2 },
+    { type: 'file',      label: 'File',       desc: '파일 업로드',              defaultColSpan: 2 },
+    { type: 'image',     label: 'Image',      desc: '이미지 등록',              defaultColSpan: 2 },
+    { type: 'video',     label: 'Video',      desc: 'URL · 파일 업로드',        defaultColSpan: 2 },
+    { type: 'hidden',    label: 'Hidden',     desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
 ];
 
 const uid = createIdGenerator('fb');
@@ -121,11 +123,13 @@ function SortableFormField({
                 </span>
                 {/* 타입 배지 */}
                 <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono flex-shrink-0">{field.type}</span>
-                {/* 라벨 */}
+                {/* 라벨 (hidden은 fieldKey 표시) */}
                 <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
                     {field.type === 'dateRange'
                         ? `${field.label || ''} ~ ${field.label2 || ''}`
-                        : (field.label || <span className="italic text-slate-300">라벨 없음</span>)
+                        : field.type === 'hidden'
+                            ? (field.fieldKey || <span className="italic text-slate-300">Key 없음</span>)
+                            : (field.label || <span className="italic text-slate-300">라벨 없음</span>)
                     }
                 </span>
                 {field.required && <span className="text-red-500 text-[10px] flex-shrink-0">*</span>}
@@ -276,9 +280,36 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             case 'radio':     return <RadioField {...props} />;
             case 'checkbox':  return <CheckboxField {...props} />;
             case 'button':    return <ButtonField {...props} />;
+            case 'editor':    return <EditorField {...props} />;
             case 'file':      return <FileField {...props} />;
             case 'image':     return <ImageField {...props} />;
             case 'video':     return <VideoField {...props} />;
+            /* hidden: KEY(fieldKey) + VALUE(defaultValue) 한 줄 배치 */
+            case 'hidden':
+                return (
+                    <div className="flex gap-2">
+                        <div className="flex-1">
+                            <label className={LABEL_CLS}>Key <span className="text-red-500">*</span></label>
+                            <input
+                                type="text"
+                                className={INPUT_CLS}
+                                value={f.fieldKey ?? ''}
+                                placeholder="예: depth"
+                                onChange={e => updateField(f.id, { fieldKey: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className={LABEL_CLS}>Value <span className="text-slate-400 font-normal">(기본값)</span></label>
+                            <input
+                                type="text"
+                                className={INPUT_CLS}
+                                value={(f as any).defaultValue ?? ''}
+                                placeholder="예: 1"
+                                onChange={e => updateField(f.id, { defaultValue: e.target.value || undefined } as any)}
+                            />
+                        </div>
+                    </div>
+                );
             default:          return null;
         }
     };

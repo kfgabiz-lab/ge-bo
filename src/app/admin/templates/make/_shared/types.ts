@@ -11,7 +11,9 @@ export type SearchFieldType =
     | 'radio' | 'checkbox' | 'button'
     | 'textarea'        // 여러 줄 텍스트 표시 (Space 텍스트 아이템 등)
     | 'action-button'   // 액션 버튼 (팝업·API·경로 연결)
-    | 'file' | 'image' | 'video'; // 파일 업로드 및 미디어 타입
+    | 'file' | 'image' | 'video' // 파일 업로드 및 미디어 타입
+    | 'editor'          // 위지윅 에디터
+    | 'hidden';         // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -62,6 +64,8 @@ export interface SearchFieldConfig {
     fileTypeMode?: 'doc' | 'image' | 'video' | 'custom' | '';
     allowedExtensions?: string[];
     videoMode?: 'url' | 'file';
+    /* ── hidden 전용 ── */
+    defaultValue?: string;      // hidden 필드 기본값 (저장 시 자동 포함)
 }
 
 /** 검색폼 행 설정 */

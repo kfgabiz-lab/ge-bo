@@ -18,8 +18,13 @@
  */
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { Calendar, Paperclip, Play, Film, Plus, X } from 'lucide-react';
 import { Image as ImageIcon } from 'lucide-react';
+
+/* 에디터는 SSR 불가 — 클라이언트에서만 로드 */
+const WysiwygEditor = dynamic(() => import('@/components/common/WysiwygEditor'), { ssr: false });
+import { ROW_HEIGHT } from '@/components/layout/GridCell';
 import { SearchFieldConfig, CodeGroupDef } from '../../types';
 import { inputCls, selectCls } from '../../styles';
 import { SelectArrow } from '../SelectArrow';
@@ -627,6 +632,25 @@ export function FieldRenderer({
                 </div>
             );
         }
+
+        /* ── editor ── 위지윅 에디터 (preview/live 모두 실제 에디터 렌더링) */
+        case 'editor': {
+            /* rowSpan × ROW_HEIGHT 로 에디터 높이 계산 — Toast UI는 px 값 필요 (100% 미지원) */
+            /* 라벨 있으면 라벨 높이(~20px) 추가 차감, 없으면 더 크게 */
+            const rowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 3;
+            const editorHeight = `${rowSpan * ROW_HEIGHT - (field.label ? 44 : 24)}px`;
+            return (
+                <WysiwygEditor
+                    initialValue={value}
+                    onChange={isPreview ? undefined : v => onChange?.(v)}
+                    height={editorHeight}
+                />
+            );
+        }
+
+        /* ── hidden ── 화면에 렌더링하지 않음 — 저장 시 defaultValue로 자동 포함 */
+        case 'hidden':
+            return null;
 
         default:
             return null;

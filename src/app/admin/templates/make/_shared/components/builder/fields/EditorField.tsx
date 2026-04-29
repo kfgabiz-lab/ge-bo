@@ -1,6 +1,5 @@
-import React from 'react';
 import { FieldEditProps } from './types';
-import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
+import { FieldBase } from './_FieldBase';
 
 /**
  * EditorField: 위지윅 에디터 설정용 L3 컴포넌트
@@ -9,9 +8,10 @@ export const EditorField = (props: FieldEditProps) => {
     const { values, onChange } = props;
 
     return (
-        <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
-                required={values.required}
-        readonly={values.readonly}>
+        <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey}
+            colSpan={values.colSpan} colSpanMode={props.colSpanMode}
+            rowSpan={values.rowSpan} rowSpanConfig={props.rowSpanConfig}
+            labelOptional isPk={values.isPk} required={values.required} readonly={values.readonly}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">에디터 설정</p>
 
