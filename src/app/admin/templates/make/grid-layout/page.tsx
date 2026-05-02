@@ -1124,7 +1124,7 @@ const buildTsxFile = (
         lines.push(`${ind(4)}mode="live"`);
         lines.push(`${ind(4)}widget={null}`);
         lines.push(`${ind(4)}dataSlug={menuSlug}`);
-        lines.push(`${ind(4)}onPopupSaved={() => { setTablePopup(null); fetchData(0); }}`);
+        lines.push(`${ind(4)}onRefresh={() => { setTablePopup(null); fetchData(0); }}`);
         lines.push(`${ind(4)}externalPopupTrigger={{ slug: tablePopup.value, ts: tablePopup.ts ?? 0, editId: tablePopup.editId, listSlug: menuSlug }}`);
         lines.push(`${ind(3)}/>`);
         lines.push(`${ind(2)})}`);
@@ -1158,7 +1158,7 @@ const buildTsxFile = (
         lines.push(`${ind(4)}mode="live"`);
         lines.push(`${ind(4)}widget={null}`);
         lines.push(`${ind(4)}dataSlug={menuSlug}`);
-        lines.push(`${ind(4)}onPopupSaved={() => { setActivePopup(null); fetchData(0); }}`);
+        lines.push(`${ind(4)}onRefresh={() => { setActivePopup(null); fetchData(0); }}`);
         lines.push(`${ind(4)}externalPopupTrigger={{ slug: activePopup.value, ts: activePopup.ts ?? 0, listSlug: menuSlug }}`);
         lines.push(`${ind(3)}/>`);
         lines.push(`${ind(2)})}`);

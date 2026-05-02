@@ -23,6 +23,9 @@
 /** 그리드 행 단위 높이 (px) — 이 값 하나로 전체 그리드 높이 기준을 결정한다 */
 export const ROW_HEIGHT = 80;
 
+/** 위젯 사이 간격 (px) — gridAutoRows = ROW_HEIGHT - GAP_SIZE, rowGap = GAP_SIZE → 합계 ROW_HEIGHT 유지 */
+export const GAP_SIZE = 8;
+
 interface GridCellProps {
     /** 12칸 그리드 기준 가로 열 점유 수 (1~12) */
     colSpan: number;
@@ -46,8 +49,11 @@ export function GridCell({ colSpan, rowSpan, children, className, onClick }: Gri
             style={{
                 gridColumn: `span ${colSpan}`,
                 gridRow: `span ${rowSpan}`,
-                height: `${rowSpan * ROW_HEIGHT}px`,
-                overflow: 'hidden',
+                /* rowGap이 GAP_SIZE이므로 height에서 GAP_SIZE만큼 빼야 track 크기와 일치 */
+                height: `${rowSpan * ROW_HEIGHT - GAP_SIZE}px`,
+                /* overflow:clip — 시각 클리핑은 유지하되 GPU 합성 레이어(video 등)는 clip 안 함
+                   overflow:hidden은 GPU compositing layer도 clip해 Edge에서 video가 안 보이는 버그 유발 */
+                overflow: 'clip',
                 minWidth: 0,
             }}
             className={className}

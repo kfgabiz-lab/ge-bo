@@ -1,5 +1,5 @@
 /**
- * 템플릿 저장 공통 API 함수
+ * 템플릿 저장/조회 공통 API 함수
  * - 모든 빌더(WIDGET, QUICK_LIST, QUICK_DETAIL)에서 동일한 방식으로 저장
  * - configJson 구조를 { widgetItems, ...extra } 로 통일
  */
@@ -17,9 +17,74 @@ export interface PageContentItem {
 /** 위젯 그리드 아이템 (12칸 그리드의 한 셀) */
 export interface PageWidgetItem {
     id: string;
-    colSpan: number;  // 12칸 기준 가로 점유
-    rowSpan: number;  // 80px 단위 세로 높이
+    colSpan: number;
+    rowSpan: number;
     contents: PageContentItem[];
+}
+
+/** 팝업 템플릿 설정 파싱 결과 */
+export interface TemplatePopupConfig {
+    outputMode:  'page' | 'layerpopup';
+    layerType?:  'center' | 'right';
+    layerTitle?: string;
+    layerWidth?: 'sm' | 'md' | 'lg' | 'xl';
+    /** 위젯 목록 — PageWidgetItem[] 구조 (PageGridRenderer에 바로 사용) */
+    widgetItems: PageWidgetItem[];
+}
+
+/**
+ * slug로 템플릿 configJson 조회 후 TemplatePopupConfig로 파싱
+ * - 신규 widgetItems 구조: PageWidgetItem[] 그대로 반환 (flat 변환 없음)
+ * - 구형 formContent/spaceContent 구조도 PageWidgetItem[]으로 자동 변환 (하위 호환)
+ *
+ * @param slug 템플릿 slug
+ */
+export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupConfig> {
+    const res = await api.get(`/page-templates/by-slug/${slug}`);
+    const raw = JSON.parse(res.data.configJson);
+
+    let widgetItems: PageWidgetItem[] = [];
+
+    if (raw.widgetItems) {
+        /* 신규 widgetItems 구조 — PageGridRenderer가 그대로 사용할 수 있는 구조 */
+        widgetItems = raw.widgetItems as PageWidgetItem[];
+    } else {
+        /* 구형 formContent/spaceContent 포맷 → PageWidgetItem[]으로 변환 */
+        if (raw.formContent?.widget) {
+            widgetItems.push({
+                id:       raw.formContent.id      ?? 'form',
+                colSpan:  raw.formContent.colSpan ?? 12,
+                rowSpan:  raw.formContent.rowSpan ?? 3,
+                contents: [{
+                    id:      raw.formContent.id      ?? 'form',
+                    colSpan: raw.formContent.colSpan ?? 12,
+                    rowSpan: raw.formContent.rowSpan ?? 3,
+                    widget:  raw.formContent.widget,
+                }],
+            });
+        }
+        if (raw.spaceContent?.widget) {
+            widgetItems.push({
+                id:       raw.spaceContent.id      ?? 'space',
+                colSpan:  raw.spaceContent.colSpan ?? 12,
+                rowSpan:  raw.spaceContent.rowSpan ?? 1,
+                contents: [{
+                    id:      raw.spaceContent.id      ?? 'space',
+                    colSpan: raw.spaceContent.colSpan ?? 12,
+                    rowSpan: raw.spaceContent.rowSpan ?? 1,
+                    widget:  raw.spaceContent.widget,
+                }],
+            });
+        }
+    }
+
+    return {
+        outputMode: raw.outputMode || 'layerpopup',
+        layerType:  raw.layerType  || 'center',
+        layerTitle: raw.layerTitle || '',
+        layerWidth: raw.layerWidth || 'md',
+        widgetItems,
+    };
 }
 
 /**

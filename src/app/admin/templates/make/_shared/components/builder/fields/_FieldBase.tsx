@@ -30,6 +30,8 @@ interface FieldBaseProps {
     labelOptional?: boolean;
     /** 한 줄 배치 모드 (공간영역 등에서 사용) */
     compact?: boolean;
+    /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
+    hideColSpan?: boolean;
     /** 필수 항목 여부 — 모든 필드 공통 */
     required?: boolean;
     /** PK 여부 — colSpanMode.type === 'input'(Form) 일 때만 표시, 미전달 시 체크박스 숨김 */
@@ -47,7 +49,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, required, isPk, readonly, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, required, isPk, readonly, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -98,10 +100,10 @@ export function FieldBase(props: FieldBaseProps) {
                 </div>
             )}
 
-            {/* ColSpan / RowSpan 배치
+            {/* ColSpan / RowSpan 배치 — hideColSpan=true 시 숨김
                 - button 모드(Search): 수직 레이아웃
                 - input 모드(Form): 2열 그리드로 한 줄 배치 */}
-            <div className={compact || isFormMode ? 'grid grid-cols-2 gap-2 mt-1' : 'space-y-1'}>
+            {!hideColSpan && <div className={compact || isFormMode ? 'grid grid-cols-2 gap-2 mt-1' : 'space-y-1'}>
                 {/* ColSpan */}
                 <div className={compact || isFormMode ? '' : 'flex items-center justify-between'}>
                     <span className={LABEL_CLS}>ColSpan (가로)</span>
@@ -154,7 +156,7 @@ export function FieldBase(props: FieldBaseProps) {
                         />
                     </div>
                 )}
-            </div>
+            </div>}
 
             {/* 필수항목 | 읽기전용 — ColSpan/RowSpan 바로 아래 한 줄 */}
             <div className={`grid gap-1 mt-1 ${isFormMode ? 'grid-cols-2' : 'grid-cols-1'}`}>

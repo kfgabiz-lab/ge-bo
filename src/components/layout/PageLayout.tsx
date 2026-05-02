@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ROW_HEIGHT } from './GridCell';
+import { ROW_HEIGHT, GAP_SIZE } from './GridCell';
 
 /**
  * PageLayout — 12칸 그리드 기반 공통 페이지 레이아웃
@@ -57,8 +57,9 @@ export default function PageLayout({ title, description, mode = 'live', children
 
     /* showGrid=true일 때 격자선 + 테두리 + 배경색 — 모드 구분 없이 동일하게 적용 */
     const gridStyle: React.CSSProperties = {
-        /* GridCell 이 각 셀 height 를 rowSpan × ROW_HEIGHT 로 고정하므로 auto 사용 */
-        gridAutoRows: `${ROW_HEIGHT}px`,
+        /* track 높이 = ROW_HEIGHT - GAP_SIZE, rowGap = GAP_SIZE → 합계 ROW_HEIGHT 유지 */
+        gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+        rowGap: `${GAP_SIZE}px`,
         ...(showGrid ? {
             backgroundImage: `
                 linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
@@ -70,7 +71,7 @@ export default function PageLayout({ title, description, mode = 'live', children
 
     /* showGrid 상태가 테두리/배경을 결정 — preview/live 모두 동일한 방식 */
     const gridCls = [
-        'grid grid-cols-12 gap-3',
+        'grid grid-cols-12',
         showGrid ? 'border border-slate-200 rounded-lg bg-slate-50' : '',
     ].filter(Boolean).join(' ');
 

@@ -123,11 +123,11 @@ export default function QuickListBuilderPage() {
             .catch(() => { });
     }, []);
 
-    /* ── Quick-Detail 템플릿 목록 — Space ActionButton 페이지 연결용 ── */
+    /* ── 전체 페이지 템플릿 목록 — Space ActionButton 페이지 연결용 ── */
     const [pageTemplates, setPageTemplates] = useState<TemplateItem[]>([]);
     useEffect(() => {
         api.get('/page-templates')
-            .then(res => setPageTemplates((res.data as TemplateItem[]).filter(t => t.templateType === 'QUICK_DETAIL')))
+            .then(res => setPageTemplates(res.data as TemplateItem[]))
             .catch(() => { });
     }, []);
 

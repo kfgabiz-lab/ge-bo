@@ -102,12 +102,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
         api.get('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
     }, []);
 
-    /* QUICK_DETAIL 팝업 목록 lazy 로딩 */
+    /* 전체 템플릿 목록 lazy 로딩 (QUICK_DETAIL · PAGE 등 모든 타입 포함) */
     const loadLayerTemplates = () => {
         if (layerTemplatesLoaded) return;
         api.get('/page-templates')
             .then(res => {
-                setLayerTemplates((res.data as TemplateItem[]).filter(t => t.templateType === 'QUICK_DETAIL'));
+                setLayerTemplates(res.data as TemplateItem[]);
                 setLayerTemplatesLoaded(true);
             })
             .catch(() => {});

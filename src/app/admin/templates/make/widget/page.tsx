@@ -14,9 +14,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Plus, Trash2, ChevronDown, X, Save, Loader2, Wand2,
     Search as SearchIcon, Table2, FileText,
-    AlignLeft, FolderOpen, Copy, Layers,
+    AlignLeft, FolderOpen, Copy, Layers, List,
     GripVertical,
 } from 'lucide-react';
+
 import {
     DndContext, closestCenter, PointerSensor,
     useSensor, useSensors,
@@ -29,8 +30,12 @@ import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
+import { OutputModePanel } from '../_shared/components/builder/OutputModePanel';
+import { PreviewWrapper } from '../_shared/components/builder/PreviewWrapper';
 import { PageGridRenderer } from '../_shared/components/renderer';
-import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget } from '../_shared/components/renderer';
+import { useOutputMode } from '../_shared/hooks/useOutputMode';
+import { saveTemplate } from '../_shared/templateApi';
+import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget, SubListWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug } from '../_shared/utils';
@@ -44,13 +49,13 @@ import { TemplateItem } from '../_shared/types';
 /* ══════════════════════════════════════════ */
 
 /** 페이지 위젯 타입 */
-type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category';
+type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'sublist';
 
 /* TextWidget, SearchWidget, SpaceItem, SpaceWidget → renderer/types에서 import */
 /* FormFieldItem, FormWidget → FormBuilder에서 import */
 
 /** 위젯 합집합 타입 */
-type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget;
+type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget | SubListWidget;
 
 /**
  * 위젯 셀 안에 배치되는 컨텐츠 아이템
@@ -97,6 +102,7 @@ const WIDGET_META: Record<PageWidgetType, {
     form:     { label: 'Form',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200',  previewBg: 'bg-violet-50/50',  desc: '폼 입력 영역' },
     space:    { label: '공간영역', color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200',   previewBg: 'bg-amber-50/50',   desc: 'Text/Button 배치 영역' },
     category: { label: '카테고리', color: 'text-cyan-700',   bg: 'bg-cyan-50',    border: 'border-cyan-200',    previewBg: 'bg-cyan-50/50',    desc: '카테고리 계층 관리' },
+    sublist:  { label: '서브리스트', color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200',  previewBg: 'bg-indigo-50/50',  desc: '다건 행 입력 목록' },
 };
 
 /** 위젯 타입별 아이콘 컴포넌트 */
@@ -106,6 +112,7 @@ const WIDGET_ICON: Record<PageWidgetType, React.ReactNode> = {
     form:     <FileText className="w-3.5 h-3.5" />,
     space:    <AlignLeft className="w-3.5 h-3.5" />,
     category: <Layers className="w-3.5 h-3.5" />,
+    sublist:  <List className="w-3.5 h-3.5" />,
 };
 
 /** 공간영역 버튼 색상 옵션 */
@@ -162,6 +169,9 @@ const WidgetTypePicker = ({ onSelect, onCancel, title = '위젯 타입 선택' }
 
 export default function PageBuilderPage() {
 
+    /* ── 출력 모드 (page / layerpopup) — 공통 훅 사용 ── */
+    const om = useOutputMode();
+
     /* ── 위젯 셀 목록 (flat 구조) ── */
     const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
 
@@ -202,11 +212,11 @@ export default function PageBuilderPage() {
             .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
     }, []);
 
-    /* ── Quick-Detail 템플릿 목록 — Space ActionButton 페이지 연결용 ── */
+    /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
     const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
     useEffect(() => {
         api.get('/page-templates')
-            .then(res => setMainLayerTemplates((res.data as TemplateItem[]).filter(t => t.templateType === 'QUICK_DETAIL')))
+            .then(res => setMainLayerTemplates(res.data as TemplateItem[]))
             .catch(() => { });
     }, []);
 
@@ -271,6 +281,7 @@ export default function PageBuilderPage() {
         try {
             const config = JSON.parse(tpl.configJson);
             setWidgetItems(config.widgetItems || []);
+            om.restore(config);  // outputMode / layerType / layerTitle / layerWidth 복원
             setCurrentTemplateId(tpl.id);
             setCurrentTemplateName(tpl.name);
             setSaveModalSlug(tpl.slug);
@@ -284,6 +295,20 @@ export default function PageBuilderPage() {
             toast.error('설정 파일 파싱에 실패했습니다.');
         }
     };
+
+    /* layerType이 'right'로 변경될 때 위젯/컨텐츠 colSpan 초과분 자동 클램핑 */
+    useEffect(() => {
+        if (om.outputMode === 'layerpopup' && om.layerType === 'right') {
+            setWidgetItems(prev => prev.map(item => ({
+                ...item,
+                colSpan: Math.min(item.colSpan, 2),
+                contents: item.contents.map(c => ({
+                    ...c,
+                    colSpan: Math.min(c.colSpan, 2),
+                })),
+            })));
+        }
+    }, [om.layerType, om.outputMode]);
 
     /* ── 위젯 셀 추가 확정 (row/col만 입력 → 빈 셀 생성) ── */
     const confirmAddWidget = () => {
@@ -334,6 +359,7 @@ export default function PageBuilderPage() {
                 case 'form':     return { type: 'form', widgetId: id, contentKey: '', fields: [] } as FormWidget;
                 case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
                 case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
+                case 'sublist':  return { type: 'sublist', widgetId: id, contentKey: '', columns: [], showBorder: true } as SubListWidget;
             }
         })();
         const parent = widgetItems.find(i => i.id === itemId);
@@ -497,32 +523,33 @@ export default function PageBuilderPage() {
         setShowSaveModal(true);
     };
 
-    /* ── 저장 확인 (모달 내 버튼) — 동일 validation 재실행 후 API 호출 ── */
+    /* ── 저장 확인 (모달 내 버튼) — 동일 validation 재실행 후 공통 saveTemplate 호출 ── */
     const handleSaveConfirm = async () => {
         if (!saveModalName.trim() || !saveModalSlug.trim()) return;
         if (!validateBeforeSave()) return;
 
         setIsSaving(true);
-        const configJson = JSON.stringify({ widgetItems });
         try {
-            if (currentTemplateId) {
-                const res = await api.put(`/page-templates/${currentTemplateId}`, {
-                    name: saveModalName, slug: saveModalSlug, description: saveModalDesc,
-                    configJson, templateType: 'PAGE',
-                });
-                setCurrentTemplateName(res.data.name);
-                toast.success('템플릿이 수정되었습니다.');
-            } else {
-                const res = await api.post('/page-templates', {
-                    name: saveModalName, slug: saveModalSlug, description: saveModalDesc,
-                    configJson, templateType: 'PAGE',
-                });
-                setCurrentTemplateId(res.data.id);
-                setCurrentTemplateName(res.data.name);
-                setSaveModalSlug(res.data.slug);
-                toast.success('템플릿이 저장되었습니다.');
-            }
+            const result = await saveTemplate({
+                id: currentTemplateId,
+                name: saveModalName,
+                slug: saveModalSlug,
+                description: saveModalDesc,
+                templateType: 'PAGE',
+                widgetItems: widgetItems as unknown as import('../_shared/templateApi').PageWidgetItem[],
+                /* outputMode / layerType 등 팝업 메타 병합 */
+                extra: {
+                    outputMode: om.outputMode,
+                    layerType:  om.layerType,
+                    layerTitle: om.layerTitle,
+                    layerWidth: om.layerWidth,
+                },
+            });
+            setCurrentTemplateId(result.id);
+            setCurrentTemplateName(result.name);
+            setSaveModalSlug(result.slug);
             setShowSaveModal(false);
+            toast.success(currentTemplateId ? '템플릿이 수정되었습니다.' : '템플릿이 저장되었습니다.');
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg || '저장 중 오류가 발생했습니다.');
@@ -646,6 +673,18 @@ export default function PageBuilderPage() {
                         </div>
                     </div>
 
+                    {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
+                    <OutputModePanel
+                        outputMode={om.outputMode}
+                        layerType={om.layerType}
+                        layerTitle={om.layerTitle}
+                        layerWidth={om.layerWidth}
+                        onOutputModeChange={om.setOutputMode}
+                        onLayerTypeChange={om.setLayerType}
+                        onLayerTitleChange={om.setLayerTitle}
+                        onLayerWidthChange={om.setLayerWidth}
+                    />
+
                     {/* 위젯 셀 목록 */}
                     <div className="p-3 space-y-1.5 max-h-[calc(100vh-280px)] overflow-y-auto">
 
@@ -715,11 +754,11 @@ export default function PageBuilderPage() {
                                                 {editingItemId === item.id && (
                                                     <div className="bg-white">
 
-                                                        {/* 위젯 크기 설정 — 다른 빌더와 동일한 SizeSettingPanel 사용 */}
+                                                        {/* 위젯 크기 설정 — 우측 드로어 모드일 때 maxColSpan 2로 제한 */}
                                                         <SizeSettingPanel
                                                             colSpan={item.colSpan}
                                                             rowSpan={item.rowSpan}
-                                                            maxColSpan={12}
+                                                            maxColSpan={om.isRightDrawer ? 2 : 12}
                                                             onColSpanChange={v => updateWidgetSize(item.id, v, item.rowSpan)}
                                                             onRowSpanChange={v => updateWidgetSize(item.id, item.colSpan, v)}
                                                         />
@@ -860,11 +899,14 @@ export default function PageBuilderPage() {
                 {/* ════════════════════════════════ */}
                 <div className="space-y-4">
 
-                    {/* 상단 툴바 — Layer 빌더와 동일한 패턴 */}
+                    {/* 상단 툴바 */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-slate-700">미리보기</span>
                             <span className="text-xs text-slate-400">{widgetItems.length}개 위젯</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${om.outputMode === 'page' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-600'}`}>
+                                {om.outputMode === 'page' ? '상세페이지' : 'LayerPopup'}
+                            </span>
                         </div>
                         <div className="flex items-center gap-1.5">
                             <button
@@ -878,31 +920,37 @@ export default function PageBuilderPage() {
                         </div>
                     </div>
 
-                    {/* 미리보기 영역 */}
-                    <div className="bg-slate-100 rounded-xl min-h-[500px] overflow-y-auto p-6">
-                        {widgetItems.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-64 text-center">
-                                <AlignLeft className="w-12 h-12 text-slate-200 mb-3" />
-                                <p className="text-sm font-medium text-slate-400">페이지 구성을 시작하세요</p>
-                                <p className="text-xs text-slate-300 mt-1">좌측 패널에서 위젯을 추가하세요</p>
-                            </div>
-                        ) : (
-                            /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
-                            <PageLayout mode="preview">
-                                {/* PageGridRenderer — 운영화면과 동일한 렌더링, 빌더 선택 인터랙션 포함 */}
-                                <PageGridRenderer
-                                    mode="preview"
-                                    widgetItems={widgetItems}
-                                    onItemClick={(itemId) => {
-                                        setShowAddWidget(false);
-                                        setAddingContentToItemId(null);
-                                        setEditingItemId(editingItemId === itemId ? null : itemId);
-                                        setEditingContentId(null);
-                                    }}
-                                    selectedItemId={editingItemId}
-                                />
-                            </PageLayout>
-                        )}
+                    {/* 미리보기 영역 — PreviewWrapper가 outputMode에 따라 팝업 레이아웃 적용 */}
+                    <div className={`bg-slate-100 rounded-xl min-h-[500px] overflow-hidden ${om.outputMode !== 'layerpopup' ? 'p-6 overflow-y-auto' : 'flex flex-col'}`}>
+                        <PreviewWrapper
+                            outputMode={om.outputMode}
+                            layerType={om.layerType}
+                            layerTitle={om.layerTitle}
+                            layerWidth={om.layerWidth}
+                        >
+                            {widgetItems.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 text-center">
+                                    <AlignLeft className="w-12 h-12 text-slate-200 mb-3" />
+                                    <p className="text-sm font-medium text-slate-400">페이지 구성을 시작하세요</p>
+                                    <p className="text-xs text-slate-300 mt-1">좌측 패널에서 위젯을 추가하세요</p>
+                                </div>
+                            ) : (
+                                /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
+                                <PageLayout mode="preview">
+                                    <PageGridRenderer
+                                        mode="preview"
+                                        widgetItems={widgetItems}
+                                        onItemClick={(itemId) => {
+                                            setShowAddWidget(false);
+                                            setAddingContentToItemId(null);
+                                            setEditingItemId(editingItemId === itemId ? null : itemId);
+                                            setEditingContentId(null);
+                                        }}
+                                        selectedItemId={editingItemId}
+                                    />
+                                </PageLayout>
+                            )}
+                        </PreviewWrapper>
                     </div>
                 </div>
             </div>{/* 메인 레이아웃 끝 */}

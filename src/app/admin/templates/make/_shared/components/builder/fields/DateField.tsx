@@ -14,7 +14,7 @@ import { FieldEditProps } from './types';
 import { FieldBase } from './_FieldBase';
 import { ToggleRow } from './_ToggleRow';
 
-export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown }: FieldEditProps) {
+export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
     return (
         <div className="space-y-1.5">
             <FieldBase
@@ -25,6 +25,7 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 isPk={values.isPk}
                 required={values.required}
                 readonly={values.readonly}
+                hideColSpan={hideColSpan}
                 onChange={onChange}
             />
             {/* 필수 항목 */}

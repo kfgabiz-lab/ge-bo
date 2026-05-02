@@ -6,6 +6,7 @@ import { TableBuilder } from './TableBuilder';
 import { FormBuilder } from './FormBuilder';
 import { SpaceBuilder } from './SpaceBuilder';
 import { CategoryBuilder } from './CategoryBuilder';
+import { SubListBuilder } from './SubListBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 
@@ -92,7 +93,17 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                 <CategoryBuilder
                     widget={widget}
                     onChange={w => onChange(w)}
+                    slugOptions={slugOptions}
                     categoryWidgets={categoryWidgets}
+                    pageTemplates={pageTemplates}
+                />
+            );
+
+        case 'sublist':
+            return (
+                <SubListBuilder
+                    widget={widget}
+                    onChange={w => onChange(w)}
                 />
             );
 

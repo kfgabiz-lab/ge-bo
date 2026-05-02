@@ -16,7 +16,7 @@
 import React from 'react';
 import { Plus, X } from 'lucide-react';
 import { TemplateItem } from '../../../types';
-import { createIdGenerator } from '../../../utils';
+import { createIdGenerator, getTemplateLabel } from '../../../utils';
 import { ColEditProps, CUSTOM_ACTION_COLORS } from './col-types';
 
 /* 커스텀 액션 버튼 고유 ID 생성기 */
@@ -72,7 +72,7 @@ export function ActionsField({ values, onChange, layerTemplates, onRequestLayerT
                                 )}
                                 className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-slate-900">
                                 <option value="">팝업 없음</option>
-                                {layerTemplates.map(t => <option key={t.id} value={t.slug}>{t.name}</option>)}
+                                {layerTemplates.map(t => <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>)}
                             </select>
                             {/* 개발자방식 경로: 로컬 컴포넌트명 직접 입력 */}
                             <input

@@ -1,11 +1,15 @@
 'use client';
 
 /**
- * InputField — 텍스트 입력 필드 설정 컴포넌트
+ * FormTextareaField — 폼 입력용 여러 줄 텍스트 필드 설정 컴포넌트
+ *
+ * 사용자가 여러 줄 텍스트를 입력하는 <textarea> 폼 필드.
+ * InputField와 동일 구조이나 Placeholder 외에 표시 행 수(rows)를 추가 설정할 수 있음.
  *
  * 사용법:
- *   <InputField values={field} onChange={onChange}
- *     colSpanMode={{ type: 'button', options: [1,2,3,4,5] }}
+ *   <FormTextareaField values={field} onChange={onChange}
+ *     colSpanMode={{ type: 'input', min: 1, max: 12 }}
+ *     rowSpanConfig={{ min: 1, max: 20 }}
  *     codeGroups={[]} codeGroupsLoading={false} />
  */
 
@@ -14,7 +18,7 @@ import { FieldEditProps } from './types';
 import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { ValidationSection } from '../../ValidationSection';
 
-export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
+export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
     return (
         <div className="space-y-1.5">
             <FieldBase
@@ -35,7 +39,18 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                     onChange={e => onChange({ placeholder: e.target.value })}
                     className={INPUT_CLS} />
             </div>
-            {/* 유효성검사 (필수항목 + 최소/최대 글자 + 정규식) */}
+            {/* 표시 행 수 */}
+            <div>
+                <label className={LABEL_CLS}>표시 행 수</label>
+                <input
+                    type="number"
+                    value={values.rows ?? 3}
+                    min={1} max={20}
+                    onChange={e => onChange({ rows: Math.max(1, Number(e.target.value)) })}
+                    className={INPUT_CLS}
+                />
+            </div>
+            {/* 유효성검사 (필수항목 + 최소/최대 글자) */}
             <ValidationSection
                 fieldType="input"
                 values={{

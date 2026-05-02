@@ -56,7 +56,7 @@ export const FileField = (props: FieldEditProps) => {
     const { values, onChange } = props;
 
     return (
-        <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
+        <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} rowSpan={values.rowSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
                 required={values.required}
         readonly={values.readonly}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">

@@ -125,7 +125,7 @@ export function FormRenderer({
                             field={f as unknown as SearchFieldConfig}
                             codeGroups={codeGroups}
                             value={values[f.id] ?? ''}
-                            onChange={isPreview ? undefined : v => onChangeValues?.(f.id, v)}
+                            onChange={isPreview ? () => {} : v => onChangeValues?.(f.id, v)}
                             fileList={fileValues?.[f.id]}
                             existingFileMeta={existingFileMeta?.[f.id]}
                             imgBlobUrls={imgBlobUrls}

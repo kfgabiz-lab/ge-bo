@@ -31,6 +31,7 @@ import {
     InputField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
     EditorField, FileField, ImageField, VideoField,
+    FormTextareaField,
 } from './fields';
 import type { FieldEditValues } from './fields';
 // SpaceBuilder와 동일한 스타일 유틸 재사용
@@ -78,6 +79,7 @@ const FORM_FIELD_TYPES: FieldTypeItem[] = [
     { type: 'file',      label: 'File',       desc: '파일 업로드',              defaultColSpan: 2 },
     { type: 'image',     label: 'Image',      desc: '이미지 등록',              defaultColSpan: 2 },
     { type: 'video',     label: 'Video',      desc: 'URL · 파일 업로드',        defaultColSpan: 2 },
+    { type: 'textarea',  label: 'Textarea',   desc: '여러 줄 텍스트 입력',      defaultColSpan: 2 },
     { type: 'hidden',    label: 'Hidden',     desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
 ];
 
@@ -284,6 +286,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             case 'file':      return <FileField {...props} />;
             case 'image':     return <ImageField {...props} />;
             case 'video':     return <VideoField {...props} />;
+            case 'textarea':  return <FormTextareaField {...props} />;
             /* hidden: KEY(fieldKey) + VALUE(defaultValue) 한 줄 배치 */
             case 'hidden':
                 return (

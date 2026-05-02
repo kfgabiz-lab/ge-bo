@@ -22,6 +22,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import { getTemplateLabel } from '../../../utils';
 import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import type { TemplateItem } from '../../../types';
@@ -62,15 +63,6 @@ export interface ActionButtonFieldProps extends FieldEditProps {
 /** 공통 select 스타일 */
 const SELECT_CLS = 'w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900';
 
-/** configJson.outputMode 파싱 → "팝업" / "상세" 접두어 반환 */
-const getPageLabel = (t: TemplateItem): string => {
-    try {
-        const cfg = JSON.parse(t.configJson || '{}');
-        if (cfg.outputMode === 'layerpopup') return `팝업 - ${t.name}`;
-        if (cfg.outputMode === 'page') return `상세 - ${t.name}`;
-    } catch { /* 파싱 실패 시 이름만 표시 */ }
-    return t.name;
-};
 
 export function ActionButtonField({
     values,
@@ -265,7 +257,7 @@ export function ActionButtonField({
                         >
                             <option value="">— 페이지 선택 —</option>
                             {pageTemplates.map(t => (
-                                <option key={t.id} value={t.slug}>{getPageLabel(t)} ({t.slug})</option>
+                                <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>
                             ))}
                         </select>
                     )}

@@ -13,8 +13,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     ChevronDown, Save, Loader2, Wand2,
-    FileText, FolderOpen, Copy, Trash2,
-    PanelRight, LayoutTemplate,
+    FolderOpen, Copy, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -22,24 +21,22 @@ import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBui
 import { SpaceBuilder } from '../_shared/components/builder/SpaceBuilder';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
+import { OutputModePanel } from '../_shared/components/builder/OutputModePanel';
+import { PreviewWrapper } from '../_shared/components/builder/PreviewWrapper';
 import { WidgetRenderer, PageGridRenderer } from '../_shared/components/renderer';
 import type { SpaceWidget, PageContentItem } from '../_shared/components/renderer';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { toSlug } from '../_shared/utils';
 import { saveTemplate } from '../_shared/templateApi';
 import { SaveModal } from '../_shared/components/TemplateModals';
-import { TemplateItem, LayerType, LayerWidth } from '../_shared/types';
-import { selectCls, inputCls } from '../_shared/styles';
-import { SelectArrow } from '../_shared/components/SelectArrow';
+import { TemplateItem } from '../_shared/types';
+import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import PageLayout from '@/components/layout/PageLayout';
-import CenterPopupLayout from '@/components/layout/popup/CenterPopupLayout';
-import RightDrawerLayout from '@/components/layout/popup/RightDrawerLayout';
+import { ROW_HEIGHT } from '@/components/layout/GridCell';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
 /* ══════════════════════════════════════════ */
-
-type OutputMode = 'page' | 'layerpopup';
 
 /** 고정 컨텐츠 아이템 (Widget 빌더의 PageContentItem과 동일 구조) */
 interface FixedContentItem {
@@ -52,13 +49,6 @@ interface FixedContentItem {
 /* ══════════════════════════════════════════ */
 /*  상수                                      */
 /* ══════════════════════════════════════════ */
-
-const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
-    { value: 'sm', label: 'Small — 380px' },
-    { value: 'md', label: 'Medium — 672px' },
-    { value: 'lg', label: 'Large — 768px' },
-    { value: 'xl', label: 'XLarge — 896px' },
-];
 
 
 /** 초기 Form 컨텐츠 생성 */
@@ -98,16 +88,8 @@ const createSpaceContent = (): FixedContentItem => ({
 /* ══════════════════════════════════════════ */
 export default function QuickDetailBuilderPage() {
 
-    /* ── 출력 모드 ── */
-    const [outputMode, setOutputMode] = useState<OutputMode>('page');
-
-    /* ── LayerPopup 설정 ── */
-    const [layerType, setLayerType] = useState<LayerType>('center');
-    const [layerTitle, setLayerTitle] = useState('');
-    const [layerWidth, setLayerWidth] = useState<LayerWidth>('md');
-
-    /* 우측 드로어 여부 — 빌더/미리보기 전체에서 공통 사용 */
-    const isRightDrawer = outputMode === 'layerpopup' && layerType === 'right';
+    /* ── 출력 모드 (page / layerpopup) — 공통 훅 사용 ── */
+    const om = useOutputMode();
 
     /* ── 고정 컨텐츠 (Form + Space) ── */
     const [formContent, setFormContent] = useState<FixedContentItem>(createFormContent);
@@ -133,11 +115,11 @@ export default function QuickDetailBuilderPage() {
     const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
     const [isDuplicatingId, setIsDuplicatingId] = useState<number | null>(null);
 
-    /* ── Quick-Detail 템플릿 목록 — Space ActionButton 페이지 연결용 ── */
+    /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
     const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
     useEffect(() => {
         api.get('/page-templates')
-            .then(res => setMainLayerTemplates((res.data as TemplateItem[]).filter(t => t.templateType === 'QUICK_DETAIL')))
+            .then(res => setMainLayerTemplates(res.data as TemplateItem[]))
             .catch(() => { });
     }, []);
 
@@ -184,10 +166,7 @@ export default function QuickDetailBuilderPage() {
                 setFormContent(config.formContent || createFormContent());
                 setSpaceContent(config.spaceContent || createSpaceContent());
             }
-            setOutputMode(config.outputMode || 'page');
-            setLayerType(config.layerType || 'center');
-            setLayerTitle(config.layerTitle || '');
-            setLayerWidth(config.layerWidth || 'md');
+            om.restore(config);
             setCurrentTemplateId(tpl.id);
             setCurrentTemplateName(tpl.name);
             setSaveModalSlug(tpl.slug);
@@ -252,7 +231,12 @@ export default function QuickDetailBuilderPage() {
                 description: saveModalDesc,
                 templateType: 'QUICK_DETAIL',
                 widgetItems,
-                extra: { outputMode, layerType, layerTitle, layerWidth },
+                extra: {
+                    outputMode: om.outputMode,
+                    layerType:  om.layerType,
+                    layerTitle: om.layerTitle,
+                    layerWidth: om.layerWidth,
+                },
             });
             setCurrentTemplateId(result.id);
             setCurrentTemplateName(result.name);
@@ -266,7 +250,7 @@ export default function QuickDetailBuilderPage() {
     };
 
     /* ── 컨텐츠 크기 수정 ── */
-    const maxCol = outputMode === 'layerpopup' && layerType === 'right' ? 2 : 12;
+    const maxCol = om.isRightDrawer ? 2 : 12;
 
     const updateFormSize = (colSpan: number, rowSpan: number) =>
         setFormContent(prev => ({ ...prev, colSpan: Math.max(1, Math.min(maxCol, colSpan)), rowSpan: Math.max(1, rowSpan) }));
@@ -276,7 +260,7 @@ export default function QuickDetailBuilderPage() {
 
     /* layerType이 'right'로 변경될 때 초과된 colSpan 자동 클램핑 */
     useEffect(() => {
-        if (outputMode === 'layerpopup' && layerType === 'right') {
+        if (om.outputMode === 'layerpopup' && om.layerType === 'right') {
             setFormContent(prev => ({
                 ...prev,
                 colSpan: Math.min(prev.colSpan, 2),
@@ -294,7 +278,7 @@ export default function QuickDetailBuilderPage() {
                 },
             }));
         }
-    }, [layerType, outputMode]);
+    }, [om.layerType, om.outputMode]);
 
     /* ── 필터된 템플릿 목록 ── */
     const filteredTemplates = templateList.filter(t =>
@@ -391,57 +375,17 @@ export default function QuickDetailBuilderPage() {
                         </div>
                     </div>
 
-                    {/* 출력 모드 탭 — Widget 빌더의 dataSource 탭과 동일한 스타일 */}
-                    <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/30 flex items-center gap-1">
-                        <button
-                            onClick={() => setOutputMode('page')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-md border transition-all ${outputMode === 'page'
-                                ? 'bg-slate-900 text-white border-slate-900'
-                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'}`}
-                        >
-                            <FileText className="w-3 h-3" />상세페이지
-                        </button>
-                        <button
-                            onClick={() => setOutputMode('layerpopup')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-md border transition-all ${outputMode === 'layerpopup'
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-slate-500 border-slate-200 hover:border-blue-400 hover:text-blue-600'}`}
-                        >
-                            <LayoutTemplate className="w-3 h-3" />LayerPopup
-                        </button>
-                    </div>
-
-                    {/* LayerPopup 설정 */}
-                    {outputMode === 'layerpopup' && (
-                        <div className="border-b border-slate-100 bg-blue-50/30 px-3 py-3 space-y-3">
-                            <div>
-                                <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block">팝업 유형</label>
-                                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md">
-                                    <button onClick={() => setLayerType('center')} className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded transition-all flex-1 justify-center ${layerType === 'center' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                                        <LayoutTemplate className="w-3 h-3" />중앙 팝업
-                                    </button>
-                                    <button onClick={() => setLayerType('right')} className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded transition-all flex-1 justify-center ${layerType === 'right' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                                        <PanelRight className="w-3 h-3" />우측 드로어
-                                    </button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-semibold text-slate-500 mb-1 block">팝업 제목</label>
-                                <input type="text" value={layerTitle} onChange={e => setLayerTitle(e.target.value)} placeholder="팝업 제목 입력" className={inputCls} />
-                            </div>
-                            {layerType === 'center' && (
-                                <div>
-                                    <label className="text-[10px] font-semibold text-slate-500 mb-1 block">팝업 너비</label>
-                                    <div className="relative">
-                                        <select value={layerWidth} onChange={e => setLayerWidth(e.target.value as LayerWidth)} className={selectCls}>
-                                            {LAYER_WIDTH_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                        </select>
-                                        <SelectArrow />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
+                    <OutputModePanel
+                        outputMode={om.outputMode}
+                        layerType={om.layerType}
+                        layerTitle={om.layerTitle}
+                        layerWidth={om.layerWidth}
+                        onOutputModeChange={om.setOutputMode}
+                        onLayerTypeChange={om.setLayerType}
+                        onLayerTitleChange={om.setLayerTitle}
+                        onLayerWidthChange={om.setLayerWidth}
+                    />
 
                     {/* 위젯 셀 영역 — Widget 빌더와 동일한 구조 */}
                     <div className="p-3 space-y-1.5 max-h-[calc(100vh-320px)] overflow-y-auto">
@@ -473,7 +417,7 @@ export default function QuickDetailBuilderPage() {
                                         <SizeSettingPanel
                                             colSpan={formContent.colSpan}
                                             rowSpan={formContent.rowSpan}
-                                            maxColSpan={isRightDrawer ? 2 : 12}
+                                            maxColSpan={om.isRightDrawer ? 2 : 12}
                                             onColSpanChange={v => updateFormSize(v, formContent.rowSpan)}
                                             onRowSpanChange={v => updateFormSize(formContent.colSpan, v)}
                                         />
@@ -481,7 +425,7 @@ export default function QuickDetailBuilderPage() {
                                             <CommonBuilderDispatcher
                                                 widget={formContent.widget}
                                                 onChange={w => setFormContent(prev => ({ ...prev, widget: w as FormWidget }))}
-                                                context={{ slugOptions, pageTemplates: mainLayerTemplates, maxColSpan: isRightDrawer ? 2 : 12 }}
+                                                context={{ slugOptions, pageTemplates: mainLayerTemplates, maxColSpan: om.isRightDrawer ? 2 : 12 }}
                                             />
                                         </div>
                                     </div>
@@ -504,7 +448,7 @@ export default function QuickDetailBuilderPage() {
                                         <SizeSettingPanel
                                             colSpan={spaceContent.colSpan}
                                             rowSpan={spaceContent.rowSpan}
-                                            maxColSpan={isRightDrawer ? 2 : 12}
+                                            maxColSpan={om.isRightDrawer ? 2 : 12}
                                             onColSpanChange={v => updateSpaceSize(v, spaceContent.rowSpan)}
                                             onRowSpanChange={v => updateSpaceSize(spaceContent.colSpan, v)}
                                         />
@@ -519,7 +463,7 @@ export default function QuickDetailBuilderPage() {
                                                     connectedSlug: formWidgetRef.connectedSlug,
                                                 }]}
                                                 actionButtonOnly={true}
-                                                maxColSpan={isRightDrawer ? 2 : 12}
+                                                maxColSpan={om.isRightDrawer ? 2 : 12}
                                             />
                                         </div>
                                     </div>
@@ -538,8 +482,8 @@ export default function QuickDetailBuilderPage() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-slate-700">미리보기</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${outputMode === 'page' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-600'}`}>
-                                {outputMode === 'page' ? '상세페이지' : 'LayerPopup'}
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${om.outputMode === 'page' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-600'}`}>
+                                {om.outputMode === 'page' ? '상세페이지' : 'LayerPopup'}
                             </span>
                         </div>
                         <button
@@ -552,54 +496,40 @@ export default function QuickDetailBuilderPage() {
                         </button>
                     </div>
 
-                    {/* 미리보기 영역 — outputMode에 따라 레이아웃 컴포넌트 적용 */}
-                    <div className={`bg-slate-100 rounded-xl min-h-[500px] overflow-hidden flex flex-col ${outputMode === 'layerpopup' ? '' : 'p-6'}`}>
-
-                        {/* 그리드 본문 — outputMode/layerType에 따라 컬럼 수 분기 */}
-                        {(() => {
-                            /* ── 우측 드로어: flex-col + 명시적 너비 (col=1→50%, col=2→100%)
-                               CSS grid auto-placement 예측 불가 문제 회피
-                               행 높이 = rowSpan * 80px 최솟값 ── */
-                            if (isRightDrawer) {
-                                const drawerContent = (
+                    {/* 미리보기 영역 — PreviewWrapper가 outputMode에 따라 팝업 레이아웃 적용 */}
+                    <div className={`bg-slate-100 rounded-xl min-h-[500px] overflow-hidden flex flex-col ${om.outputMode !== 'layerpopup' ? 'p-6' : ''}`}>
+                        <PreviewWrapper
+                            outputMode={om.outputMode}
+                            layerType={om.layerType}
+                            layerTitle={om.layerTitle}
+                            layerWidth={om.layerWidth}
+                        >
+                            {/* 우측 드로어: flex-col + 명시적 너비 (col=1→50%, col=2→100%)
+                                CSS grid auto-placement 예측 불가 문제 회피
+                                행 높이 = rowSpan * ROW_HEIGHT px 최솟값 */}
+                            {om.isRightDrawer ? (
+                                <div
+                                    className="flex flex-col border border-slate-200 rounded-lg overflow-hidden bg-slate-50"
+                                    style={{
+                                        backgroundImage: `
+                                            linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
+                                            linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
+                                        `,
+                                        backgroundSize: `50% 80px`,
+                                    }}
+                                >
                                     <div
-                                        className="flex flex-col border border-slate-200 rounded-lg overflow-hidden bg-slate-50"
-                                        style={{
-                                            backgroundImage: `
-                                                linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
-                                                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-                                            `,
-                                            backgroundSize: `50% 80px`,
-                                        }}
+                                        style={{ width: formContent.colSpan === 1 ? '50%' : '100%', minHeight: `${formContent.rowSpan * ROW_HEIGHT}px` }}
+                                        className="border-b border-slate-200"
                                     >
-                                        <div
-                                            style={{
-                                                width: formContent.colSpan === 1 ? '50%' : '100%',
-                                                minHeight: `${formContent.rowSpan * 80}px`,
-                                            }}
-                                            className="border-b border-slate-200"
-                                        >
-                                            <WidgetRenderer mode="preview" widget={formContent.widget} contentColSpan={formContent.colSpan} />
-                                        </div>
-                                        <div
-                                            style={{
-                                                width: spaceContent.colSpan === 1 ? '50%' : '100%',
-                                                minHeight: `${spaceContent.rowSpan * 80}px`,
-                                            }}
-                                        >
-                                            <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
-                                        </div>
+                                        <WidgetRenderer mode="preview" widget={formContent.widget} contentColSpan={formContent.colSpan} />
                                     </div>
-                                );
-                                return (
-                                    <RightDrawerLayout preview open onClose={() => {}} title={layerTitle || '드로어 미리보기'}>
-                                        <div className="px-6 py-5">{drawerContent}</div>
-                                    </RightDrawerLayout>
-                                );
-                            }
-
-                            /* ── 페이지/중앙팝업: PageLayout + PageGridRenderer로 운영화면과 동일한 함수 사용 ── */
-                            const grid = (
+                                    <div style={{ width: spaceContent.colSpan === 1 ? '50%' : '100%', minHeight: `${spaceContent.rowSpan * ROW_HEIGHT}px` }}>
+                                        <WidgetRenderer mode="preview" widget={spaceContent.widget} contentColSpan={spaceContent.colSpan} />
+                                    </div>
+                                </div>
+                            ) : (
+                                /* 페이지/중앙팝업: PageLayout + PageGridRenderer로 운영화면과 동일하게 렌더 */
                                 <PageLayout mode="preview">
                                     <PageGridRenderer
                                         mode="preview"
@@ -611,24 +541,8 @@ export default function QuickDetailBuilderPage() {
                                         }]}
                                     />
                                 </PageLayout>
-                            );
-
-                            /* LayerPopup 모드(중앙팝업): 팝업 레이아웃 컴포넌트로 감싸서 표시 */
-                            if (outputMode === 'layerpopup') {
-                                return (
-                                    <CenterPopupLayout preview open onClose={() => {}} title={layerTitle || '팝업 미리보기'} layerWidth={layerWidth}>
-                                        <div className="px-6 py-5">{grid}</div>
-                                    </CenterPopupLayout>
-                                );
-                            }
-
-                            /* Page 모드: 그대로 표시 (PageLayout이 내부에 포함됨) */
-                            return (
-                                <div className="p-6">
-                                    {grid}
-                                </div>
-                            );
-                        })()}
+                            )}
+                        </PreviewWrapper>
                     </div>
                 </div>
             </div>

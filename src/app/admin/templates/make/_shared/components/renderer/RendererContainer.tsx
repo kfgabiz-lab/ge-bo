@@ -48,13 +48,16 @@ export function RendererContainer({
     className = '',
     contentColSpan,
 }: RendererContainerProps) {
+    /* overflow:clip — 시각 클리핑(rounded border 포함)은 유지, GPU 합성 레이어(video)는 clip 안 함
+       overflow:hidden을 쓰면 Edge에서 video GPU 레이어가 clip돼 화면에 안 보이는 버그 발생 */
+    const borderCls = showBorder ? 'border border-slate-200' : '';
     const cls = [
-        'h-full w-full rounded overflow-auto',
-        showBorder ? 'border border-slate-200' : '',
+        'h-full w-full rounded',
+        borderCls,
         className,
     ].filter(Boolean).join(' ');
 
-    const bgStyle = (!bgColor || bgColor === 'none') ? {} : { backgroundColor: bgColor };
+    const bgStyle = (!bgColor || bgColor === 'none') ? { overflow: 'clip' as const } : { backgroundColor: bgColor, overflow: 'clip' as const };
 
     /* contentColSpan 있으면 CSS Grid 활성화 — Form/Space 공통 격자 배치 */
     const gridStyle = contentColSpan ? {

@@ -99,6 +99,14 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     /* Form 위젯별 입력값 — key: formWidget.widgetId, value: {fieldId → value} */
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
 
+    /* 카테고리 위젯별 선택 ID — key: widgetId, value: selectedId | null */
+    const [categorySelections, setCategorySelections] = useState<Record<string, number | null>>({});
+
+    /** 카테고리 항목 선택 핸들러 — CategoryRenderer → WidgetRenderer → 여기서 상태 업데이트 */
+    const handleCategorySelect = useCallback((widgetId: string, selectedId: number | null) => {
+        setCategorySelections(prev => ({ ...prev, [widgetId]: selectedId }));
+    }, []);
+
     /**
      * widgetItems에서 모든 위젯을 평탄화하여 반환
      */
@@ -381,6 +389,22 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     }, [widgetItems, formValuesMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
+     * 팝업 저장·삭제 완료 후 모든 Table 위젯 데이터 재조회
+     * WidgetRenderer의 onRefresh 콜백으로 연결
+     */
+    const handleRefresh = useCallback(() => {
+        const fieldsMap = buildSearchFieldsMap(widgetItems);
+        const sv = searchValuesRef.current;
+        flatWidgets(widgetItems).forEach(w => {
+            if (w.type !== 'table') return;
+            const connectedSlug = (w as TableWidget).connectedSlug;
+            if (!connectedSlug) return;
+            const searchFields = (w as TableWidget).connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
+            fetchPageTableData({ tableWidget: w as TableWidget, connectedSlug, searchFields, sv, page: 0 });
+        });
+    }, [widgetItems, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /**
      * 무한스크롤 다음 페이지 로드 — TableRenderer의 onLoadMore 콜백
      * tableDataMapRef로 최신 상태 참조 (stale closure 방지)
      */
@@ -447,6 +471,9 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 onSort={handleSortChange}
                 onPageChange={handlePageChange}
                 onLoadMore={handleLoadMore}
+                categorySelections={categorySelections}
+                onCategorySelect={handleCategorySelect}
+                onRefresh={handleRefresh}
             />
         </PageLayout>
     );

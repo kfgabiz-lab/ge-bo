@@ -16,6 +16,7 @@ import type {
     SearchWidget,
     SpaceWidget,
     CategoryWidget,
+    SubListWidget,
     AnyWidget,
 } from '../make/_shared/components/renderer';
 import type { TableWidget } from '../make/_shared/components/builder/TableBuilder';
@@ -31,6 +32,7 @@ const TABS = [
     { key: 'form',     label: '폼' },
     { key: 'space',    label: '공간영역' },
     { key: 'category', label: '카테고리' },
+    { key: 'sublist',  label: '서브리스트' },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -150,8 +152,10 @@ const SAMPLE_FORM: FormWidget = {
         { id: 'ff7',  type: 'radio',     label: '고용형태',         colSpan: 6,  rowSpan: 1, options: ['정규직', '계약직', '파견직'] },
         { id: 'ff8',  type: 'checkbox',  label: '권한',            colSpan: 6,  rowSpan: 1, options: ['읽기', '쓰기', '삭제', '관리'] },
         { id: 'ff9',  type: 'button',    label: '상태',            colSpan: 6,  rowSpan: 1, options: ['활성', '비활성', '대기', '잠금'] },
-        { id: 'ff10', type: 'file',      label: '첨부파일',         colSpan: 12, rowSpan: 1 },
-        { id: 'ff11', type: 'image',     label: '프로필 이미지',    colSpan: 12, rowSpan: 1 },
+        { id: 'ff10', type: 'file',  label: '첨부파일',      colSpan: 12, rowSpan: 2, maxFileCount: 3, maxFileSizeMB: 5, maxTotalSizeMB: 15, fileTypeMode: 'doc' },
+        { id: 'ff11', type: 'image', label: '프로필 이미지', colSpan: 12, rowSpan: 2 },
+        { id: 'ff12', type: 'video', label: '동영상',        colSpan: 12, rowSpan: 2, videoMode: 'file' },
+        { id: 'ff13', type: 'video', label: '동영상 URL',    colSpan: 12, rowSpan: 2, videoMode: 'url' },
     ],
 };
 
@@ -175,28 +179,46 @@ const SAMPLE_SPACE: SpaceWidget = {
 /** 카테고리 대분류 (depth 1) */
 const SAMPLE_CATEGORY_1: CategoryWidget = {
     type: 'category', widgetId: 'guide-category-1', contentKey: '', dbSlug: '',
-    depth: 1, label: '대분류', allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true,
+    depth: 1, label: '대분류', allowCreate: true, allowEdit: true, allowDelete: true,
 };
 
 /** 카테고리 중분류 (depth 2) */
 const SAMPLE_CATEGORY_2: CategoryWidget = {
     type: 'category', widgetId: 'guide-category-2', contentKey: '', dbSlug: '',
     depth: 2, label: '중분류', parentWidgetId: 'guide-category-1',
-    allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true,
+    allowCreate: true, allowEdit: true, allowDelete: true,
 };
 
 /** 카테고리 소분류 (depth 3) */
 const SAMPLE_CATEGORY_3: CategoryWidget = {
     type: 'category', widgetId: 'guide-category-3', contentKey: '', dbSlug: '',
     depth: 3, label: '소분류', parentWidgetId: 'guide-category-2',
-    allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true,
+    allowCreate: true, allowEdit: true, allowDelete: true,
 };
 
 /** 카테고리 세분류 (depth 4) */
 const SAMPLE_CATEGORY_4: CategoryWidget = {
     type: 'category', widgetId: 'guide-category-4', contentKey: '', dbSlug: '',
     depth: 4, label: '세분류', parentWidgetId: 'guide-category-3',
-    allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true,
+    allowCreate: true, allowEdit: true, allowDelete: true,
+};
+
+/** 서브리스트 — 코드 상세 목록 샘플 (코드값/코드명/정렬/기타/사용) */
+const SAMPLE_SUBLIST: SubListWidget = {
+    type: 'sublist',
+    widgetId: 'guide-sublist',
+    contentKey: 'codeDetails',
+    title: '코드 상세',
+    addButtonLabel: '코드 추가',
+    showBorder: true,
+    columns: [
+        { id: 'c1', key: 'code',      label: '코드값', type: 'input',  required: true },
+        { id: 'c2', key: 'name',      label: '코드명', type: 'input',  required: true },
+        { id: 'c3', key: 'sortOrder', label: '정렬',   type: 'input'                  },
+        { id: 'c4', key: 'etc1',      label: '기타1',  type: 'input'                  },
+        { id: 'c5', key: 'etc2',      label: '기타2',  type: 'input'                  },
+        { id: 'c6', key: 'active',    label: '사용',   type: 'select', options: ['Y', 'N'] },
+    ],
 };
 
 /* ══════════════════════════════════════════ */
@@ -210,13 +232,16 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
         { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 7 }],
+    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 13 }],
     space:    [{ widget: SAMPLE_SPACE,    colSpan: 12, rowSpan: 2 }],
     category: [
         { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },
         { widget: SAMPLE_CATEGORY_2, colSpan: 3, rowSpan: 8 },
         { widget: SAMPLE_CATEGORY_3, colSpan: 3, rowSpan: 8 },
         { widget: SAMPLE_CATEGORY_4, colSpan: 3, rowSpan: 8 },
+    ],
+    sublist: [
+        { widget: SAMPLE_SUBLIST, colSpan: 12, rowSpan: 5 },
     ],
 };
 

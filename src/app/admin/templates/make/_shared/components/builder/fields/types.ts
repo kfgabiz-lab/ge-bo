@@ -80,6 +80,8 @@ export interface FieldEditProps {
     autoFocus?: boolean;
     /** 한 줄 배치 모드 (공간영역 등에서 사용) */
     compact?: boolean;
+    /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
+    hideColSpan?: boolean;
     /** 추가 모드: 라벨 input 키 핸들러 (Enter/Escape) */
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }

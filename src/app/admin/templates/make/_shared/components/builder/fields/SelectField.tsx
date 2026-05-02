@@ -15,7 +15,7 @@ import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { FieldOptions } from './_FieldOptions';
 import { ToggleRow } from './_ToggleRow';
 
-export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown }: FieldEditProps) {
+export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
     return (
         <div className="space-y-1.5">
             <FieldBase
@@ -26,6 +26,7 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 isPk={values.isPk}
                 required={values.required}
                 readonly={values.readonly}
+                hideColSpan={hideColSpan}
                 onChange={onChange}
             />
             {/* Placeholder */}

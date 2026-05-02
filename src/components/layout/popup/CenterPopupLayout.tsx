@@ -59,7 +59,7 @@ export default function CenterPopupLayout({
             <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
             {/* 팝업 박스 */}
-            <div className={`relative w-full ${WIDTH_CLS[layerWidth]} bg-white rounded-xl shadow-2xl flex flex-col max-h-[90vh]`}>
+            <div className={`relative w-full ${WIDTH_CLS[layerWidth]} bg-white rounded-xl shadow-2xl flex flex-col max-h-[95vh]`}>
                 {/* 헤더 */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
                     <h2 className="text-base font-bold text-slate-900">{title || ''}</h2>
@@ -71,8 +71,8 @@ export default function CenterPopupLayout({
                     </button>
                 </div>
 
-                {/* 본문 — 내부 스크롤 */}
-                <div className="flex-1 overflow-y-auto">
+                {/* 본문 — 내부 스크롤, 상단 여백은 헤더와 컨텐츠 구분용 */}
+                <div className="flex-1 overflow-y-auto pt-4">
                     {children}
                 </div>
             </div>

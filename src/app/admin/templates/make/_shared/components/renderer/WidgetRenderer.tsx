@@ -24,42 +24,98 @@
  *     mode="live"
  *     widget={widget}
  *     dataSlug="my-list"
- *     onPopupSaved={() => fetchData(0)}
+ *     onRefresh={() => fetchData(0)}
  *     codeGroups={codeGroups}
  *     handlers={tableHandlers}
  *     ...
  *   />
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+/* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 싱글톤 ──
+ * WidgetRenderer가 여러 개 마운트되어도 리스너는 하나만 등록.
+ * 각 인스턴스가 콜백을 등록하면 Ctrl+` 시 일괄 호출 */
+const _hiddenLogCallbacks = new Set<() => void>();
+if (typeof document !== 'undefined') {
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.ctrlKey && e.code === 'Backquote') {
+            e.preventDefault();
+            e.stopPropagation();
+            toast.info('🔒 Hidden 필드 콘솔 출력');
+            _hiddenLogCallbacks.forEach(fn => fn());
+        }
+    }, { capture: true });
+}
 import api from '@/lib/api';
+import { ROW_HEIGHT, GAP_SIZE } from '@/components/layout/GridCell';
 import { CodeGroupDef } from '../../types';
 import { SearchRenderer } from './SearchRenderer';
 import { TableRenderer } from './TableRenderer';
 import { FormRenderer } from './FormRenderer';
 import { SpaceRenderer } from './SpaceRenderer';
 import { CategoryRenderer } from './CategoryRenderer';
+import { SubListRenderer } from './SubListRenderer';
 import CenterPopupLayout from '@/components/layout/popup/CenterPopupLayout';
 import RightDrawerLayout from '@/components/layout/popup/RightDrawerLayout';
-import type { AnyWidget, RendererMode, TableActionHandlers, SpaceWidget } from './types';
-import type { FormWidget, FormFieldItem } from '../builder/FormBuilder';
+import type { AnyWidget, RendererMode, TableActionHandlers } from './types';
+import type { FormFieldItem } from '../builder/FormBuilder';
+import { fetchTemplateConfig } from '../../templateApi';
+import type { TemplatePopupConfig } from '../../templateApi';
+import { PageGridRenderer } from './PageGridRenderer';
+
+/**
+ * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
+ * - editId가 있으면 slug+id로 dataJson 조회 후 fieldKey 기준 매핑
+ * - initialValues가 있으면 fieldKey 기준으로 덮어씀 (우선순위 최상위)
+ */
+async function fetchAndMapFieldValues(
+    connectedSlug: string,
+    editId: number | null,
+    fields: FormFieldItem[],
+    initialValues?: Record<string, string>,
+): Promise<{ values: Record<string, string>; existingFileIds: Record<string, number[]> }> {
+    let sourceData: Record<string, unknown> = {};
+    if (editId != null && connectedSlug) {
+        try {
+            const res = await api.get(`/page-data/${connectedSlug}/${editId}`);
+            sourceData = typeof res.data.dataJson === 'string'
+                ? JSON.parse(res.data.dataJson)
+                : (res.data.dataJson ?? {});
+        } catch { /* 조회 실패 시 빈 값으로 처리 */ }
+    }
+
+    const values: Record<string, string>           = {};
+    const existingFileIds: Record<string, number[]> = {};
+
+    fields.forEach(f => {
+        const key = f.fieldKey || f.label;
+        if (f.type === 'file' || f.type === 'image') {
+            const ids = sourceData[key];
+            if (Array.isArray(ids)) existingFileIds[f.id] = ids.map(Number);
+        } else if (f.type === 'hidden') {
+            values[f.id] = sourceData[key] !== undefined
+                ? String(sourceData[key])
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                : ((f as any).defaultValue ?? '');
+        } else if (sourceData[key] !== undefined) {
+            values[f.id] = String(sourceData[key]);
+        }
+        if (initialValues && key && key in initialValues) {
+            values[f.id] = initialValues[key];
+        }
+    });
+
+    return { values, existingFileIds };
+}
 
 /** 위젯 컨테이너 기본 클래스 (text / 빈 위젯 등에 사용) */
 const BASE_CLS =
     'h-full w-full rounded border bg-white border-slate-300 shadow-sm overflow-hidden p-2';
 
-/** QUICK_DETAIL 팝업 configJson 타입 (내부 처리용) */
-interface PopupConfig {
-    formContent:  { id: string; colSpan: number; rowSpan: number; widget: FormWidget };
-    spaceContent: { id: string; colSpan: number; rowSpan: number; widget: SpaceWidget };
-    outputMode:   'page' | 'layerpopup';
-    layerType?:   'center' | 'right';
-    layerTitle?:  string;
-    layerWidth?:  'sm' | 'md' | 'lg' | 'xl';
-}
 
 interface WidgetRendererProps {
     mode: RendererMode;
@@ -130,7 +186,8 @@ interface WidgetRendererProps {
      */
     dataSlug?: string;
     /** 팝업 저장·삭제 완료 후 콜백 (목록 새로고침 등) */
-    onPopupSaved?: () => void;
+    /** 팝업 저장·삭제 완료 후 콜백 — 테이블 목록 새로고침 등에 사용 */
+    onRefresh?: () => void;
     /**
      * 외부에서 팝업을 직접 트리거할 때 사용 (LIST 버튼바, test 페이지 등).
      * ts가 변경될 때마다 팝업을 오픈한다.
@@ -184,7 +241,7 @@ export function WidgetRenderer({
     onCategorySelect,
     /* 팝업 컨텍스트 */
     dataSlug,
-    onPopupSaved,
+    onRefresh,
     externalPopupTrigger,
 }: WidgetRendererProps) {
     const router = useRouter();
@@ -194,10 +251,13 @@ export function WidgetRenderer({
     /* ══════════════════════════════════════════ */
 
     const [popupOpen,            setPopupOpen]            = useState(false);
-    const [popupCfg,             setPopupCfg]             = useState<PopupConfig | null>(null);
+    const [popupCfg,             setPopupCfg]             = useState<TemplatePopupConfig | null>(null);
     const [popupSaving,          setPopupSaving]          = useState(false);
     const [popupEditId,          setPopupEditId]          = useState<number | null>(null);
     const [popupListSlug,        setPopupListSlug]        = useState('');
+    /* 카테고리 팝업 저장 후 목록 재조회용 — 증가할 때마다 CategoryRenderer가 fetchItems 호출 */
+    const [categoryRefreshTick,  setCategoryRefreshTick]  = useState(0);
+
     /* 팝업 폼 필드값 */
     const [popupValues,          setPopupValues]          = useState<Record<string, string>>({});
     const [popupFileValues,      setPopupFileValues]      = useState<Record<string, File[]>>({});
@@ -206,6 +266,44 @@ export function WidgetRenderer({
         Record<string, { id: number; origName: string; fileSize: number }[]>
     >({});
     const [popupImgBlobUrls,     setPopupImgBlobUrls]     = useState<Record<number, string>>({});
+
+    /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 ──
+     * 최신 상태를 ref로 유지하고 _hiddenLogCallbacks에 콜백 등록 */
+    const popupCfgRef    = useRef(popupCfg);    popupCfgRef.current    = popupCfg;
+    const popupValuesRef = useRef(popupValues);  popupValuesRef.current = popupValues;
+    const formValuesRef  = useRef(formValues);   formValuesRef.current  = formValues;
+    const widgetRef      = useRef(widget);       widgetRef.current      = widget;
+    useEffect(() => {
+        const logHidden = () => {
+            /* 팝업 폼 hidden 필드 — widgetItems(PageWidgetItem[]) contents에서 form 위젯 추출 */
+            const popupFields = (popupCfgRef.current?.widgetItems ?? [])
+                .flatMap(item => item.contents)
+                .filter(c => c.widget?.type === 'form')
+                .flatMap(c => (c.widget?.fields ?? [])) as FormFieldItem[];
+            const hiddenPopup = popupFields.filter(f => f.type === 'hidden');
+            if (hiddenPopup.length > 0) {
+                console.group('%c[Hidden] Popup Form', 'color: orange; font-weight: bold');
+                hiddenPopup.forEach(f => {
+                    console.log(`  ${f.fieldKey || f.label} =`, popupValuesRef.current[f.id] ?? '(없음)');
+                });
+                console.groupEnd();
+            }
+            /* 일반 폼 위젯 hidden 필드 */
+            const w = widgetRef.current;
+            if (w?.type === 'form') {
+                const hiddenForm = (w.fields as FormFieldItem[]).filter(f => f.type === 'hidden');
+                if (hiddenForm.length > 0) {
+                    console.group('%c[Hidden] Form Widget', 'color: orange; font-weight: bold');
+                    hiddenForm.forEach(f => {
+                        console.log(`  ${f.fieldKey || f.label} =`, formValuesRef.current[f.id] ?? '(없음)');
+                    });
+                    console.groupEnd();
+                }
+            }
+        };
+        _hiddenLogCallbacks.add(logHidden);
+        return () => { _hiddenLogCallbacks.delete(logHidden); };
+    }, []);
 
     /* ── 팝업 닫기 ── */
     const handlePopupClose = useCallback(() => {
@@ -216,14 +314,16 @@ export function WidgetRenderer({
 
     /**
      * 팝업 오픈 핸들러 (live 모드 전용)
-     * @param slug      QUICK_DETAIL 템플릿 slug
-     * @param editId    수정 대상 데이터 ID (신규 등록이면 null)
-     * @param listSlug  저장·삭제에 사용할 page-data slug (없으면 dataSlug prop 사용)
+     * @param slug          QUICK_DETAIL 템플릿 slug
+     * @param editId        수정 대상 데이터 ID (신규 등록이면 null)
+     * @param _listSlug     미사용 (각자 slug 독립 정책 — 팝업 폼의 connectedSlug 직접 사용)
+     * @param initialValues 초기값 맵 — fieldKey 기준으로 폼 필드에 매핑 (파라미터 전달용)
      */
     const handleInternalPopupOpen = useCallback(async (
         slug: string,
         editId?: number | null,
-        listSlug?: string,
+        _listSlug?: string,
+        initialValues?: Record<string, string>,
     ) => {
         if (mode !== 'live') return;
 
@@ -231,7 +331,7 @@ export function WidgetRenderer({
         setPopupCfg(null);
         setPopupSaving(false);
         setPopupEditId(editId ?? null);
-        setPopupListSlug(listSlug || dataSlug || '');
+        setPopupListSlug('');
         setPopupValues({});
         setPopupFileValues({});
         setPopupExistingFileIds({});
@@ -239,8 +339,8 @@ export function WidgetRenderer({
         setPopupImgBlobUrls({});
 
         try {
-            const res = await api.get(`/page-templates/by-slug/${slug}`);
-            const cfg = JSON.parse(res.data.configJson) as PopupConfig;
+            /* 1단계: 팝업 템플릿 설정 조회 (공통 유틸) */
+            const cfg = await fetchTemplateConfig(slug);
 
             /* outputMode='page': 팝업 없이 상세 페이지로 이동 */
             if (cfg.outputMode === 'page') {
@@ -249,33 +349,21 @@ export function WidgetRenderer({
                 return;
             }
 
-            /* outputMode='layerpopup': 기존 데이터 로드 후 팝업 오픈 */
-            const fields: FormFieldItem[] = cfg.formContent?.widget?.fields ?? [];
-            const resolvedSlug = listSlug || dataSlug || '';
+            /* widgetItems(PageWidgetItem[]) → contents에서 form 위젯 추출 */
+            const formContents = cfg.widgetItems.flatMap(item => item.contents).filter(c => c.widget?.type === 'form');
 
-            /* 수정 모드: 기존 데이터 조회 */
-            let sourceData: Record<string, unknown> = {};
-            if (editId != null && resolvedSlug) {
-                try {
-                    const editRes = await api.get(`/page-data/${resolvedSlug}/${editId}`);
-                    sourceData = typeof editRes.data.dataJson === 'string'
-                        ? JSON.parse(editRes.data.dataJson)
-                        : (editRes.data.dataJson ?? {});
-                } catch { /* 개별 조회 실패 무시 */ }
-            }
+            /* 팝업 저장에 사용할 slug: 첫 번째 폼 위젯의 connectedSlug */
+            const formConnectedSlug = (formContents[0]?.widget?.connectedSlug as string | undefined) || '';
+            setPopupListSlug(formConnectedSlug);
 
-            /* 필드별 초기값 설정 */
-            const init: Record<string, string>          = {};
-            const existingIds: Record<string, number[]> = {};
-            fields.forEach(f => {
-                const key = f.fieldKey || f.label;
-                if (f.type === 'file' || f.type === 'image') {
-                    const ids = sourceData[key];
-                    if (Array.isArray(ids)) existingIds[f.id] = ids.map(Number);
-                } else if (sourceData[key] !== undefined) {
-                    init[f.id] = String(sourceData[key]);
-                }
-            });
+            /* 2단계: row 데이터 조회 + 폼 필드 매핑 — 모든 폼 위젯의 필드를 합쳐서 매핑 */
+            const fields: FormFieldItem[] = formContents.flatMap(c => (c.widget?.fields as FormFieldItem[] ?? []));
+            const { values: init, existingFileIds: existingIds } = await fetchAndMapFieldValues(
+                formConnectedSlug,
+                editId ?? null,
+                fields,
+                initialValues,
+            );
             setPopupValues(init);
             setPopupExistingFileIds(existingIds);
 
@@ -347,7 +435,7 @@ export function WidgetRenderer({
             try {
                 await api.delete(`/page-data/${popupListSlug}/${popupEditId}`);
                 toast.success('삭제되었습니다.');
-                onPopupSaved?.();
+                onRefresh?.();
                 handlePopupClose();
             } catch {
                 toast.error('삭제 중 오류가 발생했습니다.');
@@ -355,11 +443,16 @@ export function WidgetRenderer({
             return;
         }
 
-        /* 저장 */
-        const fields = popupCfg?.formContent?.widget?.fields ?? [];
+        /* 저장 — widgetItems(PageWidgetItem[]) contents에서 form 위젯 필드 추출 */
+        const fields: FormFieldItem[] = (popupCfg?.widgetItems ?? [])
+            .flatMap(item => item.contents)
+            .filter(c => c.widget?.type === 'form')
+            .flatMap(c => (c.widget?.fields as FormFieldItem[] ?? []));
 
         /* 유효성 검사 */
         for (const f of fields) {
+            /* hidden 필드는 유효성 검사 건너뜀 */
+            if (f.type === 'hidden') continue;
             const label     = f.label || f.fieldKey || f.id;
             const val       = (popupValues[f.id] || '').trim();
             const fileCount = (popupExistingFileIds[f.id]?.length || 0) + (popupFileValues[f.id]?.length || 0);
@@ -454,7 +547,8 @@ export function WidgetRenderer({
                 await api.patch('/page-files/link', { fileIds: newIds, dataId: savedId });
             }
 
-            onPopupSaved?.();
+            onRefresh?.();
+            setCategoryRefreshTick(t => t + 1);
             handlePopupClose();
         } catch (err) {
             console.error('[WidgetRenderer] 팝업 저장 실패:', err);
@@ -462,89 +556,93 @@ export function WidgetRenderer({
         } finally {
             setPopupSaving(false);
         }
-    }, [popupListSlug, popupEditId, popupCfg, popupValues, popupFileValues, popupExistingFileIds, handlePopupClose, onPopupSaved]);
+    }, [popupListSlug, popupEditId, popupCfg, popupValues, popupFileValues, popupExistingFileIds, handlePopupClose, onRefresh]);
 
     /* ══════════════════════════════════════════ */
-    /*  팝업 오버레이 렌더링 함수                  */
+    /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
     /* ══════════════════════════════════════════ */
 
-    const renderPopupOverlay = () => {
-        /* 팝업 내부 본문 */
-        const body = (
-            <div className="px-6 py-5 space-y-4">
-                {popupCfg ? (
-                    <>
-                        {/* 폼 위젯 */}
-                        {popupCfg.formContent?.widget && (
-                            <WidgetRenderer
-                                mode="live"
-                                widget={popupCfg.formContent.widget}
-                                codeGroups={codeGroups}
-                                formValues={popupValues}
-                                onFormValuesChange={(id, v) =>
-                                    setPopupValues(prev => ({ ...prev, [id]: v }))
-                                }
-                                fileValues={popupFileValues}
-                                existingFileMeta={popupExistingMeta}
-                                imgBlobUrls={popupImgBlobUrls}
-                                onFileChange={(fieldId, files) =>
-                                    setPopupFileValues(prev => ({ ...prev, [fieldId]: files }))
-                                }
-                                onRemoveExisting={(fieldId, fileId) => {
-                                    setPopupExistingFileIds(prev => ({
-                                        ...prev,
-                                        [fieldId]: (prev[fieldId] || []).filter(id => id !== fileId),
-                                    }));
-                                    setPopupExistingMeta(prev => ({
-                                        ...prev,
-                                        [fieldId]: (prev[fieldId] || []).filter(m => m.id !== fileId),
-                                    }));
-                                }}
-                            />
-                        )}
-                        {/* 공간영역 (저장/삭제/닫기 버튼) */}
-                        {popupCfg.spaceContent?.widget && (
-                            <WidgetRenderer
-                                mode="live"
-                                widget={popupCfg.spaceContent.widget}
-                                onFormAction={popupSaving ? undefined : handlePopupFormAction}
-                                onClose={handlePopupClose}
-                            />
-                        )}
-                        {/* 저장 중 표시 */}
-                        {popupSaving && (
-                            <div className="flex items-center justify-center gap-2 py-2 text-slate-400 text-sm">
-                                <Loader2 className="w-4 h-4 animate-spin" />저장 중...
-                            </div>
-                        )}
-                    </>
-                ) : null}
-            </div>
-        );
+    /* form 위젯 ID — PageGridRenderer의 formValuesMap 키로 사용 */
+    const _popupFormWidgetId = (popupCfg?.widgetItems ?? [])
+        .flatMap(item => item.contents)
+        .find(c => c.widget?.type === 'form')
+        ?.widget?.widgetId as string ?? '';
 
-        /* layerType에 따라 레이아웃 선택 */
-        if (popupCfg?.layerType === 'right') {
-            return (
-                <RightDrawerLayout
-                    open={popupOpen}
-                    onClose={handlePopupClose}
-                    title={popupCfg.layerTitle || ''}
+    /* 팝업 내부 본문 — PageGridRenderer로 빌더와 동일한 그리드 렌더링 */
+    const _popupBody = popupCfg ? (
+        <>
+            {/* 여백 wrapper — grid 자체에 padding 주면 셀 크기 계산이 틀어지므로 분리 */}
+            <div className="px-4 pb-4">
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(12, 1fr)',
+                        gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                        rowGap: `${GAP_SIZE}px`,
+                        columnGap: 0,
+                    }}
                 >
-                    {body}
-                </RightDrawerLayout>
-            );
-        }
-        return (
+                    <PageGridRenderer
+                        mode="live"
+                        widgetItems={popupCfg.widgetItems as unknown as import('./PageGridRenderer').PageWidgetItem[]}
+                        codeGroups={codeGroups}
+                        /* 폼 */
+                        formValuesMap={{ [_popupFormWidgetId]: popupValues }}
+                        onFormValuesChange={(_, fieldId, value) =>
+                            setPopupValues(prev => ({ ...prev, [fieldId]: value }))
+                        }
+                        onFormAction={popupSaving ? undefined : handlePopupFormAction}
+                        onClose={handlePopupClose}
+                        /* 파일 업로드 */
+                        fileValuesMap={{ [_popupFormWidgetId]: popupFileValues }}
+                        existingFileMetaMap={{ [_popupFormWidgetId]: popupExistingMeta }}
+                        imgBlobUrls={popupImgBlobUrls}
+                        onFileChange={(_, fieldId, files) =>
+                            setPopupFileValues(prev => ({ ...prev, [fieldId]: files }))
+                        }
+                        onRemoveExisting={(_, fieldId, fileId) => {
+                            setPopupExistingFileIds(prev => ({
+                                ...prev,
+                                [fieldId]: (prev[fieldId] || []).filter(id => id !== fileId),
+                            }));
+                            setPopupExistingMeta(prev => ({
+                                ...prev,
+                                [fieldId]: (prev[fieldId] || []).filter(m => m.id !== fileId),
+                            }));
+                        }}
+                    />
+                </div>
+                {/* 저장 중 표시 */}
+                {popupSaving && (
+                    <div className="flex items-center justify-center gap-2 py-2 text-slate-400 text-sm">
+                        <Loader2 className="w-4 h-4 animate-spin" />저장 중...
+                    </div>
+                )}
+            </div>
+        </>
+    ) : null;
+
+    /* layerType에 따라 레이아웃 선택 */
+    const popupOverlay = mode === 'live' ? (
+        popupCfg?.layerType === 'right' ? (
+            <RightDrawerLayout
+                open={popupOpen}
+                onClose={handlePopupClose}
+                title={popupCfg.layerTitle || ''}
+            >
+                {_popupBody}
+            </RightDrawerLayout>
+        ) : (
             <CenterPopupLayout
                 open={popupOpen}
                 onClose={handlePopupClose}
                 title={popupCfg?.layerTitle || ''}
                 layerWidth={popupCfg?.layerWidth || 'md'}
             >
-                {body}
+                {_popupBody}
             </CenterPopupLayout>
-        );
-    };
+        )
+    ) : null;
 
     /* ══════════════════════════════════════════ */
     /*  위젯 타입별 분기                           */
@@ -554,7 +652,7 @@ export function WidgetRenderer({
     if (!widget) return (
         <>
             <div className="h-full w-full" />
-            {mode === 'live' && renderPopupOverlay()}
+            {popupOverlay}
         </>
     );
 
@@ -590,31 +688,43 @@ export function WidgetRenderer({
 
     /* ── Table ── */
     if (widget.type === 'table') {
-        /* edit/detail/fileClick 팝업을 내부적으로 처리하는 핸들러 래핑 */
-        const wrappedHandlers: TableActionHandlers | undefined = handlers
-            ? {
-                onEdit: (row) => {
-                    const actionsCol = widget.columns.find(c => c.cellType === 'actions');
-                    const slug = actionsCol?.editPopupSlug;
-                    if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug); return; }
-                    handlers.onEdit?.(row);
-                },
-                onDetail: (row) => {
-                    const actionsCol = widget.columns.find(c => c.cellType === 'actions');
-                    const slug = actionsCol?.detailPopupSlug;
-                    if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug); return; }
-                    handlers.onDetail?.(row);
-                },
-                onDelete: handlers.onDelete,
-                onFileClick: (col, row) => {
-                    if (col.fileLayerSlug) {
-                        handleInternalPopupOpen(col.fileLayerSlug, row._id as number, dataSlug);
-                        return;
+        /* edit/detail/delete/fileClick 핸들러 — handlers 없어도 팝업·기본삭제 동작 */
+        const connectedSlug = widget.connectedSlug;
+        const wrappedHandlers: TableActionHandlers = {
+            onEdit: (row) => {
+                const actionsCol = widget.columns.find(c => c.cellType === 'actions');
+                const slug = actionsCol?.editPopupSlug;
+                if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug); return; }
+                handlers?.onEdit?.(row);
+            },
+            onDetail: (row) => {
+                const actionsCol = widget.columns.find(c => c.cellType === 'actions');
+                const slug = actionsCol?.detailPopupSlug;
+                if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug); return; }
+                handlers?.onDetail?.(row);
+            },
+            /* 외부 핸들러 우선, 없으면 connectedSlug로 직접 삭제 */
+            onDelete: handlers?.onDelete ?? (mode === 'live' && connectedSlug
+                ? async (id: number) => {
+                    if (!confirm('삭제하시겠습니까?')) return;
+                    try {
+                        await api.delete(`/page-data/${connectedSlug}/${id}`);
+                        toast.success('삭제되었습니다.');
+                        onRefresh?.();
+                    } catch {
+                        toast.error('삭제 중 오류가 발생했습니다.');
                     }
-                    handlers.onFileClick?.(col, row);
-                },
-            }
-            : undefined;
+                }
+                : undefined
+            ),
+            onFileClick: (col, row) => {
+                if (col.fileLayerSlug) {
+                    handleInternalPopupOpen(col.fileLayerSlug, row._id as number, dataSlug);
+                    return;
+                }
+                handlers?.onFileClick?.(col, row);
+            },
+        };
 
         return (
             <>
@@ -639,7 +749,7 @@ export function WidgetRenderer({
                     hasMore={hasMore}
                 />
                 {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
-                {mode === 'live' && renderPopupOverlay()}
+                {popupOverlay}
             </>
         );
     }
@@ -683,7 +793,7 @@ export function WidgetRenderer({
                     onPopupOpen={(slug) => handleInternalPopupOpen(slug, null, dataSlug)}
                 />
                 {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
-                {mode === 'live' && renderPopupOverlay()}
+                {popupOverlay}
             </>
         );
     }
@@ -695,11 +805,30 @@ export function WidgetRenderer({
             ? (categorySelections?.[widget.parentWidgetId] ?? null)
             : null;
         return (
-            <CategoryRenderer
+            <>
+                <CategoryRenderer
+                    mode={mode}
+                    widget={widget}
+                    selectedParentId={selectedParentId}
+                    onSelect={onCategorySelect}
+                    onPopupOpen={(slug, editId, listSlug, initialValues) =>
+                        handleInternalPopupOpen(slug, editId ?? null, listSlug, initialValues)
+                    }
+                    refreshTick={categoryRefreshTick}
+                />
+                {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
+                {popupOverlay}
+            </>
+        );
+    }
+
+    /* ── SubList ── */
+    if (widget.type === 'sublist') {
+        return (
+            <SubListRenderer
                 mode={mode}
                 widget={widget}
-                selectedParentId={selectedParentId}
-                onSelect={onCategorySelect}
+                contentColSpan={contentColSpan}
             />
         );
     }

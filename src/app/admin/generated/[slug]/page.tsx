@@ -150,6 +150,14 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     /* ── Form 위젯별 입력값 ── */
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
 
+    /* ── 파일 업로드 상태 ── */
+    /** widgetId → fieldId → 새로 선택한 파일 목록 */
+    const [fileValuesMap, setFileValuesMap] = useState<Record<string, Record<string, File[]>>>({});
+    /** widgetId → fieldId → 기존 파일 메타 (수정 모드) */
+    const [existingFileMetaMap, setExistingFileMetaMap] = useState<Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>>({});
+    /** fileId → blob URL 캐시 (이미지 필드 미리보기용) */
+    const [imgBlobUrls, setImgBlobUrls] = useState<Record<number, string>>({});
+
     /* ── LIST 방식 전용 상태 ── */
     const [tableData,     setPageTableData]     = useState<Record<string, unknown>[]>([]);
     const [dataLoading,   setDataLoading]   = useState(false);
@@ -338,6 +346,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                             const formWidget = flatWidgets(items).find(w => w.type === 'form') as FormWidget | undefined;
                             if (formWidget?.connectedSlug) {
                                 const numId = Number(queryId);
+                                /* 폼 텍스트 데이터 로드 */
                                 api.get(`/page-data/${formWidget.connectedSlug}/${numId}`)
                                     .then(dataRes => {
                                         const dataJson = dataRes.data.dataJson || {};
@@ -350,6 +359,40 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                                         setFormValuesMap(prev => ({ ...prev, [formWidget.widgetId]: vals }));
                                     })
                                     .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
+
+                                /* 기존 파일 메타 로드 (fieldKey → fieldId 매핑) */
+                                api.get(`/page-files/by-data/${numId}`)
+                                    .then(fileRes => {
+                                        const files = fileRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
+                                        /* fieldKey → fieldId 역방향 맵 */
+                                        const fieldKeyToId: Record<string, string> = {};
+                                        formWidget.fields.forEach(f => { if (f.fieldKey) fieldKeyToId[f.fieldKey] = f.id; });
+                                        /* fieldId 기준으로 파일 메타 그룹화 */
+                                        const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
+                                        files.forEach(f => {
+                                            const fid = fieldKeyToId[f.fieldKey];
+                                            if (!fid) return;
+                                            if (!metaByFieldId[fid]) metaByFieldId[fid] = [];
+                                            metaByFieldId[fid].push({ id: f.id, origName: f.origName, fileSize: f.fileSize });
+                                        });
+                                        setExistingFileMetaMap(prev => ({ ...prev, [formWidget.widgetId]: metaByFieldId }));
+                                        /* 이미지 필드 blob URL 로드 */
+                                        const imageFieldIds = new Set(formWidget.fields.filter(f => f.type === 'image').map(f => f.id));
+                                        files.forEach(f => {
+                                            const fid = fieldKeyToId[f.fieldKey];
+                                            if (!fid || !imageFieldIds.has(fid)) return;
+                                            api.get(`/page-files/${f.id}`, { responseType: 'blob' })
+                                                .then(blobRes => {
+                                                    const url = URL.createObjectURL(blobRes.data);
+                                                    setImgBlobUrls(prev => ({ ...prev, [f.id]: url }));
+                                                })
+                                                .catch(() => {});
+                                        });
+                                    })
+                                    .catch(() => {}); /* 파일 없으면 조용히 처리 */
+
+                                /* sessionStorage에 formId 기록 (저장/삭제 시 사용) */
+                                sessionStorage.setItem(`formId_${formWidget.widgetId}`, String(numId));
                             }
                         }
                     }
@@ -440,7 +483,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         }));
     }, []);
 
-    /** Form 저장/삭제 */
+    /** Form 저장/삭제 (파일 업로드 포함) */
     const handleFormAction = useCallback(async (connectedFormWidgetId: string, action: 'save' | 'delete') => {
         const formWidget = flatWidgets(widgetItems).find(
             w => w.type === 'form' && (w as FormWidget).widgetId === connectedFormWidgetId
@@ -467,17 +510,74 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
         try {
             if (action === 'save') {
+                /* 1. 새 파일 업로드 (파일 타입/이미지 타입/비디오 타입 필드 공통) */
+                const newFiles = fileValuesMap[connectedFormWidgetId] ?? {};
+                const uploadedFileIds: number[] = [];
+                for (const [fieldId, files] of Object.entries(newFiles)) {
+                    const field = formWidget.fields.find(f => f.id === fieldId);
+                    if (!field?.fieldKey || !files.length) continue;
+                    for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('templateSlug', formWidget.connectedSlug);
+                        formData.append('fieldKey', field.fieldKey);
+                        const uploadRes = await api.post('/page-files/upload', formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' },
+                        });
+                        uploadedFileIds.push(uploadRes.data.id);
+                    }
+                }
+
+                /* 2. 폼 텍스트 데이터 저장 */
+                let savedDataId: number;
                 if (storedId) {
                     await api.put(`/page-data/${formWidget.connectedSlug}/${storedId}`, { dataJson });
+                    savedDataId = storedId;
                     toast.success('수정되었습니다.');
                 } else {
                     const res = await api.post(`/page-data/${formWidget.connectedSlug}`, {
                         dataJson,
                         ...(pkKeys.length > 0 && { pkKeys }),
                     });
-                    sessionStorage.setItem(formIdKey, String(res.data.id));
+                    savedDataId = res.data.id;
+                    sessionStorage.setItem(formIdKey, String(savedDataId));
                     toast.success('저장되었습니다.');
                 }
+
+                /* 3. 업로드된 파일을 data_id에 연결 후 상태 초기화 */
+                if (uploadedFileIds.length > 0) {
+                    await api.patch('/page-files/link', { fileIds: uploadedFileIds, dataId: savedDataId });
+                    setFileValuesMap(prev => ({ ...prev, [connectedFormWidgetId]: {} }));
+                }
+
+                /* 4. 저장 후 파일 메타 갱신 (existingFileMetaMap + imgBlobUrls 최신화) */
+                const fieldKeyToId: Record<string, string> = {};
+                formWidget.fields.forEach(f => { if (f.fieldKey) fieldKeyToId[f.fieldKey] = f.id; });
+                const imageFieldIds = new Set(formWidget.fields.filter(f => f.type === 'image').map(f => f.id));
+                api.get(`/page-files/by-data/${savedDataId}`)
+                    .then(fileRes => {
+                        const files = fileRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
+                        const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
+                        files.forEach(f => {
+                            const fid = fieldKeyToId[f.fieldKey];
+                            if (!fid) return;
+                            if (!metaByFieldId[fid]) metaByFieldId[fid] = [];
+                            metaByFieldId[fid].push({ id: f.id, origName: f.origName, fileSize: f.fileSize });
+                        });
+                        setExistingFileMetaMap(prev => ({ ...prev, [connectedFormWidgetId]: metaByFieldId }));
+                        /* 이미지 필드 blob URL 갱신 */
+                        files.forEach(f => {
+                            const fid = fieldKeyToId[f.fieldKey];
+                            if (!fid || !imageFieldIds.has(fid)) return;
+                            api.get(`/page-files/${f.id}`, { responseType: 'blob' })
+                                .then(blobRes => {
+                                    const url = URL.createObjectURL(blobRes.data);
+                                    setImgBlobUrls(prev => ({ ...prev, [f.id]: url }));
+                                })
+                                .catch(() => {});
+                        });
+                    })
+                    .catch(() => {});
             } else {
                 if (!storedId) { toast.info('삭제할 데이터가 없습니다.'); return; }
                 if (!confirm('삭제하시겠습니까?')) return;
@@ -494,7 +594,33 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 toast.error(action === 'save' ? '저장 중 오류가 발생했습니다.' : '삭제 중 오류가 발생했습니다.');
             }
         }
-    }, [widgetItems, formValuesMap, router]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, formValuesMap, fileValuesMap, router]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /** 파일 선택 핸들러 */
+    const handleFileChange = useCallback((widgetId: string, fieldId: string, files: File[]) => {
+        setFileValuesMap(prev => ({
+            ...prev,
+            [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: files },
+        }));
+    }, []);
+
+    /** 기존 파일 삭제 핸들러 */
+    const handleRemoveExisting = useCallback(async (widgetId: string, fieldId: string, fileId: number) => {
+        try {
+            await api.delete(`/page-files/${fileId}`);
+            setExistingFileMetaMap(prev => ({
+                ...prev,
+                [widgetId]: {
+                    ...(prev[widgetId] ?? {}),
+                    [fieldId]: (prev[widgetId]?.[fieldId] ?? []).filter(f => f.id !== fileId),
+                },
+            }));
+            /* 이미지 blob URL 캐시 제거 */
+            setImgBlobUrls(prev => { const n = { ...prev }; delete n[fileId]; return n; });
+        } catch {
+            toast.error('파일 삭제 중 오류가 발생했습니다.');
+        }
+    }, []);
 
     /** 무한스크롤 추가 로드 */
     const handleLoadMore = useCallback((tableWidgetId: string) => {
@@ -629,7 +755,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     }, [widgetItems, dataSlug]);
 
     /* 팝업 저장 후 테이블 새로고침 콜백 (widgetItems 방식 전용) */
-    const handlePopupSaved = useCallback(() => {
+    const handleRefresh = useCallback(() => {
         const tw = flatWidgets(widgetItems).find(w => w.type === 'table') as TableWidget | undefined;
         if (tw?.connectedSlug) {
             const fieldsMap = buildSearchFieldsMap(widgetItems);
@@ -676,6 +802,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     formValuesMap={formValuesMap}
                     onFormValuesChange={updateFormValue}
                     onFormAction={handleFormAction}
+                    fileValuesMap={fileValuesMap}
+                    existingFileMetaMap={existingFileMetaMap}
+                    imgBlobUrls={imgBlobUrls}
+                    onFileChange={handleFileChange}
+                    onRemoveExisting={handleRemoveExisting}
                     tableDataMap={tableDataMap}
                     sortKeyMap={sortKeyMap}
                     sortDirMap={sortDirMap}
@@ -683,7 +814,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     onPageChange={handlePageChange}
                     onLoadMore={handleLoadMore}
                     dataSlug={resolvedDataSlug}
-                    onPopupSaved={handlePopupSaved}
+                    onRefresh={handleRefresh}
                 />
             </PageLayout>
         );
@@ -748,7 +879,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                             codeGroups={codeGroups}
                             handlers={tableHandlers}
                             dataSlug={dataSlug}
-                            onPopupSaved={() => fetchData(currentPage)}
+                            onRefresh={() => fetchData(currentPage)}
                             tableData={tableData}
                             tableLoading={dataLoading}
                             sortKey={sortKey}
@@ -775,7 +906,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 mode="live"
                 widget={null}
                 dataSlug={dataSlug}
-                onPopupSaved={() => fetchData(currentPage)}
+                onRefresh={() => fetchData(currentPage)}
                 externalPopupTrigger={btnPopupTrigger}
             />
         </>

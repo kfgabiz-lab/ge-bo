@@ -27,8 +27,9 @@
  *   />
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Check, X, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Plus, Pencil, Trash2, Check, X, ChevronRight, Eye, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { RendererContainer } from './RendererContainer';
@@ -41,6 +42,7 @@ interface CategoryItem {
     name: string;
     depth: number;
     parentId: number | null;
+    sortOrder?: number;     // 정렬 순번 (낮을수록 위)
     code?: string;          // 항목 코드 (예: A-001)
     description?: string;   // 항목 설명
 }
@@ -52,6 +54,14 @@ interface CategoryRendererProps {
     selectedParentId?: number | null;
     /** 이 위젯에서 항목 선택 시 호출 — (widgetId, selectedId) */
     onSelect?: (widgetId: string, selectedId: number | null) => void;
+    /**
+     * 등록/수정 연결이 popup/path일 때 WidgetRenderer가 주입하는 팝업 오픈 핸들러.
+     * - popup: handleInternalPopupOpen(slug, editId, listSlug) 호출
+     * - path: router.push(path) 는 CategoryRenderer 내부에서 직접 처리
+     */
+    onPopupOpen?: (slug: string, editId?: number | null, listSlug?: string, initialValues?: Record<string, string>) => void;
+    /** 팝업 저장 완료 시 증가 — 값이 바뀔 때마다 목록 재조회 */
+    refreshTick?: number;
 }
 
 /** 미리보기 샘플 데이터 (스크롤 확인용으로 충분한 수량) */
@@ -70,8 +80,24 @@ const PREVIEW_ITEMS: CategoryItem[] = [
     { id: 12, name: '항목 L', depth: 1, parentId: null, code: 'A-012', description: '열두 번째 항목에 대한 간단한 설명입니다.' },
 ];
 
-export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: CategoryRendererProps) {
+/**
+ * 파라미터 문자열 파싱 유틸
+ * @param params "depth=1&parentId=5" 형태의 문자열
+ * @returns { depth: '1', parentId: '5' }
+ */
+function parseParams(params?: string): Record<string, string> {
+    if (!params) return {};
+    return Object.fromEntries(
+        params.split('&')
+            .map(p => p.split('='))
+            .filter(([k]) => k.trim())
+            .map(([k, v]) => [k.trim(), (v ?? '').trim()])
+    );
+}
+
+export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onPopupOpen, refreshTick }: CategoryRendererProps) {
     const isPreview = mode === 'preview';
+    const router = useRouter();
 
     /* ── 상태 ── */
     const [items, setItems]               = useState<CategoryItem[]>([]);
@@ -83,6 +109,10 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
     const [showInput, setShowInput]       = useState(false);   // 등록 입력창 표시
     const [editId, setEditId]             = useState<number | null>(null); // 수정 중인 항목 ID
     const [editName, setEditName]         = useState('');
+
+    /* ── 드래그 상태 ── */
+    const dragIndexRef  = useRef<number | null>(null); // 드래그 시작 항목 인덱스
+    const [dropIndex, setDropIndex]       = useState<number | null>(null); // 드롭 위치 인덱스 (파란 선 표시용)
 
     /* ── depth 2 이상: 상위 선택 없으면 목록 비움 ── */
     const needsParent = widget.depth > 1 && widget.parentWidgetId;
@@ -102,15 +132,30 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
                 params.eq_parentId = String(selectedParentId);
             }
             const res = await api.get(`/page-data/${widget.dbSlug}`, { params });
+            /* 설정된 필드 키 — 미설정 시 기본값 사용 */
+            const idKey    = widget.fieldId    || 'id';
+            const codeKey  = widget.fieldCode  || 'code';
+            const titleKey = widget.fieldTitle || 'name';
+            const descKey  = widget.fieldDesc  || 'description';
+
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
                 .map(item => ({
-                    id: item.id,
-                    name: String(item.dataJson.name ?? ''),
+                    /* ID: dataJson의 설정 키 값 또는 item.id */
+                    id: item.dataJson[idKey] != null ? Number(item.dataJson[idKey]) : item.id,
+                    name: String(item.dataJson[titleKey] ?? ''),
                     depth: Number(item.dataJson.depth ?? widget.depth),
                     parentId: item.dataJson.parentId != null ? Number(item.dataJson.parentId) : null,
-                    code: item.dataJson.code != null ? String(item.dataJson.code) : undefined,
-                    description: item.dataJson.description != null ? String(item.dataJson.description) : undefined,
-                }));
+                    sortOrder: item.dataJson.sortOrder != null ? Number(item.dataJson.sortOrder) : undefined,
+                    code: item.dataJson[codeKey] != null ? String(item.dataJson[codeKey]) : undefined,
+                    description: item.dataJson[descKey] != null ? String(item.dataJson[descKey]) : undefined,
+                }))
+                /* sortOrder 기준 오름차순 정렬 — sortOrder 없는 항목은 뒤로 */
+                .sort((a, b) => {
+                    if (a.sortOrder == null && b.sortOrder == null) return 0;
+                    if (a.sortOrder == null) return 1;
+                    if (b.sortOrder == null) return -1;
+                    return a.sortOrder - b.sortOrder;
+                });
             setItems(rows);
         } catch {
             toast.error('카테고리 목록을 불러오지 못했습니다.');
@@ -129,12 +174,32 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
     /* 최초 마운트 조회 */
     useEffect(() => { fetchItems(); }, []);
 
-    /* ── 항목 선택 ── */
+    /* 팝업 저장 완료 시 재조회 (refreshTick 증가 시점에 동작) */
+    useEffect(() => {
+        if (refreshTick && refreshTick > 0) fetchItems();
+    }, [refreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /* ── 항목 클릭 — 항상 selectedId 토글 (자식 카테고리 표시용) ── */
     const handleSelect = (item: CategoryItem) => {
         if (isPreview) return;
         const next = selectedId === item.id ? null : item.id;
         setSelectedId(next);
         onSelect?.(widget.widgetId, next);
+    };
+
+    /* ── 상세 버튼 클릭 — allowDetail + 연결 설정이 있을 때만 동작 ── */
+    const handleDetail = (e: React.MouseEvent, item: CategoryItem) => {
+        e.stopPropagation();
+        if (isPreview) return;
+        if (widget.detailConnType === 'popup' && widget.detailPopupSlug) {
+            const staticParams = parseParams(widget.detailParams);
+            onPopupOpen?.(widget.detailPopupSlug, item.id, widget.dbSlug, staticParams);
+            return;
+        }
+        if (widget.detailConnType === 'path' && widget.detailPath) {
+            const qs = widget.detailParams ? `&${widget.detailParams}` : '';
+            router.push(`${widget.detailPath}?id=${item.id}${qs}`);
+        }
     };
 
     /* ── 등록 ── */
@@ -144,6 +209,8 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
             const dataJson: Record<string, unknown> = {
                 name: inputName.trim(),
                 depth: widget.depth,
+                /* 마지막 순번 + 1 자동 부여 */
+                sortOrder: items.length + 1,
             };
             /* depth 2 이상이면 상위 선택값을 parentId로 저장 */
             if (widget.depth > 1 && selectedParentId != null) {
@@ -197,19 +264,102 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
         }
     };
 
+    /* ── 드래그 핸들러 ── */
+
+    /** 드래그 시작: 출발 인덱스 기록 */
+    const handleDragStart = (index: number) => {
+        dragIndexRef.current = index;
+    };
+
+    /** 드래그 오버: 삽입 위치 갱신 (기본 동작 막아서 drop 이벤트 허용) */
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        setDropIndex(index);
+    };
+
+    /** 드래그 영역 이탈: 파란 선 제거 */
+    const handleDragLeave = () => {
+        setDropIndex(null);
+    };
+
+    /**
+     * 드롭: 항목 순서 재정렬 → 변경된 항목들의 sortOrder를 BE에 저장
+     * - 출발 인덱스(dragIndexRef) → 목적지 인덱스(dropIndex) 로 이동
+     * - 새 순번은 1-based 연속 숫자 재할당
+     */
+    const handleDrop = async (e: React.DragEvent, toIndex: number) => {
+        e.preventDefault();
+        setDropIndex(null);
+        const fromIndex = dragIndexRef.current;
+        dragIndexRef.current = null;
+        if (fromIndex == null || fromIndex === toIndex) return;
+
+        /* 배열 재정렬 */
+        const reordered = [...items];
+        const [moved] = reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, moved);
+
+        /* 1-based 순번 재할당 */
+        const updated = reordered.map((item, i) => ({ ...item, sortOrder: i + 1 }));
+        setItems(updated);
+
+        /* 변경된 항목만 BE 업데이트 (기존 sortOrder와 다른 항목) */
+        const changed = updated.filter((item, i) => item.sortOrder !== items[i]?.sortOrder);
+        try {
+            await Promise.all(
+                changed.map(item => {
+                    const dataJson: Record<string, unknown> = {
+                        name: item.name,
+                        depth: item.depth,
+                        sortOrder: item.sortOrder,
+                    };
+                    if (item.parentId != null) dataJson.parentId = item.parentId;
+                    if (item.code != null) dataJson.code = item.code;
+                    if (item.description != null) dataJson.description = item.description;
+                    return api.put(`/page-data/${widget.dbSlug}/${item.id}`, { dataJson });
+                })
+            );
+        } catch {
+            toast.error('순번 저장 중 오류가 발생했습니다.');
+            fetchItems(); // 실패 시 원래 순서로 복원
+        }
+    };
+
     return (
-        /* RendererContainer — h-full w-full + 테두리 공통 처리 */
-        <RendererContainer showBorder={widget.showBorder !== false} className="flex flex-col bg-white">
+        /* 우측 여백 — 인접 카테고리 위젯과 시각적 구분을 위한 padding-right */
+        <div className="h-full w-full pr-2">
+        <RendererContainer showBorder className="flex flex-col bg-white">
 
             {/* 헤더: 레이블 + 등록 버튼 */}
             <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200 flex-shrink-0">
                 <span className="text-xs font-semibold text-slate-700">
                     {widget.label || `카테고리 (depth ${widget.depth})`}
                 </span>
-                {/* 등록 버튼 — live: 활성 / preview: 구조 확인용으로 흐릿하게 표시 */}
-                {(widget.allowCreate !== false) && !parentNotSelected && (
+                {/* 등록 버튼 — preview: 항상 표시 / live 인라인: 상위 선택 후 표시 / live popup·path: 항상 표시 */}
+                {(widget.allowCreate !== false) && (isPreview || !parentNotSelected || widget.createConnType === 'popup' || widget.createConnType === 'path') && (
                     <button
-                        onClick={() => { if (!isPreview) { setShowInput(v => !v); setInputName(''); } }}
+                        onClick={() => {
+                            if (isPreview) return;
+                            /* 상위 카테고리 미선택 시 validation (depth 2 이상) */
+                            if (parentNotSelected) {
+                                toast.warning('상위 카테고리를 선택하세요.');
+                                return;
+                            }
+                            /* 연결 타입에 따라 동작 분기 */
+                            if (widget.createConnType === 'popup' && widget.createPopupSlug) {
+                                /* 정적 파라미터 + 동적 상위 ID 자동 주입 (depth 2 이상) */
+                                const staticParams = parseParams(widget.createParams);
+                                const dynamicParams = selectedParentId != null ? { parentId: String(selectedParentId) } : {};
+                                onPopupOpen?.(widget.createPopupSlug, null, widget.dbSlug, { ...staticParams, ...dynamicParams });
+                            } else if (widget.createConnType === 'path' && widget.createPath) {
+                                const qs = widget.createParams ? `?${widget.createParams}` : '';
+                                router.push(`${widget.createPath}${qs}`);
+                            } else {
+                                /* 연결 없음 — inline 입력창 표시 */
+                                setShowInput(v => !v);
+                                setInputName('');
+                            }
+                        }}
                         className={`flex items-center gap-1 text-[11px] transition-colors ${
                             isPreview
                                 ? 'pointer-events-none opacity-40 text-slate-500'
@@ -270,9 +420,18 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
                 {/* 항목 카드 목록 */}
                 {!parentNotSelected && !loading && items.length > 0 && (
                     <div className="p-2 space-y-1.5">
-                        {items.map((item) => (
+                        {items.map((item, index) => (
+                            <div key={item.id}>
+                                {/* 드롭 위치 표시선 — 해당 인덱스 위에 표시 */}
+                                {!isPreview && dropIndex === index && dragIndexRef.current !== index && (
+                                    <div className="h-0.5 bg-blue-400 rounded mb-1.5 mx-1" />
+                                )}
                             <div
-                                key={item.id}
+                                draggable={!isPreview}
+                                onDragStart={() => handleDragStart(index)}
+                                onDragOver={e => handleDragOver(e, index)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={e => handleDrop(e, index)}
                                 onClick={() => handleSelect(item)}
                                 className={`group relative rounded-lg border cursor-pointer transition-all
                                     ${selectedId === item.id
@@ -305,8 +464,22 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="px-3 py-2.5">
+                                    <div className="flex items-center gap-1 px-2 py-2.5">
 
+                                        {/* 드래그 핸들 + 순번 */}
+                                        <div
+                                            className={`flex items-center gap-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing select-none ${
+                                                isPreview ? 'pointer-events-none' : ''
+                                            }`}
+                                            onClick={e => e.stopPropagation()}
+                                        >
+                                            <GripVertical className={`w-3.5 h-3.5 ${selectedId === item.id ? 'text-white/40' : 'text-slate-300'}`} />
+                                            <span className={`text-[10px] font-mono w-4 text-center ${selectedId === item.id ? 'text-white/50' : 'text-slate-300'}`}>
+                                                {index + 1}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex-1 min-w-0 pl-1">
                                         {/* 1행: 코드 | 타이틀 | 우측 버튼 */}
                                         <div className="flex items-center gap-2 mb-1">
                                             {item.code && (
@@ -323,30 +496,51 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
                                             }`}>
                                                 {item.name}
                                             </span>
-                                            {/* live: hover 시 수정/삭제 / preview: ChevronRight */}
-                                            {!isPreview ? (
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                                    onClick={e => e.stopPropagation()}>
-                                                    {(widget.allowEdit !== false) && (
-                                                        <button
-                                                            onClick={() => { setEditId(item.id); setEditName(item.name); }}
-                                                            className={`p-0.5 transition-colors ${selectedId === item.id ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
-                                                        >
-                                                            <Pencil className="w-3 h-3" />
-                                                        </button>
-                                                    )}
-                                                    {(widget.allowDelete !== false) && (
-                                                        <button
-                                                            onClick={() => handleDelete(item.id)}
-                                                            className={`p-0.5 transition-colors ${selectedId === item.id ? 'text-slate-300 hover:text-red-300' : 'text-slate-400 hover:text-red-500'}`}
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <ChevronRight className={`w-3 h-3 flex-shrink-0 ${selectedId === item.id ? 'text-white/40' : 'text-slate-300'}`} />
-                                            )}
+                                            {/* hover 시 수정/상세/삭제 버튼 */}
+                                            <div
+                                                className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                {(widget.allowEdit !== false) && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isPreview) return;
+                                                            if (widget.editConnType === 'popup' && widget.editPopupSlug) {
+                                                                onPopupOpen?.(widget.editPopupSlug, item.id, widget.dbSlug, parseParams(widget.editParams));
+                                                            } else if (widget.editConnType === 'path' && widget.editPath) {
+                                                                const qs = widget.editParams ? `&${widget.editParams}` : '';
+                                                                router.push(`${widget.editPath}?id=${item.id}${qs}`);
+                                                            } else {
+                                                                setEditId(item.id);
+                                                                setEditName(item.name);
+                                                            }
+                                                        }}
+                                                        className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
+                                                        title="수정"
+                                                    >
+                                                        <Pencil className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                                {/* 상세 버튼 — allowDetail 토글 ON + 연결 설정이 있을 때만 표시 */}
+                                                {widget.allowDetail && (widget.detailConnType === 'popup' || widget.detailConnType === 'path') && (
+                                                    <button
+                                                        onClick={e => handleDetail(e, item)}
+                                                        className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
+                                                        title="상세"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                                {(widget.allowDelete !== false) && (
+                                                    <button
+                                                        onClick={() => { if (!isPreview) handleDelete(item.id); }}
+                                                        className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-red-300' : 'text-slate-400 hover:text-red-500'}`}
+                                                        title="삭제"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {/* 2행: 설명 */}
@@ -357,14 +551,20 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect }: C
                                                 {item.description}
                                             </p>
                                         )}
-
+                                        </div>{/* flex-1 min-w-0 끝 */}
                                     </div>
                                 )}
                             </div>
+                            </div>
                         ))}
+                        {/* 맨 마지막 드롭 위치 표시선 */}
+                        {!isPreview && dropIndex === items.length && (
+                            <div className="h-0.5 bg-blue-400 rounded mx-1" />
+                        )}
                     </div>
                 )}
             </div>
         </RendererContainer>
+        </div>
     );
 }

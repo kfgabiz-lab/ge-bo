@@ -20,6 +20,7 @@ export { RadioField } from './RadioField';
 export { CheckboxField } from './CheckboxField';
 export { ButtonField } from './ButtonField';
 export { TextareaField } from './TextareaField';
+export { FormTextareaField } from './FormTextareaField';
 export { EditorField } from './EditorField';
 export { FileField } from './FileField';
 export { ImageField } from './ImageField';

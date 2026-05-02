@@ -111,6 +111,33 @@ export const getSpaceGridColumn = (
 };
 
 /**
+ * 템플릿 타입/outputMode → 목록 표시용 접두어 라벨 반환
+ * ActionButtonField(공간 버튼), ActionsField(테이블 액션) 등 템플릿 선택 드롭다운 공통 사용
+ *
+ * @param t templateType / configJson / name 을 가진 템플릿 객체
+ * @returns "팝업 - name" | "상세 - name" | "페이지 - name" | "name"
+ *
+ * @example
+ * getTemplateLabel({ templateType: 'PAGE', configJson: '{}', name: '게시판' }) // "페이지 - 게시판"
+ * getTemplateLabel({ templateType: 'QUICK_DETAIL', configJson: '{"outputMode":"layerpopup"}', name: '등록' }) // "팝업 - 등록"
+ */
+export const getTemplateLabel = (t: {
+    templateType?: string;
+    configJson?: string;
+    name: string;
+}): string => {
+    /* PAGE 타입 (Widget 빌더로 생성된 페이지) */
+    if (t.templateType === 'PAGE') return `페이지 - ${t.name}`;
+    /* QUICK_DETAIL: configJson의 outputMode로 팝업/상세 구분 */
+    try {
+        const cfg = JSON.parse(t.configJson || '{}');
+        if (cfg.outputMode === 'layerpopup') return `팝업 - ${t.name}`;
+        if (cfg.outputMode === 'page') return `상세 - ${t.name}`;
+    } catch { /* 파싱 실패 시 이름만 표시 */ }
+    return t.name;
+};
+
+/**
  * 유튜브/Vimeo URL → embed URL 변환
  * @example toEmbedUrl("https://youtube.com/watch?v=...") // "https://www.youtube.com/embed/..."
  */
