@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Save, Trash2, Settings2, FolderOpen, Folder, FileText, Plus, X, Wand2, ChevronDown, Loader2, Pencil, AlertTriangle } from 'lucide-react';
+import { Save, Trash2, Settings2, FolderOpen, Folder, FileText, Plus, X, Wand2, ChevronDown, Loader2 } from 'lucide-react';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { MenuRoleMatrix } from './MenuRoleMatrix';
@@ -122,12 +122,10 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
     const [menuKind, setMenuKind] = useState<'folder' | 'program'>(parentDepth >= 2 ? 'program' : 'folder');
     const [name, setName] = useState('');
     const [url, setUrl] = useState('');
-    const [slug, setSlug] = useState('');
     const [icon, setIcon] = useState('Folder');
     const [sortOrder, setSortOrder] = useState(1);
     const [nameError, setNameError] = useState('');
     const [urlError, setUrlError] = useState('');
-    const [slugError, setSlugError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [linkedTemplateName, setLinkedTemplateName] = useState(''); // 연결된 페이지 템플릿명
     const nameRef = useRef<HTMLInputElement>(null);
@@ -140,14 +138,6 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
 
     const canSelectFolder = parentDepth < 2;
     const depthLabel = parentId === null ? '1depth' : parentDepth === 1 ? '2depth' : '3depth';
-
-    /* slug 유효성 검사 (CreateMenuForm용) */
-    const validateSlugLocal = (value: string): string => {
-        if (!value) return '';
-        if (!/^[a-zA-Z0-9\-_]+$/.test(value)) return '슬러그는 영문, 숫자, -, _만 사용 가능합니다.';
-        if (value.length > 100) return '슬러그는 100자 이하로 입력해주세요.';
-        return '';
-    };
 
     const handleSubmit = async () => {
         if (isSubmitting) return;
@@ -169,9 +159,6 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
             setUrlError('');
         }
 
-        const sle = validateSlugLocal(slug);
-        if (sle) { setSlugError(sle); valid = false; } else setSlugError('');
-
         if (!valid) { if (nameError || !trimmed) nameRef.current?.focus(); return; }
 
         setIsSubmitting(true);
@@ -179,7 +166,6 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
             await addMenu({
                 name: trimmed,
                 url: menuKind === 'program' ? url.trim() : '',
-                slug: slug.trim() || undefined,
                 icon,
                 parentId,
                 menuType,
@@ -277,24 +263,6 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
                     </div>
                 )}
 
-                {/* SLUG — page-data API 식별자 */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                        SLUG
-                        <span className="ml-1.5 text-[10px] text-slate-400 font-normal">데이터 저장/조회 식별자</span>
-                    </label>
-                    <input
-                        type="text"
-                        value={slug}
-                        onChange={e => { setSlug(e.target.value); if (slugError) setSlugError(validateSlugLocal(e.target.value)); }}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-                        className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 transition-all ${slugError ? 'border-red-400 focus:ring-red-200' : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-900'}`}
-                        placeholder="예) user-list"
-                        maxLength={100}
-                    />
-                    {slugError && <p className="text-[11px] text-red-500 mt-1">{slugError}</p>}
-                </div>
-
                 {/* 아이콘 */}
                 <div>
                     <label className="text-xs font-medium text-slate-600 mb-1.5 block">아이콘</label>
@@ -372,8 +340,6 @@ export function MenuDetail() {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [url, setUrl] = useState('');
-    const [slug, setSlug] = useState('');
-    const [slugLocked, setSlugLocked] = useState(false); // slug 값이 있으면 잠금 상태
     const [icon, setIcon] = useState('');
     const [sortOrder, setSortOrder] = useState<number | string>(1);
     const [visible, setVisible] = useState(true);
@@ -383,7 +349,6 @@ export function MenuDetail() {
     /* 에러 상태 */
     const [nameError, setNameError] = useState('');
     const [urlError, setUrlError] = useState('');
-    const [slugError, setSlugError] = useState('');
     const [sortOrderError, setSortOrderError] = useState('');
 
     /* 변경사항 추적 */
@@ -399,14 +364,11 @@ export function MenuDetail() {
             setName(selectedMenu.name);
             setDescription(selectedMenu.description || '');
             setUrl(selectedMenu.url || '');
-            setSlug(selectedMenu.slug || '');
-            setSlugLocked(!!selectedMenu.slug); // slug 값이 있으면 잠금
             setIcon(selectedMenu.icon);
             setSortOrder(selectedMenu.sortOrder);
             setVisible(selectedMenu.visible);
             setNameError('');
             setUrlError('');
-            setSlugError('');
             setSortOrderError('');
             setIsDirty(false);
 
@@ -418,9 +380,13 @@ export function MenuDetail() {
                         /* 캐시 없으면 API 조회 */
                         if (templatesCache.current.length === 0) {
                             const res = await api.get('/page-templates');
-                            templatesCache.current = (res.data as { pageUrl: string; name: string }[]).filter(
-                                (t: { templateType?: string }) => t.templateType === 'LIST'
-                            );
+                            /* PAGE 타입은 메뉴 URL이 /admin/templates/widget/{slug} 형식이므로 변환 */
+                            templatesCache.current = (res.data as { pageUrl: string; name: string; slug: string; templateType?: string }[])
+                                .filter((t) => t.templateType === 'LIST' || t.templateType === 'PAGE')
+                                .map((t) => ({
+                                    pageUrl: t.templateType === 'PAGE' ? `/admin/templates/widget/${t.slug}` : t.pageUrl,
+                                    name: t.name,
+                                }));
                         }
                         const matched = templatesCache.current.find(t => t.pageUrl === currentUrl);
                         setLinkedTemplateName(matched ? matched.name : '');
@@ -451,14 +417,13 @@ export function MenuDetail() {
                 name !== selectedMenu.name ||
                 description !== (selectedMenu.description || '') ||
                 url !== selectedMenu.url ||
-                slug !== (selectedMenu.slug || '') ||
                 icon !== selectedMenu.icon ||
                 Number(sortOrder) !== selectedMenu.sortOrder ||
                 visible !== selectedMenu.visible;
             setIsDirty(dirty);
             setStoreDirty(dirty);
         }
-    }, [name, description, url, slug, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
+    }, [name, description, url, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
 
     /* ── 생성 모드 ── */
     if (!selectedMenu && isCreating) {
@@ -508,27 +473,17 @@ export function MenuDetail() {
     };
     const handleSortBlur = () => setSortOrderError(validateSortOrder(sortOrder));
 
-    /* slug 유효성 검사 */
-    const validateSlug = (value: string): string => {
-        if (!value) return ''; // 선택 항목
-        if (!/^[a-zA-Z0-9\-_]+$/.test(value)) return '슬러그는 영문, 숫자, -, _만 사용 가능합니다.';
-        if (value.length > 100) return '슬러그는 100자 이하로 입력해주세요.';
-        return '';
-    };
-
     /* 저장 */
     const handleSave = async () => {
         if (isSubmitting) return;
         // validation
         const ne = validateName(name);
         const ue = validateUrl(url, isParent);
-        const sle = validateSlug(slug);
         const se = validateSortOrder(sortOrder);
         setNameError(ne);
         setUrlError(ue);
-        setSlugError(sle);
         setSortOrderError(se);
-        if (ne || ue || sle || se) {
+        if (ne || ue || se) {
             // 첫 에러 필드 포커싱
             if (ne) nameRef.current?.focus();
             else if (ue) urlRef.current?.focus();
@@ -542,7 +497,6 @@ export function MenuDetail() {
                 name: name.trim(),
                 description: description.trim() || undefined,
                 url: (url || '').endsWith('/') && (url || '').length > 1 ? (url || '').replace(/\/+$/, '') : (url || ''),
-                slug: slug.trim() || undefined,
                 icon,
                 sortOrder: Number(sortOrder),
                 visible,
@@ -705,46 +659,6 @@ export function MenuDetail() {
                         )}
                         {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
                     </div>
-                </div>
-
-                {/* SLUG — page-data API 식별자 */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                        SLUG
-                        <span className="ml-1.5 text-[10px] text-slate-400 font-normal">페이지 진입 시 데이터 저장/조회에 사용되는 식별자</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={slug}
-                            disabled={slugLocked}
-                            onChange={e => { setSlug(e.target.value); if (slugError) setSlugError(validateSlug(e.target.value)); }}
-                            onBlur={() => setSlugError(validateSlug(slug))}
-                            className={`flex-1 ${slugLocked ? 'bg-slate-50 text-slate-400 cursor-not-allowed border border-slate-200 rounded-md px-3 py-2 text-sm font-mono' : `${inputCls(slugError)} font-mono`}`}
-                            placeholder="예) user-list  (영문, 숫자, -, _ 만 입력)"
-                            maxLength={100}
-                        />
-                        {slugLocked && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (confirm('⚠️ SLUG를 변경하면 이 메뉴에 저장된 데이터 조회/등록에 영향을 줄 수 있습니다.\n\n기존 SLUG로 저장된 데이터는 새 SLUG로 이관되지 않으므로 데이터가 보이지 않을 수 있습니다.\n\n그래도 수정하시겠습니까?')) {
-                                        setSlugLocked(false);
-                                    }
-                                }}
-                                className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-amber-600 border border-amber-300 rounded-md hover:bg-amber-50 transition-all whitespace-nowrap"
-                            >
-                                <Pencil className="w-3 h-3" />수정
-                            </button>
-                        )}
-                    </div>
-                    {slugLocked && (
-                        <p className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
-                            <AlertTriangle className="w-3 h-3 text-amber-400" />
-                            SLUG가 설정되어 있습니다. 수정 버튼을 눌러야 변경할 수 있습니다.
-                        </p>
-                    )}
-                    {slugError && <p className="text-[11px] text-red-500 mt-1">{slugError}</p>}
                 </div>
 
                 {/* 메뉴 설명 — 페이지 상단에 표시 */}

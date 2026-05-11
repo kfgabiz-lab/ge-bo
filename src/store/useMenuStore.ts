@@ -17,8 +17,6 @@ export interface MenuItem {
     sortOrder: number;
     visible: boolean;
     isCategory?: boolean;
-    /** page-data API 식별 슬러그 (메뉴에 설정된 경우) */
-    slug?: string;
     children?: MenuItem[];
 }
 
@@ -134,7 +132,6 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
                 sortOrder: menu.sortOrder,
                 visible: menu.visible,
                 isCategory: menu.isCategory || false,
-                slug: menu.slug || null,
             });
             get().fetchMenus();
         } catch (err: unknown) {
@@ -161,7 +158,6 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
                 sortOrder: updates.sortOrder ?? menu.sortOrder,
                 visible: updates.visible ?? menu.visible,
                 isCategory: updates.isCategory ?? menu.isCategory ?? false,
-                slug: updates.slug !== undefined ? (updates.slug || null) : (menu.slug || null),
             });
             get().fetchMenus();
             /* 선택된 메뉴 갱신 */

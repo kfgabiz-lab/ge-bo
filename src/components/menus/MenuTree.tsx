@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Folder, Plus } from 'lucide-react';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { useMenusQuery, useRolesQuery } from '@/hooks/useMenuQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import api from '@/lib/api';
 import {
     DndContext,
     closestCenter,
@@ -29,6 +32,7 @@ const INDENTATION_WIDTH = 16;
 
 export function MenuTree() {
     const { menus, activeTab, setActiveTab, selectedMenu, startCreate, localUpdateMenuTree, __syncQueryMenus } = useMenuStore();
+    const queryClient = useQueryClient();
 
     const [activeId, setActiveId] = useState<number | null>(null);
     const [overId, setOverId] = useState<number | null>(null);
@@ -73,7 +77,7 @@ export function MenuTree() {
         if (over) setOverId(Number(over.id));
     };
 
-    const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    const handleDragEnd = async ({ active, over }: DragEndEvent) => {
         if (active.id && over?.id && active.id !== over.id) {
             const projected = getProjection(flattenedItems, Number(active.id), Number(over.id), offsetLeft, INDENTATION_WIDTH);
 
@@ -116,12 +120,30 @@ export function MenuTree() {
 
                 function reorderTree(items: MenuItem[]) {
                     items.forEach((item, index) => {
-                        item.sortOrder = index;
+                        item.sortOrder = index + 1;
                         if (item.children) reorderTree(item.children);
                     });
                 }
                 reorderTree(finalTree);
+
+                /* 낙관적 업데이트 — 즉시 화면에 반영 */
+                const prevTree = menus;
                 localUpdateMenuTree(finalTree);
+
+                /* 변경된 순서를 서버에 저장 */
+                try {
+                    const flatUpdated = flattenTree(finalTree);
+                    await api.patch('/menus/sort-batch', flatUpdated.map(item => ({
+                        id: item.id,
+                        sortOrder: item.sortOrder,
+                        parentId: item.parentId,
+                    })));
+                    await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
+                } catch {
+                    /* 실패 시 원래 순서로 롤백 */
+                    localUpdateMenuTree(prevTree);
+                    toast.error('순서 저장에 실패했습니다.');
+                }
             }
         }
 
