@@ -16,6 +16,8 @@ import { WidgetRenderer, PageGridRenderer } from '@/app/admin/templates/make/_sh
 import type { TableActionHandlers, SearchWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
+import type { SubListWidget } from '@/app/admin/templates/make/_shared/components/renderer/types';
+import type { SubListRow } from '@/app/admin/templates/make/_shared/components/renderer/SubListRenderer';
 import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/renderer';
 
 import api from '@/lib/api';
@@ -150,6 +152,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     /* ── Form 위젯별 입력값 ── */
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
 
+    /* ── SubList 위젯별 행 데이터 (widgetId → rows) ── */
+    const [subListRowsMap, setSubListRowsMap] = useState<Record<string, SubListRow[]>>({});
+    /** SubList 파일 — widgetId → rowId → colId → 새로 선택한 파일 목록 */
+    const [subListFileMap, setSubListFileMap] = useState<Record<string, Record<string, Record<string, File[]>>>>({});
+
     /* ── 파일 업로드 상태 ── */
     /** widgetId → fieldId → 새로 선택한 파일 목록 */
     const [fileValuesMap, setFileValuesMap] = useState<Record<string, Record<string, File[]>>>({});
@@ -231,8 +238,20 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             });
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params: reqParams });
+            /* contentKey 기반 구조: dataJson 내 값이 object면 flat-map으로 펼쳐 테이블 row 구성 */
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
-                .map(item => ({ _id: item.id, ...item.dataJson }));
+                .map(item => {
+                    const flat: Record<string, unknown> = { _id: item.id };
+                    Object.entries(item.dataJson ?? {}).forEach(([k, v]) => {
+                        if (k === 'id') return; /* id는 _id로 이미 처리 */
+                        if (v && typeof v === 'object' && !Array.isArray(v)) {
+                            Object.assign(flat, v); /* contentKey wrapper 펼치기 */
+                        } else {
+                            flat[k] = v;
+                        }
+                    });
+                    return flat;
+                });
             const hasMore = res.data.last === false;
 
             setPageTableDataMap(prev => ({
@@ -278,7 +297,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             const reqParams: Record<string, string> = { page: String(page), size: String(size) };
             if (resolvedSk) reqParams.sort = `${resolvedSk},${resolvedSd}`;
             if (resolvedCfg) {
-                resolvedCfg.fieldRows.flatMap(r => r.fields).forEach(f => {
+                (resolvedCfg.fieldRows ?? []).flatMap(r => r.fields).forEach(f => {
                     const paramKey = f.fieldKey || f.accessor || f.label;
                     const val = resolvedSv[f.id];
                     if (paramKey && val && val.trim()) reqParams[paramKey] = val;
@@ -343,56 +362,95 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     if (tt === 'QUICK_DETAIL') {
                         const queryId = searchParams.get('id');
                         if (queryId) {
+                            /* connectedSlug가 있는 첫 번째 Form 위젯으로 slug 결정 */
                             const formWidget = flatWidgets(items).find(w => w.type === 'form') as FormWidget | undefined;
-                            if (formWidget?.connectedSlug) {
+                            const connectedSlug = formWidget?.connectedSlug;
+                            if (connectedSlug) {
                                 const numId = Number(queryId);
-                                /* 폼 텍스트 데이터 로드 */
-                                api.get(`/page-data/${formWidget.connectedSlug}/${numId}`)
-                                    .then(dataRes => {
-                                        const dataJson = dataRes.data.dataJson || {};
-                                        const vals: Record<string, string> = {};
-                                        formWidget.fields.forEach(f => {
-                                            if (f.fieldKey && dataJson[f.fieldKey] !== undefined) {
-                                                vals[f.id] = String(dataJson[f.fieldKey] ?? '');
-                                            }
+
+                                /* page_data 단건 로드 — dataJson 안에 contentKey별로 데이터 존재 */
+                                api.get(`/page-data/${connectedSlug}/${numId}`)
+                                    .then(async dataRes => {
+                                        const dataJson: Record<string, unknown> = dataRes.data.dataJson || {};
+
+                                        /* 모든 Form 위젯에 값 복원 */
+                                        const allWidgets = flatWidgets(items);
+                                        const formWidgets = allWidgets.filter(w => w.type === 'form') as FormWidget[];
+                                        formWidgets.forEach(fw => {
+                                            const section = (fw.contentKey && dataJson[fw.contentKey]) ? dataJson[fw.contentKey] as Record<string, unknown> : dataJson;
+                                            const vals: Record<string, string> = {};
+                                            fw.fields.forEach(f => {
+                                                if (f.fieldKey && section[f.fieldKey] !== undefined) {
+                                                    const raw = section[f.fieldKey];
+                                                    /* 파일 필드는 숫자 배열 — 텍스트 필드만 string으로 복원 */
+                                                    if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
+                                                }
+                                            });
+                                            setFormValuesMap(prev => ({ ...prev, [fw.widgetId]: vals }));
                                         });
-                                        setFormValuesMap(prev => ({ ...prev, [formWidget.widgetId]: vals }));
+
+                                        /* SubList 위젯 rows 복원 */
+                                        const sublistWidgets = allWidgets.filter(w => w.type === 'sublist') as SubListWidget[];
+                                        sublistWidgets.forEach(sw => {
+                                            const section = (sw.contentKey && dataJson[sw.contentKey]) ? dataJson[sw.contentKey] as Record<string, unknown> : {};
+                                            const rawRows = (section.rows ?? []) as Record<string, unknown>[];
+                                            const loadedRows: SubListRow[] = rawRows.map((r, i) => ({ _rowId: `row-${i}`, ...r }));
+                                            setSubListRowsMap(prev => ({ ...prev, [sw.widgetId]: loadedRows }));
+                                        });
+
+                                        /* 파일 메타 로드 — dataJson의 각 필드에 저장된 fileId 배열로 조회 */
+                                        try {
+                                            const fileIds: number[] = [];
+                                            const collectIds = (obj: Record<string, unknown>) => {
+                                                Object.values(obj).forEach(v => {
+                                                    if (Array.isArray(v) && v.every(x => typeof x === 'number')) fileIds.push(...v as number[]);
+                                                    else if (v && typeof v === 'object' && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
+                                                });
+                                            };
+                                            collectIds(dataJson);
+
+                                            if (fileIds.length > 0) {
+                                                const metaRes = await api.get('/page-files/meta', { params: { ids: fileIds.join(',') } });
+                                                const metaList = metaRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
+
+                                                /* Form 위젯 파일 메타 복원 */
+                                                formWidgets.forEach(fw => {
+                                                    const section = (fw.contentKey && dataJson[fw.contentKey]) ? dataJson[fw.contentKey] as Record<string, unknown> : dataJson;
+                                                    const fieldKeyToId: Record<string, string> = {};
+                                                    fw.fields.forEach(f => { if (f.fieldKey) fieldKeyToId[f.fieldKey] = f.id; });
+                                                    const imageFieldIds = new Set(fw.fields.filter(f => f.type === 'image').map(f => f.id));
+                                                    const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
+
+                                                    fw.fields.forEach(f => {
+                                                        if (!f.fieldKey) return;
+                                                        const ids = section[f.fieldKey];
+                                                        if (!Array.isArray(ids)) return;
+                                                        const fid = f.id;
+                                                        metaByFieldId[fid] = (ids as number[]).map(id => {
+                                                            const m = metaList.find(m => m.id === id);
+                                                            return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
+                                                        });
+                                                        /* 이미지 blob URL 로드 */
+                                                        if (imageFieldIds.has(fid)) {
+                                                            (ids as number[]).forEach(id => {
+                                                                api.get(`/page-files/${id}`, { responseType: 'blob' })
+                                                                    .then(blobRes => {
+                                                                        const url = URL.createObjectURL(blobRes.data);
+                                                                        setImgBlobUrls(prev => ({ ...prev, [id]: url }));
+                                                                    })
+                                                                    .catch(() => {});
+                                                            });
+                                                        }
+                                                    });
+                                                    setExistingFileMetaMap(prev => ({ ...prev, [fw.widgetId]: metaByFieldId }));
+                                                });
+                                            }
+                                        } catch { /* 파일 없으면 조용히 처리 */ }
+
+                                        /* sessionStorage에 pageDataId 기록 (저장/삭제 시 사용) */
+                                        sessionStorage.setItem(`pageDataId_${connectedSlug}`, String(numId));
                                     })
                                     .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
-
-                                /* 기존 파일 메타 로드 (fieldKey → fieldId 매핑) */
-                                api.get(`/page-files/by-data/${numId}`)
-                                    .then(fileRes => {
-                                        const files = fileRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
-                                        /* fieldKey → fieldId 역방향 맵 */
-                                        const fieldKeyToId: Record<string, string> = {};
-                                        formWidget.fields.forEach(f => { if (f.fieldKey) fieldKeyToId[f.fieldKey] = f.id; });
-                                        /* fieldId 기준으로 파일 메타 그룹화 */
-                                        const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
-                                        files.forEach(f => {
-                                            const fid = fieldKeyToId[f.fieldKey];
-                                            if (!fid) return;
-                                            if (!metaByFieldId[fid]) metaByFieldId[fid] = [];
-                                            metaByFieldId[fid].push({ id: f.id, origName: f.origName, fileSize: f.fileSize });
-                                        });
-                                        setExistingFileMetaMap(prev => ({ ...prev, [formWidget.widgetId]: metaByFieldId }));
-                                        /* 이미지 필드 blob URL 로드 */
-                                        const imageFieldIds = new Set(formWidget.fields.filter(f => f.type === 'image').map(f => f.id));
-                                        files.forEach(f => {
-                                            const fid = fieldKeyToId[f.fieldKey];
-                                            if (!fid || !imageFieldIds.has(fid)) return;
-                                            api.get(`/page-files/${f.id}`, { responseType: 'blob' })
-                                                .then(blobRes => {
-                                                    const url = URL.createObjectURL(blobRes.data);
-                                                    setImgBlobUrls(prev => ({ ...prev, [f.id]: url }));
-                                                })
-                                                .catch(() => {});
-                                        });
-                                    })
-                                    .catch(() => {}); /* 파일 없으면 조용히 처리 */
-
-                                /* sessionStorage에 formId 기록 (저장/삭제 시 사용) */
-                                sessionStorage.setItem(`formId_${formWidget.widgetId}`, String(numId));
                             }
                         }
                     }
@@ -483,109 +541,207 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         }));
     }, []);
 
-    /** Form 저장/삭제 (파일 업로드 포함) */
-    const handleFormAction = useCallback(async (connectedFormWidgetId: string, action: 'save' | 'delete') => {
-        const formWidget = flatWidgets(widgetItems).find(
-            w => w.type === 'form' && (w as FormWidget).widgetId === connectedFormWidgetId
-        ) as FormWidget | undefined;
-        if (!formWidget?.connectedSlug) {
-            toast.error('연결된 Form 위젯 또는 slug를 찾을 수 없습니다.');
-            return;
-        }
+    /**
+     * 컨텐츠(Form + SubList) 저장/삭제
+     *
+     * [설계 원칙]
+     * - connectedContentWidgetIds 내 위젯들을 connectedSlug 기준으로 그룹핑
+     * - 같은 slug에 속한 Form + SubList를 ONE page_data 레코드에 통합 저장
+     * - data_json 구조: { id, [contentKey]: { ...fields }, [sublistContentKey]: { rows: [...] } }
+     * - 파일 필드: fieldKey 값에 파일 ID 배열 [id1, id2] 직접 저장 (_files wrapper 없음)
+     * - sessionStorage 키: pageDataId_{connectedSlug} (위젯별 key 미사용)
+     */
+    const handleContentAction = useCallback(async (
+        connectedContentWidgetIds: string[],
+        action: 'save' | 'delete'
+    ) => {
+        const allFlat = flatWidgets(widgetItems);
 
-        const rawValues = formValuesMap[connectedFormWidgetId] ?? {};
-        const dataJson: Record<string, string> = {};
-        const pkKeys: string[] = [];
-        formWidget.fields.forEach(f => {
-            const key = f.fieldKey || f.label;
-            if (key) {
-                dataJson[key] = rawValues[f.id] ?? '';
-                if (f.isPk) pkKeys.push(key);
-            }
-        });
+        /* 대상 위젯 수집 */
+        const targetWidgets = connectedContentWidgetIds
+            .map(wid => allFlat.find(w => (w.type === 'form' || w.type === 'sublist') && (w as FormWidget | SubListWidget).widgetId === wid))
+            .filter(Boolean) as (FormWidget | SubListWidget)[];
 
-        /* QUICK_DETAIL 단일 폼: formId 기반 PUT/DELETE 지원 */
-        const formIdKey = `formId_${connectedFormWidgetId}`;
-        const storedId = Number(sessionStorage.getItem(formIdKey)) || null;
+        if (targetWidgets.length === 0) return;
+
+        /* connectedSlug 결정 — Form 위젯 우선, 없으면 SubList */
+        const formW = targetWidgets.find(w => w.type === 'form') as FormWidget | undefined;
+        const connectedSlug = formW?.connectedSlug ?? (targetWidgets.find(w => w.type === 'sublist') as SubListWidget | undefined)?.connectedSlug;
+        if (!connectedSlug) return;
+
+        const storageKey = `pageDataId_${connectedSlug}`;
+        const storedId = Number(sessionStorage.getItem(storageKey)) || null;
 
         try {
-            if (action === 'save') {
-                /* 1. 새 파일 업로드 (파일 타입/이미지 타입/비디오 타입 필드 공통) */
-                const newFiles = fileValuesMap[connectedFormWidgetId] ?? {};
-                const uploadedFileIds: number[] = [];
-                for (const [fieldId, files] of Object.entries(newFiles)) {
-                    const field = formWidget.fields.find(f => f.id === fieldId);
-                    if (!field?.fieldKey || !files.length) continue;
-                    for (const file of files) {
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        formData.append('templateSlug', formWidget.connectedSlug);
-                        formData.append('fieldKey', field.fieldKey);
-                        const uploadRes = await api.post('/page-files/upload', formData, {
-                            headers: { 'Content-Type': 'multipart/form-data' },
-                        });
-                        uploadedFileIds.push(uploadRes.data.id);
-                    }
-                }
-
-                /* 2. 폼 텍스트 데이터 저장 */
-                let savedDataId: number;
-                if (storedId) {
-                    await api.put(`/page-data/${formWidget.connectedSlug}/${storedId}`, { dataJson });
-                    savedDataId = storedId;
-                    toast.success('수정되었습니다.');
-                } else {
-                    const res = await api.post(`/page-data/${formWidget.connectedSlug}`, {
-                        dataJson,
-                        ...(pkKeys.length > 0 && { pkKeys }),
-                    });
-                    savedDataId = res.data.id;
-                    sessionStorage.setItem(formIdKey, String(savedDataId));
-                    toast.success('저장되었습니다.');
-                }
-
-                /* 3. 업로드된 파일을 data_id에 연결 후 상태 초기화 */
-                if (uploadedFileIds.length > 0) {
-                    await api.patch('/page-files/link', { fileIds: uploadedFileIds, dataId: savedDataId });
-                    setFileValuesMap(prev => ({ ...prev, [connectedFormWidgetId]: {} }));
-                }
-
-                /* 4. 저장 후 파일 메타 갱신 (existingFileMetaMap + imgBlobUrls 최신화) */
-                const fieldKeyToId: Record<string, string> = {};
-                formWidget.fields.forEach(f => { if (f.fieldKey) fieldKeyToId[f.fieldKey] = f.id; });
-                const imageFieldIds = new Set(formWidget.fields.filter(f => f.type === 'image').map(f => f.id));
-                api.get(`/page-files/by-data/${savedDataId}`)
-                    .then(fileRes => {
-                        const files = fileRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
-                        const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
-                        files.forEach(f => {
-                            const fid = fieldKeyToId[f.fieldKey];
-                            if (!fid) return;
-                            if (!metaByFieldId[fid]) metaByFieldId[fid] = [];
-                            metaByFieldId[fid].push({ id: f.id, origName: f.origName, fileSize: f.fileSize });
-                        });
-                        setExistingFileMetaMap(prev => ({ ...prev, [connectedFormWidgetId]: metaByFieldId }));
-                        /* 이미지 필드 blob URL 갱신 */
-                        files.forEach(f => {
-                            const fid = fieldKeyToId[f.fieldKey];
-                            if (!fid || !imageFieldIds.has(fid)) return;
-                            api.get(`/page-files/${f.id}`, { responseType: 'blob' })
-                                .then(blobRes => {
-                                    const url = URL.createObjectURL(blobRes.data);
-                                    setImgBlobUrls(prev => ({ ...prev, [f.id]: url }));
-                                })
-                                .catch(() => {});
-                        });
-                    })
-                    .catch(() => {});
-            } else {
+            if (action === 'delete') {
                 if (!storedId) { toast.info('삭제할 데이터가 없습니다.'); return; }
                 if (!confirm('삭제하시겠습니까?')) return;
-                await api.delete(`/page-data/${formWidget.connectedSlug}/${storedId}`);
-                sessionStorage.removeItem(formIdKey);
+                await api.delete(`/page-data/${connectedSlug}/${storedId}`);
+                sessionStorage.removeItem(storageKey);
                 toast.success('삭제되었습니다.');
                 router.back();
+                return;
             }
+
+            /* ── SAVE ── */
+
+            /* 1. 파일 업로드 — Form 위젯의 파일 필드 */
+            /** fieldId → 업로드된 파일 ID 배열 */
+            const newFileIdsByFieldId: Record<string, number[]> = {};
+            for (const w of targetWidgets) {
+                if (w.type !== 'form') continue;
+                const fw = w as FormWidget;
+                const newFiles = fileValuesMap[fw.widgetId] ?? {};
+                for (const [fieldId, files] of Object.entries(newFiles)) {
+                    const field = fw.fields.find(f => f.id === fieldId);
+                    if (!field?.fieldKey || !files.length) continue;
+                    const ids: number[] = [];
+                    for (const file of files) {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        fd.append('templateSlug', connectedSlug);
+                        fd.append('fieldKey', field.fieldKey);
+                        const uploadRes = await api.post('/page-files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                        ids.push(uploadRes.data.id);
+                    }
+                    newFileIdsByFieldId[fieldId] = ids;
+                }
+            }
+
+            /* 2. data_json 구성 — contentKey 기반 ONE 레코드 */
+            const dataJson: Record<string, unknown> = {};
+            const pkKeys: string[] = [];
+
+            for (const w of targetWidgets) {
+                if (w.type === 'form') {
+                    const fw = w as FormWidget;
+                    const rawValues = formValuesMap[fw.widgetId] ?? {};
+                    const section: Record<string, unknown> = {};
+                    fw.fields.forEach(f => {
+                        const key = f.fieldKey || f.label;
+                        if (!key) return;
+                        if (f.type === 'file' || f.type === 'image') {
+                            /* 기존 파일 ID + 새로 업로드된 ID 합산 */
+                            const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map(m => m.id);
+                            const newIds = newFileIdsByFieldId[f.id] ?? [];
+                            section[key] = [...existingIds, ...newIds];
+                        } else {
+                            section[key] = rawValues[f.id] ?? '';
+                        }
+                        if (f.isPk) pkKeys.push(key);
+                    });
+                    /* contentKey가 있으면 해당 키 아래 중첩, 없으면 flat */
+                    if (fw.contentKey) dataJson[fw.contentKey] = section;
+                    else Object.assign(dataJson, section);
+
+                } else if (w.type === 'sublist') {
+                    const sw = w as SubListWidget;
+                    const rawRows = subListRowsMap[sw.widgetId] ?? [];
+                    const processedRows: Record<string, unknown>[] = [];
+                    for (const row of rawRows) {
+                        const { _rowId, ...rest } = row;
+                        const processedRow: Record<string, unknown> = { ...rest };
+                        /* SubList 파일 컬럼 업로드 */
+                        for (const col of (sw.columns ?? [])) {
+                            if (!['file', 'image'].includes(col.type)) continue;
+                            const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
+                            const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
+                            const allIds = [...existingIds];
+                            for (const file of newFiles) {
+                                const fd = new FormData();
+                                fd.append('file', file);
+                                fd.append('templateSlug', connectedSlug);
+                                fd.append('fieldKey', col.key);
+                                const uploadRes = await api.post('/page-files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                                const newId = uploadRes.data.id;
+                                allIds.push(newId);
+                                newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), newId];
+                            }
+                            processedRow[col.key] = allIds;
+                        }
+                        processedRows.push(processedRow);
+                    }
+                    const section: Record<string, unknown> = { rows: processedRows };
+                    if (sw.contentKey) dataJson[sw.contentKey] = section;
+                    else dataJson.rows = processedRows;
+                }
+            }
+
+            /* 3. 저장 (생성 or 수정) */
+            let savedDataId: number;
+            if (storedId) {
+                await api.put(`/page-data/${connectedSlug}/${storedId}`, { dataJson });
+                savedDataId = storedId;
+                toast.success('수정되었습니다.');
+            } else {
+                const res = await api.post(`/page-data/${connectedSlug}`, {
+                    dataJson,
+                    ...(pkKeys.length > 0 && { pkKeys }),
+                });
+                savedDataId = res.data.id;
+                sessionStorage.setItem(storageKey, String(savedDataId));
+                toast.success('저장되었습니다.');
+            }
+
+            /* 4. 업로드된 파일 → page_data 레코드에 연결 */
+            const allNewIds = Object.values(newFileIdsByFieldId).flat();
+            if (allNewIds.length > 0) {
+                await api.patch('/page-files/link', { fileIds: allNewIds, dataId: savedDataId });
+                /* 새 파일 선택 상태 초기화 */
+                setFileValuesMap(prev => {
+                    const next = { ...prev };
+                    targetWidgets.forEach(w => { if (w.type === 'form') delete next[(w as FormWidget).widgetId]; });
+                    return next;
+                });
+            }
+
+            /* 5. 저장 후 파일 메타 재조회 — existingFileMetaMap 갱신 */
+            try {
+                const fileIds: number[] = [];
+                const collectIds = (obj: Record<string, unknown>) => {
+                    Object.values(obj).forEach(v => {
+                        if (Array.isArray(v) && v.every(x => typeof x === 'number')) fileIds.push(...v as number[]);
+                        else if (v && typeof v === 'object' && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
+                    });
+                };
+                collectIds(dataJson);
+
+                if (fileIds.length > 0) {
+                    const metaRes = await api.get('/page-files/meta', { params: { ids: fileIds.join(',') } });
+                    const metaList = metaRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
+
+                    for (const w of targetWidgets) {
+                        if (w.type !== 'form') continue;
+                        const fw = w as FormWidget;
+                        const section = fw.contentKey ? dataJson[fw.contentKey] as Record<string, unknown> : dataJson;
+                        const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
+                        const imageFieldIds = new Set(fw.fields.filter(f => f.type === 'image').map(f => f.id));
+
+                        fw.fields.forEach(f => {
+                            if (!f.fieldKey || (f.type !== 'file' && f.type !== 'image')) return;
+                            const ids = section[f.fieldKey];
+                            if (!Array.isArray(ids)) return;
+                            metaByFieldId[f.id] = (ids as number[]).map(id => {
+                                const m = metaList.find(m => m.id === id);
+                                return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
+                            });
+                            if (imageFieldIds.has(f.id)) {
+                                (ids as number[]).forEach(id => {
+                                    if (imgBlobUrls[id]) return; /* 이미 캐시된 경우 스킵 */
+                                    api.get(`/page-files/${id}`, { responseType: 'blob' })
+                                        .then(blobRes => {
+                                            const url = URL.createObjectURL(blobRes.data);
+                                            setImgBlobUrls(prev => ({ ...prev, [id]: url }));
+                                        })
+                                        .catch(() => {});
+                                });
+                            }
+                        });
+                        setExistingFileMetaMap(prev => ({ ...prev, [fw.widgetId]: metaByFieldId }));
+                    }
+                }
+            } catch { /* 파일 메타 갱신 실패는 조용히 처리 */ }
+
         } catch (err: unknown) {
             const status = (err as { response?: { status?: number } })?.response?.status;
             if (action === 'save' && status === 409) {
@@ -594,10 +750,24 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 toast.error(action === 'save' ? '저장 중 오류가 발생했습니다.' : '삭제 중 오류가 발생했습니다.');
             }
         }
-    }, [widgetItems, formValuesMap, fileValuesMap, router]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, imgBlobUrls, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    /** 파일 선택 핸들러 */
-    const handleFileChange = useCallback((widgetId: string, fieldId: string, files: File[]) => {
+    /** 파일 선택 핸들러 — Form: rowId 없음 / SubList: rowId 있음 */
+    const handleFileChange = useCallback((widgetId: string, fieldId: string, files: File[], rowId?: string) => {
+        if (rowId !== undefined) {
+            /* SubList 파일 변경 — widgetId → rowId → colId → File[] */
+            setSubListFileMap(prev => ({
+                ...prev,
+                [widgetId]: {
+                    ...(prev[widgetId] ?? {}),
+                    [rowId]: {
+                        ...(prev[widgetId]?.[rowId] ?? {}),
+                        [fieldId]: files,
+                    },
+                },
+            }));
+            return;
+        }
         setFileValuesMap(prev => ({
             ...prev,
             [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: files },
@@ -724,7 +894,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     /** LIST 방식: config.fieldRows → SearchWidget 변환 */
     const searchWidget = useMemo<SearchWidget | null>(() => {
-        if (!config || config.fieldRows.length === 0) return null;
+        if (!config || !config.fieldRows || config.fieldRows.length === 0) return null;
         return {
             type: 'search',
             widgetId: 'main-search',
@@ -736,13 +906,13 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     /** LIST 방식: config.tableColumns → TableWidget 변환 */
     const tableWidget = useMemo<TableWidget | null>(() => {
-        if (!config || config.tableColumns.length === 0) return null;
+        if (!config || !config.tableColumns || config.tableColumns.length === 0) return null;
         return {
             type: 'table',
             widgetId: 'main-table',
             contentKey: 'table',
             columns: config.tableColumns,
-            connectedSearchIds: config.fieldRows.length > 0 ? ['main-search'] : [],
+            connectedSearchIds: config.fieldRows?.length > 0 ? ['main-search'] : [],
             pageSize: config.pageSize ?? DEFAULT_PAGE_SIZE,
             displayMode: config.displayMode ?? 'pagination',
         };
@@ -801,7 +971,9 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     codeGroups={codeGroups}
                     formValuesMap={formValuesMap}
                     onFormValuesChange={updateFormValue}
-                    onFormAction={handleFormAction}
+                    onContentAction={handleContentAction}
+                    subListRowsMap={subListRowsMap}
+                    onSubListRowsChange={(wId, rows) => setSubListRowsMap(prev => ({ ...prev, [wId]: rows }))}
                     fileValuesMap={fileValuesMap}
                     existingFileMetaMap={existingFileMetaMap}
                     imgBlobUrls={imgBlobUrls}

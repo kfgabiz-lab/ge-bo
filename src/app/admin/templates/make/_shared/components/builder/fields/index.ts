@@ -25,6 +25,7 @@ export { EditorField } from './EditorField';
 export { FileField } from './FileField';
 export { ImageField } from './ImageField';
 export { VideoField } from './VideoField';
+export { MediaField } from './MediaField';
 export { ActionButtonField } from './ActionButtonField';
 export type { ActionButtonFieldProps } from './ActionButtonField';
 export type { FieldEditProps, FieldEditValues, ColSpanMode } from './types';

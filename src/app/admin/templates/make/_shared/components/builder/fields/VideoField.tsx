@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { FieldEditProps } from './types';
 import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
+import { FILE_TYPE_LABELS } from '../../../constants';
 
 /**
  * 확장자 태그 입력 컴포넌트 (내부용)
@@ -58,6 +59,7 @@ export const VideoField = (props: FieldEditProps) => {
     return (
         <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} rowSpan={values.rowSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
                 required={values.required}
+                description={values.description}
         readonly={values.readonly}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">동영상 설정</p>
@@ -148,7 +150,7 @@ export const VideoField = (props: FieldEditProps) => {
                                 ))}
                             </div>
                             {(values.fileTypeMode ?? 'video') === 'video' && (
-                                <p className="text-[9.5px] text-slate-400 mt-1 leading-relaxed bg-white border border-slate-200 px-2 py-1 rounded">mp4, mov, avi, mkv, webm, wmv, flv, m4v</p>
+                                <p className="text-[9.5px] text-slate-400 mt-1 leading-relaxed bg-white border border-slate-200 px-2 py-1 rounded">{FILE_TYPE_LABELS.video}</p>
                             )}
                         </div>
 

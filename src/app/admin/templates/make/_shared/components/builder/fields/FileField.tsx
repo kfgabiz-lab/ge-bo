@@ -58,6 +58,7 @@ export const FileField = (props: FieldEditProps) => {
     return (
         <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} rowSpan={values.rowSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
                 required={values.required}
+                description={values.description}
         readonly={values.readonly}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">파일 업로드 상세 설정</p>

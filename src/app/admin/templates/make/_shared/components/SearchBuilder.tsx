@@ -365,6 +365,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 fieldKey:      field.fieldKey || '',
                                                                                 colSpan:       field.colSpan,
                                                                                 placeholder:   field.placeholder,
+                                                                                description:   field.description,
                                                                                 required:      field.required,
                                                                                 options:       field.options,
                                                                                 codeGroupCode: field.codeGroupCode,

@@ -27,6 +27,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}
                 isPk={values.isPk}
                 required={values.required}
+                description={values.description}
                 readonly={values.readonly}
                 hideColSpan={hideColSpan}
                 onChange={onChange}

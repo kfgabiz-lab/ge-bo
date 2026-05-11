@@ -131,6 +131,7 @@ export function SearchRenderer({
                                 }
                                 colSpan={field.colSpan}
                                 required={field.required}
+                                description={field.description}
                             >
                                 <FieldRenderer
                                     mode={mode}

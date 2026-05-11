@@ -72,6 +72,8 @@ export default function WysiwygEditor({
             };
 
             editorInstanceRef.current = new Editor(options);
+            /* 에디터 자동포커스 차단 — 포커스 시 scroll container가 스크롤되어 Edge file input 이벤트 억제 */
+            setTimeout(() => { (document.activeElement as HTMLElement)?.blur(); }, 0);
         };
 
         initEditor();

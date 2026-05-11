@@ -17,7 +17,7 @@
  *   <FieldRenderer mode={mode} field={f} fileList={...} onFileChange={...} />
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Calendar, Paperclip, Film, Plus, X } from 'lucide-react';
 import { Image as ImageIcon } from 'lucide-react';
@@ -27,16 +27,52 @@ const WysiwygEditor = dynamic(() => import('@/components/common/WysiwygEditor'),
 import { ROW_HEIGHT } from '@/components/layout/GridCell';
 import { SearchFieldConfig, CodeGroupDef } from '../../types';
 import { inputCls, selectCls } from '../../styles';
+import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS } from '../../constants';
 import { SelectArrow } from '../SelectArrow';
+
+/** bytes → 사람이 읽기 쉬운 단위로 변환 (1MB 미만이면 KB, 이상이면 MB) */
+const fmtSize = (bytes: number) =>
+    bytes >= 1024 * 1024
+        ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
+        : `${Math.round(bytes / 1024)}KB`;
 import { parseOpt } from '../../utils';
 import type { RendererMode } from './types';
+import api from '@/lib/api';
+import { toast } from 'sonner';
 
-/* ── 파일 허용 타입 프리셋 ── */
-const FILE_TYPE_PRESETS = {
-    doc:   '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.hwp',
-    image: '.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp',
-    video: '.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v',
-} as const;
+/**
+ * 서버에 저장된 파일 다운로드
+ * @param fileId  page_file.id
+ * @param origName 저장 시 사용할 파일명
+ */
+async function downloadFile(fileId: number, origName: string) {
+    try {
+        const res = await api.get(`/page-files/${fileId}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = origName;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch {
+        toast.error('파일 다운로드에 실패했습니다.');
+    }
+}
+
+/**
+ * 아직 미저장 상태인 로컬 File 객체 다운로드
+ * @param file  브라우저 File 객체
+ */
+function downloadLocalFile(file: File) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+/* FILE_TYPE_PRESETS — constants.ts 공통 상수 사용 */
 
 /**
  * 파일 타입 모드에 따라 input[accept] 문자열 생성
@@ -49,6 +85,23 @@ function getAcceptStr(mode: string, customExts: string[]): string {
     if (mode === 'video') return FILE_TYPE_PRESETS.video;
     if (mode === 'custom') return customExts.join(',');
     return '';
+}
+
+/**
+ * 선택된 파일 목록에서 허용 확장자를 벗어난 파일 걸러내기
+ * accept 문자열이 비어있으면 모든 파일 허용
+ */
+function filterByAccept(files: File[], acceptStr: string): { valid: File[]; rejected: string[] } {
+    if (!acceptStr) return { valid: files, rejected: [] };
+    const exts = new Set(acceptStr.split(',').map(e => e.trim().toLowerCase()));
+    const valid: File[] = [];
+    const rejected: string[] = [];
+    for (const f of files) {
+        const ext = '.' + (f.name.split('.').pop() ?? '').toLowerCase();
+        if (exts.has(ext)) valid.push(f);
+        else rejected.push(f.name);
+    }
+    return { valid, rejected };
 }
 
 /**
@@ -100,6 +153,52 @@ const resolveOptions = (field: SearchFieldConfig, codeGroups: CodeGroupDef[]): s
     }
     return field.options ?? [];
 };
+
+/**
+ * 파일 선택 입력 — useRef + programmatic click() 방식
+ *
+ * Edge에서 overflow-y-auto 스크롤 컨테이너 내부의 label>input[absolute inset-0] 패턴은
+ * 파일 선택 다이얼로그가 닫힌 뒤 onChange가 발화하지 않는 버그가 있음.
+ * 이를 우회하기 위해 input을 display:none으로 숨기고 버튼 onClick에서 input.click()을 호출.
+ *
+ * 사용법:
+ *   <FileInput accept=".jpg,.png" multiple onChange={files => handleFiles(files)} renderTrigger={ref => (
+ *     <label onClick={() => ref.current?.click()} className="cursor-pointer ...">...</label>
+ *   )} />
+ */
+interface FileInputProps {
+    accept?: string;
+    multiple?: boolean;
+    onChange: (files: File[]) => void;
+    /** 클릭 트리거 UI — inputRef를 받아 onClick에서 inputRef.current?.click() 호출 */
+    renderTrigger: (inputRef: React.RefObject<HTMLInputElement | null>) => React.ReactNode;
+}
+
+function FileInput({ accept, multiple, onChange, renderTrigger }: FileInputProps) {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        onChange(files);
+        /* 같은 파일을 다시 선택할 수 있도록 value 초기화 */
+        e.target.value = '';
+    };
+
+    return (
+        <>
+            {/* display:none — overflow/scroll 컨테이너의 영향 완전히 차단 */}
+            <input
+                ref={inputRef}
+                type="file"
+                accept={accept}
+                multiple={multiple}
+                style={{ display: 'none' }}
+                onChange={handleChange}
+            />
+            {renderTrigger(inputRef)}
+        </>
+    );
+}
 
 /**
  * 새로 선택된 File 객체를 이미지로 미리보기
@@ -413,9 +512,8 @@ export function FieldRenderer({
                 <textarea
                     disabled={isPreview}
                     readOnly={isReadOnly}
-                    className={`${inputCls} resize-none${readonlyCls}`}
+                    className={`${inputCls} resize-none h-full${readonlyCls}`}
                     value={value}
-                    rows={(field as unknown as { rows?: number }).rows ?? 3}
                     placeholder={field.placeholder || '텍스트를 입력하세요'}
                     onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
                 />
@@ -485,44 +583,43 @@ export function FieldRenderer({
                 </>
             );
 
-            /* preview: 비활성 placeholder — live 빈 상태와 동일한 UI */
-            if (isPreview) {
-                return (
-                    <div style={{ height: fileHeight }} className="flex flex-col items-center justify-center gap-1.5 border border-dashed border-slate-200 rounded-md text-slate-400 overflow-hidden">
-                        {filePlaceholder}
-                    </div>
-                );
-            }
-
             const currentCount = (existingFileMeta?.length ?? 0) + (fileList?.length ?? 0);
-            const canAdd = !isReadOnly && currentCount < maxCount;
+            /* preview에서는 canAdd=false → pointer-events-none, file input 미렌더 */
+            const canAdd = !isPreview && !isReadOnly && currentCount < maxCount;
 
-            /* 파일 input 공통 — 중복 제거 */
-            const fileInput = (
-                <input
-                    type="file"
-                    className="sr-only"
-                    multiple={maxCount > 1}
-                    accept={getAcceptStr(field.fileTypeMode ?? '', field.allowedExtensions ?? [])}
-                    onChange={e => {
-                        const newFiles = Array.from(e.target.files ?? []);
-                        onFileChange?.([...(fileList ?? []), ...newFiles].slice(0, maxCount));
-                        e.target.value = '';
-                    }}
-                />
-            );
+            const fileAcceptStr = getAcceptStr(field.fileTypeMode ?? '', field.allowedExtensions ?? []);
 
-            /* 빈 상태: preview와 동일한 UI, live는 전체 영역 클릭으로 파일 선택 */
+            /* 파일 선택 후 공통 처리 — 형식 검증 + 목록 병합 */
+            const handleFileSelect = (selected: File[]) => {
+                const { valid, rejected } = filterByAccept(selected, fileAcceptStr);
+                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
+            };
+
+            /* 빈 상태: preview/live 동일한 label 구조 — canAdd 여부로 기능만 분기 */
             if (currentCount === 0) {
                 return (
                     <div style={{ height: fileHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
                         {canAdd ? (
-                            <label className="flex-1 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
-                                {filePlaceholder}
-                                {fileInput}
-                            </label>
+                            /* FileInput: display:none input + renderTrigger → Edge overflow-y-auto 내부 onChange 버그 우회 */
+                            <FileInput
+                                accept={fileAcceptStr}
+                                multiple={maxCount > 1}
+                                onChange={handleFileSelect}
+                                renderTrigger={inputRef => (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => inputRef.current?.click()}
+                                        onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                        className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
+                                    >
+                                        {filePlaceholder}
+                                    </div>
+                                )}
+                            />
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
                                 {filePlaceholder}
                             </div>
                         )}
@@ -538,8 +635,15 @@ export function FieldRenderer({
                         {existingFileMeta?.map(meta => (
                             <div key={meta.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs flex-shrink-0">
                                 <Paperclip className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                <span className="text-slate-700 truncate flex-1">{meta.origName}</span>
-                                <span className="text-slate-400 flex-shrink-0">{(meta.fileSize / 1024 / 1024).toFixed(1)}MB</span>
+                                <button
+                                    type="button"
+                                    title="클릭하여 다운로드"
+                                    onClick={() => downloadFile(meta.id, meta.origName)}
+                                    className="text-slate-700 truncate flex-1 text-left hover:text-blue-600 hover:underline transition-colors"
+                                >
+                                    {meta.origName}
+                                </button>
+                                <span className="text-slate-400 flex-shrink-0">{fmtSize(meta.fileSize)}</span>
                                 {!isReadOnly && (
                                     <button type="button" onClick={() => onRemoveExisting?.(meta.id)} className="text-slate-400 hover:text-red-500 flex-shrink-0 transition-colors">
                                         <X className="w-3.5 h-3.5" />
@@ -550,8 +654,15 @@ export function FieldRenderer({
                         {fileList?.map((file, idx) => (
                             <div key={idx} className="flex items-center gap-2 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-md text-xs flex-shrink-0">
                                 <Paperclip className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                                <span className="text-slate-700 truncate flex-1">{file.name}</span>
-                                <span className="text-slate-400 flex-shrink-0">{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                                <button
+                                    type="button"
+                                    title="클릭하여 다운로드"
+                                    onClick={() => downloadLocalFile(file)}
+                                    className="text-slate-700 truncate flex-1 text-left hover:text-blue-600 hover:underline transition-colors"
+                                >
+                                    {file.name}
+                                </button>
+                                <span className="text-slate-400 flex-shrink-0">{fmtSize(file.size)}</span>
                                 {!isReadOnly && (
                                     <button type="button" onClick={() => onFileChange?.(fileList.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-red-500 flex-shrink-0 transition-colors">
                                         <X className="w-3.5 h-3.5" />
@@ -564,11 +675,23 @@ export function FieldRenderer({
                     <div className="flex-shrink-0 px-2 pb-2 flex flex-col gap-1">
                         <p className="text-[10px] text-slate-300 text-center">{validationInfo}</p>
                         {canAdd && (
-                            <label className="flex items-center justify-center gap-1.5 cursor-pointer px-3 py-1.5 border border-dashed border-slate-300 rounded-md text-xs text-slate-500 hover:border-slate-500 hover:text-slate-700 transition-all">
-                                <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-                                파일 추가 ({currentCount}/{maxCount})
-                                {fileInput}
-                            </label>
+                            <FileInput
+                                accept={fileAcceptStr}
+                                multiple={maxCount > 1}
+                                onChange={handleFileSelect}
+                                renderTrigger={inputRef => (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => inputRef.current?.click()}
+                                        onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                        className="flex items-center justify-center gap-1.5 cursor-pointer px-3 py-1.5 border border-dashed border-slate-300 rounded-md text-xs text-slate-500 hover:border-slate-500 hover:text-slate-700 transition-all"
+                                    >
+                                        <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                                        파일 추가 ({currentCount}/{maxCount})
+                                    </div>
+                                )}
+                            />
                         )}
                     </div>
                 </div>
@@ -593,39 +716,41 @@ export function FieldRenderer({
                 </>
             );
 
-            /* preview: 비활성 — live 빈 상태와 동일한 UI */
-            if (isPreview) {
-                return (
-                    <div style={{ height: imgHeight }} className="flex flex-col items-center justify-center gap-1.5 border border-dashed border-slate-200 rounded-md text-slate-400 overflow-hidden">
-                        {imgPlaceholder}
-                    </div>
-                );
-            }
-
             const maxCount = imgMaxCount;
             const currentCount = (existingFileMeta?.length ?? 0) + (fileList?.length ?? 0);
-            const canAdd = !isReadOnly && currentCount < maxCount;
+            /* preview에서는 canAdd=false → pointer-events-none, file input 미렌더 */
+            const canAdd = !isPreview && !isReadOnly && currentCount < maxCount;
+
+            /* 이미지 파일 선택 후 공통 처리 */
+            const handleImgSelect = (selected: File[]) => {
+                const { valid, rejected } = filterByAccept(selected, FILE_TYPE_PRESETS.image);
+                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
+            };
+
             return (
                 <div style={{ height: imgHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
                     {currentCount === 0 ? (
-                        /* 빈 상태: preview와 동일한 UI, live는 전체 영역 클릭으로 파일 선택 */
+                        /* 빈 상태: canAdd일 때 FileInput(programmatic click), 아닐 때 정적 UI */
                         canAdd ? (
-                            <label className="flex-1 flex flex-col items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all gap-1.5">
-                                {imgPlaceholder}
-                                <input
-                                    type="file"
-                                    className="sr-only"
-                                    accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp"
-                                    multiple={maxCount > 1}
-                                    onChange={e => {
-                                        const newFiles = Array.from(e.target.files ?? []);
-                                        onFileChange?.([...(fileList ?? []), ...newFiles].slice(0, maxCount));
-                                        e.target.value = '';
-                                    }}
-                                />
-                            </label>
+                            <FileInput
+                                accept={FILE_TYPE_PRESETS.image}
+                                multiple={maxCount > 1}
+                                onChange={handleImgSelect}
+                                renderTrigger={inputRef => (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => inputRef.current?.click()}
+                                        onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                        className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
+                                    >
+                                        {imgPlaceholder}
+                                    </div>
+                                )}
+                            />
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
                                 {imgPlaceholder}
                             </div>
                         )
@@ -690,13 +815,26 @@ export function FieldRenderer({
                                                 </div>
                                             );
                                         }
-                                        /* 추가 버튼 셀 */
+                                        /* 추가 버튼 셀 — FileInput(programmatic click)으로 Edge overflow 내 onChange 버그 우회 */
                                         return (
-                                            <label key={`add-${i}`} className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all">
-                                                <Plus className="w-4 h-4" />
-                                                <span className="text-[10px] mt-0.5">추가</span>
-                                                <input type="file" className="sr-only" accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp" multiple={maxCount > 1} onChange={e => { const newFiles = Array.from(e.target.files ?? []); onFileChange?.([...(fileList ?? []), ...newFiles].slice(0, maxCount)); e.target.value = ''; }} />
-                                            </label>
+                                            <FileInput
+                                                key={`add-${i}`}
+                                                accept={FILE_TYPE_PRESETS.image}
+                                                multiple={maxCount > 1}
+                                                onChange={handleImgSelect}
+                                                renderTrigger={inputRef => (
+                                                    <div
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        onClick={() => inputRef.current?.click()}
+                                                        onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                                        className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                        <span className="text-[10px] mt-0.5">추가</span>
+                                                    </div>
+                                                )}
+                                            />
                                         );
                                     })}
                                 </div>
@@ -745,27 +883,39 @@ export function FieldRenderer({
             /* preview에서는 업로드 버튼 비활성 */
             const canAdd = !isPreview && !isReadOnly && currentCount < maxCount;
 
-            /* 빈 상태 */
+            const vidAcceptStr = getAcceptStr(field.fileTypeMode ?? 'video', field.allowedExtensions ?? []);
+
+            /* 비디오 파일 선택 후 공통 처리 */
+            const handleVidSelect = (selected: File[]) => {
+                const { valid, rejected } = filterByAccept(selected, vidAcceptStr);
+                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
+            };
+
+            /* 빈 상태: canAdd일 때 FileInput(programmatic click), 아닐 때 정적 UI */
             if (currentCount === 0) {
                 return (
                     <div style={{ height: vidHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
                         {canAdd ? (
-                            <label className="flex-1 flex flex-col items-center justify-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
-                                <Film className="w-5 h-5" />
-                                <span className="text-xs font-medium">동영상 업로드</span>
-                                <input
-                                    type="file"
-                                    className="sr-only"
-                                    accept={getAcceptStr(field.fileTypeMode ?? 'video', field.allowedExtensions ?? [])}
-                                    onChange={e => {
-                                        const newFiles = Array.from(e.target.files ?? []);
-                                        onFileChange?.([...(fileList ?? []), ...newFiles].slice(0, maxCount));
-                                        e.target.value = '';
-                                    }}
-                                />
-                            </label>
+                            <FileInput
+                                accept={vidAcceptStr}
+                                multiple={maxCount > 1}
+                                onChange={handleVidSelect}
+                                renderTrigger={inputRef => (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => inputRef.current?.click()}
+                                        onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                        className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
+                                    >
+                                        <Film className="w-5 h-5" />
+                                        <span className="text-xs font-medium">동영상 업로드</span>
+                                    </div>
+                                )}
+                            />
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
                                 <Film className="w-5 h-5" />
                                 <span className="text-xs font-medium">동영상 업로드</span>
                             </div>
@@ -811,8 +961,15 @@ export function FieldRenderer({
                                     return (
                                         <div key={item.meta.id} className="relative flex flex-col items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 group overflow-hidden">
                                             <Film className="w-6 h-6 text-slate-300" />
-                                            <span className="text-[10px] text-slate-500 px-1 truncate w-full text-center">{item.meta.origName}</span>
-                                            <span className="text-[10px] text-slate-400">{(item.meta.fileSize / 1024 / 1024).toFixed(1)}MB</span>
+                                            <button
+                                                type="button"
+                                                title="클릭하여 다운로드"
+                                                onClick={() => downloadFile(item.meta.id, item.meta.origName)}
+                                                className="text-[10px] text-slate-500 px-1 truncate w-full text-center hover:text-blue-600 hover:underline transition-colors"
+                                            >
+                                                {item.meta.origName}
+                                            </button>
+                                            <span className="text-[10px] text-slate-400">{fmtSize(item.meta.fileSize)}</span>
                                             {!isReadOnly && (
                                                 <button type="button" onClick={() => onRemoveExisting?.(item.meta.id)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <X className="w-2.5 h-2.5 text-white" />
@@ -835,19 +992,208 @@ export function FieldRenderer({
                                         </div>
                                     );
                                 }
-                                /* 추가 버튼 셀 */
+                                /* 추가 버튼 셀 — FileInput(programmatic click)으로 Edge overflow 내 onChange 버그 우회 */
                                 return (
-                                    <label key={`add-${i}`} className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all">
-                                        <Plus className="w-4 h-4" />
-                                        <span className="text-[10px] mt-0.5">추가</span>
-                                        <input type="file" className="sr-only" accept={getAcceptStr(field.fileTypeMode ?? 'video', field.allowedExtensions ?? [])} multiple={maxCount > 1} onChange={e => { const newFiles = Array.from(e.target.files ?? []); onFileChange?.([...(fileList ?? []), ...newFiles].slice(0, maxCount)); e.target.value = ''; }} />
-                                    </label>
+                                    <FileInput
+                                        key={`add-${i}`}
+                                        accept={vidAcceptStr}
+                                        multiple={maxCount > 1}
+                                        onChange={handleVidSelect}
+                                        renderTrigger={inputRef => (
+                                            <div
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={() => inputRef.current?.click()}
+                                                onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                                className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                <span className="text-[10px] mt-0.5">추가</span>
+                                            </div>
+                                        )}
+                                    />
                                 );
                             })}
                         </div>
                     </div>
                 );
             })();
+        }
+
+        /* ── media ── 이미지 + 동영상 통합 업로드 */
+        case 'media': {
+            /* rowSpan 기반 명시적 높이 계산 */
+            const mediaRowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 2;
+            const mediaHeight = `${mediaRowSpan * ROW_HEIGHT - (field.label ? 44 : 24)}px`;
+
+            /* 기능용 확장자 배열 — accept 문자열 생성에 사용 (FILE_TYPE_PRESETS 고정) */
+            const imgExts  = FILE_TYPE_PRESETS.image.split(',');
+            const vidExts  = FILE_TYPE_PRESETS.video.split(',');
+            const imgMaxMB = field.mediaImageMaxSizeMB ?? 5;
+            const vidMaxMB = field.mediaVideoMaxSizeMB ?? 20;
+            /* UI 안내 텍스트용 레이블 */
+            const imgLabel = FILE_TYPE_LABELS.image;
+            const vidLabel = FILE_TYPE_LABELS.video;
+
+            /* 확장자 배열 → accept 문자열 변환 (점(.) 없는 항목에도 점 보장) */
+            const toAccept = (exts: string[]) =>
+                exts.map(e => e.startsWith('.') ? e : '.' + e).join(',');
+
+            /**
+             * 파일명으로 이미지 여부 판별
+             * @param name  파일명 (확장자 포함)
+             * @param exts  허용 이미지 확장자 배열 (예: ['.jpg', '.png'])
+             */
+            const isImageFile = (name: string, exts: string[]): boolean => {
+                const ext = '.' + (name.split('.').pop() ?? '').toLowerCase();
+                return exts.map(e => e.toLowerCase()).includes(ext);
+            };
+
+            /* 현재 파일 목록 (신규) */
+            const mediaFiles = fileList ?? [];
+            const hasFile = mediaFiles.length > 0;
+
+            /* preview 또는 live 빈 상태 공통 UI */
+            const mediaPlaceholder = (
+                <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                    {/* 이미지·동영상 아이콘 나란히 */}
+                    <div className="flex items-center gap-3">
+                        {/* 사진 아이콘 */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 17.25V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v9.75M8.25 12a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                        </svg>
+                        {/* 동영상 아이콘 */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                    </div>
+                    <span className="text-xs font-medium">미디어 업로드</span>
+                    {/* 형식·용량 안내 텍스트 */}
+                    <div className="text-[10px] text-center leading-relaxed">
+                        <p>이미지 — {imgLabel} · 최대 {imgMaxMB}MB</p>
+                        <p>동영상 — {vidLabel} · 최대 {vidMaxMB}MB</p>
+                    </div>
+                </div>
+            );
+
+            /* preview: pointer-events-none + 동일 UI */
+            if (isPreview) {
+                return (
+                    <div
+                        style={{ height: mediaHeight }}
+                        className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden pointer-events-none"
+                    >
+                        {hasFile ? (
+                            /* preview에서 파일이 있는 경우: 파일명 + 제거 불가 표시 */
+                            <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-hidden">
+                                {mediaFiles.map((file, idx) => {
+                                    const isImg = isImageFile(file.name, imgExts);
+                                    return (
+                                        <div key={idx} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs">
+                                            {isImg
+                                                ? <ImageIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                                : <Film className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                            }
+                                            <span className="text-slate-700 truncate flex-1">{file.name}</span>
+                                            <span className="text-slate-400 flex-shrink-0">{fmtSize(file.size)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            /* preview 빈 상태 */
+                            <div className="flex-1 flex flex-col items-center justify-center">
+                                {mediaPlaceholder}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            /* live 모드 */
+            const canAdd = !isReadOnly && mediaFiles.length === 0;
+            const mediaAccept = toAccept([...imgExts, ...vidExts]);
+
+            /* 파일 선택 처리 — 이미지/동영상 구분 없이 accept로 제한 */
+            const handleMediaSelect = (selected: File[]) => {
+                const { valid, rejected } = filterByAccept(selected, mediaAccept);
+                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (valid.length > 0) {
+                    /* 파일 1개만 허용 (이미지 또는 동영상 중 하나) */
+                    onFileChange?.([valid[0]]);
+                }
+            };
+
+            /* live 빈 상태 */
+            if (!hasFile) {
+                return (
+                    <div
+                        style={{ height: mediaHeight }}
+                        className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}
+                    >
+                        {canAdd ? (
+                            <FileInput
+                                accept={mediaAccept}
+                                multiple={false}
+                                onChange={handleMediaSelect}
+                                renderTrigger={inputRef => (
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => inputRef.current?.click()}
+                                        onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
+                                        className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all"
+                                    >
+                                        {mediaPlaceholder}
+                                    </div>
+                                )}
+                            />
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center pointer-events-none">
+                                {mediaPlaceholder}
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            /* live 파일 선택 후 — 이미지면 img 미리보기, 동영상이면 아이콘+파일명 */
+            const selectedFile = mediaFiles[0];
+            const selectedIsImg = isImageFile(selectedFile.name, imgExts);
+
+            return (
+                <div
+                    style={{ height: mediaHeight }}
+                    className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
+                >
+                    <div className="flex-1 relative overflow-hidden">
+                        {selectedIsImg ? (
+                            /* 이미지 미리보기 */
+                            <FileImagePreview
+                                file={selectedFile}
+                                className="w-full h-full object-contain"
+                            />
+                        ) : (
+                            /* 동영상: 아이콘 + 파일명 */
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
+                                <Film className="w-6 h-6 text-slate-400" />
+                                <span className="text-xs font-medium truncate max-w-full px-4">{selectedFile.name}</span>
+                                <span className="text-[10px] text-slate-400">{fmtSize(selectedFile.size)}</span>
+                            </div>
+                        )}
+                        {/* 파일 제거 버튼 */}
+                        {!isReadOnly && (
+                            <button
+                                type="button"
+                                onClick={() => onFileChange?.([])}
+                                className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                            >
+                                <X className="w-3 h-3 text-white" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
         }
 
         /* ── editor ── 위지윅 에디터 (preview/live 모두 실제 에디터 렌더링) */

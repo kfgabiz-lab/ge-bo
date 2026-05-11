@@ -20,6 +20,8 @@ export interface FieldEditValues {
     colSpan: number;
     rowSpan?: number;        // form/layer 전용 행 높이
     placeholder?: string;   // input/select 전용
+    /** 라벨 하단 설명 텍스트 — 렌더러에서 라벨 바로 아래 회색 소형 텍스트로 표시 */
+    description?: string;
     required?: boolean;
     options?: string[];      // select/radio/checkbox/button 전용 ("텍스트:값" 형식)
     codeGroupCode?: string;  // 공통코드 그룹 코드
@@ -38,12 +40,11 @@ export interface FieldEditValues {
     /* ── action-button 전용 ── */
     color?: string;          // 버튼 색상 프리셋
     bgColor?: string;        // 커스텀 배경색
-    connType?: '' | 'form' | 'popup' | 'path' | 'close'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close'; // 클릭 시 연결 방식
     popupSlug?: string;              // 관리자방식 팝업 slug
     fileLayerSlug?: string;          // 개발자방식 로컬 컴포넌트명
-    connectedFormWidgetId?: string;  // 연결된 Form 위젯 ID
-    apiId?: number;                  // Form slug 없을 때 직접 호출할 API ID
-    formAction?: 'save' | 'delete';  // Form 연결 시 동작 (저장/삭제)
+    connectedContentWidgetIds?: string[];  // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중)
+    contentAction?: 'save' | 'delete';    // 컨텐츠 연결 시 동작 (저장/삭제)
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부
@@ -55,6 +56,9 @@ export interface FieldEditValues {
     allowedExtensions?: string[]; // 커스텀 확장자
     videoMode?: 'url' | 'file';  // 비디오 입력 방식
     rows?: number;               // textarea 행 수
+    /* ── media 전용 ── */
+    mediaImageMaxSizeMB?: number;    // 이미지 최대 크기 MB (기본: 5)
+    mediaVideoMaxSizeMB?: number;    // 동영상 최대 크기 MB (기본: 20)
 }
 
 /**

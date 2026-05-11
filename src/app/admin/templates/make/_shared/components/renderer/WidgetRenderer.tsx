@@ -51,7 +51,7 @@ if (typeof document !== 'undefined') {
     }, { capture: true });
 }
 import api from '@/lib/api';
-import { ROW_HEIGHT, GAP_SIZE } from '@/components/layout/GridCell';
+import { PageGridContainer } from '@/components/layout/PageGridContainer';
 import { CodeGroupDef } from '../../types';
 import { SearchRenderer } from './SearchRenderer';
 import { TableRenderer } from './TableRenderer';
@@ -77,7 +77,7 @@ async function fetchAndMapFieldValues(
     editId: number | null,
     fields: FormFieldItem[],
     initialValues?: Record<string, string>,
-): Promise<{ values: Record<string, string>; existingFileIds: Record<string, number[]> }> {
+): Promise<{ values: Record<string, string>; existingFileIds: Record<string, number[]>; sourceData: Record<string, unknown> }> {
     let sourceData: Record<string, unknown> = {};
     if (editId != null && connectedSlug) {
         try {
@@ -109,7 +109,7 @@ async function fetchAndMapFieldValues(
         }
     });
 
-    return { values, existingFileIds };
+    return { values, existingFileIds, sourceData };
 }
 
 /** 위젯 컨테이너 기본 클래스 (text / 빈 위젯 등에 사용) */
@@ -137,8 +137,8 @@ interface WidgetRendererProps {
     formValues?: Record<string, string>;
     /** Form 필드값 변경 핸들러 */
     onFormValuesChange?: (fieldId: string, value: string) => void;
-    /** Space 위젯 버튼 클릭 시 Form 저장/삭제 동작 */
-    onFormAction?: (connectedFormWidgetId: string, action: 'save' | 'delete') => void;
+    /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete') => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
     onClose?: () => void;
 
@@ -149,8 +149,8 @@ interface WidgetRendererProps {
     existingFileMeta?: Record<string, { id: number; origName: string; fileSize: number }[]>;
     /** 이미지 blob URL 캐시 (fileId → blob URL) */
     imgBlobUrls?: Record<number, string>;
-    /** 파일 변경 핸들러 */
-    onFileChange?: (fieldId: string, files: File[]) => void;
+    /** 파일 변경 핸들러 — Form: (fieldId, files) / SubList: (fieldId, files, rowId) */
+    onFileChange?: (fieldId: string, files: File[], rowId?: string) => void;
     /** 기존 파일 제거 핸들러 */
     onRemoveExisting?: (fieldId: string, fileId: number) => void;
 
@@ -172,6 +172,12 @@ interface WidgetRendererProps {
     /** 무한스크롤 추가 로딩 여부 */
     appendLoading?: boolean;
     hasMore?: boolean;
+
+    /* ── live 모드 전용 — sublist ── */
+    /** SubList 위젯별 행 데이터 (widgetId → SubListRow[]) */
+    subListRowsMap?: Record<string, import('./SubListRenderer').SubListRow[]>;
+    /** SubList 행 변경 콜백 — (widgetId, rows) */
+    onSubListRowsChange?: (widgetId: string, rows: import('./SubListRenderer').SubListRow[]) => void;
 
     /* ── live 모드 전용 — category ── */
     /** 카테고리 위젯별 선택된 항목 ID (widgetId → selectedId) */
@@ -214,7 +220,7 @@ export function WidgetRenderer({
     /* form */
     formValues = {},
     onFormValuesChange,
-    onFormAction,
+    onContentAction,
     onClose,
     /* file */
     fileValues,
@@ -236,6 +242,9 @@ export function WidgetRenderer({
     onLoadMore,
     appendLoading,
     hasMore,
+    /* sublist */
+    subListRowsMap,
+    onSubListRowsChange,
     /* category */
     categorySelections,
     onCategorySelect,
@@ -262,6 +271,10 @@ export function WidgetRenderer({
     const [popupValues,          setPopupValues]          = useState<Record<string, string>>({});
     const [popupFileValues,      setPopupFileValues]      = useState<Record<string, File[]>>({});
     const [popupExistingFileIds, setPopupExistingFileIds] = useState<Record<string, number[]>>({});
+    /* 팝업 내 SubList rows 상태 — widgetId → SubListRow[] */
+    const [popupSubListRowsMap,  setPopupSubListRowsMap]  = useState<Record<string, import('./SubListRenderer').SubListRow[]>>({});
+    /* 팝업 내 SubList 파일 맵 — widgetId → rowId → colId → File[] */
+    const [popupSubListFileMap,  setPopupSubListFileMap]  = useState<Record<string, Record<string, Record<string, File[]>>>>({});
     const [popupExistingMeta,    setPopupExistingMeta]    = useState<
         Record<string, { id: number; origName: string; fileSize: number }[]>
     >({});
@@ -310,6 +323,7 @@ export function WidgetRenderer({
         setPopupOpen(false);
         setPopupCfg(null);
         setPopupEditId(null);
+        setPopupSubListRowsMap({});
     }, []);
 
     /**
@@ -337,6 +351,8 @@ export function WidgetRenderer({
         setPopupExistingFileIds({});
         setPopupExistingMeta({});
         setPopupImgBlobUrls({});
+        setPopupSubListRowsMap({});
+        setPopupSubListFileMap({});
 
         try {
             /* 1단계: 팝업 템플릿 설정 조회 (공통 유틸) */
@@ -358,7 +374,7 @@ export function WidgetRenderer({
 
             /* 2단계: row 데이터 조회 + 폼 필드 매핑 — 모든 폼 위젯의 필드를 합쳐서 매핑 */
             const fields: FormFieldItem[] = formContents.flatMap(c => (c.widget?.fields as FormFieldItem[] ?? []));
-            const { values: init, existingFileIds: existingIds } = await fetchAndMapFieldValues(
+            const { values: init, existingFileIds: existingIds, sourceData } = await fetchAndMapFieldValues(
                 formConnectedSlug,
                 editId ?? null,
                 fields,
@@ -366,6 +382,22 @@ export function WidgetRenderer({
             );
             setPopupValues(init);
             setPopupExistingFileIds(existingIds);
+
+            /* SubList rows 복원 — sourceData에서 contentKey 기준으로 추출 */
+            const sublistContents = cfg.widgetItems.flatMap(item => item.contents).filter(c => c.widget?.type === 'sublist');
+            if (sublistContents.length > 0) {
+                const initSubListRows: Record<string, import('./SubListRenderer').SubListRow[]> = {};
+                sublistContents.forEach(c => {
+                    const sw = c.widget as { widgetId?: string; contentKey?: string };
+                    const wid = sw.widgetId ?? '';
+                    const section = sw.contentKey
+                        ? (sourceData[sw.contentKey] as Record<string, unknown> | undefined)
+                        : sourceData;
+                    const rawRows = ((section?.rows ?? []) as Record<string, unknown>[]);
+                    initSubListRows[wid] = rawRows.map((r, i) => ({ _rowId: `row-${i}`, ...r }));
+                });
+                setPopupSubListRowsMap(initSubListRows);
+            }
 
             /* 기존 파일 메타데이터 조회 */
             const allIds = Object.values(existingIds).flat();
@@ -420,10 +452,11 @@ export function WidgetRenderer({
 
     /**
      * 팝업 내 저장·삭제 핸들러
-     * SpaceRenderer의 connType='form' 버튼이 팝업 WidgetRenderer를 통해 호출
+     * SpaceRenderer의 connType='content' 버튼이 팝업 WidgetRenderer를 통해 호출
+     * widgetIds 배열의 첫 번째 Form 위젯을 기준으로 동작 (팝업 내부 단순화)
      */
-    const handlePopupFormAction = useCallback(async (
-        _widgetId: string,
+    const handlePopupContentAction = useCallback(async (
+        _widgetIds: string[],
         action: 'save' | 'delete',
     ) => {
         if (!popupListSlug) return;
@@ -521,7 +554,7 @@ export function WidgetRenderer({
                 uploadedMap[key] = allIds;
             }
 
-            /* 2단계: dataJson 구성 */
+            /* 2단계: dataJson 구성 — Form 필드 */
             const dataJson: Record<string, unknown> = {};
             fields.forEach(f => {
                 const key = f.fieldKey || f.label || '';
@@ -529,6 +562,50 @@ export function WidgetRenderer({
                     ? (uploadedMap[key] ?? popupExistingFileIds[f.id] ?? [])
                     : (popupValues[f.id] ?? '');
             });
+
+            /* 2-1단계: SubList rows 구성 — 파일 컬럼 업로드 포함 */
+            const sublistContents = (popupCfg?.widgetItems ?? [])
+                .flatMap(item => item.contents)
+                .filter(c => c.widget?.type === 'sublist');
+            for (const c of sublistContents) {
+                const sw = c.widget as {
+                    widgetId?: string;
+                    contentKey?: string;
+                    columns?: { id: string; key: string; type: string }[];
+                };
+                const wid = sw.widgetId ?? '';
+                const rawRows = popupSubListRowsMap[wid] ?? [];
+                const processedRows: Record<string, unknown>[] = [];
+                for (const row of rawRows) {
+                    const { _rowId, ...rest } = row;
+                    const processedRow: Record<string, unknown> = { ...rest };
+                    /* SubList 파일 컬럼 업로드 */
+                    for (const col of (sw.columns ?? [])) {
+                        if (!['file', 'image'].includes(col.type)) continue;
+                        const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
+                        const newFiles = popupSubListFileMap[wid]?.[_rowId]?.[col.id] ?? [];
+                        const allIds = [...existingIds];
+                        for (const file of newFiles) {
+                            const fd = new FormData();
+                            fd.append('file', file);
+                            fd.append('templateSlug', popupListSlug);
+                            fd.append('fieldKey', col.key);
+                            const uploadRes = await api.post('/page-files/upload', fd, {
+                                transformRequest: (data, headers) => {
+                                    if (headers) headers.delete('Content-Type');
+                                    return data;
+                                },
+                            });
+                            allIds.push(uploadRes.data.id);
+                            newIds.push(uploadRes.data.id);
+                        }
+                        processedRow[col.key] = allIds;
+                    }
+                    processedRows.push(processedRow);
+                }
+                if (sw.contentKey) dataJson[sw.contentKey] = { rows: processedRows };
+                else dataJson.rows = processedRows;
+            }
 
             /* 3단계: page_data 저장 (신규 POST / 수정 PUT) */
             let savedId: number | null = null;
@@ -556,7 +633,7 @@ export function WidgetRenderer({
         } finally {
             setPopupSaving(false);
         }
-    }, [popupListSlug, popupEditId, popupCfg, popupValues, popupFileValues, popupExistingFileIds, handlePopupClose, onRefresh]);
+    }, [popupListSlug, popupEditId, popupCfg, popupValues, popupFileValues, popupExistingFileIds, popupSubListRowsMap, popupSubListFileMap, handlePopupClose, onRefresh]);
 
     /* ══════════════════════════════════════════ */
     /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
@@ -573,15 +650,7 @@ export function WidgetRenderer({
         <>
             {/* 여백 wrapper — grid 자체에 padding 주면 셀 크기 계산이 틀어지므로 분리 */}
             <div className="px-4 pb-4">
-                <div
-                    style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(12, 1fr)',
-                        gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                        rowGap: `${GAP_SIZE}px`,
-                        columnGap: 0,
-                    }}
-                >
+                <PageGridContainer>
                     <PageGridRenderer
                         mode="live"
                         widgetItems={popupCfg.widgetItems as unknown as import('./PageGridRenderer').PageWidgetItem[]}
@@ -591,15 +660,35 @@ export function WidgetRenderer({
                         onFormValuesChange={(_, fieldId, value) =>
                             setPopupValues(prev => ({ ...prev, [fieldId]: value }))
                         }
-                        onFormAction={popupSaving ? undefined : handlePopupFormAction}
+                        onContentAction={popupSaving ? undefined : handlePopupContentAction}
                         onClose={handlePopupClose}
+                        /* 팝업 내 SubList rows */
+                        subListRowsMap={popupSubListRowsMap}
+                        onSubListRowsChange={(wid, rows) =>
+                            setPopupSubListRowsMap(prev => ({ ...prev, [wid]: rows }))
+                        }
                         /* 파일 업로드 */
                         fileValuesMap={{ [_popupFormWidgetId]: popupFileValues }}
                         existingFileMetaMap={{ [_popupFormWidgetId]: popupExistingMeta }}
                         imgBlobUrls={popupImgBlobUrls}
-                        onFileChange={(_, fieldId, files) =>
-                            setPopupFileValues(prev => ({ ...prev, [fieldId]: files }))
-                        }
+                        onFileChange={(wid, fieldId, files, rowId?) => {
+                            if (rowId !== undefined) {
+                                /* SubList 파일 변경 — widgetId → rowId → colId → File[] */
+                                setPopupSubListFileMap(prev => ({
+                                    ...prev,
+                                    [wid]: {
+                                        ...(prev[wid] ?? {}),
+                                        [rowId]: {
+                                            ...(prev[wid]?.[rowId] ?? {}),
+                                            [fieldId]: files,
+                                        },
+                                    },
+                                }));
+                            } else {
+                                /* Form 파일 변경 */
+                                setPopupFileValues(prev => ({ ...prev, [fieldId]: files }));
+                            }
+                        }}
                         onRemoveExisting={(_, fieldId, fileId) => {
                             setPopupExistingFileIds(prev => ({
                                 ...prev,
@@ -611,7 +700,7 @@ export function WidgetRenderer({
                             }));
                         }}
                     />
-                </div>
+                </PageGridContainer>
                 {/* 저장 중 표시 */}
                 {popupSaving && (
                     <div className="flex items-center justify-center gap-2 py-2 text-slate-400 text-sm">
@@ -788,7 +877,7 @@ export function WidgetRenderer({
                     contentColSpan={contentColSpan}
                     showBorder={widget.showBorder}
                     bgColor={widget.bgColor}
-                    onFormAction={onFormAction}
+                    onContentAction={onContentAction}
                     onClose={onClose}
                     onPopupOpen={(slug) => handleInternalPopupOpen(slug, null, dataSlug)}
                 />
@@ -824,11 +913,14 @@ export function WidgetRenderer({
 
     /* ── SubList ── */
     if (widget.type === 'sublist') {
+        const subWid = (widget as { widgetId?: string }).widgetId ?? '';
         return (
             <SubListRenderer
                 mode={mode}
                 widget={widget}
-                contentColSpan={contentColSpan}
+                rows={subListRowsMap?.[subWid]}
+                onChange={rows => onSubListRowsChange?.(subWid, rows)}
+                onFileChange={onFileChange}
             />
         );
     }

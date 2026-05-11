@@ -3,42 +3,32 @@
 /**
  * ActionButtonField — 액션 버튼 설정 필드 컴포넌트
  *
- * 클릭 시 동작(Form·팝업·경로)을 지정하는 버튼을 구성하는 빌더 설정 컴포넌트.
+ * 클릭 시 동작(컨텐츠·팝업·경로)을 지정하는 버튼을 구성하는 빌더 설정 컴포넌트.
  * Space 위젯의 버튼 아이템 설정에 사용하며, 향후 다른 위젯에서도 재사용 가능.
  *
- * [Form 연결 동작]
- *  1. Form 위젯 목록에서 선택
- *  2. 선택한 Form의 connectedSlug 있음 → 저장 / 삭제 선택 (formAction)
- *     선택한 Form의 connectedSlug 없음 → API 목록 내부 fetch 후 선택
+ * [컨텐츠 연결 동작]
+ *  1. Form/SubList 위젯 목록에서 체크박스로 다중 선택
+ *  2. 1개 이상 선택된 경우 저장 / 삭제 선택 (contentAction)
  *
  * 사용법:
  *   <ActionButtonField values={field} onChange={onChange}
  *     colSpanMode={{ type: 'button', options: [1,2,3,4,5] }}
  *     codeGroups={[]} codeGroupsLoading={false}
- *     layerTemplates={layerTemplates}
- *     slugOptions={slugOptions}
- *     formWidgets={formWidgets} />
+ *     pageTemplates={pageTemplates}
+ *     contentWidgets={contentWidgets} />
  */
 
-import { useState, useEffect } from 'react';
-import api from '@/lib/api';
-import { getTemplateLabel } from '../../../utils';
 import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import type { TemplateItem } from '../../../types';
+import { getTemplateLabel } from '../../../utils';
 
-/** API 정보 타입 (내부 fetch 전용) */
-interface ApiOption {
-    id: number;
-    name: string;
-    method: string;
-    urlPattern: string;
-}
-
-/** Form 위젯 정보 타입 */
-interface FormWidgetOption {
+/** 컨텐츠 위젯 정보 타입 (Form + SubList 공용) */
+export interface ContentWidgetOption {
+    type: 'form' | 'sublist';
     widgetId: string;
     contentKey: string;
+    title?: string;
     connectedSlug?: string;
 }
 
@@ -57,7 +47,8 @@ const BTN_COLOR_OPTIONS = [
 export interface ActionButtonFieldProps extends FieldEditProps {
     /** Quick-Detail 템플릿 목록 — configJson.outputMode 파싱으로 팝업/상세 구분 */
     pageTemplates: TemplateItem[];
-    formWidgets?: FormWidgetOption[];
+    /** 현재 페이지의 Form + SubList 위젯 목록 — 컨텐츠 연결 다중 선택용 */
+    contentWidgets?: ContentWidgetOption[];
 }
 
 /** 공통 select 스타일 */
@@ -73,52 +64,41 @@ export function ActionButtonField({
     autoFocus,
     onLabelKeyDown,
     pageTemplates,
-    formWidgets = [],
+    contentWidgets = [],
 }: ActionButtonFieldProps) {
     const connType = values.connType ?? '';
 
-    /* 선택된 Form 위젯 정보 */
-    const selectedForm = formWidgets.find(f => f.widgetId === values.connectedFormWidgetId);
-
-    /* Form 연결 + 선택한 Form의 slug 없을 때 사용할 API 목록 (내부 fetch) */
-    const [apiOptions, setApiOptions] = useState<ApiOption[]>([]);
-    const [apiLoading, setApiLoading] = useState(false);
-
-    /**
-     * Form 선택 후 connectedSlug 없을 때만 API 목록 fetch
-     * connectedSlug 있으면 저장/삭제 UI 표시이므로 불필요
-     */
-    useEffect(() => {
-        if (connType !== 'form') return;
-        if (!selectedForm) return;
-        if (selectedForm.connectedSlug) return;
-
-        setApiLoading(true);
-        api.get('/api-infos', { params: { size: 100 } })
-            .then(res => setApiOptions(res.data.content || []))
-            .catch(() => {})
-            .finally(() => setApiLoading(false));
-    }, [connType, selectedForm]);
+    /* 현재 선택된 위젯 ID 목록 */
+    const selectedIds: string[] = values.connectedContentWidgetIds ?? [];
 
     /** 연결 타입 변경 시 연결 관련 값 초기화 */
     const handleConnTypeChange = (newType: string) => {
         onChange({
-            connType: newType as '' | 'form' | 'popup' | 'path' | 'close',
+            connType: newType as '' | 'content' | 'popup' | 'path' | 'close',
             popupSlug: undefined,
             fileLayerSlug: undefined,
-            connectedFormWidgetId: undefined,
-            apiId: undefined,
-            formAction: undefined,
+            connectedContentWidgetIds: undefined,
+            contentAction: undefined,
         });
     };
 
-    /** Form 위젯 선택 시 연결 관련 값 초기화 */
-    const handleFormWidgetChange = (widgetId: string) => {
+    /** 체크박스 토글 — 선택 배열에 추가/제거 */
+    const handleContentWidgetToggle = (widgetId: string) => {
+        const next = selectedIds.includes(widgetId)
+            ? selectedIds.filter(id => id !== widgetId)
+            : [...selectedIds, widgetId];
         onChange({
-            connectedFormWidgetId: widgetId || undefined,
-            apiId: undefined,
-            formAction: undefined,
+            connectedContentWidgetIds: next.length > 0 ? next : undefined,
+            /* 선택 해제 시 contentAction도 초기화 */
+            contentAction: next.length > 0 ? values.contentAction : undefined,
         });
+    };
+
+    /** 컨텐츠 아이템 표시 라벨 구성 */
+    const getContentLabel = (w: ContentWidgetOption): string => {
+        const typeLabel = w.type === 'form' ? 'Form' : 'SubList';
+        const name = w.title || w.contentKey || w.widgetId;
+        return `[${typeLabel}] ${name}`;
     };
 
     return (
@@ -175,75 +155,68 @@ export function ActionButtonField({
                         className={SELECT_CLS}
                     >
                         <option value="">없음</option>
-                        <option value="form">Form</option>
+                        <option value="content">컨텐츠</option>
                         <option value="popup">페이지 (관리자)</option>
                         <option value="path">경로 (개발자)</option>
                         <option value="close">닫기</option>
                     </select>
 
-                    {/* Form 연결 */}
-                    {connType === 'form' && (
+                    {/* 컨텐츠 연결 — Form/SubList 다중 체크박스 선택 */}
+                    {connType === 'content' && (
                         <div className="space-y-1.5">
-                            {/* Form 위젯 선택 */}
-                            <select
-                                value={values.connectedFormWidgetId ?? ''}
-                                onChange={e => handleFormWidgetChange(e.target.value)}
-                                className={SELECT_CLS}
-                            >
-                                <option value="">— Form 선택 —</option>
-                                {formWidgets.map(f => (
-                                    <option key={f.widgetId} value={f.widgetId}>
-                                        {f.contentKey || f.widgetId}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Form 선택 후 — slug 있으면 저장/삭제, 없으면 API 선택 */}
-                            {selectedForm && (
-                                selectedForm.connectedSlug ? (
-                                    /* slug 있음 → 저장 / 삭제 선택 */
-                                    <div>
-                                        <label className={LABEL_CLS}>
-                                            동작
-                                            <span className="ml-1.5 font-mono text-slate-400">({selectedForm.connectedSlug})</span>
-                                        </label>
-                                        <div className="flex gap-4">
-                                            {(['save', 'delete'] as const).map(action => (
-                                                <label key={action} className="flex items-center gap-1.5 cursor-pointer">
-                                                    <input
-                                                        type="radio"
-                                                        name={`formAction-${values.fieldKey}`}
-                                                        value={action}
-                                                        checked={values.formAction === action}
-                                                        onChange={() => onChange({ formAction: action })}
-                                                        className="accent-slate-900"
-                                                    />
-                                                    <span className="text-xs text-slate-700">
-                                                        {action === 'save' ? '저장' : '삭제'}
-                                                    </span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    /* slug 없음 → API 목록 선택 */
-                                    <div>
-                                        <label className={LABEL_CLS}>API 선택</label>
-                                        <select
-                                            value={values.apiId ?? ''}
-                                            onChange={e => onChange({ apiId: e.target.value ? Number(e.target.value) : undefined })}
-                                            className={SELECT_CLS}
-                                            disabled={apiLoading}
+                            {/* 위젯 목록이 없을 때 안내 */}
+                            {contentWidgets.length === 0 ? (
+                                <p className="text-[10px] text-slate-400 italic px-1">
+                                    연결 가능한 Form/SubList 위젯이 없습니다.
+                                </p>
+                            ) : (
+                                <div className="border border-slate-200 rounded overflow-hidden">
+                                    {contentWidgets.map(w => (
+                                        <label
+                                            key={w.widgetId}
+                                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
                                         >
-                                            <option value="">{apiLoading ? '로딩 중...' : '— API 선택 —'}</option>
-                                            {apiOptions.map(a => (
-                                                <option key={a.id} value={a.id}>
-                                                    [{a.method}] {a.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(w.widgetId)}
+                                                onChange={() => handleContentWidgetToggle(w.widgetId)}
+                                                className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                            />
+                                            <span className="text-xs text-slate-700 truncate">
+                                                {getContentLabel(w)}
+                                            </span>
+                                            {w.connectedSlug && (
+                                                <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
+                                                    {w.connectedSlug}
+                                                </span>
+                                            )}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* 1개 이상 선택된 경우에만 저장/삭제 표시 */}
+                            {selectedIds.length > 0 && (
+                                <div>
+                                    <label className={LABEL_CLS}>동작</label>
+                                    <div className="flex gap-4">
+                                        {(['save', 'delete'] as const).map(action => (
+                                            <label key={action} className="flex items-center gap-1.5 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name={`contentAction-${values.fieldKey}`}
+                                                    value={action}
+                                                    checked={values.contentAction === action}
+                                                    onChange={() => onChange({ contentAction: action })}
+                                                    className="accent-slate-900"
+                                                />
+                                                <span className="text-xs text-slate-700">
+                                                    {action === 'save' ? '저장' : '삭제'}
+                                                </span>
+                                            </label>
+                                        ))}
                                     </div>
-                                )
+                                </div>
                             )}
                         </div>
                     )}

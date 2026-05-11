@@ -8,8 +8,8 @@
  *
  * contentColSpan 지정 시 내부를 CSS Grid로 전환:
  *   - gridTemplateColumns: repeat(N, 1fr)
- *   - gridAutoRows: ROW_HEIGHT(80px) — 외부 PageLayout 격자와 행 높이 일치
- *   - rowGap: 0 — 격자선과 정확히 일치 (gap 있으면 누적 오차 발생)
+ *   - gridAutoRows: ROW_HEIGHT - GAP_SIZE(72px) — PageLayout과 동일한 track 높이
+ *   - rowGap: GAP_SIZE(8px) — PageLayout rowGap과 일치, 필드 하단 클리핑 방지
  *   - columnGap: 8px
  *
  * Form/Space 등 필드 배치가 필요한 렌더러는 contentColSpan을 전달하면
@@ -27,7 +27,7 @@
  *   </RendererContainer>
  */
 
-import { ROW_HEIGHT } from '@/components/layout/GridCell';
+import { ROW_HEIGHT, GAP_SIZE } from '@/components/layout/GridCell';
 
 interface RendererContainerProps {
     children: React.ReactNode;
@@ -63,8 +63,8 @@ export function RendererContainer({
     const gridStyle = contentColSpan ? {
         display: 'grid' as const,
         gridTemplateColumns: `repeat(${contentColSpan}, 1fr)`,
-        gridAutoRows: `${ROW_HEIGHT}px`,
-        rowGap: 0,
+        gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+        rowGap: `${GAP_SIZE}px`,
         columnGap: '8px',
     } : {};
 

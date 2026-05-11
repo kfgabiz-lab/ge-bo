@@ -9,6 +9,7 @@ import { CategoryBuilder } from './CategoryBuilder';
 import { SubListBuilder } from './SubListBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
+import type { ContentWidgetOption } from './fields/ActionButtonField';
 
 /**
  * CommonBuilderDispatcher — 위젯 타입별 설정 빌더 통합 디스패처
@@ -25,16 +26,21 @@ interface CommonBuilderDispatcherProps {
         slugOptions: { id: number; slug: string; name: string }[];
         pageTemplates?: TemplateItem[];
         searchWidgets?: Array<{ widgetId: string; contentKey: string }>;
+        /** 현재 페이지의 Form + SubList 위젯 목록 — ActionButton 컨텐츠 연결용 */
+        contentWidgets?: ContentWidgetOption[];
+        /** @deprecated contentWidgets 사용 권장 */
         formWidgets?: Array<{ widgetId: string; contentKey: string; connectedSlug?: string }>;
         /** 필드 ColSpan 최대값 (기본 12, 우측 드로어 등 좁은 공간에서 2로 제한) */
         maxColSpan?: number;
         /** 현재 페이지의 카테고리 위젯 목록 — parentWidgetId 선택용 */
         categoryWidgets?: { widgetId: string; label?: string; depth: number }[];
+        /** Space 위젯에서 ActionButton만 추가 가능하도록 제한 (quick-list, quick-detail 전용) */
+        actionButtonOnly?: boolean;
     };
 }
 
 export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBuilderDispatcherProps) {
-    const { slugOptions, pageTemplates = [], searchWidgets = [], formWidgets = [], maxColSpan, categoryWidgets = [] } = context;
+    const { slugOptions, pageTemplates = [], searchWidgets = [], contentWidgets, formWidgets = [], maxColSpan, categoryWidgets = [], actionButtonOnly } = context;
 
     switch (widget.type) {
         case 'text':
@@ -84,7 +90,10 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     widget={widget}
                     onChange={w => onChange(w)}
                     pageTemplates={pageTemplates}
+                    contentWidgets={contentWidgets}
                     formWidgets={formWidgets}
+                    actionButtonOnly={actionButtonOnly}
+                    maxColSpan={maxColSpan}
                 />
             );
 
@@ -104,6 +113,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                 <SubListBuilder
                     widget={widget}
                     onChange={w => onChange(w)}
+                    slugOptions={slugOptions}
                 />
             );
 

@@ -30,7 +30,7 @@ import { createIdGenerator } from '../../utils';
 import {
     InputField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
-    EditorField, FileField, ImageField, VideoField,
+    EditorField, FileField, ImageField, VideoField, MediaField,
     FormTextareaField,
 } from './fields';
 import type { FieldEditValues } from './fields';
@@ -79,6 +79,7 @@ const FORM_FIELD_TYPES: FieldTypeItem[] = [
     { type: 'file',      label: 'File',       desc: '파일 업로드',              defaultColSpan: 2 },
     { type: 'image',     label: 'Image',      desc: '이미지 등록',              defaultColSpan: 2 },
     { type: 'video',     label: 'Video',      desc: 'URL · 파일 업로드',        defaultColSpan: 2 },
+    { type: 'media',     label: '미디어',     desc: '이미지·동영상 통합',        defaultColSpan: 2 },
     { type: 'textarea',  label: 'Textarea',   desc: '여러 줄 텍스트 입력',      defaultColSpan: 2 },
     { type: 'hidden',    label: 'Hidden',     desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
 ];
@@ -245,6 +246,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 colSpan:       f.colSpan,
                 rowSpan:       f.rowSpan,
                 placeholder:   f.placeholder,
+                description:   f.description,
                 required:      f.required,
                 options:       f.options,
                 codeGroupCode: f.codeGroupCode,
@@ -262,7 +264,11 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 maxTotalSizeMB:    f.maxTotalSizeMB,
                 fileTypeMode:      f.fileTypeMode,
                 allowedExtensions: f.allowedExtensions,
-                videoMode:         f.videoMode,
+                videoMode:           f.videoMode,
+                mediaImageExts:      f.mediaImageExts,
+                mediaVideoExts:      f.mediaVideoExts,
+                mediaImageMaxSizeMB: f.mediaImageMaxSizeMB,
+                mediaVideoMaxSizeMB: f.mediaVideoMaxSizeMB,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),
@@ -286,6 +292,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             case 'file':      return <FileField {...props} />;
             case 'image':     return <ImageField {...props} />;
             case 'video':     return <VideoField {...props} />;
+            case 'media':     return <MediaField {...props} />;
             case 'textarea':  return <FormTextareaField {...props} />;
             /* hidden: KEY(fieldKey) + VALUE(defaultValue) 한 줄 배치 */
             case 'hidden':

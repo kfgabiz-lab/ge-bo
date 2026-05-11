@@ -3,8 +3,8 @@
 /**
  * SubListBuilder — 서브 목록(SubList) 위젯 설정 빌더 공통 컴포넌트
  *
- * Form 위젯 내부에 삽입되는 다건 행 입력 목록을 구성한다.
- * - 위젯 기본 설정: contentKey, title, addButtonLabel, showBorder, minRows, maxRows
+ * Form과 독립된 다건 행 입력 목록을 구성한다.
+ * - 위젯 기본 설정: connectedSlug, contentKey, title, addButtonLabel, showBorder, maxRows
  * - 컬럼 목록: DnD 순서변경 / 추가(FieldPickerTypeList) / 삭제
  * - 컬럼 편집 패널(Accordion): 타입별 공통 필드 컴포넌트 재사용
  *   input→InputField / select→SelectField / date→DateField /
@@ -55,6 +55,7 @@ const SUBLIST_COLUMN_TYPES: FieldTypeItem[] = [
 interface SubListBuilderProps {
     widget: SubListWidget;
     onChange: (w: SubListWidget) => void;
+    slugOptions: { id: number; slug: string; name: string }[];
 }
 
 /* ══════════════════════════════════════════════════════════════ */
@@ -240,7 +241,7 @@ function ColumnEditPanel({
 /*  메인 컴포넌트                               */
 /* ══════════════════════════════════════════ */
 
-export function SubListBuilder({ widget, onChange }: SubListBuilderProps) {
+export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilderProps) {
     const [editingColId, setEditingColId] = useState<string | null>(null);
     const [showPicker, setShowPicker] = useState(false);
 
@@ -295,6 +296,21 @@ export function SubListBuilder({ widget, onChange }: SubListBuilderProps) {
             <section className="space-y-3">
                 <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">기본 설정</h4>
 
+                {/* connectedSlug */}
+                <div>
+                    <label className={LABEL_CLS}>연결 Slug (connectedSlug)</label>
+                    <select
+                        value={widget.connectedSlug ?? ''}
+                        onChange={e => onChange({ ...widget, connectedSlug: e.target.value || undefined })}
+                        className={INPUT_CLS}
+                    >
+                        <option value="">선택</option>
+                        {slugOptions.map(s => (
+                            <option key={s.id} value={s.slug}>{s.slug} ({s.name})</option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* contentKey */}
                 <div>
                     <label className={LABEL_CLS}>데이터 키 (contentKey) <span className="text-red-400">*</span></label>
@@ -302,7 +318,7 @@ export function SubListBuilder({ widget, onChange }: SubListBuilderProps) {
                         type="text"
                         value={widget.contentKey}
                         onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                        placeholder="상위 Form dataJson 내 배열 키 (영문)"
+                        placeholder="이 SubList 데이터의 식별 키 (영문)"
                         className={INPUT_CLS}
                     />
                 </div>
@@ -331,26 +347,15 @@ export function SubListBuilder({ widget, onChange }: SubListBuilderProps) {
                     </div>
                 </div>
 
-                {/* minRows / maxRows */}
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className={LABEL_CLS}>최소 행 수 (0=제한없음)</label>
-                        <input
-                            type="number" min={0}
-                            value={widget.minRows ?? 0}
-                            onChange={e => onChange({ ...widget, minRows: Number(e.target.value) })}
-                            className={INPUT_CLS}
-                        />
-                    </div>
-                    <div>
-                        <label className={LABEL_CLS}>최대 행 수 (0=제한없음)</label>
-                        <input
-                            type="number" min={0}
-                            value={widget.maxRows ?? 0}
-                            onChange={e => onChange({ ...widget, maxRows: Number(e.target.value) })}
-                            className={INPUT_CLS}
-                        />
-                    </div>
+                {/* maxRows */}
+                <div>
+                    <label className={LABEL_CLS}>최대 행 수 (0=제한없음)</label>
+                    <input
+                        type="number" min={0}
+                        value={widget.maxRows ?? 0}
+                        onChange={e => onChange({ ...widget, maxRows: Number(e.target.value) })}
+                        className={INPUT_CLS}
+                    />
                 </div>
 
                 {/* showBorder */}

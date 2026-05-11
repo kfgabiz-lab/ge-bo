@@ -79,7 +79,7 @@ export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupCo
     }
 
     return {
-        outputMode: raw.outputMode || 'layerpopup',
+        outputMode: raw.outputMode || 'page',
         layerType:  raw.layerType  || 'center',
         layerTitle: raw.layerTitle || '',
         layerWidth: raw.layerWidth || 'md',

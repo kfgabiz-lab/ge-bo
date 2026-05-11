@@ -1,6 +1,7 @@
 import React from 'react';
 import { FieldEditProps } from './types';
 import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
+import { FILE_TYPE_LABELS } from '../../../constants';
 
 /**
  * ImageField: 이미지 설정용 L3 컴포넌트
@@ -11,6 +12,7 @@ export const ImageField = (props: FieldEditProps) => {
     return (
         <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} rowSpan={values.rowSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
                 required={values.required}
+                description={values.description}
         readonly={values.readonly}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">이미지 등록 설정</p>
@@ -38,7 +40,7 @@ export const ImageField = (props: FieldEditProps) => {
 
                 <div className="bg-slate-50 border border-slate-200 p-2 rounded-lg">
                     <p className="text-[10px] font-semibold text-slate-500 mb-1">허용 형식 (고정)</p>
-                    <p className="text-[9.5px] text-slate-400 leading-relaxed font-mono">jpg, jpeg, png, gif, webp, svg, bmp</p>
+                    <p className="text-[9.5px] text-slate-400 leading-relaxed font-mono">{FILE_TYPE_LABELS.image}</p>
                 </div>
             </div>
         </FieldBase>

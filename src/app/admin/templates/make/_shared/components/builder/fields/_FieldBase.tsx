@@ -34,11 +34,13 @@ interface FieldBaseProps {
     hideColSpan?: boolean;
     /** 필수 항목 여부 — 모든 필드 공통 */
     required?: boolean;
+    /** 라벨 하단 설명 텍스트 */
+    description?: string;
     /** PK 여부 — colSpanMode.type === 'input'(Form) 일 때만 표시, 미전달 시 체크박스 숨김 */
     isPk?: boolean;
     /** 읽기 전용 여부 — Form 빌더(input 모드)일 때만 표시 */
     readonly?: boolean;
-    onChange: (updates: Partial<{ label: string; label2: string; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean }>) => void;
+    onChange: (updates: Partial<{ label: string; label2: string; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; description: string }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
 }
@@ -49,7 +51,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, required, isPk, readonly, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, required, description, isPk, readonly, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -84,6 +86,18 @@ export function FieldBase(props: FieldBaseProps) {
                         className={`${INPUT_CLS} font-mono`}
                     />
                 </div>
+            </div>
+
+            {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}
+            <div>
+                <label className={LABEL_CLS}>설명 <span className="text-slate-300 font-normal">(선택)</span></label>
+                <input
+                    type="text"
+                    value={description ?? ''}
+                    onChange={e => onChange({ description: e.target.value || undefined })}
+                    placeholder="예: 설명을 입력 해주세요."
+                    className={INPUT_CLS}
+                />
             </div>
 
             {/* 라벨 2 (dateRange 전용) */}

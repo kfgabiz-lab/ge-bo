@@ -24,6 +24,8 @@ import { PageGridRenderer } from '@/app/admin/templates/make/_shared/components/
 import type { AnyWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
+import type { SubListWidget } from '@/app/admin/templates/make/_shared/components/renderer/types';
+import type { SubListRow } from '@/app/admin/templates/make/_shared/components/renderer/SubListRenderer';
 import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types';
 
 /* ══════════════════════════════════════════ */
@@ -98,6 +100,9 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
 
     /* Form 위젯별 입력값 — key: formWidget.widgetId, value: {fieldId → value} */
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
+
+    /* SubList 위젯별 행 데이터 */
+    const [subListRowsMap, setSubListRowsMap] = useState<Record<string, SubListRow[]>>({});
 
     /* 카테고리 위젯별 선택 ID — key: widgetId, value: selectedId | null */
     const [categorySelections, setCategorySelections] = useState<Record<string, number | null>>({});
@@ -336,57 +341,87 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         }));
     }, []);
 
-    /**
-     * Form 저장/삭제 — Space 버튼 클릭 시 호출
-     * connectedFormWidgetId로 Form 위젯을 찾아 connectedSlug API 호출
-     * 저장 시 isPk=true인 필드의 fieldKey를 pkKeys로 함께 전송 → 서버 중복 체크
-     */
-    const handleFormAction = useCallback(async (connectedFormWidgetId: string, action: 'save' | 'delete') => {
-        /* Form 위젯 탐색 */
-        const formWidget = flatWidgets(widgetItems).find(
-            w => w.type === 'form' && (w as FormWidget).widgetId === connectedFormWidgetId
-        ) as FormWidget | undefined;
-        if (!formWidget?.connectedSlug) {
-            toast.error('연결된 Form 위젯 또는 slug를 찾을 수 없습니다.');
-            return;
-        }
+    /** 컨텐츠(Form+SubList) 저장/삭제 — Space 버튼 클릭 시 호출 */
+    const handleContentAction = useCallback(async (
+        connectedContentWidgetIds: string[],
+        action: 'save' | 'delete'
+    ) => {
+        for (const widgetId of connectedContentWidgetIds) {
+            const widget = flatWidgets(widgetItems).find(w =>
+                (w.type === 'form' || w.type === 'sublist') &&
+                (w as FormWidget | SubListWidget).widgetId === widgetId
+            );
+            if (!widget) continue;
 
-        /* {fieldId → value} → {fieldKey → value} 변환 + PK 키 수집 */
-        const rawValues = formValuesMap[connectedFormWidgetId] ?? {};
-        const dataJson: Record<string, string> = {};
-        const pkKeys: string[] = [];
+            /* ── Form 위젯 처리 ── */
+            if (widget.type === 'form') {
+                const formWidget = widget as FormWidget;
+                if (!formWidget.connectedSlug) continue;
 
-        formWidget.fields.forEach(f => {
-            const key = f.fieldKey || f.label;
-            if (key) {
-                dataJson[key] = rawValues[f.id] ?? '';
-                if (f.isPk) pkKeys.push(key); // isPk=true 필드의 key 수집
-            }
-        });
-
-        try {
-            if (action === 'save') {
-                /* pkKeys가 있으면 함께 전송 → 서버에서 PK 중복 체크 */
-                await api.post(`/page-data/${formWidget.connectedSlug}`, {
-                    dataJson,
-                    ...(pkKeys.length > 0 && { pkKeys }),
+                const rawValues = formValuesMap[widgetId] ?? {};
+                const dataJson: Record<string, string> = {};
+                const pkKeys: string[] = [];
+                formWidget.fields.forEach(f => {
+                    const key = f.fieldKey || f.label;
+                    if (key) {
+                        dataJson[key] = rawValues[f.id] ?? '';
+                        if (f.isPk) pkKeys.push(key);
+                    }
                 });
-                toast.success('저장되었습니다.');
-            } else {
-                /* pkKeys와 dataJson 함께 전송 → BE에서 pk 값으로 id 조회 후 삭제 */
-                await api.delete(`/page-data/${formWidget.connectedSlug}`, { data: { dataJson, ...(pkKeys.length > 0 && { pkKeys }) } });
-                toast.success('삭제되었습니다.');
-            }
-        } catch (err: unknown) {
-            /* 서버 PK 중복 에러(409) 구분 처리 */
-            const status = (err as { response?: { status?: number } })?.response?.status;
-            if (action === 'save' && status === 409) {
-                toast.error('이미 동일한 키 값의 데이터가 존재합니다.');
-            } else {
-                toast.error(action === 'save' ? '저장 중 오류가 발생했습니다.' : '삭제 중 오류가 발생했습니다.');
+
+                try {
+                    if (action === 'save') {
+                        await api.post(`/page-data/${formWidget.connectedSlug}`, {
+                            dataJson,
+                            ...(pkKeys.length > 0 && { pkKeys }),
+                        });
+                        toast.success('저장되었습니다.');
+                    } else {
+                        await api.delete(`/page-data/${formWidget.connectedSlug}`, { data: { dataJson, ...(pkKeys.length > 0 && { pkKeys }) } });
+                        toast.success('삭제되었습니다.');
+                    }
+                } catch (err: unknown) {
+                    const status = (err as { response?: { status?: number } })?.response?.status;
+                    if (action === 'save' && status === 409) {
+                        toast.error('이미 동일한 키 값의 데이터가 존재합니다.');
+                    } else {
+                        toast.error(action === 'save' ? '저장 중 오류가 발생했습니다.' : '삭제 중 오류가 발생했습니다.');
+                    }
+                }
+
+            /* ── SubList 위젯 처리 ── */
+            } else if (widget.type === 'sublist') {
+                const sublistWidget = widget as SubListWidget;
+                if (!sublistWidget.connectedSlug) continue;
+
+                const storageKey = `sublistId_${widgetId}`;
+                const storedId = Number(sessionStorage.getItem(storageKey)) || null;
+                const rows = subListRowsMap[widgetId] ?? [];
+
+                try {
+                    if (action === 'save') {
+                        const cleanRows = rows.map(({ _rowId, ...rest }) => rest);
+                        if (storedId) {
+                            await api.put(`/page-data/${sublistWidget.connectedSlug}/${storedId}`, { dataJson: { rows: cleanRows } });
+                            toast.success('수정되었습니다.');
+                        } else {
+                            const res = await api.post(`/page-data/${sublistWidget.connectedSlug}`, { dataJson: { rows: cleanRows } });
+                            sessionStorage.setItem(storageKey, String(res.data.id));
+                            toast.success('저장되었습니다.');
+                        }
+                    } else {
+                        if (!storedId) { toast.info('삭제할 데이터가 없습니다.'); continue; }
+                        if (!confirm('삭제하시겠습니까?')) return;
+                        await api.delete(`/page-data/${sublistWidget.connectedSlug}/${storedId}`);
+                        sessionStorage.removeItem(storageKey);
+                        toast.success('삭제되었습니다.');
+                    }
+                } catch {
+                    toast.error(action === 'save' ? '저장 중 오류가 발생했습니다.' : '삭제 중 오류가 발생했습니다.');
+                }
             }
         }
-    }, [widgetItems, formValuesMap]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, formValuesMap, subListRowsMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * 팝업 저장·삭제 완료 후 모든 Table 위젯 데이터 재조회
@@ -464,7 +499,9 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 codeGroups={codeGroups}
                 formValuesMap={formValuesMap}
                 onFormValuesChange={updateFormValue}
-                onFormAction={handleFormAction}
+                onContentAction={handleContentAction}
+                subListRowsMap={subListRowsMap}
+                onSubListRowsChange={(wId, rows) => setSubListRowsMap(prev => ({ ...prev, [wId]: rows }))}
                 tableDataMap={tableDataMap}
                 sortKeyMap={sortKeyMap}
                 sortDirMap={sortDirMap}

@@ -31,6 +31,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { createIdGenerator } from '../../utils';
 import { TextareaField, ActionButtonField } from './fields';
+import type { ContentWidgetOption } from './fields/ActionButtonField';
 import type { SpaceWidget } from '../renderer/types';
 import type { SearchFieldConfig, TemplateItem } from '../../types';
 import type { FieldEditValues } from './fields/types';
@@ -74,6 +75,9 @@ interface SpaceBuilderProps {
     onChange: (w: SpaceWidget) => void;
     /** Quick-Detail 템플릿 목록 — ActionButton 페이지 연결용 */
     pageTemplates: TemplateItem[];
+    /** 현재 페이지의 Form + SubList 위젯 목록 — ActionButton 컨텐츠 연결용 */
+    contentWidgets?: ContentWidgetOption[];
+    /** @deprecated formWidgets 대신 contentWidgets 사용 */
     formWidgets?: { widgetId: string; contentKey: string; connectedSlug?: string }[];
     /** true 시 ActionButton 아이템만 추가 가능 (Text 추가 버튼 숨김) */
     actionButtonOnly?: boolean;
@@ -163,10 +167,15 @@ export function SpaceBuilder({
     widget,
     onChange,
     pageTemplates,
+    contentWidgets = [],
     formWidgets = [],
     actionButtonOnly = false,
     maxColSpan = 12,
 }: SpaceBuilderProps) {
+    /* formWidgets를 contentWidgets 형식으로 변환 (하위 호환) */
+    const resolvedContentWidgets: ContentWidgetOption[] = contentWidgets.length > 0
+        ? contentWidgets
+        : formWidgets.map(f => ({ type: 'form' as const, widgetId: f.widgetId, contentKey: f.contentKey, connectedSlug: f.connectedSlug }));
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const sensors = useSensors(
@@ -288,7 +297,7 @@ export function SpaceBuilder({
                                         codeGroups={[]}
                                         codeGroupsLoading={false}
                                         pageTemplates={pageTemplates}
-                                        formWidgets={formWidgets}
+                                        contentWidgets={resolvedContentWidgets}
                                     />
                                 )}
                             </SortableSpaceItem>

@@ -78,7 +78,7 @@ interface PageGridRendererProps {
     formValuesMap?: Record<string, Record<string, string>>;
     /** (widgetId, fieldId, value) 형태로 호출 */
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
-    onFormAction?: (connectedFormWidgetId: string, action: 'save' | 'delete') => void;
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete') => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;
@@ -108,12 +108,18 @@ interface PageGridRendererProps {
     existingFileMetaMap?: Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>;
     /** fileId → blob URL 캐시 */
     imgBlobUrls?: Record<number, string>;
-    /** (widgetId, fieldId, files) 형태로 호출 */
-    onFileChange?: (widgetId: string, fieldId: string, files: File[]) => void;
+    /** (widgetId, fieldId, files, rowId?) 형태로 호출 — SubList 파일 변경 시 rowId 포함 */
+    onFileChange?: (widgetId: string, fieldId: string, files: File[], rowId?: string) => void;
     /** (widgetId, fieldId, fileId) 형태로 호출 */
     onRemoveExisting?: (widgetId: string, fieldId: string, fileId: number) => void;
     /** Space 위젯 닫기 버튼 핸들러 (팝업 닫기용) */
     onClose?: () => void;
+
+    /* live 모드 전용 — sublist */
+    /** widgetId → SubListRow[] */
+    subListRowsMap?: Record<string, import('./SubListRenderer').SubListRow[]>;
+    /** SubList 행 변경 콜백 — (widgetId, rows) */
+    onSubListRowsChange?: (widgetId: string, rows: import('./SubListRenderer').SubListRow[]) => void;
 }
 
 /**
@@ -132,7 +138,7 @@ export function PageGridRenderer({
     codeGroups,
     formValuesMap,
     onFormValuesChange,
-    onFormAction,
+    onContentAction,
     tableDataMap,
     sortKeyMap,
     sortDirMap,
@@ -149,6 +155,8 @@ export function PageGridRenderer({
     onFileChange,
     onRemoveExisting,
     onClose,
+    subListRowsMap,
+    onSubListRowsChange,
 }: PageGridRendererProps) {
     /* ── 카테고리 dbSlug 상속 맵 ──
      * depth 2+ 위젯은 dbSlug가 없으므로 parentWidgetId 체인을 타고 올라가 상위 dbSlug 상속.
@@ -232,13 +240,16 @@ export function PageGridRenderer({
                                         /* 폼 */
                                         formValues={formValuesMap?.[wid] ?? {}}
                                         onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
-                                        onFormAction={onFormAction}
+                                        onContentAction={onContentAction}
                                         onClose={onClose}
-                                        /* 파일 업로드 */
+                                        /* SubList */
+                                        subListRowsMap={subListRowsMap}
+                                        onSubListRowsChange={onSubListRowsChange}
+                                        /* 파일 업로드 — SubList 파일 변경 시 rowId도 함께 전달 */
                                         fileValues={fileValuesMap?.[wid]}
                                         existingFileMeta={existingFileMetaMap?.[wid]}
                                         imgBlobUrls={imgBlobUrls}
-                                        onFileChange={onFileChange ? (fieldId, files) => onFileChange(wid, fieldId, files) : undefined}
+                                        onFileChange={onFileChange ? (fieldId, files, rowId?) => onFileChange(wid, fieldId, files, rowId) : undefined}
                                         onRemoveExisting={onRemoveExisting ? (fieldId, fileId) => onRemoveExisting(wid, fieldId, fileId) : undefined}
                                         /* 테이블 */
                                         tableData={td?.rows}

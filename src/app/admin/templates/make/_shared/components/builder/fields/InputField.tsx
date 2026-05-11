@@ -24,6 +24,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}
                 isPk={values.isPk}
                 required={values.required}
+                description={values.description}
                 readonly={values.readonly}
                 hideColSpan={hideColSpan}
                 onChange={onChange}

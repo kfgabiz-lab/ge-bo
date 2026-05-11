@@ -25,6 +25,7 @@ interface RightDrawerLayoutProps {
 export default function RightDrawerLayout({
     open, onClose, title, children, preview = false,
 }: RightDrawerLayoutProps) {
+
     if (!open) return null;
 
     /* ── 빌더 미리보기 모드: 실제 드로어와 동일한 구조를 인라인으로 재현 ── */
@@ -50,12 +51,13 @@ export default function RightDrawerLayout({
     }
 
     return (
-        /* 전체 화면 오버레이 */
-        <div className="fixed inset-0 z-50 flex">
-            {/* 좌측 배경 클릭 시 닫기 */}
-            <div className="flex-1 bg-black/40" onClick={onClose} />
+        /* 전체 화면 오버레이 — CenterPopupLayout과 동일한 absolute 구조:
+           flex-1 형제 방식은 Edge에서 파일 다이얼로그 닫힐 때 overlay onClick이 트리거됨 */
+        <div className="fixed inset-0 z-50 flex justify-end">
+            {/* 배경 — absolute inset-0으로 전체 덮음, 패널 영역 클릭은 relative 패널이 가로막음 */}
+            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
-            {/* 드로어 패널 (우측 고정) */}
+            {/* 드로어 패널 (우측 고정) — relative로 overlay 위에 표시 */}
             <div className="relative w-full max-w-lg bg-white shadow-2xl flex flex-col h-full">
                 {/* 헤더 */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">

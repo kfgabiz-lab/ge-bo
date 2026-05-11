@@ -15,7 +15,7 @@ interface CommonFieldDispatcherProps {
     codeGroupsLoading: boolean;
     /* ActionButtonField 전용 */
     pageTemplates?: TemplateItem[];
-    formWidgets?: { widgetId: string; contentKey: string; connectedSlug?: string }[];
+    contentWidgets?: { type: 'form' | 'sublist'; widgetId: string; contentKey: string; title?: string; connectedSlug?: string }[];
 }
 
 /**
@@ -53,7 +53,7 @@ export const CommonFieldDispatcher = (props: CommonFieldDispatcherProps) => {
             <ActionButtonField
                 {...fieldProps}
                 pageTemplates={props.pageTemplates ?? []}
-                formWidgets={props.formWidgets ?? []}
+                contentWidgets={props.contentWidgets ?? []}
             />
         );
 

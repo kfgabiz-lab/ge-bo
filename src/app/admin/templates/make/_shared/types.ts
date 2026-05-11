@@ -11,7 +11,7 @@ export type SearchFieldType =
     | 'radio' | 'checkbox' | 'button'
     | 'textarea'        // 여러 줄 텍스트 표시 (Space 텍스트 아이템 등)
     | 'action-button'   // 액션 버튼 (팝업·API·경로 연결)
-    | 'file' | 'image' | 'video' // 파일 업로드 및 미디어 타입
+    | 'file' | 'image' | 'video' | 'media' // 파일 업로드 및 미디어 타입
     | 'editor'          // 위지윅 에디터
     | 'hidden';         // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
 
@@ -28,6 +28,8 @@ export interface SearchFieldConfig {
     fieldKey?: string;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
     placeholder?: string;
+    /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
+    description?: string;
     colSpan: 1 | 2 | 3 | 4 | 5;
     rowSpan?: number;
     required?: boolean;
@@ -48,13 +50,12 @@ export interface SearchFieldConfig {
     /* ── action-button 전용 ── */
     color?: string;             // 버튼 색상 프리셋 (black/green/...)
     bgColor?: string;           // 커스텀 배경색 (hex)
-    connType?: '' | 'form' | 'popup' | 'path' | 'close'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close'; // 클릭 시 연결 방식
     popupSlug?: string;         // 연결 방식 popup: LAYER 템플릿 slug
     fileLayerSlug?: string;     // 연결 방식 path: 로컬 컴포넌트명
     connectedSlug?: string;     // 연결 방식 slug: DB slug (레거시)
-    apiId?: number;             // Form slug 없을 때 직접 호출할 API ID
-    connectedFormWidgetId?: string; // 연결된 Form 위젯 ID
-    formAction?: 'save' | 'delete'; // Form 연결 시 동작 (저장/삭제)
+    connectedContentWidgetIds?: string[];    // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
+    contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
     isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
     readonly?: boolean;             // 읽기 전용 여부 (Form 전용)
     // ── 파일/이미지/비디오 전용 ──
@@ -64,6 +65,9 @@ export interface SearchFieldConfig {
     fileTypeMode?: 'doc' | 'image' | 'video' | 'custom' | '';
     allowedExtensions?: string[];
     videoMode?: 'url' | 'file';
+    /* ── media 전용 ── */
+    mediaImageMaxSizeMB?: number;   // 이미지 최대 크기 MB (기본: 5)
+    mediaVideoMaxSizeMB?: number;   // 동영상 최대 크기 MB (기본: 20)
     /* ── hidden 전용 ── */
     defaultValue?: string;      // hidden 필드 기본값 (저장 시 자동 포함)
 }

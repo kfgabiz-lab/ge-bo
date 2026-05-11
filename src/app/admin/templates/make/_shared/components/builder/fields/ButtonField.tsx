@@ -26,6 +26,7 @@ export function ButtonField({ values, onChange, colSpanMode, rowSpanConfig, code
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}
                 isPk={values.isPk}
                 required={values.required}
+                description={values.description}
                 readonly={values.readonly}
                 onChange={onChange}
             />

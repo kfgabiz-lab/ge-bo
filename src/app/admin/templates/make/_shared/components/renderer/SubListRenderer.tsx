@@ -3,21 +3,17 @@
 /**
  * SubListRenderer — 서브 목록 위젯 렌더러
  *
- * Form 위젯 내부에서 다건 행 배열을 입력·수정·삭제하는 컨텐츠 컴포넌트.
- * 상위 Form의 dataJson[contentKey]에 배열로 함께 저장된다.
+ * Form 위젯 내부에서 다건 행 배열을 입력·삭제하는 컨텐츠 컴포넌트.
+ * 모든 행은 항상 입력 필드로 표시된다 (normal/adding 구분 없음).
  *
- * [행 상태]
- * - normal  : 저장된 행 — 값 텍스트 표시 + ✏️🗑️ 버튼
- * - editing : 편집 중인 행 — FieldRenderer 입력 컴포넌트 + ✓✕ 버튼
- * - adding  : 신규 추가 행 — FieldRenderer 빈 입력 컴포넌트 + ✓✕ 버튼
+ * [동작]
+ * - + 추가 클릭 → 빈 행을 rows에 즉시 추가
+ * - 각 셀 입력 → 해당 행의 값 업데이트
+ * - 🗑️ 클릭 → confirm 후 행 제거
  *
  * [모드]
- * - preview: 빈 테이블(헤더 + "등록된 항목이 없습니다.") 표시 — 빌더 미리보기
- * - live   : 실제 CRUD 동작 — 상위 Form에 배열 데이터 전달
- *
- * [재사용]
- * 셀 편집 입력은 FieldRenderer(공통 필드 렌더러)를 재사용한다.
- * SubListColumn → SearchFieldConfig 변환 후 전달.
+ * - preview: 빈 샘플 행 1개(disabled) 표시 — 빌더 미리보기
+ * - live   : 실제 입력 동작
  *
  * 사용법:
  *   <SubListRenderer mode="preview" widget={subListWidget} />
@@ -25,16 +21,19 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Trash2, Check, X, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { RendererContainer } from './RendererContainer';
 import { FieldRenderer } from './FieldRenderer';
 import type { RendererMode, SubListWidget, SubListColumn } from './types';
 import type { SearchFieldConfig, CodeGroupDef } from '../../types';
 
+/* 파일 업로드가 필요한 컬럼 타입 */
+const FILE_COL_TYPES = ['file', 'image'] as const;
+
 /* ── 타입 정의 ── */
 
-/** 렌더러 내부에서 관리하는 행 데이터 */
+/** 렌더러에서 관리하는 행 데이터 */
 export interface SubListRow {
     _rowId: string;
     [key: string]: unknown;
@@ -43,11 +42,12 @@ export interface SubListRow {
 interface SubListRendererProps {
     mode: RendererMode;
     widget: SubListWidget;
-    contentColSpan?: number;
     /** live 모드 — 현재 행 데이터 배열 */
     rows?: SubListRow[];
-    /** live 모드 — 행 변경 콜백 (상위 Form에 전달) */
+    /** live 모드 — 행 변경 콜백 */
     onChange?: (rows: SubListRow[]) => void;
+    /** 외부 파일 변경 콜백 — Form: (fieldId, files) / SubList: (fieldId, files, rowId) */
+    onFileChange?: (fieldId: string, files: File[], rowId?: string) => void;
 }
 
 /* ── SubListColumn → SearchFieldConfig 변환 유틸 ── */
@@ -60,7 +60,7 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
     return {
         id: col.id,
         type: col.type as SearchFieldConfig['type'],
-        label: '',                      // 셀 내부 — 라벨 미표시
+        label: '',
         colSpan: 1,
         placeholder: col.placeholder,
         options: col.options,
@@ -72,89 +72,6 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
     } as SearchFieldConfig;
 }
 
-
-/* ── 일반 행 셀 값 표시 컴포넌트 ── */
-
-interface NormalCellProps {
-    col: SubListColumn;
-    value: unknown;
-}
-
-/**
- * normal 상태 행의 셀 값을 타입에 맞게 표시한다.
- * file/image는 아이콘 + 개수 표시로 컴팩트하게 처리한다.
- */
-function NormalCell({ col, value }: NormalCellProps) {
-    /* file / image — 아이콘 + 개수 표시 */
-    if (col.type === 'file') {
-        const count = Array.isArray(value) ? value.length : 0;
-        return (
-            <span className="flex items-center gap-1 text-slate-500 text-xs">
-                <Paperclip className="w-3 h-3 flex-shrink-0" />
-                {count > 0 ? `${count}개` : <span className="text-slate-300">-</span>}
-            </span>
-        );
-    }
-    if (col.type === 'image') {
-        const count = Array.isArray(value) ? value.length : 0;
-        return (
-            <span className="flex items-center gap-1 text-slate-500 text-xs">
-                <ImageIcon className="w-3 h-3 flex-shrink-0" />
-                {count > 0 ? `${count}개` : <span className="text-slate-300">-</span>}
-            </span>
-        );
-    }
-    /* dateRange — from~to 포맷 */
-    if (col.type === 'dateRange') {
-        const str = value != null ? String(value) : '';
-        const [from, to] = str.split('~');
-        return (
-            <span className="text-slate-700 text-xs whitespace-nowrap">
-                {from || '-'} ~ {to || '-'}
-            </span>
-        );
-    }
-    /* textarea — 줄바꿈 없이 한 줄 truncate */
-    if (col.type === 'textarea') {
-        const text = value != null && value !== '' ? String(value) : '';
-        return (
-            <span className="text-slate-700 text-xs truncate block max-w-[160px]" title={text}>
-                {text || <span className="text-slate-300">-</span>}
-            </span>
-        );
-    }
-    /* 그 외 (input, select, date) */
-    const text = value != null && value !== '' ? String(value) : '';
-    return <span className="text-slate-700 text-xs">{text || <span className="text-slate-300">-</span>}</span>;
-}
-
-/* ── 편집/추가 행 셀 입력 컴포넌트 ── */
-
-interface EditCellProps {
-    col: SubListColumn;
-    value: string;
-    mode: RendererMode;
-    codeGroups: CodeGroupDef[];
-    onChange: (v: string) => void;
-}
-
-/**
- * editing / adding 상태 행의 셀 입력을 FieldRenderer를 재사용하여 표시한다.
- * file/image는 셀 높이가 늘어나므로 행 확장이 자연스럽게 처리된다.
- */
-function EditCell({ col, value, mode, codeGroups, onChange }: EditCellProps) {
-    const fieldConfig = toFieldConfig(col);
-    return (
-        <FieldRenderer
-            mode={mode}
-            field={fieldConfig}
-            value={value}
-            codeGroups={codeGroups}
-            onChange={onChange}
-        />
-    );
-}
-
 /* ── 메인 컴포넌트 ── */
 
 export function SubListRenderer({
@@ -162,10 +79,11 @@ export function SubListRenderer({
     widget,
     rows: externalRows,
     onChange,
+    onFileChange: externalOnFileChange,
 }: SubListRendererProps) {
     const visibleColumns = widget.columns;
 
-    /* 공통코드 목록 — FormRenderer/SearchRenderer와 동일한 패턴 */
+    /* 공통코드 목록 */
     const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
     useEffect(() => {
         api.get('/codes')
@@ -173,59 +91,134 @@ export function SubListRenderer({
             .catch(() => {});
     }, []);
 
-    /* live 모드 행 목록 */
-    const [liveRows, setLiveRows] = useState<SubListRow[]>(externalRows ?? []);
+    /* 파일 컬럼 상태 — rowId → colId → File[] (UI 표시용 내부 관리) */
+    const [internalFileMap, setInternalFileMap] = useState<Record<string, Record<string, File[]>>>({});
+    /* 항상 내부 state 사용 */
+    const effectiveFileMap = internalFileMap;
 
+    /* 기존 파일 메타 — row 데이터의 파일 ID 배열로부터 로드 (수정 모드) */
+    const [existingMetaMap, setExistingMetaMap] = useState<
+        Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>
+    >({});
 
-    /* 신규 추가 행 표시 여부 */
-    const [isAdding, setIsAdding] = useState(false);
-    /* 신규 추가 행 입력값 */
-    const [addingValues, setAddingValues] = useState<Record<string, string>>({});
+    /* 행 목록 — 모든 행이 항상 입력 필드로 표시 */
+    const [rows, setRows] = useState<SubListRow[]>(externalRows ?? []);
 
-    /* 현재 표시할 행 목록 */
-    const displayRows = liveRows;
+    /* 외부에서 rows prop이 변경되면 내부 상태 동기화 */
+    useEffect(() => {
+        if (externalRows !== undefined) setRows(externalRows);
+    }, [externalRows]);
+
+    /* rows 변경 시 파일 컬럼의 기존 파일 ID → 메타 로드 */
+    useEffect(() => {
+        if (mode !== 'live') return;
+        const fileCols = visibleColumns.filter(c => (FILE_COL_TYPES as readonly string[]).includes(c.type));
+        if (fileCols.length === 0) return;
+
+        const allIds: number[] = [];
+        rows.forEach(row => {
+            fileCols.forEach(col => {
+                const val = row[col.key];
+                if (Array.isArray(val) && val.length > 0 && val.every(x => typeof x === 'number')) {
+                    allIds.push(...(val as number[]));
+                }
+            });
+        });
+
+        if (allIds.length === 0) { setExistingMetaMap({}); return; }
+
+        api.get('/page-files/meta', { params: { ids: allIds.join(',') } })
+            .then(res => {
+                const metaList = res.data as { id: number; origName: string; fileSize: number }[];
+                const newMap: Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>> = {};
+                rows.forEach(row => {
+                    fileCols.forEach(col => {
+                        const val = row[col.key];
+                        if (!Array.isArray(val) || !val.every(x => typeof x === 'number')) return;
+                        if (!newMap[row._rowId]) newMap[row._rowId] = {};
+                        newMap[row._rowId][col.id] = (val as number[]).map(id => {
+                            const m = metaList.find(m => m.id === id);
+                            return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
+                        });
+                    });
+                });
+                setExistingMetaMap(newMap);
+            })
+            .catch(() => {});
+    }, [rows, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* 추가 버튼 활성 여부 */
     const maxRows = widget.maxRows ?? 0;
-    const isAddDisabled = mode === 'preview' || isAdding || (maxRows > 0 && displayRows.length >= maxRows);
+    const isAddDisabled = mode === 'preview' || (maxRows > 0 && rows.length >= maxRows);
 
-    /* ── 이벤트 핸들러 (live 모드 전용) ── */
+    /* ── 이벤트 핸들러 ── */
 
-    /** 삭제 */
+    /** 추가 — 빈 행을 rows에 즉시 추가 */
+    const handleAdd = useCallback(() => {
+        const newRow: SubListRow = { _rowId: `row-${Date.now()}` };
+        const updated = [...rows, newRow];
+        setRows(updated);
+        onChange?.(updated);
+    }, [rows, onChange]);
+
+    /** 파일 변경 핸들러 — 항상 내부 state 업데이트 후 외부 콜백 호출 */
+    const handleFileChange = useCallback((rowId: string, colId: string, files: File[]) => {
+        /* 항상 내부 state 업데이트 (UI 표시용) */
+        setInternalFileMap(prev => ({
+            ...prev,
+            [rowId]: { ...(prev[rowId] ?? {}), [colId]: files },
+        }));
+        /* 외부 콜백 — colId가 fieldId 역할, rowId는 SubList 행 식별자 */
+        externalOnFileChange?.(colId, files, rowId);
+    }, [externalOnFileChange]);
+
+    /** 삭제 — 행 데이터와 함께 해당 행의 파일 상태도 정리 */
     const handleDelete = useCallback((rowId: string) => {
         if (!confirm('삭제하시겠습니까?')) return;
-        const updated = liveRows.filter(r => r._rowId !== rowId);
-        setLiveRows(updated);
+        const updated = rows.filter(r => r._rowId !== rowId);
+        setRows(updated);
         onChange?.(updated);
-    }, [liveRows, onChange]);
+        /* 내부 파일 state 정리 */
+        setInternalFileMap(prev => {
+            const next = { ...prev };
+            delete next[rowId];
+            return next;
+        });
+    }, [rows, onChange]);
 
-    /** 추가 행 열기 */
-    const handleAddOpen = useCallback(() => {
-        setAddingValues({});
-        setIsAdding(true);
-    }, []);
-
-    /** 추가 확인 */
-    const handleAddConfirm = useCallback(() => {
-        const newRow: SubListRow = {
-            _rowId: `row-${Date.now()}`,
-            ...addingValues,
-        };
-        const updated = [...liveRows, newRow];
-        setLiveRows(updated);
+    /** 행 값 변경 */
+    const handleRowChange = useCallback((rowId: string, key: string, value: string) => {
+        const updated = rows.map(r => r._rowId === rowId ? { ...r, [key]: value } : r);
+        setRows(updated);
         onChange?.(updated);
-        setIsAdding(false);
-        setAddingValues({});
-    }, [liveRows, addingValues, onChange]);
+    }, [rows, onChange]);
 
-    /** 추가 취소 */
-    const handleAddCancel = useCallback(() => {
-        setIsAdding(false);
-        setAddingValues({});
-    }, []);
+    /** 기존 파일 제거 — existingMetaMap + row 데이터의 ID 배열 동시 갱신 */
+    const handleRemoveExisting = useCallback((rowId: string, colId: string, fileId: number) => {
+        setExistingMetaMap(prev => ({
+            ...prev,
+            [rowId]: {
+                ...(prev[rowId] ?? {}),
+                [colId]: (prev[rowId]?.[colId] ?? []).filter(m => m.id !== fileId),
+            },
+        }));
+        const col = visibleColumns.find(c => c.id === colId);
+        if (!col) return;
+        const updated = rows.map(r => {
+            if (r._rowId !== rowId) return r;
+            const ids = Array.isArray(r[col.key]) ? (r[col.key] as number[]) : [];
+            return { ...r, [col.key]: ids.filter(id => id !== fileId) };
+        });
+        setRows(updated);
+        onChange?.(updated);
+    }, [rows, onChange, visibleColumns]);
 
-    /* addButtonLabel 기본값 — 버튼 앞에 <Plus> 아이콘이 있으므로 텍스트에 + 미포함 */
+    /* addButtonLabel 기본값 */
     const addLabel = widget.addButtonLabel ?? '추가';
+
+    /* preview 모드 — 빈 샘플 행 1개 표시 */
+    const previewRows: SubListRow[] = [{ _rowId: 'preview-1' }];
+    const displayRows = mode === 'preview' ? previewRows : rows;
 
     return (
         <RendererContainer showBorder={widget.showBorder ?? true}>
@@ -242,7 +235,7 @@ export function SubListRenderer({
                             </span>
                         )}
                         <span className="text-xs text-slate-400 font-medium whitespace-nowrap">
-                            {displayRows.length}개
+                            {mode === 'preview' ? '-' : `${rows.length}개`}
                         </span>
                     </div>
 
@@ -250,7 +243,7 @@ export function SubListRenderer({
                     <button
                         type="button"
                         disabled={isAddDisabled}
-                        onClick={handleAddOpen}
+                        onClick={handleAdd}
                         className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
                     >
                         <Plus className="w-3 h-3" />
@@ -277,7 +270,6 @@ export function SubListRenderer({
                                         )}
                                     </th>
                                 ))}
-                                {/* 삭제 컬럼 */}
                                 <th className="px-3 py-2 text-center font-semibold text-slate-600 w-16 whitespace-nowrap">
                                     삭제
                                 </th>
@@ -285,8 +277,8 @@ export function SubListRenderer({
                         </thead>
 
                         <tbody>
-                            {/* ── 데이터 행 ── */}
-                            {displayRows.length === 0 && !isAdding && mode === 'live' ? (
+                            {/* 빈 상태 — live 모드 전용 */}
+                            {displayRows.length === 0 && mode === 'live' ? (
                                 <tr>
                                     <td
                                         colSpan={visibleColumns.length + 1}
@@ -296,72 +288,45 @@ export function SubListRenderer({
                                     </td>
                                 </tr>
                             ) : (
-                                displayRows.map(row => {
-                                    return (
-                                        <tr
-                                            key={row._rowId}
-                                            className="border-b border-slate-100 transition-colors hover:bg-slate-50/60"
-                                        >
-                                            {visibleColumns.map(col => (
+                                displayRows.map(row => (
+                                    <tr
+                                        key={row._rowId}
+                                        className="border-b border-slate-100"
+                                    >
+                                        {/* 각 셀 — 항상 입력 필드, 파일 타입은 Form과 동일하게 props 전달 */}
+                                        {visibleColumns.map(col => {
+                                            const isFileType = (FILE_COL_TYPES as readonly string[]).includes(col.type);
+                                            return (
                                                 <td key={col.id} className="px-2 py-1.5 align-middle">
-                                                    <NormalCell col={col} value={row[col.key]} />
+                                                    <FieldRenderer
+                                                        mode={mode}
+                                                        field={toFieldConfig(col)}
+                                                        value={String(row[col.key] ?? '')}
+                                                        codeGroups={codeGroups}
+                                                        onChange={v => handleRowChange(row._rowId, col.key, v)}
+                                                        fileList={isFileType ? (effectiveFileMap[row._rowId]?.[col.id] ?? []) : undefined}
+                                                        existingFileMeta={isFileType ? (existingMetaMap[row._rowId]?.[col.id] ?? []) : undefined}
+                                                        onFileChange={isFileType ? (files => handleFileChange(row._rowId, col.id, files)) : undefined}
+                                                        onRemoveExisting={isFileType ? (fileId => handleRemoveExisting(row._rowId, col.id, fileId)) : undefined}
+                                                    />
                                                 </td>
-                                            ))}
+                                            );
+                                        })}
 
-                                            {/* 삭제 버튼 */}
-                                            <td className="px-2 py-1.5 text-center align-middle w-16">
-                                                <button type="button" disabled={mode === 'preview'} title="삭제"
-                                                    onClick={() => handleDelete(row._rowId)}
-                                                    className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-
-                            {/* ── 신규 추가 행 (preview: disabled 상태로 폼 모양 표시) ── */}
-                            {(isAdding || mode === 'preview') && (
-                                <tr className="border-b border-blue-100 bg-blue-50/30">
-                                    {visibleColumns.map(col => (
-                                        <td
-                                            key={col.id}
-                                            className="px-2 py-1.5 align-middle"
-                                        >
-                                            <EditCell
-                                                col={col}
-                                                value={addingValues[col.key] ?? ''}
-                                                mode={mode === 'preview' ? 'preview' : 'live'}
-                                                codeGroups={codeGroups}
-                                                onChange={v => setAddingValues(prev => ({ ...prev, [col.key]: v }))}
-                                            />
+                                        {/* 삭제 버튼 */}
+                                        <td className="px-2 py-1.5 text-center align-middle w-16">
+                                            <button
+                                                type="button"
+                                                disabled={mode === 'preview'}
+                                                title="삭제"
+                                                onClick={() => handleDelete(row._rowId)}
+                                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
                                         </td>
-                                    ))}
-                                    {/* 추가 행 확인 / 취소 */}
-                                    <td className="px-2 py-1.5 text-center align-middle w-16">
-                                        <div className={`flex items-center justify-center gap-1 ${mode === 'preview' ? 'opacity-40' : ''}`}>
-                                            <button
-                                                type="button"
-                                                title="저장"
-                                                disabled={mode === 'preview'}
-                                                onClick={handleAddConfirm}
-                                                className="p-1 rounded hover:bg-emerald-50 text-emerald-500 hover:text-emerald-700 transition-all disabled:cursor-not-allowed"
-                                            >
-                                                <Check className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                title="취소"
-                                                disabled={mode === 'preview'}
-                                                onClick={handleAddCancel}
-                                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all disabled:cursor-not-allowed"
-                                            >
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>

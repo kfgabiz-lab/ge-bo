@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ROW_HEIGHT, GAP_SIZE } from './GridCell';
+import { ROW_HEIGHT } from './GridCell';
+import { PageGridContainer } from './PageGridContainer';
 
 /**
  * PageLayout — 12칸 그리드 기반 공통 페이지 레이아웃
@@ -56,24 +57,17 @@ export default function PageLayout({ title, description, mode = 'live', children
     }, []);
 
     /* showGrid=true일 때 격자선 + 테두리 + 배경색 — 모드 구분 없이 동일하게 적용 */
-    const gridStyle: React.CSSProperties = {
-        /* track 높이 = ROW_HEIGHT - GAP_SIZE, rowGap = GAP_SIZE → 합계 ROW_HEIGHT 유지 */
-        gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-        rowGap: `${GAP_SIZE}px`,
-        ...(showGrid ? {
-            backgroundImage: `
-                linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
-                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-            `,
-            backgroundSize: `calc(100% / 12) ${ROW_HEIGHT}px`,
-        } : {}),
-    };
+    /* showGrid=true 일 때 격자선 배경 — PageGridContainer 위에 겹쳐 표시 */
+    const overlayStyle: React.CSSProperties = showGrid ? {
+        backgroundImage: `
+            linear-gradient(to right,  #e2e8f0 1px, transparent 1px),
+            linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
+        `,
+        backgroundSize: `calc(100% / 12) ${ROW_HEIGHT}px`,
+    } : {};
 
-    /* showGrid 상태가 테두리/배경을 결정 — preview/live 모두 동일한 방식 */
-    const gridCls = [
-        'grid grid-cols-12',
-        showGrid ? 'border border-slate-200 rounded-lg bg-slate-50' : '',
-    ].filter(Boolean).join(' ');
+    /* showGrid 상태가 테두리/배경을 결정 */
+    const wrapCls = showGrid ? 'border border-slate-200 rounded-lg bg-slate-50' : '';
 
     return (
         <div className="space-y-3">
@@ -85,8 +79,10 @@ export default function PageLayout({ title, description, mode = 'live', children
                     )}
                 </div>
             )}
-            <div className={gridCls} style={gridStyle}>
-                {children}
+            <div className={wrapCls} style={overlayStyle}>
+                <PageGridContainer>
+                    {children}
+                </PageGridContainer>
             </div>
         </div>
     );

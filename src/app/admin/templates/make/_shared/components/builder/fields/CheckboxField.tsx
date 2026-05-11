@@ -26,6 +26,7 @@ export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, co
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}
                 isPk={values.isPk}
                 required={values.required}
+                description={values.description}
                 readonly={values.readonly}
                 onChange={onChange}
             />

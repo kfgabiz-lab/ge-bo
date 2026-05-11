@@ -143,7 +143,7 @@ const SAMPLE_FORM: FormWidget = {
     description: '필수 입력 항목은 * 로 표시됩니다.',
     showBorder: true,
     fields: [
-        { id: 'ff1',  type: 'input',     label: '이름',           colSpan: 6,  rowSpan: 1, required: true,  placeholder: '이름을 입력하세요' },
+        { id: 'ff1',  type: 'input',     label: '이름',           colSpan: 6,  rowSpan: 1, required: true,  placeholder: '이름을 입력하세요', description: '실명을 입력해주세요. 다른 사용자에게 표시됩니다.' },
         { id: 'ff2',  type: 'input',     label: '이메일',          colSpan: 6,  rowSpan: 1, required: true,  placeholder: 'email@example.com' },
         { id: 'ff3',  type: 'select',    label: '부서',            colSpan: 4,  rowSpan: 1, options: ['개발팀', '기획팀', '디자인팀', '마케팅팀'] },
         { id: 'ff4',  type: 'select',    label: '직급',            colSpan: 4,  rowSpan: 1, options: ['사원', '대리', '과장', '차장', '부장'] },
@@ -156,6 +156,7 @@ const SAMPLE_FORM: FormWidget = {
         { id: 'ff11', type: 'image', label: '프로필 이미지', colSpan: 12, rowSpan: 2 },
         { id: 'ff12', type: 'video', label: '동영상',        colSpan: 12, rowSpan: 2, videoMode: 'file' },
         { id: 'ff13', type: 'video', label: '동영상 URL',    colSpan: 12, rowSpan: 2, videoMode: 'url' },
+        { id: 'ff14', type: 'media', label: '컨텐츠 업로드', colSpan: 12, rowSpan: 2, required: true },
     ],
 };
 
@@ -171,8 +172,8 @@ const SAMPLE_SPACE: SpaceWidget = {
             content: '※ 입력 후 저장 버튼을 클릭하세요.',
         },
         { id: 's2', type: 'action-button', label: '취소', colSpan: 1, color: 'gray',  connType: 'close' },
-        { id: 's3', type: 'action-button', label: '삭제', colSpan: 1, color: 'red',   connType: 'form', formAction: 'delete' },
-        { id: 's4', type: 'action-button', label: '저장', colSpan: 1, color: 'black', connType: 'form', formAction: 'save' },
+        { id: 's3', type: 'action-button', label: '삭제', colSpan: 1, color: 'red',   connType: 'content', contentAction: 'delete' },
+        { id: 's4', type: 'action-button', label: '저장', colSpan: 1, color: 'black', connType: 'content', contentAction: 'save' },
     ],
 };
 
@@ -207,6 +208,7 @@ const SAMPLE_CATEGORY_4: CategoryWidget = {
 const SAMPLE_SUBLIST: SubListWidget = {
     type: 'sublist',
     widgetId: 'guide-sublist',
+    connectedSlug: '/api/codes/details',
     contentKey: 'codeDetails',
     title: '코드 상세',
     addButtonLabel: '코드 추가',
@@ -232,7 +234,7 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
         { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 13 }],
+    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 15 }],
     space:    [{ widget: SAMPLE_SPACE,    colSpan: 12, rowSpan: 2 }],
     category: [
         { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },

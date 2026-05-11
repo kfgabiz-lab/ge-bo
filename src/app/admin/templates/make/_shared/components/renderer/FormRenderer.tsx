@@ -105,7 +105,7 @@ export function FormRenderer({
             {fields.map(f => (
                 <div
                     key={f.id}
-                    className="flex flex-col px-3 py-2 min-w-0"
+                    className="flex flex-col px-3 min-w-0"
                     style={{
                         gridColumn: `span ${Math.min(f.colSpan, contentColSpan)}`,
                         gridRow: `span ${f.rowSpan}`,
@@ -113,11 +113,15 @@ export function FormRenderer({
                 >
                     {/* 라벨 */}
                     {f.label && (
-                        <label className="block text-xs font-medium text-slate-700 mb-1 flex-shrink-0">
+                        <label className="block text-xs font-medium text-slate-700 flex-shrink-0">
                             {f.label}
                             {f.required && <span className="text-red-500 ml-0.5">*</span>}
                         </label>
                     )}
+                    {/* 설명 — description 유무와 무관하게 항상 동일 높이 예약 → input 위치 정렬 */}
+                    <p className="text-[10px] text-slate-400 mb-0.5 flex-shrink-0 leading-tight truncate min-h-[13px]">
+                        {f.description}
+                    </p>
                     {/* 필드 렌더링 */}
                     <div className="flex-1 min-h-0">
                         <FieldRenderer

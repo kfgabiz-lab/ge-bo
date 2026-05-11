@@ -150,16 +150,16 @@ export interface SubListColumn {
 
 /**
  * 서브 목록 위젯
- * Form 위젯 내부에서 다건 행 배열을 입력·수정·삭제하는 컨텐츠 컴포넌트
- * 저장 시 상위 Form의 dataJson[contentKey]에 배열로 포함된다.
+ * Form과 독립된 다건 행 입력 컨텐츠 컴포넌트.
+ * Button 위젯과 연결(connectedSlug)하여 저장한다.
  */
 export interface SubListWidget {
     type: 'sublist';
     widgetId: string;
-    contentKey: string;           // 상위 Form dataJson 내 배열 키 (영문 필수)
+    connectedSlug?: string;       // 저장 시 호출할 API slug (Button 위젯과 연결)
+    contentKey: string;           // 이 SubList 데이터의 식별 키 (영문 필수)
     title?: string;               // 헤더 타이틀 (예: '코드 상세')
     addButtonLabel?: string;      // 추가 버튼 텍스트 (기본 '추가')
-    minRows?: number;             // 최소 행 수 (0 = 제한 없음)
     maxRows?: number;             // 최대 행 수 (0 = 제한 없음)
     showBorder?: boolean;         // 테두리 표시 여부 (기본 true)
     columns: SubListColumn[];     // 컬럼 설정 목록

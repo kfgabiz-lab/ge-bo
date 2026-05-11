@@ -8,14 +8,15 @@
  *
  * - textarea:      content 값을 정적 텍스트로 표시
  * - action-button: 색상 지정 버튼 표시
- *   - connType='form' + formAction → onFormAction 콜백 호출
- *   - connType='popup' → 팝업 오픈 (향후 구현)
+ *   - connType='content' + contentAction → onContentAction 콜백 호출 (Form/SubList 다중 연결)
+ *   - connType='popup' → 팝업 오픈
  *   - connType='path'  → 경로 이동 (향후 구현)
  *   - connType='close' → onClose 있으면 팝업 닫기, 없으면 router.back() 뒤로가기
  *
  * 사용법:
  *   <SpaceRenderer mode="preview" items={widget.items} />
- *   <SpaceRenderer mode="live" items={widget.items} onFormAction={(widgetId, action) => handleFormAction(widgetId, action)} />
+ *   <SpaceRenderer mode="live" items={widget.items}
+ *     onContentAction={(widgetIds, action) => handleContentAction(widgetIds, action)} />
  *   <SpaceRenderer mode="live" items={widget.items} onClose={() => setOpen(false)} />
  */
 
@@ -35,15 +36,15 @@ interface SpaceRendererProps {
     showBorder?: boolean;
     /** 영역 바탕색 (기본 white) */
     bgColor?: string;
-    /** Form 버튼 클릭 시 호출 — connectedFormWidgetId + formAction 전달 */
-    onFormAction?: (connectedFormWidgetId: string, action: 'save' | 'delete') => void;
+    /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction 전달 */
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete') => void;
     /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
     onClose?: () => void;
     /** 팝업 오픈 요청 — connType='popup' 버튼 클릭 시 slug 전달 */
     onPopupOpen?: (slug: string) => void;
 }
 
-export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onFormAction, onClose, onPopupOpen }: SpaceRendererProps) {
+export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen }: SpaceRendererProps) {
     const router = useRouter();
     if (!items.length) {
         return (
@@ -58,8 +59,9 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
     /** action-button 클릭 핸들러 — connType에 따라 동작 분기 */
     const handleButtonClick = (field: SearchFieldConfig) => {
         if (mode === 'preview') return;
-        if (field.connType === 'form' && field.connectedFormWidgetId && field.formAction) {
-            onFormAction?.(field.connectedFormWidgetId, field.formAction);
+        /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
+        if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
+            onContentAction?.(field.connectedContentWidgetIds, field.contentAction);
         } else if (field.connType === 'close') {
             /* LayerPopup이면 onClose(), 상세페이지면 router.back() */
             if (onClose) {
