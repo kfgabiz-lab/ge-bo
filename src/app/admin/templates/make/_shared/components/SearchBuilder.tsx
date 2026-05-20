@@ -189,7 +189,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
     const isAddDisabled = (): boolean => {
         if (!pendingType || !pendingValues) return true;
         const { label, label2, fieldKey, codeGroupCode, options } = pendingValues;
-        if (!label.trim() || !fieldKey.trim()) return true;
+        if (!label.trim() || !fieldKey?.trim()) return true;
         if (pendingType === 'dateRange' && !label2?.trim()) return true;
         if (needsOptions(pendingType)) {
             const hasCodeGroup = !!codeGroupCode;
@@ -215,7 +215,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             type: pendingType,
             label: label.trim(),
             label2: pendingType === 'dateRange' ? label2?.trim() : undefined,
-            fieldKey: fieldKey.trim() || undefined,
+            fieldKey: fieldKey?.trim() || undefined,
             placeholder: placeholder?.trim() || (pendingType === 'input' ? '입력하세요' : pendingType === 'select' ? '전체' : ''),
             colSpan: colSpan as 1|2|3|4|5,
             required: required || undefined,

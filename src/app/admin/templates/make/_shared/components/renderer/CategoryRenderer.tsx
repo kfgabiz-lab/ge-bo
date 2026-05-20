@@ -349,7 +349,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                             if (widget.createConnType === 'popup' && widget.createPopupSlug) {
                                 /* 정적 파라미터 + 동적 상위 ID 자동 주입 (depth 2 이상) */
                                 const staticParams = parseParams(widget.createParams);
-                                const dynamicParams = selectedParentId != null ? { parentId: String(selectedParentId) } : {};
+                                const dynamicParams: Record<string, string> = selectedParentId != null ? { parentId: String(selectedParentId) } : {};
                                 onPopupOpen?.(widget.createPopupSlug, null, widget.dbSlug, { ...staticParams, ...dynamicParams });
                             } else if (widget.createConnType === 'path' && widget.createPath) {
                                 const qs = widget.createParams ? `?${widget.createParams}` : '';

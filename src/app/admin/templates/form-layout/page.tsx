@@ -96,42 +96,42 @@ export default function FormLayoutPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <FieldWrap label="이름" required>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-name', type: 'input', label: '이름', colSpan: 6, required: true, placeholder: '이름을 입력하세요' }}
+                                field={{ id: 'f-name', type: 'input', label: '이름', colSpan: 5, required: true, placeholder: '이름을 입력하세요' }}
                                 value={values['f-name']} onChange={v => setValue('f-name', v)} />
                         </FieldWrap>
                         <FieldWrap label="사번" required>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-empno', type: 'input', label: '사번', colSpan: 6, required: true, placeholder: '예: EMP-001' }}
+                                field={{ id: 'f-empno', type: 'input', label: '사번', colSpan: 5, required: true, placeholder: '예: EMP-001' }}
                                 value={values['f-empno']} onChange={v => setValue('f-empno', v)} />
                         </FieldWrap>
                         <FieldWrap label="이메일" required>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-email', type: 'input', label: '이메일', colSpan: 6, required: true, placeholder: 'example@company.com' }}
+                                field={{ id: 'f-email', type: 'input', label: '이메일', colSpan: 5, required: true, placeholder: 'example@company.com' }}
                                 value={values['f-email']} onChange={v => setValue('f-email', v)} />
                         </FieldWrap>
                         <FieldWrap label="연락처">
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-phone', type: 'input', label: '연락처', colSpan: 6, placeholder: '010-0000-0000' }}
+                                field={{ id: 'f-phone', type: 'input', label: '연락처', colSpan: 5, placeholder: '010-0000-0000' }}
                                 value={values['f-phone']} onChange={v => setValue('f-phone', v)} />
                         </FieldWrap>
                         <FieldWrap label="권한" required>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-role', type: 'select', label: '권한', colSpan: 6, required: true, placeholder: '선택하세요', options: ['SUPER_ADMIN:SUPER_ADMIN', 'ADMIN:ADMIN', 'EDITOR:EDITOR', 'VIEWER:VIEWER'] }}
+                                field={{ id: 'f-role', type: 'select', label: '권한', colSpan: 5, required: true, placeholder: '선택하세요', options: ['SUPER_ADMIN:SUPER_ADMIN', 'ADMIN:ADMIN', 'EDITOR:EDITOR', 'VIEWER:VIEWER'] }}
                                 value={values['f-role']} onChange={v => setValue('f-role', v)} />
                         </FieldWrap>
                         <FieldWrap label="부서">
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-dept', type: 'select', label: '부서', colSpan: 6, placeholder: '선택하세요', options: ['개발팀:dev', '기획팀:plan', '디자인팀:design', '마케팅팀:mkt'] }}
+                                field={{ id: 'f-dept', type: 'select', label: '부서', colSpan: 5, placeholder: '선택하세요', options: ['개발팀:dev', '기획팀:plan', '디자인팀:design', '마케팅팀:mkt'] }}
                                 value={values['f-dept']} onChange={v => setValue('f-dept', v)} />
                         </FieldWrap>
                         <FieldWrap label="입사일">
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-joindate', type: 'date', label: '입사일', colSpan: 6 }}
+                                field={{ id: 'f-joindate', type: 'date', label: '입사일', colSpan: 5 }}
                                 value={values['f-joindate']} onChange={v => setValue('f-joindate', v)} />
                         </FieldWrap>
                         <FieldWrap label="계약 기간 ~ 종료일" full>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-contract', type: 'dateRange', label: '계약 기간', colSpan: 12 }}
+                                field={{ id: 'f-contract', type: 'dateRange', label: '계약 기간', colSpan: 5 }}
                                 value={values['f-contract']} onChange={v => setValue('f-contract', v)} />
                         </FieldWrap>
                     </div>
@@ -144,17 +144,17 @@ export default function FormLayoutPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <FieldWrap label="고용형태" full>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-emptype', type: 'radio', label: '고용형태', colSpan: 12, options: ['정규직:full', '계약직:contract', '파견직:dispatch', '인턴:intern'] }}
+                                field={{ id: 'f-emptype', type: 'radio', label: '고용형태', colSpan: 5, options: ['정규직:full', '계약직:contract', '파견직:dispatch', '인턴:intern'] }}
                                 value={values['f-emptype']} onChange={v => setValue('f-emptype', v)} />
                         </FieldWrap>
                         <FieldWrap label="담당 업무" full>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-task', type: 'checkbox', label: '담당 업무', colSpan: 12, options: ['개발:dev', '기획:plan', '디자인:design', '마케팅:mkt', '영업:sales'] }}
+                                field={{ id: 'f-task', type: 'checkbox', label: '담당 업무', colSpan: 5, options: ['개발:dev', '기획:plan', '디자인:design', '마케팅:mkt', '영업:sales'] }}
                                 value={values['f-task']} onChange={v => setValue('f-task', v)} />
                         </FieldWrap>
                         <FieldWrap label="조회 기간" full>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-period', type: 'button', label: '조회 기간', colSpan: 12, options: ['오늘:today', '1주:1w', '1개월:1m', '3개월:3m', '전체:all'] }}
+                                field={{ id: 'f-period', type: 'button', label: '조회 기간', colSpan: 5, options: ['오늘:today', '1주:1w', '1개월:1m', '3개월:3m', '전체:all'] }}
                                 value={values['f-period']} onChange={v => setValue('f-period', v)} />
                         </FieldWrap>
                     </div>
@@ -167,22 +167,22 @@ export default function FormLayoutPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <FieldWrap label="소개" full>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-intro', type: 'textarea', label: '소개', colSpan: 12, placeholder: '간단한 소개를 입력하세요' }}
+                                field={{ id: 'f-intro', type: 'textarea', label: '소개', colSpan: 5, placeholder: '간단한 소개를 입력하세요' }}
                                 value={values['f-intro']} onChange={v => setValue('f-intro', v)} />
                         </FieldWrap>
                         <FieldWrap label="첨부파일">
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-file', type: 'file', label: '첨부파일', colSpan: 6, maxFileCount: 3, fileTypeMode: 'doc' }}
+                                field={{ id: 'f-file', type: 'file', label: '첨부파일', colSpan: 5, maxFileCount: 3, fileTypeMode: 'doc' }}
                                 fileList={fileList} onFileChange={setFileList} />
                         </FieldWrap>
                         <FieldWrap label="프로필 이미지">
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-image', type: 'image', label: '프로필 이미지', colSpan: 6, maxFileCount: 1 }}
+                                field={{ id: 'f-image', type: 'image', label: '프로필 이미지', colSpan: 5, maxFileCount: 1 }}
                                 fileList={imageList} onFileChange={setImageList} />
                         </FieldWrap>
                         <FieldWrap label="동영상 URL" full>
                             <FieldRenderer mode="live"
-                                field={{ id: 'f-video', type: 'video', label: '동영상', colSpan: 12, videoMode: 'url' }}
+                                field={{ id: 'f-video', type: 'video', label: '동영상', colSpan: 5, videoMode: 'url' }}
                                 value={values['f-video']} onChange={v => setValue('f-video', v)} />
                         </FieldWrap>
                     </div>

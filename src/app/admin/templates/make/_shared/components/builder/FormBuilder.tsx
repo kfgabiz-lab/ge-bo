@@ -266,8 +266,6 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 fileTypeMode:      f.fileTypeMode,
                 allowedExtensions: f.allowedExtensions,
                 videoMode:           f.videoMode,
-                mediaImageExts:      f.mediaImageExts,
-                mediaVideoExts:      f.mediaVideoExts,
                 mediaImageMaxSizeMB: f.mediaImageMaxSizeMB,
                 mediaVideoMaxSizeMB: f.mediaVideoMaxSizeMB,
             } satisfies FieldEditValues,

@@ -35,7 +35,7 @@ import { TemplateLoader } from '../_shared/components/builder/TemplateLoader';
 import { PageGridRenderer } from '../_shared/components/renderer';
 import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
-import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget, SubListWidget } from '../_shared/components/renderer';
+import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget, SubListWidget, MultiSelectWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug } from '../_shared/utils';
@@ -56,7 +56,7 @@ type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'subl
 /* FormFieldItem, FormWidget → FormBuilder에서 import */
 
 /** 위젯 합집합 타입 */
-type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget | SubListWidget;
+type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget | SubListWidget | MultiSelectWidget;
 
 /**
  * 위젯 셀 안에 배치되는 컨텐츠 아이템

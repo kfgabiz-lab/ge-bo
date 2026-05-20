@@ -174,9 +174,9 @@ interface MenuFormProps {
     onUrlBlur?: () => void;
     onSortBlur?: () => void;
     /* refs */
-    nameRef: React.RefObject<HTMLInputElement>;
-    urlRef: React.RefObject<HTMLInputElement>;
-    sortRef?: React.RefObject<HTMLInputElement>;
+    nameRef: React.RefObject<HTMLInputElement | null>;
+    urlRef: React.RefObject<HTMLInputElement | null>;
+    sortRef?: React.RefObject<HTMLInputElement | null>;
     /* 타입 전환 관련 — 추가/상세 모드 차이가 있어 외부에서 주입 */
     isFolderActive: boolean;
     isProgramActive: boolean;
