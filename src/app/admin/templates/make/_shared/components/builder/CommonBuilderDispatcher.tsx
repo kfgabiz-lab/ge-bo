@@ -7,6 +7,7 @@ import { FormBuilder } from './FormBuilder';
 import { SpaceBuilder } from './SpaceBuilder';
 import { CategoryBuilder } from './CategoryBuilder';
 import { SubListBuilder } from './SubListBuilder';
+import { MultiSelectBuilder } from './MultiSelectBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 import type { ContentWidgetOption } from './fields/ActionButtonField';
@@ -111,6 +112,15 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
         case 'sublist':
             return (
                 <SubListBuilder
+                    widget={widget}
+                    onChange={w => onChange(w)}
+                    slugOptions={slugOptions}
+                />
+            );
+
+        case 'multiselect':
+            return (
+                <MultiSelectBuilder
                     widget={widget}
                     onChange={w => onChange(w)}
                     slugOptions={slugOptions}

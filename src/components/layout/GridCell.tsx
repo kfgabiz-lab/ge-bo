@@ -34,6 +34,8 @@ interface GridCellProps {
     children: React.ReactNode;
     className?: string;
     onClick?: () => void;
+    /** 시작 열 위치 (1~12) — 지정 시 절대 위치 배치, 미지정 시 자동 배치 */
+    colStart?: number;
 }
 
 /**
@@ -43,11 +45,11 @@ interface GridCellProps {
  * - overflow             : hidden (내부 컴포넌트가 자체 스크롤 처리)
  * - minWidth             : 0 (flex/grid 내부 축소 허용)
  */
-export function GridCell({ colSpan, rowSpan, children, className, onClick }: GridCellProps) {
+export function GridCell({ colSpan, rowSpan, children, className, onClick, colStart }: GridCellProps) {
     return (
         <div
             style={{
-                gridColumn: `span ${colSpan}`,
+                gridColumn: colStart ? `${colStart} / span ${colSpan}` : `span ${colSpan}`,
                 gridRow: `span ${rowSpan}`,
                 /* rowGap이 GAP_SIZE이므로 height에서 GAP_SIZE만큼 빼야 track 크기와 일치 */
                 height: `${rowSpan * ROW_HEIGHT - GAP_SIZE}px`,

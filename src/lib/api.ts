@@ -1,5 +1,6 @@
 import axios, { InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/authStore';
+import { useSiteStore } from '@/store/useSiteStore';
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
@@ -20,12 +21,16 @@ const api = axios.create({
     withCredentials: true,
 });
 
-// 요청 인터셉터: Zustand 메모리에서 Access Token 읽어 첨부
+// 요청 인터셉터: Access Token + 활성 사이트 ID 자동 첨부
 api.interceptors.request.use(
     (config) => {
         const token = useAuthStore.getState().accessToken;
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        }
+        const siteId = useSiteStore.getState().activeSiteId;
+        if (siteId) {
+            config.headers['X-Site-Id'] = String(siteId);
         }
         return config;
     },

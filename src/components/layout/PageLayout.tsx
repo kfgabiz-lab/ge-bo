@@ -1,8 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { ROW_HEIGHT } from './GridCell';
 import { PageGridContainer } from './PageGridContainer';
+import { useMenuStore, MenuItem } from '@/store/useMenuStore';
+
+/** navMenus 트리에서 현재 pathname과 일치하는 메뉴 항목 반환 */
+function findMenuByUrl(menus: MenuItem[], pathname: string): MenuItem | null {
+    for (const item of menus) {
+        if (item.url === pathname) return item;
+        if (item.children?.length) {
+            const found = findMenuByUrl(item.children, pathname);
+            if (found) return found;
+        }
+    }
+    return null;
+}
 
 /**
  * PageLayout — 12칸 그리드 기반 공통 페이지 레이아웃
@@ -42,6 +56,14 @@ interface PageLayoutProps {
 }
 
 export default function PageLayout({ title, description, mode = 'live', children }: PageLayoutProps) {
+    const pathname = usePathname();
+    const navMenus = useMenuStore((state) => state.navMenus);
+
+    /* mode="live"일 때 현재 URL로 메뉴명/설명 자동 조회 — title prop 우선 */
+    const autoMenu = mode === 'live' ? findMenuByUrl(navMenus, pathname || '') : null;
+    const displayTitle = title ?? autoMenu?.name;
+    const displayDescription = description ?? autoMenu?.description;
+
     /* 격자 표시 여부 — preview는 기본 true, live는 기본 false */
     const [showGrid, setShowGrid] = useState(mode === 'preview');
 
@@ -71,11 +93,11 @@ export default function PageLayout({ title, description, mode = 'live', children
 
     return (
         <div className="space-y-3">
-            {title && (
+            {displayTitle && (
                 <div>
-                    <h1 className="text-lg font-bold text-slate-900">{title}</h1>
-                    {description && (
-                        <p className="text-sm text-slate-500 mt-0.5">{description}</p>
+                    <h1 className="text-lg font-bold text-slate-900">{displayTitle}</h1>
+                    {displayDescription && (
+                        <p className="text-sm text-slate-500 mt-0.5">{displayDescription}</p>
                     )}
                 </div>
             )}

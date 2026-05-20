@@ -45,6 +45,7 @@ export interface FieldEditValues {
     fileLayerSlug?: string;          // 개발자방식 로컬 컴포넌트명
     connectedContentWidgetIds?: string[];  // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중)
     contentAction?: 'save' | 'delete';    // 컨텐츠 연결 시 동작 (저장/삭제)
+    goBackAfterAction?: boolean;          // 동작 완료 후 이전 페이지 이동 / 팝업 닫기
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부

@@ -67,6 +67,66 @@ export const showValidationError = (errors: string[]): void => {
 };
 
 /**
+ * Form 위젯 필드 유효성 검사 (required / minLength / maxLength / pattern / 파일 개수·용량)
+ * - 오류 발견 시 toast.warning 표시 후 false 반환
+ * - 모든 항목 통과 시 true 반환
+ * @param fields        Form 위젯의 fields 배열
+ * @param values        widgetId별 필드값 맵 (fieldId → 값)
+ * @param fileValues    widgetId별 신규 파일 맵 (fieldId → File[])
+ * @param existingFileMeta widgetId별 기존 파일 맵 (fieldId → any[] — 개수만 사용)
+ * @example if (!validateFormFields(fw.fields, vals, fVals, eMeta)) return;
+ */
+export const validateFormFields = (
+    fields: import('./components/builder/FormBuilder').FormFieldItem[],
+    values: Record<string, string>,
+    fileValues: Record<string, File[]>,
+    existingFileMeta: Record<string, unknown[]>,
+): boolean => {
+    for (const f of fields) {
+        /* hidden 필드는 유효성 검사 건너뜀 */
+        if (f.type === 'hidden') continue;
+        const label     = f.label || f.fieldKey || f.id;
+        const val       = (values[f.id] || '').trim();
+        const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
+
+        if (f.required) {
+            const empty = (f.type === 'file' || f.type === 'image') ? fileCount === 0 : !val;
+            if (empty) { toast.warning(`'${label}' 항목은 필수 입력입니다.`); return false; }
+        }
+        if (val && f.type !== 'file' && f.type !== 'image' && f.type !== 'video') {
+            if (f.minLength && val.length < f.minLength) {
+                toast.warning(`'${label}' 항목은 최소 ${f.minLength}자 이상 입력해야 합니다.`); return false;
+            }
+            if (f.maxLength && val.length > f.maxLength) {
+                toast.warning(`'${label}' 항목은 최대 ${f.maxLength}자까지 입력 가능합니다.`); return false;
+            }
+        }
+        if (val && f.pattern) {
+            try {
+                if (!new RegExp(f.pattern).test(val)) {
+                    toast.warning(`'${label}' 형식이 올바르지 않습니다.${f.patternDesc ? ` (${f.patternDesc})` : ''}`);
+                    return false;
+                }
+            } catch { /* 잘못된 패턴 무시 */ }
+        }
+        if ((f.type === 'file' || f.type === 'image') && f.maxFileCount && fileCount > f.maxFileCount) {
+            toast.warning(`'${label}' 항목은 최대 ${f.maxFileCount}개까지 첨부 가능합니다.`); return false;
+        }
+        if ((f.type === 'file' || f.type === 'image') && f.maxFileSizeMB) {
+            const over = (fileValues[f.id] || []).find(file => file.size > f.maxFileSizeMB! * 1024 * 1024);
+            if (over) { toast.warning(`'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`); return false; }
+        }
+        if ((f.type === 'file' || f.type === 'image') && f.maxTotalSizeMB) {
+            const total = (fileValues[f.id] || []).reduce((s, file) => s + file.size, 0);
+            if (total > f.maxTotalSizeMB * 1024 * 1024) {
+                toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
+            }
+        }
+    }
+    return true;
+};
+
+/**
  * key 목록에서 중복된 key를 찾아 반환합니다.
  * @param keys 검사할 key 목록
  * @returns 중복된 key 목록 (중복 제거된 상태)

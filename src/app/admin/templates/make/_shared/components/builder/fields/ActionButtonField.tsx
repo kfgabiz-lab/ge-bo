@@ -197,7 +197,7 @@ export function ActionButtonField({
 
                             {/* 1개 이상 선택된 경우에만 저장/삭제 표시 */}
                             {selectedIds.length > 0 && (
-                                <div>
+                                <div className="space-y-1.5">
                                     <label className={LABEL_CLS}>동작</label>
                                     <div className="flex gap-4">
                                         {(['save', 'delete'] as const).map(action => (
@@ -216,6 +216,16 @@ export function ActionButtonField({
                                             </label>
                                         ))}
                                     </div>
+                                    {/* 동작 완료 후 이전 페이지 이동 여부 */}
+                                    <label className="flex items-center gap-1.5 cursor-pointer mt-0.5">
+                                        <input
+                                            type="checkbox"
+                                            checked={values.goBackAfterAction ?? false}
+                                            onChange={e => onChange({ goBackAfterAction: e.target.checked || undefined })}
+                                            className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                        />
+                                        <span className="text-xs text-slate-700">동작 후 이전페이지 이동</span>
+                                    </label>
                                 </div>
                             )}
                         </div>

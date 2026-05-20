@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Check, X, Search, Pencil } from 'lucide-react';
+import { Plus, Trash2, Check, X, Search, Pencil, RotateCcw } from 'lucide-react';
 import { useCodeStore, CodeDetail } from '@/store/useCodeStore';
 import { toast } from 'sonner';
 
@@ -54,9 +54,15 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
 
     /* 코드 검색 필터 */
     const [search, setSearch] = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
+
+    const handleSearch = () => setAppliedSearch(search);
+    const handleReset = () => { setSearch(''); setAppliedSearch(''); };
+
     const filtered = details.filter(d =>
-        d.code.includes(search.toUpperCase()) ||
-        d.name.toLowerCase().includes(search.toLowerCase())
+        appliedSearch === '' ||
+        d.code.includes(appliedSearch.toUpperCase()) ||
+        d.name.toLowerCase().includes(appliedSearch.toLowerCase())
     );
 
     /* ── 편집 Map 헬퍼 ── */
@@ -177,16 +183,31 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
                     코드 상세
                     <span className="ml-1.5 text-slate-400 font-normal">{details.length}개</span>
                 </h3>
-                {/* 코드 검색 */}
-                <div className="relative flex-1">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="코드값 / 코드명 검색"
-                        className="w-full pl-6 pr-2 py-1 text-[11px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-slate-400"
-                    />
+                {/* 빌더 SimpleSearch 스타일 검색 영역 */}
+                <div className="flex-1 flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-4 py-1.5">
+                    <div className="flex-1 flex items-center gap-2">
+                        <label className="text-xs font-medium text-slate-600 shrink-0">코드 검색</label>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+                            placeholder="코드값 / 코드명"
+                            className="flex-1 border border-slate-200 rounded px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
+                        />
+                    </div>
+                    <button
+                        onClick={handleReset}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-slate-50 transition-all"
+                    >
+                        <RotateCcw className="w-3 h-3" /> 초기화
+                    </button>
+                    <button
+                        onClick={handleSearch}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"
+                    >
+                        <Search className="w-3 h-3" /> 검색
+                    </button>
                 </div>
                 {/* 코드 추가 버튼 */}
                 {!isAdding && (

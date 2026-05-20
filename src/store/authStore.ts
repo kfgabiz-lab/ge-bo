@@ -5,7 +5,8 @@ interface AdminInfo {
     id: number;
     name: string;
     email: string;
-    role: 'SUPER_ADMIN' | 'EDITOR';
+    role: string;
+    isSystem: boolean; // role.is_system 기반 시스템관리자 여부
 }
 
 interface AuthState {
@@ -33,16 +34,27 @@ export const useAuthStore = create<AuthState>((set) => ({
     /** 로그인 성공 시 호출 - 토큰과 관리자 정보를 메모리에만 저장 */
     login: (accessToken, adminInfo) => {
         set({ isLoggedIn: true, adminInfo, accessToken });
+        /* 미들웨어 라우트 보호용 — is_system 값을 일반 쿠키에 저장 (비httpOnly) */
+        if (typeof window !== 'undefined') {
+            document.cookie = `bo_is_system=${adminInfo.isSystem}; path=/; SameSite=Strict`;
+        }
     },
 
     /** 로그아웃 - 메모리 상태 초기화 (쿠키 삭제는 api.ts에서 처리) */
     logout: () => {
         set({ isLoggedIn: false, adminInfo: null, accessToken: null });
+        /* 미들웨어 라우트 보호용 쿠키 제거 */
+        if (typeof window !== 'undefined') {
+            document.cookie = 'bo_is_system=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        }
     },
 
     /** 토큰 갱신 후 상태 업데이트 */
     setAccessToken: (accessToken, adminInfo) => {
         set({ isLoggedIn: true, adminInfo, accessToken });
+        if (typeof window !== 'undefined') {
+            document.cookie = `bo_is_system=${adminInfo.isSystem}; path=/; SameSite=Strict`;
+        }
     },
 
     /**
@@ -58,8 +70,14 @@ export const useAuthStore = create<AuthState>((set) => ({
             );
             const { accessToken, adminInfo } = resp.data;
             set({ isLoggedIn: true, adminInfo, accessToken });
+            if (typeof window !== 'undefined') {
+                document.cookie = `bo_is_system=${adminInfo.isSystem}; path=/; SameSite=Strict`;
+            }
         } catch {
             set({ isLoggedIn: false, adminInfo: null, accessToken: null });
+            if (typeof window !== 'undefined') {
+                document.cookie = 'bo_is_system=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            }
         }
     },
 }));

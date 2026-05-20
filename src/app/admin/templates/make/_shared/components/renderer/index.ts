@@ -20,8 +20,9 @@ export { TableRenderer }       from './TableRenderer';
 export { FormRenderer }        from './FormRenderer';
 export { SpaceRenderer }       from './SpaceRenderer';
 export { CategoryRenderer }    from './CategoryRenderer';
-export { SubListRenderer }     from './SubListRenderer';
-export { WidgetRenderer }      from './WidgetRenderer';
+export { SubListRenderer }       from './SubListRenderer';
+export { MultiSelectRenderer }   from './MultiSelectRenderer';
+export { WidgetRenderer }        from './WidgetRenderer';
 export { PageGridRenderer }    from './PageGridRenderer';
 
 /* 타입 export */
@@ -35,6 +36,7 @@ export type {
     SubListWidget,
     SubListColumn,
     SubListColumnType,
+    MultiSelectWidget,
     AnyWidget,
     TableActionHandlers,
     SearchHandlers,

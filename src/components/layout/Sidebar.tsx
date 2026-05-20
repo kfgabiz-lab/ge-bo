@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+// import { Layers } from 'lucide-react'; /* 기존 로고 — 원복 시 주석 해제 */
 import * as LucideIcons from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore, MenuItem as DbMenu } from '@/store/useMenuStore';
@@ -19,6 +21,9 @@ const renderIcon = (name: string, className = 'w-4 h-4') => {
 /* ── 메뉴 아이템 ── */
 const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; depth?: number; isCollapsed?: boolean }) => {
     const pathname = usePathname();
+
+    /* 비노출 메뉴는 렌더링하지 않음 — 상위가 숨김이면 children도 자동으로 숨겨짐 */
+    if (!item.visible) return null;
     const hasChildren = item.children && item.children.length > 0;
     const hasUrl = item.url && item.url.length > 0;
 
@@ -43,7 +48,9 @@ const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; dep
     const base = `relative flex items-center justify-between gap-2.5 py-2 pr-3 rounded-lg transition-all duration-150 text-[13px] group ${depth > 0 && !isCollapsed ? 'pl-9' : 'pl-3'} ${isCollapsed ? 'justify-center pr-0' : ''}`;
     const style = isActive
         ? 'bg-white/[0.08] text-white font-medium'
-        : 'text-slate-300 hover:bg-white/5 hover:text-white';
+        : depth === 0
+            ? 'text-slate-200 hover:bg-white/5 hover:text-white'
+            : 'text-slate-400 hover:bg-white/5 hover:text-white';
 
     const inner = (
         <>
@@ -89,7 +96,23 @@ const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; dep
 export function Sidebar() {
     const adminInfo = useAuthStore((state) => state.adminInfo);
     const accessToken = useAuthStore((state) => state.accessToken);
-    const { navMenus: menus, fetchNavMenus, isSidebarCollapsed, toggleSidebar } = useMenuStore();
+    const { navMenus: rawMenus, fetchNavMenus, isSidebarCollapsed, toggleSidebar } = useMenuStore();
+
+    /* SYSTEM_ADMIN이 아니면 isSystem=true 메뉴 제외 */
+    const isSystemAdmin = adminInfo?.role === 'SYSTEM_ADMIN';
+    const menus = isSystemAdmin ? rawMenus : rawMenus.filter(cat => !cat.isSystem);
+
+    /* 카테고리별 접기 상태 (id Set) */
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
+
+    const toggleCategory = (id: number) => {
+        setCollapsedCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     /* 메뉴 조회 (로그인 후) */
     useEffect(() => {
@@ -104,33 +127,42 @@ export function Sidebar() {
                 className="h-14 flex items-center gap-2.5 px-4 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.02]"
                 onClick={toggleSidebar}
             >
+                {/* 기존 로고 — 원복 시 주석 해제
                 <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-sm flex items-center justify-center shadow-lg shadow-emerald-500/20">
                     <Layers className="w-4 h-4 text-white" />
                 </div>
                 {!isSidebarCollapsed && <span className="text-white font-extrabold text-[14px] tracking-tight truncate">WORKSPACE</span>}
+                */}
+                {!isSidebarCollapsed && <img src="/bo/ls-electric-logo.png" alt="LS ELECTRIC" className="h-5 w-auto" />}
             </div>
 
             {/* 네비게이션 — DB 메뉴 기반 */}
             <nav className="flex-1 py-4 px-2.5 overflow-y-auto space-y-4">
-                {menus.map(category => (
-                    category.isCategory ? (
-                        /* 카테고리 헤더 + 하위 메뉴 */
-                        <div key={category.id}>
-                            {!isSidebarCollapsed && (
-                                <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2 px-3">
+                {menus.filter(cat => cat.visible !== false).map(category => (
+                    /* 1depth 메뉴는 모두 카테고리 헤더 + 하위 메뉴 형태로 렌더링 */
+                    <div key={category.id}>
+                        {!isSidebarCollapsed && (
+                            <button
+                                onClick={() => toggleCategory(category.id)}
+                                className="w-full flex items-center justify-between mb-2 px-3 group"
+                            >
+                                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-400 transition-colors">
                                     {category.name}
-                                </p>
-                            )}
+                                </span>
+                                {collapsedCategories.has(category.id)
+                                    ? <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-slate-500 transition-colors" />
+                                    : <ChevronDown className="w-3 h-3 text-slate-600 group-hover:text-slate-500 transition-colors" />
+                                }
+                            </button>
+                        )}
+                        {!collapsedCategories.has(category.id) && (
                             <div className="space-y-0.5">
                                 {(category.children ?? []).map(item => (
                                     <MenuItemComponent key={item.id} item={item} isCollapsed={isSidebarCollapsed} />
                                 ))}
                             </div>
-                        </div>
-                    ) : (
-                        /* 카테고리가 아닌 루트 메뉴 (있으면) */
-                        <MenuItemComponent key={category.id} item={category} isCollapsed={isSidebarCollapsed} />
-                    )
+                        )}
+                    </div>
                 ))}
             </nav>
 

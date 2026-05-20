@@ -83,18 +83,42 @@ export function MenuTree() {
 
             if (projected) {
                 const clonedItems = [...flattenedItems];
-                const oldActiveIndex = clonedItems.findIndex(({ id }) => id === active.id);
-                const oldOverIndex = clonedItems.findIndex(({ id }) => id === over.id);
+                const oldActiveIndex = clonedItems.findIndex(({ id }) => id === Number(active.id));
+                const oldOverIndex = clonedItems.findIndex(({ id }) => id === Number(over.id));
 
                 const childrenCount = getChildCount(flattenedItems, Number(active.id));
                 const activeTreeItems = clonedItems.splice(oldActiveIndex, 1 + childrenCount);
 
-                let newOverIndex = clonedItems.findIndex(({ id }) => id === over.id);
+                let newOverIndex = clonedItems.findIndex(({ id }) => id === Number(over.id));
                 if (newOverIndex < 0) newOverIndex = clonedItems.length;
 
-                // 드래그를 위에서 아래로 한 경우 타겟(over)의 밑(뒤)에 붙도록 보정
                 const isBelow = oldActiveIndex < oldOverIndex;
-                const insertPos = newOverIndex + (isBelow ? 1 : 0);
+                let insertPos = newOverIndex + (isBelow ? 1 : 0);
+                let finalDepth = projected.depth;
+                let finalParentId = projected.parentId;
+
+                /* depth=0 아이템은 항상 root 위치에만 삽입 */
+                const activeItemDepth = flattenedItems.find(i => i.id === Number(active.id))?.depth ?? 1;
+                if (activeItemDepth === 0 && finalDepth > 0) {
+                    finalDepth = 0;
+                    finalParentId = null;
+                    /* over 아이템의 depth-0 조상을 찾아 삽입 위치 재조정 */
+                    let ancestorIdx = newOverIndex;
+                    while (ancestorIdx > 0 && (clonedItems[ancestorIdx]?.depth ?? 0) > 0) {
+                        ancestorIdx--;
+                    }
+                    if (!isBelow) {
+                        /* 상향 드래그: depth-0 조상 앞에 삽입 */
+                        insertPos = ancestorIdx;
+                    } else {
+                        /* 하향 드래그: depth-0 조상 그룹 끝 뒤에 삽입 */
+                        let groupEnd = ancestorIdx + 1;
+                        while (groupEnd < clonedItems.length && (clonedItems[groupEnd]?.depth ?? 0) > 0) {
+                            groupEnd++;
+                        }
+                        insertPos = groupEnd;
+                    }
+                }
 
                 clonedItems.splice(insertPos, 0, ...activeTreeItems);
 
@@ -103,15 +127,17 @@ export function MenuTree() {
                 let childCountDown = 0;
 
                 const updatedItems = clonedItems.map((item) => {
-                    if (item.id === active.id) {
+                    if (item.id === Number(active.id)) {
                         isApplyingToChildren = true;
                         childCountDown = childrenCount;
-                        activeDepthDiff = projected.depth - item.depth;
-                        return { ...item, depth: projected.depth, parentId: projected.parentId };
+                        activeDepthDiff = finalDepth - item.depth;
+                        return { ...item, depth: finalDepth, parentId: finalParentId };
                     }
                     if (isApplyingToChildren && childCountDown > 0) {
                         childCountDown--;
-                        return { ...item, depth: item.depth + activeDepthDiff };
+                        /* 자식 depth는 max 2(3depth)를 초과하지 않도록 제한 */
+                        const newDepth = Math.min(item.depth + activeDepthDiff, 2);
+                        return { ...item, depth: newDepth };
                     }
                     return item;
                 });

@@ -1265,15 +1265,15 @@ export default function MakeGridLayoutPage() {
     const [pendingOptionMode, setPendingOptionMode] = useState<'manual' | 'code'>('manual');
     const [pendingCodeGroupCode, setPendingCodeGroupCode] = useState('');
 
-    /* ── LAYER 팝업 연결용 템플릿 목록 ── */
+    /* ── PAGE 팝업 연결용 템플릿 목록 ── */
     const [layerTemplateList, setLayerTemplateList] = useState<TemplateItem[]>([]);
     const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
-    /** actions 컬럼 편집 시 QUICK_DETAIL 템플릿 목록 lazy 로딩 */
+    /** actions 컬럼 편집 시 PAGE 위젯 템플릿 목록 lazy 로딩 */
     const loadLayerTemplates = () => {
         if (layerTemplatesLoaded) return;
         api.get('/page-templates')
             .then(res => {
-                setLayerTemplateList((res.data as TemplateItem[]).filter(t => t.templateType === 'QUICK_DETAIL'));
+                setLayerTemplateList((res.data as TemplateItem[]).filter(t => t.templateType === 'PAGE'));
                 setLayerTemplatesLoaded(true);
             })
             .catch(() => {});

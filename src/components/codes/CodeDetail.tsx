@@ -247,13 +247,14 @@ export function CodeDetail() {
                     </div>
                     <div>
                         <label className="text-[10px] font-medium text-slate-500 mb-1 block">사용여부</label>
-                        <button type="button" onClick={() => setActive(!active)}
-                            className={`w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border text-xs font-medium transition-all ${
-                                active ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-400'
-                            }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                            {active ? '사용' : '미사용'}
-                        </button>
+                        <select
+                            value={active ? 'Y' : 'N'}
+                            onChange={e => setActive(e.target.value === 'Y')}
+                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
+                        >
+                            <option value="Y">사용</option>
+                            <option value="N">미사용</option>
+                        </select>
                     </div>
                 </div>
 

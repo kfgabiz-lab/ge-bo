@@ -78,7 +78,7 @@ interface PageGridRendererProps {
     formValuesMap?: Record<string, Record<string, string>>;
     /** (widgetId, fieldId, value) 형태로 호출 */
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete') => void;
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;
@@ -120,6 +120,12 @@ interface PageGridRendererProps {
     subListRowsMap?: Record<string, import('./SubListRenderer').SubListRow[]>;
     /** SubList 행 변경 콜백 — (widgetId, rows) */
     onSubListRowsChange?: (widgetId: string, rows: import('./SubListRenderer').SubListRow[]) => void;
+
+    /* live 모드 전용 — multiselect */
+    /** widgetId → 선택된 ID 배열 */
+    multiSelectValuesMap?: Record<string, number[]>;
+    /** 선택 변경 콜백 — (widgetId, ids) */
+    onMultiSelectChange?: (widgetId: string, ids: number[]) => void;
 }
 
 /**
@@ -157,6 +163,8 @@ export function PageGridRenderer({
     onClose,
     subListRowsMap,
     onSubListRowsChange,
+    multiSelectValuesMap,
+    onMultiSelectChange,
 }: PageGridRendererProps) {
     /* ── 카테고리 dbSlug 상속 맵 ──
      * depth 2+ 위젯은 dbSlug가 없으므로 parentWidgetId 체인을 타고 올라가 상위 dbSlug 상속.
@@ -267,6 +275,9 @@ export function PageGridRenderer({
                                         /* 카테고리 */
                                         categorySelections={categorySelections}
                                         onCategorySelect={onCategorySelect}
+                                        /* multiselect */
+                                        multiSelectValuesMap={multiSelectValuesMap}
+                                        onMultiSelectChange={onMultiSelectChange}
                                         /* 팝업 */
                                         dataSlug={dataSlug}
                                         onRefresh={onRefresh}

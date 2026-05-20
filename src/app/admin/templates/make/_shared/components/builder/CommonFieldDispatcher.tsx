@@ -1,6 +1,7 @@
 import {
     InputField, SelectField, DateField, DateRangeField, RadioField, CheckboxField,
     TextareaField, EditorField, FileField, VideoField, ImageField,
+    ColorField,
     ActionButtonField, FieldEditValues, FieldEditProps, ColSpanMode
 } from './fields';
 import { CodeGroupDef, TemplateItem } from '../../types';
@@ -56,6 +57,7 @@ export const CommonFieldDispatcher = (props: CommonFieldDispatcherProps) => {
                 contentWidgets={props.contentWidgets ?? []}
             />
         );
+        case 'color': return <ColorField {...fieldProps} />;
 
         default:
             return (

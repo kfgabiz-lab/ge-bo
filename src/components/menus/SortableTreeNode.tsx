@@ -30,7 +30,7 @@ export function SortableTreeNode({ item, indentationWidth }: SortableTreeNodePro
     const hasUrl = item.url && item.url.length > 0;
     // 원래 hasChildren은 Flatten에서 파악하기 애매하지만, 실제 자식이 있는지 여부는 store(menus)의 원본과 동기화 해야함.
     // 로컬 테스트용이므로 깊이와 하위 관계만 유추합니다.
-    const hasChildren = !item.isCategory && (item.children?.length ?? 0) > 0;
+    const hasChildren = item.depth > 0 && (item.children?.length ?? 0) > 0;
 
     const style: CSSProperties = {
         transform: CSS.Transform.toString(transform),
@@ -46,7 +46,7 @@ export function SortableTreeNode({ item, indentationWidth }: SortableTreeNodePro
         else selectMenu(item);
     };
 
-    if (item.isCategory) {
+    if (item.depth === 0) {
         return (
             <div
                 ref={setNodeRef}

@@ -2,7 +2,7 @@
 
 /**
  * ============================================================
- *  [위젯 렌더러] /admin/templates/widget/{slug}
+ *  [위젯 렌더러] /admin/widget/{slug}
  * ============================================================
  *  - DB에서 slug로 위젯 템플릿(PAGE 타입) 로딩
  *  - configJson.widgetItems → 12칸 그리드 레이아웃으로 렌더링
@@ -15,10 +15,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PageLayout from '@/components/layout/PageLayout';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { useCodeStore } from '@/store/useCodeStore';
 import { PageGridRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { AnyWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
@@ -42,30 +40,6 @@ interface WidgetConfig {
 
 const DEFAULT_PAGE_SIZE = 10;
 
-/** 메뉴 트리 재귀 탐색으로 현재 URL의 메뉴명 반환 */
-function findMenuName(menus: MenuItem[], pathname: string): string | null {
-    for (const item of menus) {
-        if (item.url === pathname) return item.name;
-        if (item.children?.length) {
-            const found = findMenuName(item.children, pathname);
-            if (found) return found;
-        }
-    }
-    return null;
-}
-
-/** 메뉴 트리 재귀 탐색으로 현재 URL의 메뉴 설명 반환 */
-function findMenuDescription(menus: MenuItem[], pathname: string): string | null {
-    for (const item of menus) {
-        if (item.url === pathname) return item.description ?? null;
-        if (item.children?.length) {
-            const found = findMenuDescription(item.children, pathname);
-            if (found) return found;
-        }
-    }
-    return null;
-}
-
 
 /* ══════════════════════════════════════════ */
 /*  메인 페이지                                */
@@ -73,10 +47,6 @@ function findMenuDescription(menus: MenuItem[], pathname: string): string | null
 
 export default function WidgetRendererPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = React.use(params);
-    const pathname = usePathname();
-    const navMenus = useMenuStore((state) => state.navMenus);
-    const menuName = findMenuName(navMenus, pathname || '');
-    const menuDescription = findMenuDescription(navMenus, pathname || '');
     const { groups: codeGroups, fetchGroups } = useCodeStore();
 
     /* 템플릿 로딩 상태 */
@@ -189,8 +159,20 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             });
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params });
+            /* contentKey 기반 구조: dataJson 내 값이 object면 flat-map으로 펼쳐 테이블 row 구성 */
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
-                .map(item => ({ _id: item.id, ...item.dataJson }));
+                .map(item => {
+                    const flat: Record<string, unknown> = { _id: item.id };
+                    Object.entries(item.dataJson ?? {}).forEach(([k, v]) => {
+                        if (k === 'id') return; /* id는 _id로 이미 처리 */
+                        if (v && typeof v === 'object' && !Array.isArray(v)) {
+                            Object.assign(flat, v); /* contentKey wrapper 펼치기 */
+                        } else {
+                            flat[k] = v;
+                        }
+                    });
+                    return flat;
+                });
 
             const hasMore = res.data.last === false; // 백엔드 DTO에 추가된 last 필드 사용
             setPageTableDataMap(prev => ({
@@ -488,7 +470,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     }
 
     return (
-        <PageLayout mode="live" title={menuName ?? undefined} description={menuDescription ?? undefined}>
+        <PageLayout mode="live">
             <PageGridRenderer
                 mode="live"
                 widgetItems={widgetItems}

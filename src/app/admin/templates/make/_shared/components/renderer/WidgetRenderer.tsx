@@ -12,7 +12,7 @@
  * [팝업 내부 처리 — live 모드 전용]
  * SpaceRenderer의 connType='popup' 버튼, TableRenderer의 수정·상세·파일 버튼 클릭 시
  * 아래 로직을 내부적으로 처리한다:
- *   - outputMode='page'       → router.push('/admin/generated/{slug}?id={id}')
+ *   - outputMode='page'       → router.push('/admin/widgetSub/{slug}?id={id}')
  *   - outputMode='layerpopup' → CenterPopupLayout / RightDrawerLayout + 재귀 WidgetRenderer
  *
  * 사용법:
@@ -59,6 +59,7 @@ import { FormRenderer } from './FormRenderer';
 import { SpaceRenderer } from './SpaceRenderer';
 import { CategoryRenderer } from './CategoryRenderer';
 import { SubListRenderer } from './SubListRenderer';
+import { MultiSelectRenderer } from './MultiSelectRenderer';
 import CenterPopupLayout from '@/components/layout/popup/CenterPopupLayout';
 import RightDrawerLayout from '@/components/layout/popup/RightDrawerLayout';
 import type { AnyWidget, RendererMode, TableActionHandlers } from './types';
@@ -66,6 +67,7 @@ import type { FormFieldItem } from '../builder/FormBuilder';
 import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
+import { validateFormFields } from '../../utils';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
@@ -138,7 +140,7 @@ interface WidgetRendererProps {
     /** Form 필드값 변경 핸들러 */
     onFormValuesChange?: (fieldId: string, value: string) => void;
     /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete') => void;
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
     onClose?: () => void;
 
@@ -178,6 +180,12 @@ interface WidgetRendererProps {
     subListRowsMap?: Record<string, import('./SubListRenderer').SubListRow[]>;
     /** SubList 행 변경 콜백 — (widgetId, rows) */
     onSubListRowsChange?: (widgetId: string, rows: import('./SubListRenderer').SubListRow[]) => void;
+
+    /* ── live 모드 전용 — multiselect ── */
+    /** widgetId → 선택된 ID 배열 */
+    multiSelectValuesMap?: Record<string, number[]>;
+    /** 선택 변경 콜백 — (widgetId, ids) */
+    onMultiSelectChange?: (widgetId: string, ids: number[]) => void;
 
     /* ── live 모드 전용 — category ── */
     /** 카테고리 위젯별 선택된 항목 ID (widgetId → selectedId) */
@@ -245,6 +253,9 @@ export function WidgetRenderer({
     /* sublist */
     subListRowsMap,
     onSubListRowsChange,
+    /* multiselect */
+    multiSelectValuesMap,
+    onMultiSelectChange,
     /* category */
     categorySelections,
     onCategorySelect,
@@ -332,12 +343,14 @@ export function WidgetRenderer({
      * @param editId        수정 대상 데이터 ID (신규 등록이면 null)
      * @param _listSlug     미사용 (각자 slug 독립 정책 — 팝업 폼의 connectedSlug 직접 사용)
      * @param initialValues 초기값 맵 — fieldKey 기준으로 폼 필드에 매핑 (파라미터 전달용)
+     * @param groupId       다중 slug 저장 그룹 ID — page 이동 시 ?group_id=uuid 파라미터로 전달
      */
     const handleInternalPopupOpen = useCallback(async (
         slug: string,
         editId?: number | null,
         _listSlug?: string,
         initialValues?: Record<string, string>,
+        groupId?: string | null,
     ) => {
         if (mode !== 'live') return;
 
@@ -360,8 +373,11 @@ export function WidgetRenderer({
 
             /* outputMode='page': 팝업 없이 상세 페이지로 이동 */
             if (cfg.outputMode === 'page') {
-                const query = editId != null ? `?id=${editId}` : '';
-                router.push(`/admin/generated/${slug}${query}`);
+                /* group_id 있으면 다중 slug 수정 모드 — group_id 우선 사용 */
+                let query = '';
+                if (groupId) query = `?group_id=${groupId}`;
+                else if (editId != null) query = `?id=${editId}`;
+                router.push(`/admin/widgetSub/${slug}${query}`);
                 return;
             }
 
@@ -458,6 +474,7 @@ export function WidgetRenderer({
     const handlePopupContentAction = useCallback(async (
         _widgetIds: string[],
         action: 'save' | 'delete',
+        _goBackAfterAction?: boolean,
     ) => {
         if (!popupListSlug) return;
 
@@ -482,48 +499,8 @@ export function WidgetRenderer({
             .filter(c => c.widget?.type === 'form')
             .flatMap(c => (c.widget?.fields as FormFieldItem[] ?? []));
 
-        /* 유효성 검사 */
-        for (const f of fields) {
-            /* hidden 필드는 유효성 검사 건너뜀 */
-            if (f.type === 'hidden') continue;
-            const label     = f.label || f.fieldKey || f.id;
-            const val       = (popupValues[f.id] || '').trim();
-            const fileCount = (popupExistingFileIds[f.id]?.length || 0) + (popupFileValues[f.id]?.length || 0);
-
-            if (f.required) {
-                const empty = (f.type === 'file' || f.type === 'image') ? fileCount === 0 : !val;
-                if (empty) { toast.warning(`'${label}' 항목은 필수 입력입니다.`); return; }
-            }
-            if (val && f.type !== 'file' && f.type !== 'image' && f.type !== 'video') {
-                if (f.minLength && val.length < f.minLength) {
-                    toast.warning(`'${label}' 항목은 최소 ${f.minLength}자 이상 입력해야 합니다.`); return;
-                }
-                if (f.maxLength && val.length > f.maxLength) {
-                    toast.warning(`'${label}' 항목은 최대 ${f.maxLength}자까지 입력 가능합니다.`); return;
-                }
-            }
-            if (val && f.pattern) {
-                try {
-                    if (!new RegExp(f.pattern).test(val)) {
-                        toast.warning(`'${label}' 형식이 올바르지 않습니다.${f.patternDesc ? ` (${f.patternDesc})` : ''}`);
-                        return;
-                    }
-                } catch { /* 잘못된 패턴 무시 */ }
-            }
-            if ((f.type === 'file' || f.type === 'image') && f.maxFileCount && fileCount > f.maxFileCount) {
-                toast.warning(`'${label}' 항목은 최대 ${f.maxFileCount}개까지 첨부 가능합니다.`); return;
-            }
-            if ((f.type === 'file' || f.type === 'image') && f.maxFileSizeMB) {
-                const over = (popupFileValues[f.id] || []).find(file => file.size > f.maxFileSizeMB! * 1024 * 1024);
-                if (over) { toast.warning(`'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`); return; }
-            }
-            if ((f.type === 'file' || f.type === 'image') && f.maxTotalSizeMB) {
-                const total = (popupFileValues[f.id] || []).reduce((s, file) => s + file.size, 0);
-                if (total > f.maxTotalSizeMB * 1024 * 1024) {
-                    toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return;
-                }
-            }
-        }
+        /* 유효성 검사 — 공통 함수 위임 */
+        if (!validateFormFields(fields, popupValues, popupFileValues, popupExistingFileIds)) return;
 
         setPopupSaving(true);
         try {
@@ -783,7 +760,8 @@ export function WidgetRenderer({
             onEdit: (row) => {
                 const actionsCol = widget.columns.find(c => c.cellType === 'actions');
                 const slug = actionsCol?.editPopupSlug;
-                if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug); return; }
+                /* _groupId: 다중 slug 저장 row — group_id 파라미터로 page 이동 */
+                if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug, undefined, row._groupId as string | null); return; }
                 handlers?.onEdit?.(row);
             },
             onDetail: (row) => {
@@ -921,6 +899,18 @@ export function WidgetRenderer({
                 rows={subListRowsMap?.[subWid]}
                 onChange={rows => onSubListRowsChange?.(subWid, rows)}
                 onFileChange={onFileChange}
+            />
+        );
+    }
+
+    if (widget.type === 'multiselect') {
+        const msWid = widget.widgetId;
+        return (
+            <MultiSelectRenderer
+                mode={mode}
+                widget={widget}
+                selectedIds={multiSelectValuesMap?.[msWid] ?? []}
+                onChange={ids => onMultiSelectChange?.(msWid, ids)}
             />
         );
     }

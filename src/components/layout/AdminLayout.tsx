@@ -10,8 +10,14 @@ import { useMenuStore } from '@/store/useMenuStore';
 export function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isLoginPage = pathname?.startsWith('/admin/login');
+    const isPublicPage = pathname?.startsWith('/test');
 
     const { isSidebarCollapsed } = useMenuStore();
+
+    /* 공개 페이지 — 인증/사이드바 없이 그대로 렌더링 */
+    if (isPublicPage) {
+        return <>{children}</>;
+    }
 
     if (isLoginPage) {
         return (

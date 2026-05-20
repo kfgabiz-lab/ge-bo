@@ -608,15 +608,15 @@ export default function MakeListPage() {
         (!templateSearchQuery || t.name.includes(templateSearchQuery) || t.slug.includes(templateSearchQuery))
     );
 
-    /* ── QUICK_DETAIL 팝업 연결용 템플릿 목록 ── */
+    /* ── PAGE 팝업 연결용 템플릿 목록 ── */
     const [layerTemplateList, setLayerTemplateList] = useState<TemplateItem[]>([]);
     const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
-    /** actions 컬럼 편집 시 QUICK_DETAIL 템플릿 목록 lazy 로딩 */
+    /** actions 컬럼 편집 시 PAGE 위젯 템플릿 목록 lazy 로딩 */
     const loadLayerTemplates = () => {
         if (layerTemplatesLoaded) return;
         api.get('/page-templates')
             .then(res => {
-                setLayerTemplateList((res.data as TemplateItem[]).filter(t => t.templateType === 'QUICK_DETAIL'));
+                setLayerTemplateList((res.data as TemplateItem[]).filter(t => t.templateType === 'PAGE'));
                 setLayerTemplatesLoaded(true);
             })
             .catch(() => { });
@@ -653,6 +653,14 @@ export default function MakeListPage() {
     const [isGenerating, setIsGenerating] = useState(false);
     /* 미리보기 팝업 — slug 연결된 액션 버튼 클릭 시 externalPopupTrigger로 WidgetRenderer에 위임 */
     const [previewPopupTrigger, setPreviewPopupTrigger] = useState<{ slug: string; ts: number } | null>(null);
+
+    /* ── Slug 레지스트리 — TableBuilder DB Slug 드롭다운용 ── */
+    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
+    useEffect(() => {
+        api.get('/slug-registry/active')
+            .then(res => setSlugOptions((res.data || []).filter((s: { type: string }) => s.type === 'PAGE_DATA')))
+            .catch(() => { });
+    }, []);
 
     /* ── 공통코드 목록 로딩 ── */
     useEffect(() => {
@@ -1278,7 +1286,8 @@ export default function MakeListPage() {
                                 <TableBuilder
                                     widget={tableWidget}
                                     onChange={setTableWidget}
-                                    searchWidgets={[]} // 리스트 빌더에서는 단일 테이블이므로 빈 배열 또는 검색 위젯 필요 시 추가
+                                    searchWidgets={[]}
+                                    slugOptions={slugOptions}
                                 />
                             )}
 
@@ -1378,7 +1387,7 @@ export default function MakeListPage() {
                                                                 ))}
                                                             </select>
                                                             {layerTemplateList.length === 0 && (
-                                                                <p className="text-[10px] text-slate-400 mt-1">등록된 QUICK_DETAIL 팝업이 없습니다.</p>
+                                                                <p className="text-[10px] text-slate-400 mt-1">등록된 위젯 팝업이 없습니다.</p>
                                                             )}
                                                         </div>
                                                         {/* 개발자방식 — 생성된 로컬 파일 컴포넌트명 (예: LayerPopup) */}

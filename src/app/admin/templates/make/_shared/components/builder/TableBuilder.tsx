@@ -27,6 +27,7 @@ import {
     TextCodeGroupField,
     BooleanTextField,
     ActionsField,
+    SlugSelectField,
 } from './fields';
 
 /* ══════════════════════════════════════════ */
@@ -239,20 +240,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                     className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
             </div>
 
-            {/* DB Slug — 데이터를 가져올 Slug 레지스트리 선택 */}
-            <div>
-                <label className="text-[10px] font-medium text-slate-500 mb-1 block">DB Slug</label>
-                <select
-                    value={widget.connectedSlug ?? ''}
-                    onChange={e => onChange({ ...widget, connectedSlug: e.target.value })}
-                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900 bg-white"
-                >
-                    <option value="">(선택 안 함 - 데이터 조회 없음)</option>
-                    {slugOptions.map(s => (
-                        <option key={s.id} value={s.slug}>{s.name} ({s.slug})</option>
-                    ))}
-                </select>
-            </div>
+            {/* 연결 Slug — 데이터를 가져올 Slug 레지스트리 선택 */}
+            <SlugSelectField
+                value={widget.connectedSlug ?? ''}
+                onChange={slug => onChange({ ...widget, connectedSlug: slug })}
+                slugOptions={slugOptions}
+            />
 
             {/* 연결된 Search 위젯 */}
             {searchWidgets.length > 0 && (

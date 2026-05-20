@@ -17,6 +17,7 @@ import type {
     SpaceWidget,
     CategoryWidget,
     SubListWidget,
+    MultiSelectWidget,
     AnyWidget,
 } from '../make/_shared/components/renderer';
 import type { TableWidget } from '../make/_shared/components/builder/TableBuilder';
@@ -27,12 +28,13 @@ import type { FormWidget } from '../make/_shared/components/builder/FormBuilder'
 /* ══════════════════════════════════════════ */
 
 const TABS = [
-    { key: 'search',   label: '검색폼' },
-    { key: 'table',    label: '데이터테이블' },
-    { key: 'form',     label: '폼' },
-    { key: 'space',    label: '공간영역' },
-    { key: 'category', label: '카테고리' },
-    { key: 'sublist',  label: '서브리스트' },
+    { key: 'search',      label: '검색폼' },
+    { key: 'table',       label: '데이터테이블' },
+    { key: 'form',        label: '폼' },
+    { key: 'space',       label: '공간영역' },
+    { key: 'category',    label: '카테고리' },
+    { key: 'sublist',     label: '서브리스트' },
+    { key: 'multiselect', label: '다중선택' },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -156,7 +158,11 @@ const SAMPLE_FORM: FormWidget = {
         { id: 'ff11', type: 'image', label: '프로필 이미지', colSpan: 12, rowSpan: 2 },
         { id: 'ff12', type: 'video', label: '동영상',        colSpan: 12, rowSpan: 2, videoMode: 'file' },
         { id: 'ff13', type: 'video', label: '동영상 URL',    colSpan: 12, rowSpan: 2, videoMode: 'url' },
-        { id: 'ff14', type: 'media', label: '컨텐츠 업로드', colSpan: 12, rowSpan: 2, required: true },
+        { id: 'ff14', type: 'media',  label: '컨텐츠 업로드', colSpan: 12, rowSpan: 2, required: true },
+        {
+            id: 'ff15', type: 'color', label: '색상',         colSpan: 12, rowSpan: 1,
+            options: ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6b7280'],
+        },
     ],
 };
 
@@ -204,6 +210,19 @@ const SAMPLE_CATEGORY_4: CategoryWidget = {
     allowCreate: true, allowEdit: true, allowDelete: true,
 };
 
+/** 다중선택 — 담당자 선택 샘플 (name,dept 필드 표시) */
+const SAMPLE_MULTISELECT: MultiSelectWidget = {
+    type: 'multiselect',
+    widgetId: 'guide-multiselect',
+    contentKey: 'assignedUsers',
+    sourceSlug: '',
+    labelFields: 'name,dept',
+    valueField: 'id',
+    placeholder: '담당자를 선택하세요',
+    title: '담당자 선택',
+    showBorder: true,
+};
+
 /** 서브리스트 — 코드 상세 목록 샘플 (코드값/코드명/정렬/기타/사용) */
 const SAMPLE_SUBLIST: SubListWidget = {
     type: 'sublist',
@@ -234,7 +253,7 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
         { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 15 }],
+    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 16 }],
     space:    [{ widget: SAMPLE_SPACE,    colSpan: 12, rowSpan: 2 }],
     category: [
         { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },
@@ -244,6 +263,9 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
     ],
     sublist: [
         { widget: SAMPLE_SUBLIST, colSpan: 12, rowSpan: 5 },
+    ],
+    multiselect: [
+        { widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 },
     ],
 };
 

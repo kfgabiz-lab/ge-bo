@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 
 /* ── 역할별 메뉴 접근 권한 체크박스 ── */
 export function MenuRoleMatrix() {
-    const { selectedMenu, roles, roleMenuMappings, updateRoleMenuMapping } = useMenuStore();
+    /* roles 대신 roleMenuMappings 직접 사용 — /roles API는 시스템관리자 전용이므로 접근 불가 */
+    const { selectedMenu, roleMenuMappings, updateRoleMenuMapping } = useMenuStore();
     const [pendingRoles, setPendingRoles] = useState<Set<number>>(new Set()); // API 호출 중인 역할
 
     if (!selectedMenu) return null;
@@ -40,13 +41,12 @@ export function MenuRoleMatrix() {
                 역할별 접근 권한
             </h3>
             <div className="grid grid-cols-2 gap-2">
-                {roles.map(role => {
-                    const mapping = roleMenuMappings.find(m => m.roleId === role.id);
-                    const hasAccess = mapping?.hasAccess ?? false;
-                    const isPending = pendingRoles.has(role.id);
+                {roleMenuMappings.map(mapping => {
+                    const hasAccess = mapping.hasAccess;
+                    const isPending = pendingRoles.has(mapping.roleId);
                     return (
                         <label
-                            key={role.id}
+                            key={mapping.roleId}
                             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
                                 isPending ? 'opacity-60 cursor-wait' :
                                 hasAccess
@@ -57,13 +57,13 @@ export function MenuRoleMatrix() {
                             <input
                                 type="checkbox"
                                 checked={hasAccess}
-                                onChange={() => handleToggle(role.id, hasAccess)}
+                                onChange={() => handleToggle(mapping.roleId, hasAccess)}
                                 disabled={isPending}
                                 className="w-4 h-4 rounded border-slate-400 text-slate-900 focus:ring-slate-900/20 cursor-pointer disabled:cursor-wait"
                             />
                             <div>
-                                <span className="text-sm font-medium text-slate-700">{role.displayName}</span>
-                                <span className="text-[10px] text-slate-400 ml-1.5 font-mono">{role.name}</span>
+                                <span className="text-sm font-medium text-slate-700">{mapping.roleDisplayName}</span>
+                                <span className="text-[10px] text-slate-400 ml-1.5 font-mono">{mapping.roleName}</span>
                             </div>
                         </label>
                     );

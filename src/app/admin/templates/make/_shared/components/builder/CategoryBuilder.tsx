@@ -16,6 +16,7 @@
 
 import React from 'react';
 import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
+import { SlugSelectField } from './fields';
 import type { CategoryWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 
@@ -56,17 +57,12 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                 <div className="flex-1 min-w-0">
                     {widget.depth === 1 ? (
                         <>
-                            <label className={LABEL_CLS}>연결 Slug <span className="text-red-500">*</span></label>
-                            <select
-                                className={INPUT_CLS}
+                            <SlugSelectField
                                 value={widget.dbSlug}
-                                onChange={e => onChange({ ...widget, dbSlug: e.target.value })}
-                            >
-                                <option value="">선택</option>
-                                {slugOptions.map(s => (
-                                    <option key={s.id} value={s.slug}>{s.slug} ({s.name})</option>
-                                ))}
-                            </select>
+                                onChange={slug => onChange({ ...widget, dbSlug: slug })}
+                                slugOptions={slugOptions}
+                                required
+                            />
                         </>
                     ) : (
                         <>

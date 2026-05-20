@@ -32,6 +32,7 @@ import {
     RadioField, CheckboxField, ButtonField,
     EditorField, FileField, ImageField, VideoField, MediaField,
     FormTextareaField,
+    SlugSelectField,
 } from './fields';
 import type { FieldEditValues } from './fields';
 // SpaceBuilder와 동일한 스타일 유틸 재사용
@@ -339,19 +340,11 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                         className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900"
                     />
                 </div>
-                <div>
-                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">연결 slug</label>
-                    <select
-                        value={widget.connectedSlug ?? ''}
-                        onChange={e => onChange({ ...widget, connectedSlug: e.target.value || undefined })}
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900 bg-white"
-                    >
-                        <option value="">선택</option>
-                        {slugOptions.map(s => (
-                            <option key={s.id} value={s.slug}>{s.slug} ({s.name})</option>
-                        ))}
-                    </select>
-                </div>
+                <SlugSelectField
+                    value={widget.connectedSlug ?? ''}
+                    onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
+                    slugOptions={slugOptions}
+                />
             </div>
 
             {/* 타이틀 + 설명 — 1행 안에 함께 표시됨 */}

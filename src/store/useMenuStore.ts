@@ -16,7 +16,8 @@ export interface MenuItem {
     menuType: 'BO' | 'FO';
     sortOrder: number;
     visible: boolean;
-    isCategory?: boolean;
+    /** SYSTEM_ADMIN 전용 메뉴 여부 */
+    isSystem?: boolean;
     children?: MenuItem[];
 }
 
@@ -54,7 +55,7 @@ interface MenuStore {
     fetchMenus: () => Promise<void>;
     fetchRoles: () => Promise<void>;
     fetchRoleMenuMappings: (menuId: number) => Promise<void>;
-    addMenu: (menu: Omit<MenuItem, 'id' | 'children'>) => Promise<void>;
+    addMenu: (menu: Omit<MenuItem, 'id' | 'children'>) => Promise<MenuItem>;
     updateMenu: (id: number, updates: Partial<MenuItem>) => Promise<void>;
     deleteMenu: (id: number) => Promise<void>;
     moveMenu: (id: number, direction: 'up' | 'down') => void;
@@ -123,17 +124,18 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
 
     addMenu: async (menu) => {
         try {
-            await api.post(API_PATH, {
+            const res = await api.post(API_PATH, {
                 name: menu.name,
+                description: menu.description || '',
                 url: menu.url || '',
                 icon: menu.icon,
                 parentId: menu.parentId,
                 menuType: menu.menuType,
                 sortOrder: menu.sortOrder,
                 visible: menu.visible,
-                isCategory: menu.isCategory || false,
             });
             get().fetchMenus();
+            return res.data as MenuItem;
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg || '메뉴 추가 중 오류가 발생했습니다.');
@@ -157,7 +159,6 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
                 menuType: menu.menuType,
                 sortOrder: updates.sortOrder ?? menu.sortOrder,
                 visible: updates.visible ?? menu.visible,
-                isCategory: updates.isCategory ?? menu.isCategory ?? false,
             });
             get().fetchMenus();
             /* 선택된 메뉴 갱신 */

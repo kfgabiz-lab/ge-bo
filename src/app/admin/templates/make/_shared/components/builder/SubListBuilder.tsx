@@ -34,6 +34,7 @@ import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
 import {
     InputField, SelectField, DateField, DateRangeField,
     FormTextareaField, FileField, ImageField,
+    SlugSelectField,
 } from './fields';
 import type { FieldEditValues } from './fields/types';
 import { createIdGenerator } from '../../utils';
@@ -297,19 +298,11 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
                 <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">기본 설정</h4>
 
                 {/* connectedSlug */}
-                <div>
-                    <label className={LABEL_CLS}>연결 Slug (connectedSlug)</label>
-                    <select
-                        value={widget.connectedSlug ?? ''}
-                        onChange={e => onChange({ ...widget, connectedSlug: e.target.value || undefined })}
-                        className={INPUT_CLS}
-                    >
-                        <option value="">선택</option>
-                        {slugOptions.map(s => (
-                            <option key={s.id} value={s.slug}>{s.slug} ({s.name})</option>
-                        ))}
-                    </select>
-                </div>
+                <SlugSelectField
+                    value={widget.connectedSlug ?? ''}
+                    onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
+                    slugOptions={slugOptions}
+                />
 
                 {/* contentKey */}
                 <div>

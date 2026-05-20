@@ -75,9 +75,10 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
                         <ul className="max-h-52 overflow-y-auto divide-y divide-slate-50">
                             {list.map(tpl => {
                                 const badge = TEMPLATE_TYPE_BADGE[tpl.templateType || ''];
-                                /* PAGE(Widget) 타입은 위젯 렌더러 경로, LIST는 기존 pageUrl 사용 */
-                                const menuUrl = tpl.templateType === 'PAGE'
-                                    ? `/admin/templates/widget/${tpl.slug}`
+                                /* PAGE/QUICK_LIST/QUICK_DETAIL 타입은 위젯 렌더러 경로, LIST는 기존 pageUrl 사용 */
+                                const isWidgetType = tpl.templateType === 'PAGE' || tpl.templateType === 'QUICK_LIST' || tpl.templateType === 'QUICK_DETAIL';
+                                const menuUrl = isWidgetType
+                                    ? `/admin/widget/${tpl.slug}`
                                     : tpl.pageUrl;
                                 return (
                                     <li key={tpl.id}>
@@ -107,206 +108,17 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
     );
 }
 
-/* ══════════════════════════════════════ */
-/*  생성 모드 폼                            */
-/* ══════════════════════════════════════ */
-function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, addMenu }: {
-    parentId: number | null;
-    parentDepth: number;
-    menuType: 'BO' | 'FO';
-    onCancel: () => void;
-    onCreated: () => Promise<void>;
-    addMenu: (menu: Omit<MenuItem, 'id' | 'children'>) => Promise<void>;
-}) {
-    const queryClient = useQueryClient();
-    const [menuKind, setMenuKind] = useState<'folder' | 'program'>(parentDepth >= 2 ? 'program' : 'folder');
-    const [name, setName] = useState('');
-    const [url, setUrl] = useState('');
-    const [icon, setIcon] = useState('Folder');
-    const [sortOrder, setSortOrder] = useState(1);
-    const [nameError, setNameError] = useState('');
-    const [urlError, setUrlError] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [linkedTemplateName, setLinkedTemplateName] = useState(''); // 연결된 페이지 템플릿명
-    const nameRef = useRef<HTMLInputElement>(null);
-
-    /* 자동 포커싱 */
-    useEffect(() => { setTimeout(() => nameRef.current?.focus(), 100); }, []);
-
-    /* 폴더/프로그램 전환 시 아이콘 자동 변경 */
-    useEffect(() => { setIcon(menuKind === 'folder' ? 'Folder' : 'FileText'); }, [menuKind]);
-
-    const canSelectFolder = parentDepth < 2;
-    const depthLabel = parentId === null ? '1depth' : parentDepth === 1 ? '2depth' : '3depth';
-
-    const handleSubmit = async () => {
-        if (isSubmitting) return;
-        /* validation */
-        let valid = true;
-        const trimmed = name.trim();
-        if (!trimmed) { setNameError('메뉴명을 입력해주세요.'); valid = false; }
-        else if (XSS_CHARS.test(trimmed)) { setNameError('허용되지 않는 문자가 포함되어 있습니다.'); valid = false; }
-        else if (!NAME_REGEX.test(trimmed)) { setNameError('메뉴명은 한글, 영문, 숫자만 사용 가능합니다.'); valid = false; }
-        else setNameError('');
-
-        if (menuKind === 'program') {
-            if (!url.trim()) { setUrlError('프로그램은 URL을 입력해야 합니다.'); valid = false; }
-            else if (!url.startsWith('/')) { setUrlError('URL은 /로 시작해야 합니다.'); valid = false; }
-            else if (XSS_CHARS.test(url)) { setUrlError('허용되지 않는 문자가 포함되어 있습니다.'); valid = false; }
-            else if (!URL_REGEX.test(url)) { setUrlError('URL은 영문, 숫자, -, _, /만 가능합니다.'); valid = false; }
-            else setUrlError('');
-        } else {
-            setUrlError('');
-        }
-
-        if (!valid) { if (nameError || !trimmed) nameRef.current?.focus(); return; }
-
-        setIsSubmitting(true);
-        try {
-            await addMenu({
-                name: trimmed,
-                url: menuKind === 'program' ? url.trim() : '',
-                icon,
-                parentId,
-                menuType,
-                sortOrder,
-                visible: true,
-                isCategory: false,
-            });
-            toast.success(`'${trimmed}' 메뉴가 추가되었습니다.`);
-            // React Query 캐시 무효화 → 메뉴 트리 자동 갱신
-            await queryClient.invalidateQueries({ queryKey: ['menus', menuType] });
-            await onCreated();
-        } catch {
-            /* store에서 에러 토스트 처리 */
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    return (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden h-full flex flex-col">
-            {/* 헤더 */}
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Plus className="w-4 h-4 text-slate-400" />
-                    <h2 className="text-sm font-bold text-slate-800">메뉴 추가</h2>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">{depthLabel}</span>
-                </div>
-                <button onClick={onCancel} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100">
-                    <X className="w-4 h-4" />
-                </button>
-            </div>
-
-            {/* 폼 */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                {/* 메뉴 타입 (폴더/프로그램) */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">메뉴 타입</label>
-                    <div className="flex items-center gap-2">
-                        {canSelectFolder && (
-                            <button type="button" onClick={() => setMenuKind('folder')}
-                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium transition-all ${
-                                    menuKind === 'folder' ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-400 hover:border-amber-200'
-                                }`}>
-                                <Folder className="w-4 h-4" />폴더
-                            </button>
-                        )}
-                        <button type="button" onClick={() => setMenuKind('program')}
-                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium transition-all ${
-                                menuKind === 'program' ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-400 hover:border-blue-200'
-                            }`}>
-                            <FileText className="w-4 h-4" />프로그램
-                        </button>
-                    </div>
-                </div>
-
-                {/* 메뉴명 */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">메뉴명 <span className="text-red-500">*</span></label>
-                    <input
-                        ref={nameRef}
-                        type="text"
-                        value={name}
-                        onChange={e => { setName(e.target.value); if (nameError) setNameError(''); }}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-                        className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-all ${nameError ? 'border-red-400 focus:ring-red-200' : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-900'}`}
-                        placeholder="메뉴명을 입력하세요"
-                        maxLength={50}
-                    />
-                    {nameError && <p className="text-[11px] text-red-500 mt-1">{nameError}</p>}
-                </div>
-
-                {/* URL (프로그램만) */}
-                {menuKind === 'program' && (
-                    <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-medium text-slate-600">URL <span className="text-red-500">*</span></label>
-                            <TemplateUrlPicker onSelect={(v, n) => { setUrl(v); setUrlError(''); setLinkedTemplateName(n); }} />
-                        </div>
-                        <input
-                            type="text"
-                            value={url}
-                            onChange={e => { setUrl(e.target.value); setLinkedTemplateName(''); if (urlError) setUrlError(''); }}
-                            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-                            className={`w-full border rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 transition-all ${urlError ? 'border-red-400 focus:ring-red-200' : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-900'}`}
-                            placeholder="/admin/..."
-                        />
-                        {/* 연결된 템플릿명 표시 */}
-                        {linkedTemplateName && (
-                            <p className="flex items-center gap-1 text-[11px] text-blue-600 mt-1">
-                                <Wand2 className="w-3 h-3" />
-                                연결된 템플릿: <span className="font-semibold">{linkedTemplateName}</span>
-                            </p>
-                        )}
-                        {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
-                    </div>
-                )}
-
-                {/* 아이콘 */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">아이콘</label>
-                    <IconPicker value={icon} onChange={setIcon} />
-                </div>
-
-                {/* 정렬 순서 */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">정렬 순서</label>
-                    <input
-                        type="number"
-                        value={sortOrder}
-                        onChange={e => setSortOrder(Number(e.target.value) || 1)}
-                        min={1} max={999}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
-                    />
-                </div>
-            </div>
-
-            {/* 하단 버튼 */}
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
-                <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-md hover:bg-white transition-all">취소</button>
-                <button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || !name.trim()}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                    {isSubmitting ? '추가 중...' : '메뉴 추가'}
-                </button>
-            </div>
-        </div>
-    );
-}
-
+/* ── validation 함수 ── */
 const validateName = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) return '메뉴명을 입력해주세요.';
     if (XSS_CHARS.test(trimmed)) return '메뉴명에 <, >, ", \' 문자는 사용할 수 없습니다.';
-    if (!NAME_REGEX.test(trimmed)) return '메뉴명은 한글, 영문, 숫자, 공백, -, _, ()만 사용 가능합니다.';
+    if (!NAME_REGEX.test(trimmed)) return '메뉴명은 한글, 영문, 숫자, 공백, -, _, (), &만 사용 가능합니다.';
     return '';
 };
 
-const validateUrl = (value: string, _isParent: boolean): string => {
-    if (!value) return ''; // 폴더(URL 없음)는 항상 허용
+const validateUrl = (value: string): string => {
+    if (!value) return '';
     if (XSS_CHARS.test(value)) return 'URL에 <, >, ", \' 문자는 사용할 수 없습니다.';
     if (!value.startsWith('/')) return 'URL은 /로 시작해야 합니다.';
     if (value.includes('//')) return 'URL에 연속 슬래시(//)는 사용할 수 없습니다.';
@@ -331,9 +143,347 @@ const inputCls = (error: string) =>
             : 'border-slate-200 focus:ring-slate-900/10 focus:border-slate-900'
     }`;
 
-/* ── 메뉴 상세 편집 패널 ── */
+/* ══════════════════════════════════════════════════════════════ */
+/*  공통 폼 컴포넌트                                                */
+/*  추가 모드 / 상세 모드 모두 이 컴포넌트를 사용하여 UI를 동일하게 유지   */
+/* ══════════════════════════════════════════════════════════════ */
+interface MenuFormProps {
+    /* 폼 값 */
+    name: string;
+    description: string;
+    url: string;
+    icon: string;
+    sortOrder: number | string;
+    visible: boolean;
+    linkedTemplateName: string;
+    /* 에러 */
+    nameError: string;
+    urlError: string;
+    sortOrderError?: string;
+    /* 변경 핸들러 */
+    onNameChange: (v: string) => void;
+    onDescriptionChange: (v: string) => void;
+    onUrlChange: (v: string) => void;
+    onIconChange: (v: string) => void;
+    onSortOrderChange: (v: string) => void;
+    onVisibleChange: (v: boolean) => void;
+    onTemplateSelect: (url: string, name: string) => void;
+    onLinkedTemplateNameChange: (v: string) => void;
+    /* blur 핸들러 (상세 모드에서 사용, 추가 모드는 undefined 가능) */
+    onNameBlur?: () => void;
+    onUrlBlur?: () => void;
+    onSortBlur?: () => void;
+    /* refs */
+    nameRef: React.RefObject<HTMLInputElement>;
+    urlRef: React.RefObject<HTMLInputElement>;
+    sortRef?: React.RefObject<HTMLInputElement>;
+    /* 타입 전환 관련 — 추가/상세 모드 차이가 있어 외부에서 주입 */
+    isFolderActive: boolean;
+    isProgramActive: boolean;
+    canSwitchToProgram: boolean; /* 하위 메뉴 없어야 함 */
+    hasChildren: boolean;
+    onFolderClick: () => void;
+    onProgramClick: () => void;
+    /* Enter 키로 제출 */
+    onEnterSubmit: () => void;
+    /* 외부에서 wrapper 클래스 주입 — 기본값: flex-1 overflow-y-auto (단독 사용 시) */
+    wrapperClassName?: string;
+}
+
+function MenuForm({
+    name, description, url, icon, sortOrder, visible, linkedTemplateName,
+    nameError, urlError, sortOrderError = '',
+    onNameChange, onDescriptionChange, onUrlChange, onIconChange, onSortOrderChange, onVisibleChange,
+    onTemplateSelect, onLinkedTemplateNameChange,
+    onNameBlur, onUrlBlur, onSortBlur,
+    nameRef, urlRef, sortRef,
+    isFolderActive, isProgramActive, canSwitchToProgram, hasChildren,
+    onFolderClick, onProgramClick,
+    onEnterSubmit,
+    wrapperClassName = 'flex-1 overflow-y-auto p-5 space-y-5',
+}: MenuFormProps) {
+    return (
+        <div className={wrapperClassName}>
+            {/* 메뉴 타입 (폴더 ↔ 프로그램) */}
+            <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">메뉴 타입</label>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={onFolderClick}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium transition-all ${
+                            isFolderActive
+                                ? 'border-amber-300 bg-amber-50 text-amber-700'
+                                : 'border-slate-200 bg-white text-slate-400 hover:border-amber-200'
+                        }`}
+                    >
+                        <Folder className="w-4 h-4" />폴더
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onProgramClick}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-md border text-sm font-medium transition-all ${
+                            isProgramActive
+                                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                : hasChildren
+                                    ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                                    : 'border-slate-200 bg-white text-slate-400 hover:border-blue-200'
+                        }`}
+                    >
+                        <FileText className="w-4 h-4" />프로그램
+                    </button>
+                </div>
+                {hasChildren && isFolderActive && (
+                    <p className="text-[11px] text-amber-500 mt-1">하위 메뉴가 있어 프로그램으로 변경할 수 없습니다</p>
+                )}
+            </div>
+
+            {/* 메뉴명 + URL — 2컬럼 */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">메뉴명 <span className="text-red-500">*</span></label>
+                    <input
+                        ref={nameRef}
+                        type="text"
+                        value={name}
+                        onChange={e => onNameChange(e.target.value)}
+                        onBlur={onNameBlur}
+                        onKeyDown={e => { if (e.key === 'Enter') onEnterSubmit(); }}
+                        className={inputCls(nameError)}
+                        placeholder="메뉴명을 입력하세요"
+                        maxLength={50}
+                    />
+                    {nameError && <p className="text-[11px] text-red-500 mt-1">{nameError}</p>}
+                </div>
+                <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-medium text-slate-600">URL</label>
+                        <TemplateUrlPicker onSelect={onTemplateSelect} />
+                    </div>
+                    <input
+                        ref={urlRef}
+                        type="text"
+                        value={url}
+                        onChange={e => { onUrlChange(e.target.value); onLinkedTemplateNameChange(''); }}
+                        onBlur={onUrlBlur}
+                        onKeyDown={e => { if (e.key === 'Enter') onEnterSubmit(); }}
+                        className={`${inputCls(urlError)} font-mono`}
+                        placeholder="폴더는 비워두세요. 프로그램은 /admin/..."
+                    />
+                    {/* 연결된 템플릿명 표시 */}
+                    {linkedTemplateName && (
+                        <p className="flex items-center gap-1 text-[11px] text-blue-600 mt-1">
+                            <Wand2 className="w-3 h-3" />
+                            연결된 템플릿: <span className="font-semibold">{linkedTemplateName}</span>
+                        </p>
+                    )}
+                    {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
+                </div>
+            </div>
+
+            {/* 메뉴 설명 */}
+            <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                    메뉴 설명
+                    <span className="ml-1.5 text-[10px] text-slate-400 font-normal">페이지 타이틀 아래에 표시됩니다 (선택)</span>
+                </label>
+                <textarea
+                    value={description}
+                    onChange={e => onDescriptionChange(e.target.value)}
+                    rows={2}
+                    maxLength={500}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none transition-all"
+                    placeholder="페이지에 대한 간략한 설명을 입력하세요"
+                />
+                <p className="text-right text-[10px] text-slate-300 mt-0.5">{description.length}/500</p>
+            </div>
+
+            {/* 아이콘 + 정렬 순서 + 노출 여부 — 3컬럼 */}
+            <div className="grid grid-cols-3 gap-4">
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">아이콘</label>
+                    <IconPicker value={icon} onChange={onIconChange} />
+                </div>
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">정렬 순서</label>
+                    <input
+                        ref={sortRef}
+                        type="number"
+                        value={sortOrder}
+                        onChange={e => onSortOrderChange(e.target.value)}
+                        onBlur={onSortBlur}
+                        min={1}
+                        max={999}
+                        className={inputCls(sortOrderError)}
+                    />
+                    {sortOrderError && <p className="text-[11px] text-red-500 mt-1">{sortOrderError}</p>}
+                </div>
+                <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">노출 여부</label>
+                    <button
+                        type="button"
+                        onClick={() => onVisibleChange(!visible)}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all ${
+                            visible
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                : 'border-slate-200 bg-slate-50 text-slate-400'
+                        }`}
+                    >
+                        <span className={`w-2 h-2 rounded-full ${visible ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        {visible ? '노출' : '숨김'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ══════════════════════════════════════ */
+/*  생성 모드 폼                            */
+/* ══════════════════════════════════════ */
+function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, addMenu }: {
+    parentId: number | null;
+    parentDepth: number;
+    menuType: 'BO' | 'FO';
+    onCancel: () => void;
+    onCreated: (menu: MenuItem) => Promise<void>;
+    addMenu: (menu: Omit<MenuItem, 'id' | 'children'>) => Promise<MenuItem>;
+}) {
+    const queryClient = useQueryClient();
+    /* URL 유무로 폴더/프로그램 판단 (상세 모드와 동일한 방식) */
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [url, setUrl] = useState('');
+    const [icon, setIcon] = useState('');
+    const [sortOrder, setSortOrder] = useState<number | string>(1);
+    const [visible, setVisible] = useState(true);
+    const [nameError, setNameError] = useState('');
+    const [urlError, setUrlError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [linkedTemplateName, setLinkedTemplateName] = useState('');
+    const nameRef = useRef<HTMLInputElement>(null);
+    const urlRef = useRef<HTMLInputElement>(null);
+
+    const canSelectFolder = parentDepth < 2;
+    const depthLabel = parentId === null ? '1depth' : parentDepth === 1 ? '2depth' : '3depth';
+
+    /* 자동 포커싱 */
+    useEffect(() => { setTimeout(() => nameRef.current?.focus(), 100); }, []);
+
+    /* 폴더 활성 여부: URL이 비어있으면 폴더 */
+    const isFolderActive = !url || !url.trim();
+    const isProgramActive = !isFolderActive;
+
+    const handleSubmit = async () => {
+        if (isSubmitting) return;
+        const ne = validateName(name);
+        const ue = isProgramActive ? validateUrl(url) || (!url.trim() ? '프로그램은 URL을 입력해야 합니다.' : '') : '';
+        setNameError(ne);
+        setUrlError(ue);
+        if (ne || ue) { if (ne) nameRef.current?.focus(); else urlRef.current?.focus(); return; }
+
+        setIsSubmitting(true);
+        try {
+            const createdMenu = await addMenu({
+                name: name.trim(),
+                description: description.trim() || undefined,
+                url: url.trim(),
+                icon,
+                parentId,
+                menuType,
+                sortOrder: Number(sortOrder),
+                visible,
+            });
+            toast.success(`'${name.trim()}' 메뉴가 추가되었습니다.`);
+            await queryClient.invalidateQueries({ queryKey: ['menus', menuType] });
+            await onCreated(createdMenu);
+        } catch {
+            /* store에서 에러 토스트 처리 */
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleFolderClick = () => {
+        if (url && url.trim()) {
+            if (confirm('폴더로 변경하면 URL이 제거됩니다. 계속하시겠습니까?')) {
+                setUrl('');
+                setUrlError('');
+            }
+        }
+    };
+
+    const handleProgramClick = () => {
+        if (!url || !url.trim()) {
+            setUrl('/');
+            urlRef.current?.focus();
+        }
+    };
+
+    return (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden h-full flex flex-col">
+            {/* 헤더 */}
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-slate-400" />
+                    <h2 className="text-sm font-bold text-slate-800">메뉴 추가</h2>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">{depthLabel}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onCancel}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-500 border border-slate-200 rounded-md hover:bg-slate-100 transition-all"
+                    >
+                        <X className="w-3.5 h-3.5" />취소
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || !name.trim()}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                        <Plus className="w-3.5 h-3.5" />{isSubmitting ? '추가 중...' : '메뉴 추가'}
+                    </button>
+                </div>
+            </div>
+
+            {/* 공통 폼 */}
+            <MenuForm
+                name={name}
+                description={description}
+                url={url}
+                icon={icon}
+                sortOrder={sortOrder}
+                visible={visible}
+                linkedTemplateName={linkedTemplateName}
+                nameError={nameError}
+                urlError={urlError}
+                onNameChange={v => { setName(v); if (nameError) setNameError(''); }}
+                onDescriptionChange={setDescription}
+                onUrlChange={v => { setUrl(v); if (urlError) setUrlError(''); }}
+                onIconChange={setIcon}
+                onSortOrderChange={v => { const n = parseInt(v, 10); if (!isNaN(n)) setSortOrder(n); }}
+                onVisibleChange={setVisible}
+                onTemplateSelect={(v, n) => { setUrl(v); setUrlError(''); setLinkedTemplateName(n); }}
+                onLinkedTemplateNameChange={setLinkedTemplateName}
+                nameRef={nameRef}
+                urlRef={urlRef}
+                isFolderActive={isFolderActive}
+                isProgramActive={isProgramActive}
+                canSwitchToProgram={true}
+                hasChildren={false}
+                onFolderClick={handleFolderClick}
+                onProgramClick={handleProgramClick}
+                onEnterSubmit={handleSubmit}
+            />
+        </div>
+    );
+}
+
+/* ══════════════════════════════════════ */
+/*  메뉴 상세 편집 패널                      */
+/* ══════════════════════════════════════ */
 export function MenuDetail() {
-    const { selectedMenu, updateMenu, deleteMenu, setIsDirty: setStoreDirty, isCreating, createParentId, createMaxDepth, cancelCreate, addMenu, activeTab } = useMenuStore();
+    const { selectedMenu, updateMenu, deleteMenu, setIsDirty: setStoreDirty, isCreating, createParentId, createMaxDepth, cancelCreate, addMenu, activeTab, selectMenu } = useMenuStore();
     const queryClient = useQueryClient();
 
     /* 로컬 편집 상태 */
@@ -343,8 +493,8 @@ export function MenuDetail() {
     const [icon, setIcon] = useState('');
     const [sortOrder, setSortOrder] = useState<number | string>(1);
     const [visible, setVisible] = useState(true);
-    const [linkedTemplateName, setLinkedTemplateName] = useState(''); // 연결된 페이지 템플릿명
-    const templatesCache = useRef<{ pageUrl: string; name: string }[]>([]); // 템플릿 목록 캐시
+    const [linkedTemplateName, setLinkedTemplateName] = useState('');
+    const templatesCache = useRef<{ pageUrl: string; name: string }[]>([]);
 
     /* 에러 상태 */
     const [nameError, setNameError] = useState('');
@@ -377,14 +527,13 @@ export function MenuDetail() {
             if (currentUrl) {
                 const fetchAndMatch = async () => {
                     try {
-                        /* 캐시 없으면 API 조회 */
                         if (templatesCache.current.length === 0) {
                             const res = await api.get('/page-templates');
-                            /* PAGE 타입은 메뉴 URL이 /admin/templates/widget/{slug} 형식이므로 변환 */
+                            const isWidget = (type?: string) => type === 'PAGE' || type === 'QUICK_LIST' || type === 'QUICK_DETAIL';
                             templatesCache.current = (res.data as { pageUrl: string; name: string; slug: string; templateType?: string }[])
-                                .filter((t) => t.templateType === 'LIST' || t.templateType === 'PAGE')
+                                .filter((t) => t.templateType === 'LIST' || isWidget(t.templateType))
                                 .map((t) => ({
-                                    pageUrl: t.templateType === 'PAGE' ? `/admin/templates/widget/${t.slug}` : t.pageUrl,
+                                    pageUrl: isWidget(t.templateType) ? `/admin/widget/${t.slug}` : t.pageUrl,
                                     name: t.name,
                                 }));
                         }
@@ -403,20 +552,18 @@ export function MenuDetail() {
 
     /* beforeunload — 미저장 데이터 보호 */
     useEffect(() => {
-        const handler = (e: BeforeUnloadEvent) => {
-            if (isDirty) { e.preventDefault(); }
-        };
+        const handler = (e: BeforeUnloadEvent) => { if (isDirty) { e.preventDefault(); } };
         window.addEventListener('beforeunload', handler);
         return () => window.removeEventListener('beforeunload', handler);
     }, [isDirty]);
 
-    /* isDirty 체크 공개 (MenuTree에서 사용) */
+    /* isDirty 체크 */
     useEffect(() => {
         if (selectedMenu) {
             const dirty =
                 name !== selectedMenu.name ||
                 description !== (selectedMenu.description || '') ||
-                url !== selectedMenu.url ||
+                url !== (selectedMenu.url || '') ||
                 icon !== selectedMenu.icon ||
                 Number(sortOrder) !== selectedMenu.sortOrder ||
                 visible !== selectedMenu.visible;
@@ -427,7 +574,17 @@ export function MenuDetail() {
 
     /* ── 생성 모드 ── */
     if (!selectedMenu && isCreating) {
-        return <CreateMenuForm parentId={createParentId} parentDepth={createMaxDepth} menuType={activeTab} onCancel={cancelCreate} onCreated={async () => { cancelCreate(); await fetchMenus(); }} addMenu={addMenu} />;
+        return <CreateMenuForm
+            parentId={createParentId}
+            parentDepth={createMaxDepth}
+            menuType={activeTab}
+            onCancel={cancelCreate}
+            onCreated={async (createdMenu) => {
+                cancelCreate();
+                selectMenu(createdMenu);
+            }}
+            addMenu={addMenu}
+        />;
     }
 
     if (!selectedMenu) {
@@ -441,20 +598,23 @@ export function MenuDetail() {
     }
 
     const isParent = !selectedMenu.parentId;
+    const hasChildren = !!(selectedMenu.children && selectedMenu.children.length > 0);
+    /* URL 유무로 폴더/프로그램 판단 */
+    const isFolderActive = !url || !url.trim();
+    const isProgramActive = !isFolderActive;
 
     /* onChange 핸들러 */
     const handleNameChange = (v: string) => {
-        if (v.length > 50) return; // maxLength 차단
+        if (v.length > 50) return;
         setName(v);
         if (nameError) setNameError(validateName(v));
     };
     const handleUrlChange = (v: string) => {
         setUrl(v);
-        setLinkedTemplateName(''); // 직접 수정 시 연결 표시 초기화
-        if (urlError) setUrlError(validateUrl(v, isParent));
+        setLinkedTemplateName('');
+        if (urlError) setUrlError(validateUrl(v));
     };
     const handleSortChange = (v: string) => {
-        // 소수점/음수 입력 차단
         const num = parseInt(v, 10);
         if (v === '') { setSortOrder(''); setSortOrderError('정렬 순서를 입력해주세요.'); return; }
         if (isNaN(num) || num < 0) return;
@@ -465,31 +625,48 @@ export function MenuDetail() {
     /* onBlur 핸들러 */
     const handleNameBlur = () => setNameError(validateName(name));
     const handleUrlBlur = () => {
-        // trailing slash 제거
         let cleaned = url;
         if (cleaned.length > 1 && cleaned.endsWith('/')) cleaned = cleaned.replace(/\/+$/, '');
         setUrl(cleaned);
-        setUrlError(validateUrl(cleaned, isParent));
+        setUrlError(validateUrl(cleaned));
     };
     const handleSortBlur = () => setSortOrderError(validateSortOrder(sortOrder));
+
+    /* 폴더/프로그램 전환 핸들러 */
+    const handleFolderClick = () => {
+        if (url && url.trim()) {
+            if (confirm('프로그램에서 폴더로 변경하면 URL이 제거됩니다. 계속하시겠습니까?')) {
+                setUrl('');
+                setUrlError('');
+            }
+        }
+    };
+    const handleProgramClick = () => {
+        if (hasChildren) {
+            toast.error('하위 메뉴가 있는 폴더는 프로그램으로 변경할 수 없습니다. 하위 메뉴를 먼저 삭제해주세요.');
+            return;
+        }
+        if (!url || !url.trim()) {
+            setUrl('/');
+            urlRef.current?.focus();
+        }
+    };
 
     /* 저장 */
     const handleSave = async () => {
         if (isSubmitting) return;
-        // validation
         const ne = validateName(name);
-        const ue = validateUrl(url, isParent);
+        const ue = validateUrl(url);
         const se = validateSortOrder(sortOrder);
         setNameError(ne);
         setUrlError(ue);
         setSortOrderError(se);
         if (ne || ue || se) {
-            // 첫 에러 필드 포커싱
             if (ne) nameRef.current?.focus();
             else if (ue) urlRef.current?.focus();
             return;
         }
-        if (!isDirty) { toast.info('변경사항이 없습니다.'); return; }
+        if (!isDirty) { toast.success('저장되었습니다.'); return; }
 
         setIsSubmitting(true);
         try {
@@ -503,7 +680,6 @@ export function MenuDetail() {
             });
             toast.success('메뉴가 저장되었습니다.');
             setIsDirty(false);
-            // React Query 캐시 무효화 → 메뉴 트리 자동 갱신
             await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -523,7 +699,6 @@ export function MenuDetail() {
         try {
             await deleteMenu(selectedMenu.id);
             toast.success('메뉴가 삭제되었습니다.');
-            // React Query 캐시 무효화 → 메뉴 트리 자동 갱신
             await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
         } catch (err: unknown) {
             const msg2 = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -541,7 +716,7 @@ export function MenuDetail() {
                     <Settings2 className="w-4 h-4 text-slate-400" />
                     <h2 className="text-sm font-bold text-slate-800">메뉴 상세</h2>
                     <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">
-                        {selectedMenu.isCategory ? '카테고리' : isParent ? '대메뉴' : '하위메뉴'}
+                        {isParent ? '대메뉴' : '하위메뉴'}
                     </span>
                     {isDirty && <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded">수정됨</span>}
                 </div>
@@ -563,160 +738,49 @@ export function MenuDetail() {
                 </div>
             </div>
 
-            {/* 편집 폼 */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                {/* 메뉴 타입 전환 (폴더 ↔ 프로그램) */}
-                {!selectedMenu.isCategory && (
-                    <div>
-                        <label className="text-xs font-medium text-slate-600 mb-1.5 block">메뉴 타입</label>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (url && url.trim()) {
-                                        /* 프로그램 → 폴더: URL 제거 */
-                                        if (confirm('프로그램에서 폴더로 변경하면 URL이 제거됩니다. 계속하시겠습니까?')) {
-                                            setUrl('');
-                                            setUrlError('');
-                                        }
-                                    }
-                                }}
-                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all ${
-                                    !url || !url.trim()
-                                        ? 'border-amber-300 bg-amber-50 text-amber-700'
-                                        : 'border-slate-200 bg-white text-slate-400 hover:border-amber-200'
-                                }`}
-                            >
-                                <Folder className="w-4 h-4" />폴더
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (selectedMenu.children && selectedMenu.children.length > 0) {
-                                        toast.error('하위 메뉴가 있는 폴더는 프로그램으로 변경할 수 없습니다. 하위 메뉴를 먼저 삭제해주세요.');
-                                        return;
-                                    }
-                                    if (!url || !url.trim()) {
-                                        setUrl('/');
-                                        urlRef.current?.focus();
-                                    }
-                                }}
-                                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all ${
-                                    url && url.trim()
-                                        ? 'border-blue-300 bg-blue-50 text-blue-700'
-                                        : selectedMenu.children && selectedMenu.children.length > 0
-                                            ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
-                                            : 'border-slate-200 bg-white text-slate-400 hover:border-blue-200'
-                                }`}
-                            >
-                                <FileText className="w-4 h-4" />프로그램
-                            </button>
-                        </div>
-                        {selectedMenu.children && selectedMenu.children.length > 0 && (!url || !url.trim()) && (
-                            <p className="text-[11px] text-amber-500 mt-1">하위 메뉴가 있어 프로그램으로 변경할 수 없습니다</p>
-                        )}
-                    </div>
-                )}
+            {/* 폼 + 역할별 접근 권한을 하나의 스크롤 영역으로 통합 */}
+            <div className="flex-1 overflow-y-auto">
+                {/* 공통 폼 — overflow 없이 내용만 */}
+                <MenuForm
+                    name={name}
+                    description={description}
+                    url={url}
+                    icon={icon}
+                    sortOrder={sortOrder}
+                    visible={visible}
+                    linkedTemplateName={linkedTemplateName}
+                    nameError={nameError}
+                    urlError={urlError}
+                    sortOrderError={sortOrderError}
+                    onNameChange={handleNameChange}
+                    onDescriptionChange={setDescription}
+                    onUrlChange={handleUrlChange}
+                    onIconChange={setIcon}
+                    onSortOrderChange={handleSortChange}
+                    onVisibleChange={setVisible}
+                    onTemplateSelect={(v, n) => { handleUrlChange(v); setLinkedTemplateName(n); }}
+                    onLinkedTemplateNameChange={setLinkedTemplateName}
+                    onNameBlur={handleNameBlur}
+                    onUrlBlur={handleUrlBlur}
+                    onSortBlur={handleSortBlur}
+                    nameRef={nameRef}
+                    urlRef={urlRef}
+                    sortRef={sortRef}
+                    isFolderActive={isFolderActive}
+                    isProgramActive={isProgramActive}
+                    canSwitchToProgram={!hasChildren}
+                    hasChildren={hasChildren}
+                    onFolderClick={handleFolderClick}
+                    onProgramClick={handleProgramClick}
+                    onEnterSubmit={handleSave}
+                    wrapperClassName="p-5 space-y-5"
+                />
 
-                {/* 기본 정보 */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-slate-600 mb-1.5 block">메뉴명 <span className="text-red-500">*</span></label>
-                        <input
-                            ref={nameRef}
-                            type="text"
-                            value={name}
-                            onChange={e => handleNameChange(e.target.value)}
-                            onBlur={handleNameBlur}
-                            className={inputCls(nameError)}
-                            placeholder="메뉴명을 입력하세요"
-                            maxLength={50}
-                        />
-                        {nameError && <p className="text-[11px] text-red-500 mt-1">{nameError}</p>}
-                    </div>
-                    <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-medium text-slate-600">URL</label>
-                            {!selectedMenu.isCategory && (
-                                <TemplateUrlPicker onSelect={(v, n) => { handleUrlChange(v); setLinkedTemplateName(n); }} />
-                            )}
-                        </div>
-                        <input
-                            ref={urlRef}
-                            type="text"
-                            value={url}
-                            onChange={e => handleUrlChange(e.target.value)}
-                            onBlur={handleUrlBlur}
-                            className={`${inputCls(urlError)} font-mono`}
-                            placeholder="폴더는 비워두세요. 프로그램은 /admin/..."
-                        />
-                        {/* 연결된 템플릿명 표시 */}
-                        {linkedTemplateName && (
-                            <p className="flex items-center gap-1 text-[11px] text-blue-600 mt-1">
-                                <Wand2 className="w-3 h-3" />
-                                연결된 템플릿: <span className="font-semibold">{linkedTemplateName}</span>
-                            </p>
-                        )}
-                        {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
-                    </div>
+                {/* 역할별 접근 권한 */}
+                <div className="px-5 pb-5">
+                    <div className="border-t border-slate-100 mb-5" />
+                    <MenuRoleMatrix />
                 </div>
-
-                {/* 메뉴 설명 — 페이지 상단에 표시 */}
-                <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                        메뉴 설명
-                        <span className="ml-1.5 text-[10px] text-slate-400 font-normal">페이지 타이틀 아래에 표시됩니다 (선택)</span>
-                    </label>
-                    <textarea
-                        value={description}
-                        onChange={e => setDescription(e.target.value)}
-                        rows={2}
-                        maxLength={500}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none transition-all"
-                        placeholder="페이지에 대한 간략한 설명을 입력하세요"
-                    />
-                    <p className="text-right text-[10px] text-slate-300 mt-0.5">{description.length}/500</p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-slate-600 mb-1.5 block">아이콘</label>
-                        <IconPicker value={icon} onChange={setIcon} />
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-slate-600 mb-1.5 block">정렬 순서</label>
-                        <input
-                            ref={sortRef}
-                            type="number"
-                            value={sortOrder}
-                            onChange={e => handleSortChange(e.target.value)}
-                            onBlur={handleSortBlur}
-                            min={1}
-                            max={999}
-                            className={inputCls(sortOrderError)}
-                        />
-                        {sortOrderError && <p className="text-[11px] text-red-500 mt-1">{sortOrderError}</p>}
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-slate-600 mb-1.5 block">노출 여부</label>
-                        <button
-                            type="button"
-                            onClick={() => setVisible(!visible)}
-                            className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition-all ${
-                                visible
-                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                    : 'border-slate-200 bg-slate-50 text-slate-400'
-                            }`}
-                        >
-                            <span className={`w-2 h-2 rounded-full ${visible ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                            {visible ? '노출' : '숨김'}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="border-t border-slate-100" />
-
-                <MenuRoleMatrix />
             </div>
         </div>
     );

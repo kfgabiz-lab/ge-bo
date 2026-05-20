@@ -25,19 +25,21 @@ export function buildTree(flattenedItems: FlattenedItem[]): MenuItem[] {
     const rootItems: MenuItem[] = [];
     const lookup: Record<number, MenuItem> = {};
 
+    /* 1패스: 모든 항목을 lookup에 먼저 등록 (parent보다 child가 먼저 나와도 orphan 방지) */
     for (const item of flattenedItems) {
         const { depth, index, parentId, collapsed, ...menuItem } = item;
-        const itemCopy = { ...menuItem, parentId, children: [] };
-        lookup[item.id] = itemCopy;
+        lookup[item.id] = { ...menuItem, parentId, children: [] };
+    }
 
+    /* 2패스: 트리 연결 (flattenedItems 순서대로 parent-child 관계 구성) */
+    for (const item of flattenedItems) {
         if (item.parentId === null) {
-            rootItems.push(itemCopy);
+            rootItems.push(lookup[item.id]);
         } else if (lookup[item.parentId]) {
-            lookup[item.parentId].children!.push(itemCopy);
+            lookup[item.parentId].children!.push(lookup[item.id]);
         }
     }
 
-    // 순서 정렬 (Flattened 배열의 순서를 그대로 보장)
     return rootItems;
 }
 

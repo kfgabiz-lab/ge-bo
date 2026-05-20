@@ -8,10 +8,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, LayoutGrid, ShieldCheck, Users } from "lucide-react";
+import Image from "next/image";
+import { User, Lock, Eye, EyeOff, ArrowRight, LayoutGrid, ShieldCheck, Users } from "lucide-react";
 
 const loginSchema = z.object({
-    email: z.string().email("올바른 이메일 주소를 입력해주세요.").min(1, "이메일을 입력해주세요."),
+    /* 영문·숫자만, 최대 30자 */
+    email: z.string()
+        .min(1, "아이디를 입력해주세요.")
+        .max(30, "아이디는 최대 30자까지 입력 가능합니다.")
+        .regex(/^[a-zA-Z0-9]+$/, "영문/숫자만 입력 가능합니다."),
     password: z.string().min(4, "비밀번호는 최소 4자 이상이어야 합니다."),
 });
 
@@ -26,8 +31,8 @@ export default function LoginForm() {
     const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema),
         defaultValues: {
-            email: "admin@ge.com",
-            password: "password1!",
+            email: "",
+            password: "P@ssw0rd123",
         },
     });
 
@@ -71,11 +76,14 @@ export default function LoginForm() {
 
                 {/* Logo */}
                 <div className="flex items-center gap-2.5 relative">
+                    {/* 기존 로고 — 원복 시 주석 해제
                     <div className="w-8 h-8 bg-[#4361ee] rounded-lg flex items-center justify-center shadow-lg shadow-[#4361ee]/30">
                         <LayoutGrid className="w-4 h-4 text-white" />
                     </div>
                     <span className="text-white font-bold text-[17px] tracking-tight">BackOffice</span>
                     <span className="text-[10px] px-1.5 py-0.5 bg-white/10 text-white/50 rounded font-medium uppercase tracking-wider">Admin</span>
+                    */}
+                    <img src="/bo/ls-electric-logo.png" alt="LS ELECTRIC" className="h-6 w-auto" />
                 </div>
 
                 {/* Main copy */}
@@ -113,10 +121,13 @@ export default function LoginForm() {
                 <div className="w-full max-w-[380px]">
                     {/* Mobile logo */}
                     <div className="flex items-center gap-2 mb-8 lg:hidden">
+                        {/* 기존 로고 — 원복 시 주석 해제
                         <div className="w-7 h-7 bg-[#4361ee] rounded-lg flex items-center justify-center">
                             <LayoutGrid className="w-4 h-4 text-white" />
                         </div>
                         <span className="font-bold text-lg">BackOffice</span>
+                        */}
+                        <img src="/bo/ls-electric-logo.png" alt="LS ELECTRIC" className="h-5 w-auto" />
                     </div>
 
                     <div className="mb-7">
@@ -124,16 +135,17 @@ export default function LoginForm() {
                         <p className="text-sm text-[#6b7280]">관리자 계정으로 로그인하세요</p>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-[#e2e4e9] shadow-sm p-6 space-y-4">
+                    <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl border border-[#e2e4e9] shadow-sm p-6 space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-[#374151] mb-1.5">Work Email</label>
+                            <label className="block text-sm font-medium text-[#374151] mb-1.5">ID</label>
                             <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9ca3af]" />
                                 <input
                                     {...register("email")}
-                                    type="email"
+                                    type="text"
                                     autoFocus
-                                    placeholder="admin@ge.com"
+                                    placeholder="아이디 입력"
+                                    maxLength={30}
                                     className={`w-full pl-9 pr-4 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4361ee]/15 focus:border-[#4361ee] transition-all ${errors.email ? "border-red-400 bg-red-50" : "border-[#e2e4e9]"}`}
                                 />
                             </div>
@@ -162,8 +174,7 @@ export default function LoginForm() {
                         </div>
 
                         <button
-                            type="button"
-                            onClick={handleSubmit(onSubmit)}
+                            type="submit"
                             disabled={isLoading}
                             className="w-full py-2.5 bg-[#4361ee] hover:bg-[#3451d1] text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed mt-1 shadow-md shadow-[#4361ee]/20"
                         >
@@ -173,12 +184,8 @@ export default function LoginForm() {
                                 <>Sign In <ArrowRight className="w-4 h-4" /></>
                             )}
                         </button>
-                    </div>
+                    </form>
 
-                    <div className="mt-5 flex items-center justify-between text-xs text-[#9ca3af]">
-                        <span>계정이 없으신가요?</span>
-                        <button className="text-[#4361ee] font-medium hover:underline">관리자에게 문의</button>
-                    </div>
                 </div>
             </div>
         </div>

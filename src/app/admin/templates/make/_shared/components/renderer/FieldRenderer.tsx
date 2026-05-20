@@ -258,6 +258,52 @@ function FileVideoPreview({ file, cellHeight }: { file: File; cellHeight: number
     );
 }
 
+interface ColorPresetSelectorProps {
+    colors: string[];
+    selectedColor: string;
+    disabled: boolean;
+    onChange: (color: string) => void;
+}
+
+/**
+ * ColorPresetSelector — Preset 원형 버튼형 색상 선택기
+ * preview: disabled=true → pointer-events-none (UI 동일 유지)
+ * live: 클릭으로 색상 선택, outline으로 선택 표시
+ */
+function ColorPresetSelector({ colors, selectedColor, disabled, onChange }: ColorPresetSelectorProps) {
+    return (
+        <div className="flex items-center gap-2 flex-wrap p-1">
+            {colors.map(color => {
+                const isSelected = selectedColor === color;
+                return (
+                    <button
+                        key={color}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => onChange(color)}
+                        title={color}
+                        /* preview: cursor-default, live: hover 확대 효과 */
+                        className={`w-7 h-7 rounded-full flex-shrink-0 transition-all ${
+                            disabled ? 'cursor-default' : 'cursor-pointer hover:scale-110'
+                        }`}
+                        style={{
+                            backgroundColor: color,
+                            /* 선택된 색상: 해당 색상으로 outline 표시 */
+                            outline: isSelected ? `3px solid ${color}` : 'none',
+                            outlineOffset: isSelected ? '2px' : '0',
+                            /* 미선택: 연한 테두리 */
+                            boxShadow: isSelected ? 'none' : '0 0 0 1px rgba(0,0,0,0.12)',
+                        }}
+                    />
+                );
+            })}
+            {colors.length === 0 && (
+                <span className="text-xs text-slate-400 italic">색상 옵션 없음</span>
+            )}
+        </div>
+    );
+}
+
 export function FieldRenderer({
     mode,
     field,
@@ -1207,6 +1253,21 @@ export function FieldRenderer({
                     initialValue={value}
                     onChange={isPreview ? undefined : v => onChange?.(v)}
                     height={editorHeight}
+                />
+            );
+        }
+
+        /* ── color ── Preset 원형 버튼형 색상 선택 */
+        case 'color': {
+            /* options 배열이 HEX 색상 목록 */
+            const colorOptions = field.options ?? [];
+            const selectedColor = value ?? '';
+            return (
+                <ColorPresetSelector
+                    colors={colorOptions}
+                    selectedColor={selectedColor}
+                    disabled={isPreview}
+                    onChange={color => onChange?.(color)}
                 />
             );
         }

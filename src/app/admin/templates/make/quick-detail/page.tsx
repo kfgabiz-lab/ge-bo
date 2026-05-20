@@ -10,27 +10,23 @@
  * ============================================================
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-    ChevronDown, Save, Loader2, Wand2,
-    FolderOpen, Copy, Trash2,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
+import { Save, Wand2 } from 'lucide-react';
 import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
-import { SpaceBuilder } from '../_shared/components/builder/SpaceBuilder';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
 import { OutputModePanel } from '../_shared/components/builder/OutputModePanel';
 import { PreviewWrapper } from '../_shared/components/builder/PreviewWrapper';
+import { TemplateLoader } from '../_shared/components/builder/TemplateLoader';
 import { WidgetRenderer, PageGridRenderer } from '../_shared/components/renderer';
 import type { SpaceWidget, PageContentItem } from '../_shared/components/renderer';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { toSlug } from '../_shared/utils';
-import { saveTemplate } from '../_shared/templateApi';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem } from '../_shared/types';
 import { useOutputMode } from '../_shared/hooks/useOutputMode';
+import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
 import PageLayout from '@/components/layout/PageLayout';
 import { ROW_HEIGHT } from '@/components/layout/GridCell';
 
@@ -49,7 +45,6 @@ interface FixedContentItem {
 /* ══════════════════════════════════════════ */
 /*  상수                                      */
 /* ══════════════════════════════════════════ */
-
 
 /** 초기 Form 컨텐츠 생성 */
 const createFormContent = (): FixedContentItem => ({
@@ -79,11 +74,6 @@ const createSpaceContent = (): FixedContentItem => ({
 });
 
 /* ══════════════════════════════════════════ */
-/*  미리보기 컴포넌트 — Widget 빌더와 동일      */
-/* ══════════════════════════════════════════ */
-
-
-/* ══════════════════════════════════════════ */
 /*  메인 컴포넌트                               */
 /* ══════════════════════════════════════════ */
 export default function QuickDetailBuilderPage() {
@@ -91,29 +81,15 @@ export default function QuickDetailBuilderPage() {
     /* ── 출력 모드 (page / layerpopup) — 공통 훅 사용 ── */
     const om = useOutputMode();
 
+    /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
+    const tm = useTemplateManagement('PAGE');
+
     /* ── 고정 컨텐츠 (Form + Space) ── */
     const [formContent, setFormContent] = useState<FixedContentItem>(createFormContent);
     const [spaceContent, setSpaceContent] = useState<FixedContentItem>(createSpaceContent);
 
     /* ── 편집 상태 (Widget 빌더와 동일 패턴) ── */
     const [editingContentId, setEditingContentId] = useState<string | null>(null);
-
-    /* ── 저장 모달 상태 ── */
-    const [showSaveModal, setShowSaveModal] = useState(false);
-    const [currentTemplateId, setCurrentTemplateId] = useState<number | null>(null);
-    const [currentTemplateName, setCurrentTemplateName] = useState('');
-    const [saveModalName, setSaveModalName] = useState('');
-    const [saveModalSlug, setSaveModalSlug] = useState('');
-    const [saveModalDesc, setSaveModalDesc] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
-
-    /* ── 불러오기 상태 ── */
-    const [templateList, setTemplateList] = useState<TemplateItem[]>([]);
-    const [isLoadingList, setIsLoadingList] = useState(false);
-    const [showLoadDropdown, setShowLoadDropdown] = useState(false);
-    const [loadSearch, setLoadSearch] = useState('');
-    const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
-    const [isDuplicatingId, setIsDuplicatingId] = useState<number | null>(null);
 
     /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
     const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
@@ -131,18 +107,7 @@ export default function QuickDetailBuilderPage() {
             .catch(() => { });
     }, []);
 
-    /* ── 템플릿 목록 불러오기 ── */
-    const loadTemplateList = useCallback(async () => {
-        setIsLoadingList(true);
-        try {
-            const res = await api.get('/page-templates');
-            setTemplateList((res.data || []).filter((t: TemplateItem) => t.templateType === 'QUICK_DETAIL'));
-        } catch { /* 조용히 처리 */ } finally {
-            setIsLoadingList(false);
-        }
-    }, []);
-
-    /* ── 템플릿 불러오기 ── */
+    /* ── 템플릿 불러오기 (페이지 고유 파싱 로직) ── */
     const handleLoadSelect = (tpl: TemplateItem) => {
         try {
             const config = JSON.parse(tpl.configJson);
@@ -167,86 +132,11 @@ export default function QuickDetailBuilderPage() {
                 setSpaceContent(config.spaceContent || createSpaceContent());
             }
             om.restore(config);
-            setCurrentTemplateId(tpl.id);
-            setCurrentTemplateName(tpl.name);
-            setSaveModalSlug(tpl.slug);
-            setShowLoadDropdown(false);
             setEditingContentId(null);
-            toast.success(`"${tpl.name}" 불러왔습니다.`);
+            tm.onLoadSuccess(tpl); /* 공통: currentTemplateId/Name 업데이트 + 드롭다운 닫기 + toast */
         } catch {
-            toast.error('설정 파일 파싱에 실패했습니다.');
+            import('sonner').then(({ toast }) => toast.error('설정 파일 파싱에 실패했습니다.'));
         }
-    };
-
-    /* ── 템플릿 삭제 ── */
-    const handleDeleteTemplate = async (id: number) => {
-        if (!window.confirm('템플릿을 삭제하시겠습니까?')) return;
-        setIsDeletingId(id);
-        try {
-            await api.delete(`/page-templates/${id}`);
-            setTemplateList(prev => prev.filter(t => t.id !== id));
-            if (currentTemplateId === id) { setCurrentTemplateId(null); setCurrentTemplateName(''); }
-            toast.success('템플릿이 삭제되었습니다.');
-        } catch {
-            toast.error('삭제 중 오류가 발생했습니다.');
-        } finally { setIsDeletingId(null); }
-    };
-
-    /* ── 템플릿 복사 ── */
-    const handleDuplicateTemplate = async (tpl: TemplateItem) => {
-        setIsDuplicatingId(tpl.id);
-        try {
-            const newName = `${tpl.name} (복사)`;
-            const res = await api.post('/page-templates', {
-                name: newName, slug: `${tpl.slug}-copy`,
-                description: tpl.description, configJson: tpl.configJson, templateType: 'QUICK_DETAIL',
-            });
-            setTemplateList(prev => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
-            toast.success(`"${newName}" 으로 복사되었습니다.`);
-        } catch (err: unknown) {
-            const axiosError = err as { response?: { data?: { message?: string } } };
-            toast.error(axiosError.response?.data?.message || '복사 중 오류가 발생했습니다.');
-        } finally { setIsDuplicatingId(null); }
-    };
-
-    /* ── 저장 처리 ── */
-    const handleSaveConfirm = async () => {
-        setIsSaving(true);
-        try {
-            /* 미리보기와 동일한 1개 outer item 구조로 저장 → 운영 페이지와 완전 일치 */
-            const widgetItems = [{
-                id: 'wi-all',
-                colSpan: 12,
-                rowSpan: formContent.rowSpan + spaceContent.rowSpan,
-                contents: [
-                    { id: formContent.id,  colSpan: formContent.colSpan,  rowSpan: formContent.rowSpan,  widget: formContent.widget  as unknown as Record<string, unknown> },
-                    { id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> },
-                ],
-            }];
-            /* outputMode, layerType 등 팝업 메타는 extra로 병합 */
-            const result = await saveTemplate({
-                id: currentTemplateId,
-                name: saveModalName,
-                slug: saveModalSlug,
-                description: saveModalDesc,
-                templateType: 'QUICK_DETAIL',
-                widgetItems,
-                extra: {
-                    outputMode: om.outputMode,
-                    layerType:  om.layerType,
-                    layerTitle: om.layerTitle,
-                    layerWidth: om.layerWidth,
-                },
-            });
-            setCurrentTemplateId(result.id);
-            setCurrentTemplateName(result.name);
-            setSaveModalSlug(result.slug);
-            setShowSaveModal(false);
-            toast.success(currentTemplateId ? '템플릿이 수정되었습니다.' : '템플릿이 저장되었습니다.');
-        } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '저장 중 오류가 발생했습니다.');
-        } finally { setIsSaving(false); }
     };
 
     /* ── 컨텐츠 크기 수정 ── */
@@ -280,14 +170,19 @@ export default function QuickDetailBuilderPage() {
         }
     }, [om.layerType, om.outputMode]);
 
-    /* ── 필터된 템플릿 목록 ── */
-    const filteredTemplates = templateList.filter(t =>
-        t.name.toLowerCase().includes(loadSearch.toLowerCase()) ||
-        t.slug.toLowerCase().includes(loadSearch.toLowerCase())
-    );
-
     /* ── Form 위젯 참조 (SpaceBuilder formWidgets prop용) ── */
     const formWidgetRef = formContent.widget as FormWidget;
+
+    /* ── widgetItems 조립 (저장 시 호출) ── */
+    const buildWidgetItems = () => [{
+        id: 'wi-all',
+        colSpan: 12,
+        rowSpan: formContent.rowSpan + spaceContent.rowSpan,
+        contents: [
+            { id: formContent.id,  colSpan: formContent.colSpan,  rowSpan: formContent.rowSpan,  widget: formContent.widget  as unknown as Record<string, unknown> },
+            { id: spaceContent.id, colSpan: spaceContent.colSpan, rowSpan: spaceContent.rowSpan, widget: spaceContent.widget as unknown as Record<string, unknown> },
+        ],
+    }];
 
     /* ═══════════════════════════════════════ */
     /*  렌더                                    */
@@ -303,9 +198,9 @@ export default function QuickDetailBuilderPage() {
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">
                     상세/등록 페이지 레이아웃을 구성합니다.
-                    {currentTemplateName && (
+                    {tm.currentTemplateName && (
                         <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                            <Save className="w-3 h-3" />{currentTemplateName}
+                            <Save className="w-3 h-3" />{tm.currentTemplateName}
                         </span>
                     )}
                 </p>
@@ -320,60 +215,14 @@ export default function QuickDetailBuilderPage() {
                 <div className="bg-white border border-slate-200 rounded-xl sticky top-4">
 
                     {/* 불러오기 드롭다운 */}
-                    <div className="px-3 pt-2.5 pb-2 border-b border-slate-100 bg-slate-50/30">
-                        <div className="relative">
-                            <button
-                                onClick={() => { setShowLoadDropdown(v => !v); if (!showLoadDropdown) loadTemplateList(); }}
-                                className={`w-full flex items-center justify-between px-2.5 py-1.5 border rounded-md text-xs transition-all ${showLoadDropdown ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white hover:border-slate-400'}`}
-                            >
-                                <span className="text-slate-400 flex items-center gap-1.5">
-                                    <FolderOpen className="w-3 h-3" />불러오기...
-                                </span>
-                                {isLoadingList
-                                    ? <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin" />
-                                    : <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showLoadDropdown ? 'rotate-180' : ''}`} />
-                                }
-                            </button>
-                            {showLoadDropdown && (
-                                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
-                                    <div className="p-2 border-b border-slate-100">
-                                        <input
-                                            type="text" value={loadSearch}
-                                            onChange={e => setLoadSearch(e.target.value)}
-                                            placeholder="템플릿 검색..."
-                                            className="w-full border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-slate-900"
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
-                                        {filteredTemplates.length === 0 ? (
-                                            <div className="py-4 text-center text-xs text-slate-400">
-                                                {isLoadingList ? '불러오는 중...' : '저장된 템플릿이 없습니다.'}
-                                            </div>
-                                        ) : filteredTemplates.map(tpl => (
-                                            <div key={tpl.id} className="group flex items-center px-3 py-2 hover:bg-slate-50 transition-all">
-                                                <button onClick={() => handleLoadSelect(tpl)} className="flex-1 min-w-0 text-left">
-                                                    <p className="text-[11px] font-medium text-slate-800 truncate">{tpl.name}</p>
-                                                    <p className="text-[10px] text-slate-400 font-mono truncate">{tpl.slug}</p>
-                                                </button>
-                                                {currentTemplateId === tpl.id && (
-                                                    <span className="text-[9px] font-bold text-blue-500 bg-blue-50 px-1 py-0.5 rounded shrink-0 mr-1">현재</span>
-                                                )}
-                                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
-                                                    <button onClick={e => { e.stopPropagation(); handleDuplicateTemplate(tpl); }} disabled={isDuplicatingId === tpl.id} className="p-1 rounded text-slate-400 hover:bg-blue-50 hover:text-blue-500 transition-all disabled:opacity-50" title="복사">
-                                                        {isDuplicatingId === tpl.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
-                                                    </button>
-                                                    <button onClick={e => { e.stopPropagation(); handleDeleteTemplate(tpl.id); }} disabled={isDeletingId === tpl.id} className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all disabled:opacity-50" title="삭제">
-                                                        {isDeletingId === tpl.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <TemplateLoader
+                        {...tm}
+                        onToggle={() => { tm.setShowLoadDropdown(v => !v); if (!tm.showLoadDropdown) tm.loadTemplateList(); }}
+                        onSearchChange={tm.setLoadSearch}
+                        onSelect={handleLoadSelect}
+                        onDelete={tm.handleDeleteTemplate}
+                        onDuplicate={tm.handleDuplicateTemplate}
+                    />
 
                     {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
                     <OutputModePanel
@@ -391,7 +240,7 @@ export default function QuickDetailBuilderPage() {
                     <div className="p-3 space-y-1.5 max-h-[calc(100vh-320px)] overflow-y-auto">
                         <div className="border border-slate-200 rounded-lg overflow-hidden">
 
-                            {/* 위젯 헤더 — Widget 빌더와 동일한 다크 스타일 (드래그/삭제 제거) */}
+                            {/* 위젯 헤더 */}
                             <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-900 select-none">
                                 <span className="text-[10px] font-bold w-4 text-center text-slate-400">1</span>
                                 <span className="text-[10px] font-semibold flex-1 truncate text-slate-300">
@@ -453,17 +302,21 @@ export default function QuickDetailBuilderPage() {
                                             onRowSpanChange={v => updateSpaceSize(spaceContent.colSpan, v)}
                                         />
                                         <div className="px-3 pb-2 pt-1">
-                                            <SpaceBuilder
-                                                widget={spaceContent.widget as SpaceWidget}
-                                                onChange={w => setSpaceContent(prev => ({ ...prev, widget: w }))}
-                                                pageTemplates={mainLayerTemplates}
-                                                formWidgets={[{
-                                                    widgetId: formWidgetRef.widgetId,
-                                                    contentKey: formWidgetRef.contentKey,
-                                                    connectedSlug: formWidgetRef.connectedSlug,
-                                                }]}
-                                                actionButtonOnly={true}
-                                                maxColSpan={om.isRightDrawer ? 2 : 12}
+                                            <CommonBuilderDispatcher
+                                                widget={spaceContent.widget}
+                                                onChange={w => setSpaceContent(prev => ({ ...prev, widget: w as SpaceWidget }))}
+                                                context={{
+                                                    slugOptions,
+                                                    pageTemplates: mainLayerTemplates,
+                                                    contentWidgets: [{
+                                                        type: 'form' as const,
+                                                        widgetId: formWidgetRef.widgetId,
+                                                        contentKey: formWidgetRef.contentKey,
+                                                        connectedSlug: formWidgetRef.connectedSlug,
+                                                    }],
+                                                    actionButtonOnly: true,
+                                                    maxColSpan: om.isRightDrawer ? 2 : 12,
+                                                }}
                                             />
                                         </div>
                                     </div>
@@ -478,7 +331,7 @@ export default function QuickDetailBuilderPage() {
                 {/* ════════════════════════════════ */}
                 <div className="space-y-4">
 
-                    {/* 상단 툴바 — Widget 빌더와 동일 */}
+                    {/* 상단 툴바 */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-slate-700">미리보기</span>
@@ -487,12 +340,12 @@ export default function QuickDetailBuilderPage() {
                             </span>
                         </div>
                         <button
-                            onClick={() => { setSaveModalName(currentTemplateName || ''); setShowSaveModal(true); }}
+                            onClick={tm.openSaveModal}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-all"
-                            title={currentTemplateId ? '템플릿 수정 저장' : '새 템플릿 저장'}
+                            title={tm.currentTemplateId ? '템플릿 수정 저장' : '새 템플릿 저장'}
                         >
                             <Save className="w-3.5 h-3.5" />
-                            {currentTemplateId ? '수정' : '저장'}
+                            {tm.currentTemplateId ? '수정' : '저장'}
                         </button>
                     </div>
 
@@ -504,9 +357,6 @@ export default function QuickDetailBuilderPage() {
                             layerTitle={om.layerTitle}
                             layerWidth={om.layerWidth}
                         >
-                            {/* 우측 드로어: flex-col + 명시적 너비 (col=1→50%, col=2→100%)
-                                CSS grid auto-placement 예측 불가 문제 회피
-                                행 높이 = rowSpan * ROW_HEIGHT px 최솟값 */}
                             {om.isRightDrawer ? (
                                 <div
                                     className="flex flex-col border border-slate-200 rounded-lg overflow-hidden bg-slate-50"
@@ -529,7 +379,6 @@ export default function QuickDetailBuilderPage() {
                                     </div>
                                 </div>
                             ) : (
-                                /* 페이지/중앙팝업: PageLayout + PageGridRenderer로 운영화면과 동일하게 렌더 */
                                 <PageLayout mode="preview">
                                     <PageGridRenderer
                                         mode="preview"
@@ -549,17 +398,22 @@ export default function QuickDetailBuilderPage() {
 
             {/* 저장 모달 */}
             <SaveModal
-                show={showSaveModal}
-                onClose={() => setShowSaveModal(false)}
-                isEdit={!!currentTemplateId}
-                name={saveModalName}
-                slug={saveModalSlug}
-                desc={saveModalDesc}
-                isSaving={isSaving}
-                onNameChange={setSaveModalName}
-                onSlugChange={setSaveModalSlug}
-                onDescChange={setSaveModalDesc}
-                onConfirm={handleSaveConfirm}
+                show={tm.showSaveModal}
+                onClose={() => tm.setShowSaveModal(false)}
+                isEdit={!!tm.currentTemplateId}
+                name={tm.saveModalName}
+                slug={tm.saveModalSlug}
+                desc={tm.saveModalDesc}
+                isSaving={tm.isSaving}
+                onNameChange={tm.setSaveModalName}
+                onSlugChange={tm.setSaveModalSlug}
+                onDescChange={tm.setSaveModalDesc}
+                onConfirm={() => tm.handleSaveConfirm(buildWidgetItems(), {
+                    outputMode: om.outputMode,
+                    layerType:  om.layerType,
+                    layerTitle: om.layerTitle,
+                    layerWidth: om.layerWidth,
+                })}
                 toSlug={toSlug}
             />
         </div>

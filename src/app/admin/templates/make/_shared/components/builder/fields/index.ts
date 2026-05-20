@@ -26,8 +26,11 @@ export { FileField } from './FileField';
 export { ImageField } from './ImageField';
 export { VideoField } from './VideoField';
 export { MediaField } from './MediaField';
+export { ColorField } from './ColorField';
 export { ActionButtonField } from './ActionButtonField';
 export type { ActionButtonFieldProps } from './ActionButtonField';
+export { SlugSelectField } from './SlugSelectField';
+export type { SlugOption } from './SlugSelectField';
 export type { FieldEditProps, FieldEditValues, ColSpanMode } from './types';
 
 /* ── TableColumn 계열 ── */

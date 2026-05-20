@@ -5,12 +5,13 @@ export interface Admin {
   id: number;
   email: string;
   name: string;
-  employeeId: string;
+  deptCode: string;
+  deptName: string;
+  remark: string;
   role: string;
   isActive: boolean;
   createdAt: string;
   lastLoginAt?: string;
-  lastLoginIp?: string;
 }
 
 interface AdminState {

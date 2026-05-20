@@ -13,7 +13,8 @@ export type SearchFieldType =
     | 'action-button'   // 액션 버튼 (팝업·API·경로 연결)
     | 'file' | 'image' | 'video' | 'media' // 파일 업로드 및 미디어 타입
     | 'editor'          // 위지윅 에디터
-    | 'hidden';         // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
+    | 'hidden'          // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
+    | 'color';          // 색상 선택 (Preset 원형 버튼)
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -56,6 +57,7 @@ export interface SearchFieldConfig {
     connectedSlug?: string;     // 연결 방식 slug: DB slug (레거시)
     connectedContentWidgetIds?: string[];    // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
     contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
+    goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
     isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
     readonly?: boolean;             // 읽기 전용 여부 (Form 전용)
     // ── 파일/이미지/비디오 전용 ──

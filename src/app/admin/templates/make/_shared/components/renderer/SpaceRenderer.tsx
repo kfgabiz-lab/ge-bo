@@ -36,8 +36,8 @@ interface SpaceRendererProps {
     showBorder?: boolean;
     /** 영역 바탕색 (기본 white) */
     bgColor?: string;
-    /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction 전달 */
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete') => void;
+    /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction + goBackAfterAction 전달 */
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
     onClose?: () => void;
     /** 팝업 오픈 요청 — connType='popup' 버튼 클릭 시 slug 전달 */
@@ -61,7 +61,7 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         if (mode === 'preview') return;
         /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
         if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
-            onContentAction?.(field.connectedContentWidgetIds, field.contentAction);
+            onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction);
         } else if (field.connType === 'close') {
             /* LayerPopup이면 onClose(), 상세페이지면 router.back() */
             if (onClose) {

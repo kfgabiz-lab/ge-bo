@@ -7,6 +7,7 @@ import { MENU_ICON_LIST } from './constants';
 
 /* ── 아이콘 동적 렌더러 ── */
 const renderIcon = (name: string, className = 'w-4 h-4') => {
+    if (!name) return null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Icon = (LucideIcons as any)[name] as React.ComponentType<{ className?: string }> | undefined;
     if (!Icon) return <span className={className}>?</span>;
@@ -44,8 +45,10 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                 className="w-full flex items-center justify-between gap-2 border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
             >
                 <span className="flex items-center gap-2">
-                    {renderIcon(value, 'w-4 h-4 text-slate-600')}
-                    <span className="text-slate-700">{value}</span>
+                    {value === ''
+                        ? <span className="w-4 h-4 flex items-center justify-center text-slate-300 text-base">—</span>
+                        : renderIcon(value, 'w-4 h-4 text-slate-600')}
+                    <span className="text-slate-700">{value === '' ? '아이콘 없음' : value}</span>
                 </span>
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
@@ -55,7 +58,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {MENU_ICON_LIST.map(iconName => (
                         <button
-                            key={iconName}
+                            key={iconName === '' ? '__none__' : iconName}
                             type="button"
                             onClick={() => { onChange(iconName); setOpen(false); }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-all ${
@@ -64,8 +67,10 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                                     : 'text-slate-700 hover:bg-slate-50'
                             }`}
                         >
-                            {renderIcon(iconName, `w-4 h-4 ${value === iconName ? 'text-white' : 'text-slate-500'}`)}
-                            <span>{iconName}</span>
+                            {iconName === ''
+                                ? <span className={`w-4 h-4 flex items-center justify-center ${value === '' ? 'text-white' : 'text-slate-300'}`}>—</span>
+                                : renderIcon(iconName, `w-4 h-4 ${value === iconName ? 'text-white' : 'text-slate-500'}`)}
+                            <span>{iconName === '' ? '아이콘 없음' : iconName}</span>
                         </button>
                     ))}
                 </div>
