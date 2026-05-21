@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Plus, Trash2, X, Save, Wand2,
     Search as SearchIcon, Table2, FileText,
-    AlignLeft, Layers, List,
+    AlignLeft, Layers, List, CheckSquare,
     GripVertical,
 } from 'lucide-react';
 
@@ -50,7 +50,7 @@ import { toast } from 'sonner';
 /* ══════════════════════════════════════════ */
 
 /** 페이지 위젯 타입 */
-type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'sublist';
+type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'sublist' | 'multiselect';
 
 /* TextWidget, SearchWidget, SpaceItem, SpaceWidget → renderer/types에서 import */
 /* FormFieldItem, FormWidget → FormBuilder에서 import */
@@ -103,7 +103,8 @@ const WIDGET_META: Record<PageWidgetType, {
     form:     { label: 'Form',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200',  previewBg: 'bg-violet-50/50',  desc: '폼 입력 영역' },
     space:    { label: '공간영역', color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200',   previewBg: 'bg-amber-50/50',   desc: 'Text/Button 배치 영역' },
     category: { label: '카테고리', color: 'text-cyan-700',   bg: 'bg-cyan-50',    border: 'border-cyan-200',    previewBg: 'bg-cyan-50/50',    desc: '카테고리 계층 관리' },
-    sublist:  { label: '서브리스트', color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200',  previewBg: 'bg-indigo-50/50',  desc: '다건 행 입력 목록' },
+    sublist:     { label: '서브리스트', color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200', previewBg: 'bg-indigo-50/50', desc: '다건 행 입력 목록' },
+    multiselect: { label: '다중선택',   color: 'text-teal-700',   bg: 'bg-teal-50',   border: 'border-teal-200',   previewBg: 'bg-teal-50/50',   desc: '체크박스 드롭다운 다중 선택' },
 };
 
 /** 위젯 타입별 아이콘 컴포넌트 */
@@ -112,8 +113,9 @@ const WIDGET_ICON: Record<PageWidgetType, React.ReactNode> = {
     table:    <Table2 className="w-3.5 h-3.5" />,
     form:     <FileText className="w-3.5 h-3.5" />,
     space:    <AlignLeft className="w-3.5 h-3.5" />,
-    category: <Layers className="w-3.5 h-3.5" />,
-    sublist:  <List className="w-3.5 h-3.5" />,
+    category:    <Layers      className="w-3.5 h-3.5" />,
+    sublist:     <List        className="w-3.5 h-3.5" />,
+    multiselect: <CheckSquare className="w-3.5 h-3.5" />,
 };
 
 /** 공간영역 버튼 색상 옵션 */
@@ -291,7 +293,8 @@ export default function PageBuilderPage() {
                 case 'form':     return { type: 'form', widgetId: id, contentKey: '', fields: [] } as FormWidget;
                 case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
                 case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
-                case 'sublist':  return { type: 'sublist', widgetId: id, contentKey: '', columns: [], showBorder: true } as SubListWidget;
+                case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true } as SubListWidget;
+                case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', connectedSlug: '', labelFields: 'name' } as MultiSelectWidget;
             }
         })();
         const parent = widgetItems.find(i => i.id === itemId);
@@ -650,6 +653,7 @@ export default function PageBuilderPage() {
                                                                                                     contentWidgets: [
                                                                                                         ...(collectWidgets(widgetItems, 'form') as FormWidget[]).map(w => ({ type: 'form' as const, widgetId: w.widgetId, contentKey: w.contentKey, connectedSlug: w.connectedSlug })),
                                                                                                         ...(collectWidgets(widgetItems, 'sublist') as SubListWidget[]).map(w => ({ type: 'sublist' as const, widgetId: w.widgetId, contentKey: w.contentKey, title: w.title })),
+                                                                                                        ...(collectWidgets(widgetItems, 'multiselect') as MultiSelectWidget[]).map(w => ({ type: 'multiselect' as const, widgetId: w.widgetId, contentKey: w.contentKey, title: w.title })),
                                                                                                     ],
                                                                                                     categoryWidgets: (collectWidgets(widgetItems, 'category') as CategoryWidget[]).map(w => ({ widgetId: w.widgetId, label: w.label, depth: w.depth })),
                                                                                                     maxColSpan: om.isRightDrawer ? 2 : 12,

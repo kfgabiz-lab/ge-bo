@@ -65,7 +65,6 @@ function buildLabel(item: OptionItem, labelFields: string): string {
 export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }: MultiSelectRendererProps) {
     const isPreview = mode === 'preview';
     const labelFields = widget.labelFields || 'name';
-    const valueField  = widget.valueField  || 'id';
 
     /* ── 상태 ── */
     const [options,  setOptions]  = useState<OptionItem[]>([]);
@@ -81,15 +80,15 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
             setOptions(PREVIEW_OPTIONS as OptionItem[]);
             return;
         }
-        if (!widget.sourceSlug) return;
+        if (!widget.connectedSlug) return;
         /* 전체 목록 한 번에 로드 (페이징 없음) */
-        api.get(`/page-data/${widget.sourceSlug}`, { params: { size: 9999 } })
+        api.get(`/page-data/${widget.connectedSlug}`, { params: { size: 9999 } })
             .then(res => {
                 const rows = (res.data.content ?? []) as { dataJson: Record<string, unknown> }[];
-                setOptions(rows.map(r => ({ id: Number(r.dataJson[valueField] ?? 0), ...r.dataJson })));
+                setOptions(rows.map(r => ({ id: Number(r.dataJson['id'] ?? 0), ...r.dataJson })));
             })
             .catch(() => {});
-    }, [isPreview, widget.sourceSlug, valueField]);
+    }, [isPreview, widget.connectedSlug]);
 
     /* ── live: 외부 selectedIds 동기화 ── */
     useEffect(() => {
@@ -135,12 +134,17 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
     const selectedOptions = options.filter(opt => selected.includes(opt.id));
 
     return (
-        <RendererContainer showBorder={widget.showBorder ?? true}>
+        <RendererContainer showBorder={widget.showBorder ?? true} bgColor={widget.bgColor}>
             <div className="p-3 flex flex-col gap-3 h-full">
 
                 {/* 타이틀 */}
                 {widget.title && (
                     <p className="text-sm font-medium text-slate-700">{widget.title}</p>
+                )}
+
+                {/* 설명 */}
+                {widget.description && (
+                    <p className="text-xs text-slate-500">{widget.description}</p>
                 )}
 
                 {/* 드롭다운 영역 */}

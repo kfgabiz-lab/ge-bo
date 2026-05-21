@@ -334,7 +334,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                         type="text"
                         value={widget.contentKey}
                         onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                        placeholder="예: registerForm"
+                        placeholder="예: registerForm (페이지 내 고유)"
                         className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900"
                     />
                 </div>

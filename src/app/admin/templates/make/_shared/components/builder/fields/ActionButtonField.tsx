@@ -23,9 +23,9 @@ import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import type { TemplateItem } from '../../../types';
 import { getTemplateLabel } from '../../../utils';
 
-/** 컨텐츠 위젯 정보 타입 (Form + SubList 공용) */
+/** 컨텐츠 위젯 정보 타입 (Form + SubList + MultiSelect 공용) */
 export interface ContentWidgetOption {
-    type: 'form' | 'sublist';
+    type: 'form' | 'sublist' | 'multiselect';
     widgetId: string;
     contentKey: string;
     title?: string;
@@ -96,7 +96,7 @@ export function ActionButtonField({
 
     /** 컨텐츠 아이템 표시 라벨 구성 */
     const getContentLabel = (w: ContentWidgetOption): string => {
-        const typeLabel = w.type === 'form' ? 'Form' : 'SubList';
+        const typeLabel = w.type === 'form' ? 'Form' : w.type === 'sublist' ? 'SubList' : 'MultiSelect';
         const name = w.title || w.contentKey || w.widgetId;
         return `[${typeLabel}] ${name}`;
     };
@@ -167,7 +167,7 @@ export function ActionButtonField({
                             {/* 위젯 목록이 없을 때 안내 */}
                             {contentWidgets.length === 0 ? (
                                 <p className="text-[10px] text-slate-400 italic px-1">
-                                    연결 가능한 Form/SubList 위젯이 없습니다.
+                                    연결 가능한 Form/SubList/MultiSelect 위젯이 없습니다.
                                 </p>
                             ) : (
                                 <div className="border border-slate-200 rounded overflow-hidden">

@@ -306,12 +306,12 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
 
                 {/* contentKey */}
                 <div>
-                    <label className={LABEL_CLS}>데이터 키 (contentKey) <span className="text-red-400">*</span></label>
+                    <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
                     <input
                         type="text"
                         value={widget.contentKey}
                         onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                        placeholder="이 SubList 데이터의 식별 키 (영문)"
+                        placeholder="예: subList1 (페이지 내 고유)"
                         className={INPUT_CLS}
                     />
                 </div>

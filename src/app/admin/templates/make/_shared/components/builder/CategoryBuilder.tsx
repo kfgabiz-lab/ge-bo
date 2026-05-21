@@ -49,7 +49,7 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                         type="text"
                         className={INPUT_CLS}
                         value={widget.contentKey}
-                        placeholder="예: cate1"
+                        placeholder="예: category1 (페이지 내 고유)"
                         onChange={e => onChange({ ...widget, contentKey: e.target.value })}
                     />
                 </div>

@@ -175,17 +175,15 @@ export interface MultiSelectWidget {
     widgetId: string;
     /** dataJson 저장 키 (예: "relatedUsers") */
     contentKey: string;
-    /** 저장 대상 slug (action-button connectedContentWidgetIds 연결용) */
-    connectedSlug?: string;
     /** 옵션 목록을 가져올 slug */
-    sourceSlug: string;
+    connectedSlug: string;
     /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
     labelFields: string;
-    /** 저장할 ID 필드 키 (기본: 'id') */
-    valueField?: string;
     placeholder?: string;
     title?: string;
+    description?: string;
     showBorder?: boolean;
+    bgColor?: string;
 }
 
 /**

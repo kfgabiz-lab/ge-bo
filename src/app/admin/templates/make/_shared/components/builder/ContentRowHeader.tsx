@@ -25,7 +25,7 @@
  */
 
 import React from 'react';
-import { X, GripVertical, Search, AlignLeft, FileText, Table2, Layers, List } from 'lucide-react';
+import { X, GripVertical, Search, AlignLeft, FileText, Table2, Layers, List, CheckSquare } from 'lucide-react';
 
 /* 컨텐츠 타입별 시각 메타 (label·color·icon) — widget/page.tsx WIDGET_META/WIDGET_ICON과 동일하게 유지 */
 const CONTENT_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -34,7 +34,8 @@ const CONTENT_META: Record<string, { label: string; color: string; icon: React.R
     form:     { label: 'Form',      color: 'text-violet-700',  icon: <FileText  className="w-3.5 h-3.5" /> },
     space:    { label: '공간영역',   color: 'text-amber-700',   icon: <AlignLeft className="w-3.5 h-3.5" /> },
     category: { label: '카테고리',   color: 'text-cyan-700',    icon: <Layers    className="w-3.5 h-3.5" /> },
-    sublist:  { label: '서브리스트', color: 'text-indigo-700',  icon: <List      className="w-3.5 h-3.5" /> },
+    sublist:     { label: '서브리스트', color: 'text-indigo-700', icon: <List        className="w-3.5 h-3.5" /> },
+    multiselect: { label: '다중선택',   color: 'text-teal-700',   icon: <CheckSquare className="w-3.5 h-3.5" /> },
 };
 
 interface ContentRowHeaderProps {
