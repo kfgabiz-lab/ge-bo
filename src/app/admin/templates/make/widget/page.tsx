@@ -429,8 +429,8 @@ export default function PageBuilderPage() {
             const label = fw.contentKey || '?';
             const fieldKeys: string[] = [];
             fw.fields.forEach(f => {
-                /* editor 타입은 라벨 선택 입력 — 다른 타입만 필수 검사 */
-                if (f.type !== 'editor' && !f.label?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
+                /* editor/hidden 타입은 라벨 불필요 — 나머지 타입만 필수 검사 */
+                if (f.type !== 'editor' && f.type !== 'hidden' && !f.label?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
                 if (!f.fieldKey?.trim()) {
                     errors.push(`[Form:${label}] 필드 Key 미입력`);
                 } else {
