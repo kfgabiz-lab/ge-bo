@@ -6,7 +6,7 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 /**
  * Axios 기본 인스턴스
@@ -46,14 +46,14 @@ api.interceptors.response.use(
         if (error.response?.status === 401 && !original._retry) {
             original._retry = true;
             try {
-                const resp = await axios.post(`${BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+                const resp = await api.post('/auth/refresh', {}, { withCredentials: true });
                 const { accessToken, adminInfo } = resp.data;
                 useAuthStore.getState().setAccessToken(accessToken, adminInfo);
                 original.headers.Authorization = `Bearer ${accessToken}`;
                 return api(original);
             } catch {
                 // Refresh 실패 시 로그아웃 처리
-                await axios.post(`${BASE_URL}/auth/logout`, {}, { withCredentials: true }).catch(() => {});
+                await api.post('/auth/logout', {}, { withCredentials: true }).catch(() => {});
                 useAuthStore.getState().logout();
                 if (typeof window !== 'undefined' && window.location.pathname !== '/admin/login') {
                     window.location.href = '/admin/login';
