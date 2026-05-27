@@ -10,42 +10,8 @@ import { useMenuStore, MenuItem } from '@/store/useMenuStore';
 import { useNavMenusQuery } from '@/hooks/useMenuQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSiteStore } from '@/store/useSiteStore';
+import { usePageTitleStore } from '@/store/usePageTitleStore';
 
-/** 동적 세그먼트(숫자 ID, 'new') → 부모 세그먼트 기준으로 등록/수정 레이블 반환 */
-const DYNAMIC_SEGMENT_LABEL_MAP: Record<string, { edit: string; create: string }> = {
-    'users':  { edit: '관리자 수정',   create: '관리자 등록' },
-    'roles':  { edit: '권한 수정',     create: '권한 등록' },
-    'menus':  { edit: '메뉴 수정',     create: '메뉴 등록' },
-    'sites':  { edit: '홈페이지 수정', create: '홈페이지 등록' },
-};
-
-const BREADCRUMB_MAP: Record<string, string> = {
-    'admin': '관리자',
-    'dashboard': '대시보드',
-    'settings': '설정',
-    'users': '사용자 관리',
-    'roles': '권한 관리',
-    'menus': '메뉴 관리',
-    'sites': '홈페이지 관리',
-    'content': '콘텐츠',
-    'display': '디스플레이',
-    'boards': '게시판',
-    'templates': '템플릿',
-    'ui-components': 'UI 컴포넌트',
-    'list-layout': '목록형 레이아웃',
-    'grid-layout': '카드형 레이아웃',
-    'form-layout': '폼형 레이아웃',
-    'dashboard-layout': '대시보드 레이아웃',
-    'search-layout': '검색 템플릿',
-    'list': '목록',
-    'server-pagination': '서버사이드 페이징',
-    'virtual-scroll': '가상 스크롤링',
-    'demo': '데모',
-    'page1': 'Page1',
-    'page2': 'Page2',
-    'form': '폼',
-    'layout-right': 'Layout(Right)',
-};
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
 function findMenuBreadcrumb(
@@ -173,6 +139,8 @@ export function Header() {
     const navMenus = useMenuStore((state) => state.navMenus);
     const __syncQueryMenus = useMenuStore((state) => state.__syncQueryMenus);
     const queryClient = useQueryClient();
+    const pageTitle = usePageTitleStore(s => s.pageTitle);
+    const previousPath = usePageTitleStore(s => s.previousPath);
 
     /* React Query 기반 네비게이션 메뉴 캐싱 연동 */
     const { data: serverNavMenus } = useNavMenusQuery();
@@ -185,22 +153,31 @@ export function Header() {
 
     /* 메뉴 트리에서 현재 경로 조회 → 없으면 URL 세그먼트 폴백 */
     const menuCrumbs = findMenuBreadcrumb(navMenus, pathname || '');
-    const crumbs = menuCrumbs
-        ? [{ label: '관리자', href: '/admin', isLast: false }, ...menuCrumbs.map((c, i) => ({ ...c, isLast: i === menuCrumbs.length - 1 }))]
-        : (pathname || '').split('/').filter(Boolean).map((seg, i, arr) => {
-            /* 숫자 ID 또는 'new' 세그먼트는 부모 세그먼트 기준으로 레이블 결정 */
-            let label: string;
-            if (BREADCRUMB_MAP[seg]) {
-                label = BREADCRUMB_MAP[seg];
-            } else if (/^\d+$/.test(seg) || seg === 'new') {
-                const parentSeg = arr[i - 1];
-                const dynMap = DYNAMIC_SEGMENT_LABEL_MAP[parentSeg];
-                label = dynMap ? (seg === 'new' ? dynMap.create : dynMap.edit) : seg;
-            } else {
-                label = seg;
+    /* 메뉴명이 비어있을 때 빌더 pageTitle로 대체 (우선순위: 메뉴명 > pageTitle) */
+    const resolvedCrumbs = menuCrumbs?.map((c, i, arr) =>
+        i === arr.length - 1 && !c.label.trim() && pageTitle
+            ? { ...c, label: pageTitle }
+            : c
+    );
+    /* 메뉴에 없는 페이지 — previousPath로 부모 메뉴 전체 크럼 탐색 */
+    const parentCrumbs = !resolvedCrumbs && previousPath
+        ? findMenuBreadcrumb(navMenus, previousPath) ?? null
+        : null;
+
+    const crumbs = resolvedCrumbs
+        ? [...resolvedCrumbs.map((c, i) => ({ ...c, isLast: i === resolvedCrumbs.length - 1 }))]
+        : (() => {
+            /* pageTitle이 있으면 단일 크럼으로 표시, 없으면 마지막 URL 세그먼트 폴백 */
+            const lastLabel = pageTitle || (pathname || '').split('/').filter(Boolean).pop() || '';
+            const lastHref = pathname || '/';
+            const items: { label: string; href: string; isLast: boolean }[] = [];
+            /* 부모 크럼 전체 — previousPath에서 찾은 계층 모두 앞에 추가 */
+            if (parentCrumbs) {
+                parentCrumbs.forEach(c => items.push({ label: c.label, href: c.href, isLast: false }));
             }
-            return { label, href: '/' + arr.slice(0, i + 1).join('/'), isLast: i === arr.length - 1 };
-        });
+            items.push({ label: lastLabel, href: lastHref, isLast: true });
+            return items;
+        })();
 
     const handleLogout = async () => {
         try {

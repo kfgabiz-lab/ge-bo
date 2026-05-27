@@ -6,6 +6,7 @@
  * 사용법:
  *   const om = useOutputMode();
  *   // om.outputMode, om.layerType, om.isRightDrawer
+ *   // om.pageTitle — page 모드 전용 제목
  *   // om.setOutputMode, om.setLayerType, om.setLayerTitle, om.setLayerWidth
  *   // om.restore(config) — 불러온 configJson에서 일괄 복원
  */
@@ -17,12 +18,15 @@ export type OutputMode = 'page' | 'layerpopup';
 
 export interface OutputModeValue {
     outputMode: OutputMode;
+    /** page 모드 전용 제목 */
+    pageTitle: string;
     layerType: LayerType;
     layerTitle: string;
     layerWidth: LayerWidth;
     /** 우측 드로어 여부 — layerpopup + right 조합일 때 true */
     isRightDrawer: boolean;
     setOutputMode: (v: OutputMode) => void;
+    setPageTitle: (v: string) => void;
     setLayerType: (v: LayerType) => void;
     setLayerTitle: (v: string) => void;
     setLayerWidth: (v: LayerWidth) => void;
@@ -35,6 +39,7 @@ export interface OutputModeValue {
 
 export function useOutputMode(): OutputModeValue {
     const [outputMode, setOutputMode] = useState<OutputMode>('page');
+    const [pageTitle, setPageTitle]   = useState('');
     const [layerType, setLayerType]   = useState<LayerType>('center');
     const [layerTitle, setLayerTitle] = useState('');
     const [layerWidth, setLayerWidth] = useState<LayerWidth>('md');
@@ -43,14 +48,15 @@ export function useOutputMode(): OutputModeValue {
 
     const restore = (cfg: Record<string, unknown>) => {
         setOutputMode((cfg.outputMode as OutputMode)  || 'page');
+        setPageTitle ((cfg.pageTitle   as string)     || '');
         setLayerType ((cfg.layerType  as LayerType)   || 'center');
         setLayerTitle((cfg.layerTitle  as string)     || '');
         setLayerWidth((cfg.layerWidth  as LayerWidth) || 'md');
     };
 
     return {
-        outputMode, layerType, layerTitle, layerWidth, isRightDrawer,
-        setOutputMode, setLayerType, setLayerTitle, setLayerWidth,
+        outputMode, pageTitle, layerType, layerTitle, layerWidth, isRightDrawer,
+        setOutputMode, setPageTitle, setLayerType, setLayerTitle, setLayerWidth,
         restore,
     };
 }

@@ -215,6 +215,7 @@ const SAMPLE_MULTISELECT: MultiSelectWidget = {
     type: 'multiselect',
     widgetId: 'guide-multiselect',
     contentKey: 'assignedUsers',
+    sourceSlug: '',
     connectedSlug: '',
     labelFields: 'name,dept',
     placeholder: '담당자를 선택하세요',

@@ -294,7 +294,7 @@ export default function PageBuilderPage() {
                 case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
                 case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
                 case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true } as SubListWidget;
-                case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', connectedSlug: '', labelFields: 'name' } as MultiSelectWidget;
+                case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', sourceSlug: '', connectedSlug: '', labelFields: 'name' } as MultiSelectWidget;
             }
         })();
         const parent = widgetItems.find(i => i.id === itemId);
@@ -464,6 +464,7 @@ export default function PageBuilderPage() {
             widgetItems as unknown as import('../_shared/templateApi').PageWidgetItem[],
             {
                 outputMode: om.outputMode,
+                pageTitle:  om.pageTitle,
                 layerType:  om.layerType,
                 layerTitle: om.layerTitle,
                 layerWidth: om.layerWidth,
@@ -516,10 +517,12 @@ export default function PageBuilderPage() {
                     {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
                     <OutputModePanel
                         outputMode={om.outputMode}
+                        pageTitle={om.pageTitle}
                         layerType={om.layerType}
                         layerTitle={om.layerTitle}
                         layerWidth={om.layerWidth}
                         onOutputModeChange={om.setOutputMode}
+                        onPageTitleChange={om.setPageTitle}
                         onLayerTypeChange={om.setLayerType}
                         onLayerTitleChange={om.setLayerTitle}
                         onLayerWidthChange={om.setLayerWidth}

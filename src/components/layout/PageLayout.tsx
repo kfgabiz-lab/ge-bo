@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ROW_HEIGHT } from './GridCell';
 import { PageGridContainer } from './PageGridContainer';
 import { useMenuStore, MenuItem } from '@/store/useMenuStore';
+import { usePageTitleStore } from '@/store/usePageTitleStore';
 
 /** navMenus 트리에서 현재 pathname과 일치하는 메뉴 항목 반환 */
 function findMenuByUrl(menus: MenuItem[], pathname: string): MenuItem | null {
@@ -59,9 +60,13 @@ export default function PageLayout({ title, description, mode = 'live', children
     const pathname = usePathname();
     const navMenus = useMenuStore((state) => state.navMenus);
 
+    /* 빌더에서 설정한 페이지 제목 (메뉴명 없을 때 폴백) */
+    const pageTitle = usePageTitleStore(s => s.pageTitle);
+
     /* mode="live"일 때 현재 URL로 메뉴명/설명 자동 조회 — title prop 우선 */
     const autoMenu = mode === 'live' ? findMenuByUrl(navMenus, pathname || '') : null;
-    const displayTitle = title ?? autoMenu?.name;
+    /* 우선순위: title prop > 메뉴명 > 빌더 pageTitle */
+    const displayTitle = title ?? autoMenu?.name ?? (mode === 'live' ? pageTitle : undefined);
     const displayDescription = description ?? autoMenu?.description;
 
     /* 격자 표시 여부 — preview는 기본 true, live는 기본 false */

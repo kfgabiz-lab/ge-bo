@@ -67,11 +67,12 @@ import type { FormFieldItem } from '../builder/FormBuilder';
 import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
-import { validateFormFields } from '../../utils';
+import { validateFormFields, buildDataJson } from '../../utils';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
  * - editId가 있으면 slug+id로 dataJson 조회 후 fieldKey 기준 매핑
+ * - contentKey가 있으면 dataJson[contentKey] 섹션에서 읽음 (중첩 저장 구조 대응)
  * - initialValues가 있으면 fieldKey 기준으로 덮어씀 (우선순위 최상위)
  */
 async function fetchAndMapFieldValues(
@@ -79,6 +80,7 @@ async function fetchAndMapFieldValues(
     editId: number | null,
     fields: FormFieldItem[],
     initialValues?: Record<string, string>,
+    contentKey?: string,
 ): Promise<{ values: Record<string, string>; existingFileIds: Record<string, number[]>; sourceData: Record<string, unknown> }> {
     let sourceData: Record<string, unknown> = {};
     if (editId != null && connectedSlug) {
@@ -90,21 +92,29 @@ async function fetchAndMapFieldValues(
         } catch { /* 조회 실패 시 빈 값으로 처리 */ }
     }
 
+    /* contentKey가 있으면 해당 섹션에서 읽기, 없으면 root에서 읽기 */
+    const section: Record<string, unknown> = (
+        contentKey &&
+        sourceData[contentKey] &&
+        typeof sourceData[contentKey] === 'object' &&
+        !Array.isArray(sourceData[contentKey])
+    ) ? sourceData[contentKey] as Record<string, unknown> : sourceData;
+
     const values: Record<string, string>           = {};
     const existingFileIds: Record<string, number[]> = {};
 
     fields.forEach(f => {
         const key = f.fieldKey || f.label;
         if (f.type === 'file' || f.type === 'image') {
-            const ids = sourceData[key];
+            const ids = section[key];
             if (Array.isArray(ids)) existingFileIds[f.id] = ids.map(Number);
         } else if (f.type === 'hidden') {
-            values[f.id] = sourceData[key] !== undefined
-                ? String(sourceData[key])
+            values[f.id] = section[key] !== undefined
+                ? String(section[key])
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 : ((f as any).defaultValue ?? '');
-        } else if (sourceData[key] !== undefined) {
-            values[f.id] = String(sourceData[key]);
+        } else if (section[key] !== undefined) {
+            values[f.id] = String(section[key]);
         }
         if (initialValues && key && key in initialValues) {
             values[f.id] = initialValues[key];
@@ -278,23 +288,24 @@ export function WidgetRenderer({
     /* 카테고리 팝업 저장 후 목록 재조회용 — 증가할 때마다 CategoryRenderer가 fetchItems 호출 */
     const [categoryRefreshTick,  setCategoryRefreshTick]  = useState(0);
 
-    /* 팝업 폼 필드값 */
-    const [popupValues,          setPopupValues]          = useState<Record<string, string>>({});
-    const [popupFileValues,      setPopupFileValues]      = useState<Record<string, File[]>>({});
-    const [popupExistingFileIds, setPopupExistingFileIds] = useState<Record<string, number[]>>({});
+    /* 팝업 폼 필드값 — widgetId → { fieldId: 값 } (page 모드 formValuesMap과 동일 구조) */
+    const [popupFormValuesMap,   setPopupFormValuesMap]   = useState<Record<string, Record<string, string>>>({});
+    /* 팝업 폼 새 파일 — widgetId → { fieldId: File[] } */
+    const [popupFileValuesMap,   setPopupFileValuesMap]   = useState<Record<string, Record<string, File[]>>>({});
     /* 팝업 내 SubList rows 상태 — widgetId → SubListRow[] */
     const [popupSubListRowsMap,  setPopupSubListRowsMap]  = useState<Record<string, import('./SubListRenderer').SubListRow[]>>({});
     /* 팝업 내 SubList 파일 맵 — widgetId → rowId → colId → File[] */
     const [popupSubListFileMap,  setPopupSubListFileMap]  = useState<Record<string, Record<string, Record<string, File[]>>>>({});
-    const [popupExistingMeta,    setPopupExistingMeta]    = useState<
-        Record<string, { id: number; origName: string; fileSize: number }[]>
+    /* 팝업 기존 파일 메타 — widgetId → { fieldId: meta[] } (page 모드 existingFileMetaMap과 동일 구조) */
+    const [popupExistingMetaMap, setPopupExistingMetaMap] = useState<
+        Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>
     >({});
     const [popupImgBlobUrls,     setPopupImgBlobUrls]     = useState<Record<number, string>>({});
 
     /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 ──
      * 최신 상태를 ref로 유지하고 _hiddenLogCallbacks에 콜백 등록 */
     const popupCfgRef    = useRef(popupCfg);    popupCfgRef.current    = popupCfg;
-    const popupValuesRef = useRef(popupValues);  popupValuesRef.current = popupValues;
+    const popupFormValuesMapRef = useRef(popupFormValuesMap);  popupFormValuesMapRef.current = popupFormValuesMap;
     const formValuesRef  = useRef(formValues);   formValuesRef.current  = formValues;
     const widgetRef      = useRef(widget);       widgetRef.current      = widget;
     useEffect(() => {
@@ -308,7 +319,9 @@ export function WidgetRenderer({
             if (hiddenPopup.length > 0) {
                 console.group('%c[Hidden] Popup Form', 'color: orange; font-weight: bold');
                 hiddenPopup.forEach(f => {
-                    console.log(`  ${f.fieldKey || f.label} =`, popupValuesRef.current[f.id] ?? '(없음)');
+                    /* 전체 formValuesMap에서 fieldId 탐색 */
+                    const val = Object.values(popupFormValuesMapRef.current).find(vals => f.id in vals)?.[f.id];
+                    console.log(`  ${f.fieldKey || f.label} =`, val ?? '(없음)');
                 });
                 console.groupEnd();
             }
@@ -359,10 +372,9 @@ export function WidgetRenderer({
         setPopupSaving(false);
         setPopupEditId(editId ?? null);
         setPopupListSlug('');
-        setPopupValues({});
-        setPopupFileValues({});
-        setPopupExistingFileIds({});
-        setPopupExistingMeta({});
+        setPopupFormValuesMap({});
+        setPopupFileValuesMap({});
+        setPopupExistingMetaMap({});
         setPopupImgBlobUrls({});
         setPopupSubListRowsMap({});
         setPopupSubListFileMap({});
@@ -374,10 +386,15 @@ export function WidgetRenderer({
             /* outputMode='page': 팝업 없이 상세 페이지로 이동 */
             if (cfg.outputMode === 'page') {
                 /* group_id 있으면 다중 slug 수정 모드 — group_id 우선 사용 */
-                let query = '';
-                if (groupId) query = `?group_id=${groupId}`;
-                else if (editId != null) query = `?id=${editId}`;
-                router.push(`/admin/widgetSub/${slug}${query}`);
+                const params = new URLSearchParams();
+                if (groupId) params.set('group_id', groupId);
+                else if (editId != null) params.set('id', String(editId));
+                /* initialValues(depth, parentId 등) → URL 파라미터로 직렬화 */
+                if (initialValues) {
+                    Object.entries(initialValues).forEach(([k, v]) => params.set(k, v));
+                }
+                const qs = params.toString() ? `?${params.toString()}` : '';
+                router.push(`/admin/widgetSub/${slug}${qs}`);
                 return;
             }
 
@@ -388,16 +405,30 @@ export function WidgetRenderer({
             const formConnectedSlug = (formContents[0]?.widget?.connectedSlug as string | undefined) || '';
             setPopupListSlug(formConnectedSlug);
 
-            /* 2단계: row 데이터 조회 + 폼 필드 매핑 — 모든 폼 위젯의 필드를 합쳐서 매핑 */
-            const fields: FormFieldItem[] = formContents.flatMap(c => (c.widget?.fields as FormFieldItem[] ?? []));
-            const { values: init, existingFileIds: existingIds, sourceData } = await fetchAndMapFieldValues(
-                formConnectedSlug,
-                editId ?? null,
-                fields,
-                initialValues,
-            );
-            setPopupValues(init);
-            setPopupExistingFileIds(existingIds);
+            /* 2단계: row 데이터 조회 + 폼 필드 매핑 — widgetId별로 분리 (page 모드와 동일 구조) */
+            const formValuesAccum: Record<string, Record<string, string>>   = {};
+            const fileIdsAccum:    Record<string, Record<string, number[]>> = {};
+            const allFields: FormFieldItem[]                                 = [];
+            let sourceData: Record<string, unknown>                          = {};
+
+            for (const formContent of formContents) {
+                const fw           = formContent.widget as { fields?: FormFieldItem[]; contentKey?: string; widgetId?: string };
+                const fwWidgetId   = fw?.widgetId ?? '';
+                const fwFields     = fw?.fields ?? [];
+                const fwContentKey = fw?.contentKey || undefined;
+                const { values: fwValues, existingFileIds: fwIds, sourceData: sd } = await fetchAndMapFieldValues(
+                    formConnectedSlug,
+                    editId ?? null,
+                    fwFields,
+                    initialValues,
+                    fwContentKey,
+                );
+                formValuesAccum[fwWidgetId] = fwValues;
+                fileIdsAccum[fwWidgetId]    = fwIds;
+                allFields.push(...fwFields);
+                sourceData = sd;
+            }
+            setPopupFormValuesMap(formValuesAccum);
 
             /* SubList rows 복원 — sourceData에서 contentKey 기준으로 추출 */
             const sublistContents = cfg.widgetItems.flatMap(item => item.contents).filter(c => c.widget?.type === 'sublist');
@@ -415,23 +446,25 @@ export function WidgetRenderer({
                 setPopupSubListRowsMap(initSubListRows);
             }
 
-            /* 기존 파일 메타데이터 조회 */
-            const allIds = Object.values(existingIds).flat();
+            /* 기존 파일 메타데이터 조회 — widgetId별 구조로 저장 */
+            const allIds = Object.values(fileIdsAccum).flatMap(widgetIds => Object.values(widgetIds).flat());
             if (allIds.length > 0) {
-                const metaRes = await api.get('/page-files/meta', {
-                    params: { ids: allIds.join(',') },
-                });
-                const metaMap: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
-                Object.entries(existingIds).forEach(([fid, ids]) => {
-                    metaMap[fid] = metaRes.data.filter(
-                        (m: { id: number; origName: string; fileSize: number }) => ids.includes(m.id),
-                    );
-                });
-                setPopupExistingMeta(metaMap);
+                const metaRes  = await api.get('/page-files/meta', { params: { ids: allIds.join(',') } });
+                const metaData = metaRes.data as { id: number; origName: string; fileSize: number }[];
+
+                const metaAccum: Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>> = {};
+                for (const [widgetId, widgetFileIds] of Object.entries(fileIdsAccum)) {
+                    metaAccum[widgetId] = {};
+                    for (const [fieldId, ids] of Object.entries(widgetFileIds)) {
+                        metaAccum[widgetId][fieldId] = metaData.filter(m => ids.includes(m.id));
+                    }
+                }
+                setPopupExistingMetaMap(metaAccum);
 
                 /* 이미지 필드 blob URL 미리 로딩 */
-                const imgFieldIds = new Set(fields.filter(f => f.type === 'image').map(f => f.id));
-                const imgIds = Object.entries(existingIds)
+                const imgFieldIds = new Set(allFields.filter(f => f.type === 'image').map(f => f.id));
+                const imgIds = Object.values(fileIdsAccum)
+                    .flatMap(widgetIds => Object.entries(widgetIds))
                     .filter(([fid]) => imgFieldIds.has(fid))
                     .flatMap(([, ids]) => ids);
                 if (imgIds.length > 0) {
@@ -493,85 +526,75 @@ export function WidgetRenderer({
             return;
         }
 
-        /* 저장 — widgetItems(PageWidgetItem[]) contents에서 form 위젯 필드 추출 */
-        const fields: FormFieldItem[] = (popupCfg?.widgetItems ?? [])
-            .flatMap(item => item.contents)
-            .filter(c => c.widget?.type === 'form')
-            .flatMap(c => (c.widget?.fields as FormFieldItem[] ?? []));
+        /* 저장 — form/sublist 위젯 추출 */
+        const saveFormContents    = (popupCfg?.widgetItems ?? []).flatMap(item => item.contents).filter(c => c.widget?.type === 'form');
+        const saveSublistContents = (popupCfg?.widgetItems ?? []).flatMap(item => item.contents).filter(c => c.widget?.type === 'sublist');
 
-        /* 유효성 검사 — 공통 함수 위임 */
-        if (!validateFormFields(fields, popupValues, popupFileValues, popupExistingFileIds)) return;
+        /* 유효성 검사 — form 위젯별로 수행 (page 모드와 동일) */
+        for (const fc of saveFormContents) {
+            const fw     = fc.widget as { fields?: FormFieldItem[]; widgetId?: string };
+            const fwId   = (fw as { widgetId?: string })?.widgetId ?? '';
+            const fwFields = fw?.fields as FormFieldItem[] ?? [];
+            if (!validateFormFields(
+                fwFields,
+                popupFormValuesMap[fwId] ?? {},
+                popupFileValuesMap[fwId] ?? {},
+                popupExistingMetaMap[fwId] ?? {},
+            )) return;
+        }
 
         setPopupSaving(true);
         try {
-            /* 1단계: 파일/이미지 업로드 */
-            const fileFields   = fields.filter(f => f.type === 'file' || f.type === 'image');
-            const uploadedMap: Record<string, number[]> = {};
             const newIds: number[] = [];
 
-            for (const f of fileFields) {
-                const key      = f.fieldKey || f.label || '';
-                const existing = popupExistingFileIds[f.id] || [];
-                const newFiles = popupFileValues[f.id] || [];
-                const allIds   = [...existing];
-                for (const file of newFiles) {
-                    const fd = new FormData();
-                    fd.append('file', file);
-                    fd.append('templateSlug', popupListSlug);
-                    fd.append('fieldKey', key);
-                    const uploadRes = await api.post('/page-files/upload', fd, {
-                        transformRequest: (data, headers) => {
-                            if (headers) headers.delete('Content-Type');
-                            return data;
-                        },
-                    });
-                    allIds.push(uploadRes.data.id);
-                    newIds.push(uploadRes.data.id);
+            /* 1단계: Form 파일 업로드 — widgetId별 순회 (page 모드와 동일 패턴) */
+            const formFileIdsMap: Record<string, Record<string, number[]>> = {};
+            for (const fc of saveFormContents) {
+                const fw       = fc.widget as { fields?: FormFieldItem[]; widgetId?: string };
+                const fwId     = (fw as { widgetId?: string })?.widgetId ?? '';
+                const fwFields = fw?.fields as FormFieldItem[] ?? [];
+                formFileIdsMap[fwId] = {};
+                for (const f of fwFields) {
+                    if (f.type !== 'file' && f.type !== 'image') continue;
+                    const existing = (popupExistingMetaMap[fwId]?.[f.id] ?? []).map(m => m.id);
+                    const newFiles = popupFileValuesMap[fwId]?.[f.id] ?? [];
+                    const allIds   = [...existing];
+                    for (const file of newFiles) {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        fd.append('templateSlug', popupListSlug);
+                        fd.append('fieldKey', f.fieldKey || f.label || '');
+                        const uploadRes = await api.post('/page-files/upload', fd, {
+                            transformRequest: (data, headers) => { if (headers) headers.delete('Content-Type'); return data; },
+                        });
+                        allIds.push(uploadRes.data.id);
+                        newIds.push(uploadRes.data.id);
+                    }
+                    formFileIdsMap[fwId][f.id] = allIds;
                 }
-                uploadedMap[key] = allIds;
             }
 
-            /* 2단계: dataJson 구성 — Form 필드 */
-            const dataJson: Record<string, unknown> = {};
-            fields.forEach(f => {
-                const key = f.fieldKey || f.label || '';
-                dataJson[key] = (f.type === 'file' || f.type === 'image')
-                    ? (uploadedMap[key] ?? popupExistingFileIds[f.id] ?? [])
-                    : (popupValues[f.id] ?? '');
-            });
-
-            /* 2-1단계: SubList rows 구성 — 파일 컬럼 업로드 포함 */
-            const sublistContents = (popupCfg?.widgetItems ?? [])
-                .flatMap(item => item.contents)
-                .filter(c => c.widget?.type === 'sublist');
-            for (const c of sublistContents) {
-                const sw = c.widget as {
-                    widgetId?: string;
-                    contentKey?: string;
-                    columns?: { id: string; key: string; type: string }[];
-                };
+            /* 2단계: SubList rows 처리 — 파일 업로드 후 processedRows 확정 */
+            const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
+            for (const sc of saveSublistContents) {
+                const sw  = sc.widget as { widgetId?: string; contentKey?: string; columns?: { id: string; key: string; type: string }[] };
                 const wid = sw.widgetId ?? '';
-                const rawRows = popupSubListRowsMap[wid] ?? [];
                 const processedRows: Record<string, unknown>[] = [];
-                for (const row of rawRows) {
+                for (const row of (popupSubListRowsMap[wid] ?? [])) {
                     const { _rowId, ...rest } = row;
                     const processedRow: Record<string, unknown> = { ...rest };
-                    /* SubList 파일 컬럼 업로드 */
                     for (const col of (sw.columns ?? [])) {
                         if (!['file', 'image'].includes(col.type)) continue;
                         const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
-                        const newFiles = popupSubListFileMap[wid]?.[_rowId]?.[col.id] ?? [];
-                        const allIds = [...existingIds];
+                        const newFiles    = popupSubListFileMap[wid]?.[_rowId]?.[col.id] ?? [];
+                        const allIds      = [...existingIds];
                         for (const file of newFiles) {
                             const fd = new FormData();
                             fd.append('file', file);
                             fd.append('templateSlug', popupListSlug);
                             fd.append('fieldKey', col.key);
                             const uploadRes = await api.post('/page-files/upload', fd, {
-                                transformRequest: (data, headers) => {
-                                    if (headers) headers.delete('Content-Type');
-                                    return data;
-                                },
+                                transformRequest: (data, headers) => { if (headers) headers.delete('Content-Type'); return data; },
                             });
                             allIds.push(uploadRes.data.id);
                             newIds.push(uploadRes.data.id);
@@ -580,11 +603,23 @@ export function WidgetRenderer({
                     }
                     processedRows.push(processedRow);
                 }
-                if (sw.contentKey) dataJson[sw.contentKey] = { rows: processedRows };
-                else dataJson.rows = processedRows;
+                processedSubListRowsMap[wid] = processedRows;
             }
 
-            /* 3단계: page_data 저장 (신규 POST / 수정 PUT) */
+            /* 3단계: dataJson 구성 — 공통 함수 사용 (page 모드와 동일) */
+            const allSaveWidgets = [
+                ...saveFormContents.map(c => c.widget),
+                ...saveSublistContents.map(c => c.widget),
+            ] as Parameters<typeof buildDataJson>[0];
+            const { dataJson } = buildDataJson(
+                allSaveWidgets,
+                popupFormValuesMap,
+                formFileIdsMap,
+                processedSubListRowsMap,
+                {},
+            );
+
+            /* 4단계: page_data 저장 (신규 POST / 수정 PUT) */
             let savedId: number | null = null;
             if (popupEditId) {
                 await api.put(`/page-data/${popupListSlug}/${popupEditId}`, { dataJson });
@@ -596,7 +631,7 @@ export function WidgetRenderer({
                 toast.success('저장되었습니다.');
             }
 
-            /* 4단계: 신규 업로드 파일 dataId 연결 */
+            /* 5단계: 신규 업로드 파일 dataId 연결 */
             if (newIds.length > 0 && savedId) {
                 await api.patch('/page-files/link', { fileIds: newIds, dataId: savedId });
             }
@@ -610,17 +645,11 @@ export function WidgetRenderer({
         } finally {
             setPopupSaving(false);
         }
-    }, [popupListSlug, popupEditId, popupCfg, popupValues, popupFileValues, popupExistingFileIds, popupSubListRowsMap, popupSubListFileMap, handlePopupClose, onRefresh]);
+    }, [popupListSlug, popupEditId, popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, handlePopupClose, onRefresh]);
 
     /* ══════════════════════════════════════════ */
     /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
     /* ══════════════════════════════════════════ */
-
-    /* form 위젯 ID — PageGridRenderer의 formValuesMap 키로 사용 */
-    const _popupFormWidgetId = (popupCfg?.widgetItems ?? [])
-        .flatMap(item => item.contents)
-        .find(c => c.widget?.type === 'form')
-        ?.widget?.widgetId as string ?? '';
 
     /* 팝업 내부 본문 — PageGridRenderer로 빌더와 동일한 그리드 렌더링 */
     const _popupBody = popupCfg ? (
@@ -632,10 +661,13 @@ export function WidgetRenderer({
                         mode="live"
                         widgetItems={popupCfg.widgetItems as unknown as import('./PageGridRenderer').PageWidgetItem[]}
                         codeGroups={codeGroups}
-                        /* 폼 */
-                        formValuesMap={{ [_popupFormWidgetId]: popupValues }}
-                        onFormValuesChange={(_, fieldId, value) =>
-                            setPopupValues(prev => ({ ...prev, [fieldId]: value }))
+                        /* 폼 — widgetId별 구조 직접 전달 (page 모드와 동일) */
+                        formValuesMap={popupFormValuesMap}
+                        onFormValuesChange={(wid, fieldId, value) =>
+                            setPopupFormValuesMap(prev => ({
+                                ...prev,
+                                [wid]: { ...(prev[wid] ?? {}), [fieldId]: value },
+                            }))
                         }
                         onContentAction={popupSaving ? undefined : handlePopupContentAction}
                         onClose={handlePopupClose}
@@ -644,9 +676,9 @@ export function WidgetRenderer({
                         onSubListRowsChange={(wid, rows) =>
                             setPopupSubListRowsMap(prev => ({ ...prev, [wid]: rows }))
                         }
-                        /* 파일 업로드 */
-                        fileValuesMap={{ [_popupFormWidgetId]: popupFileValues }}
-                        existingFileMetaMap={{ [_popupFormWidgetId]: popupExistingMeta }}
+                        /* 파일 업로드 — widgetId별 구조 직접 전달 (page 모드와 동일) */
+                        fileValuesMap={popupFileValuesMap}
+                        existingFileMetaMap={popupExistingMetaMap}
                         imgBlobUrls={popupImgBlobUrls}
                         onFileChange={(wid, fieldId, files, rowId?) => {
                             if (rowId !== undefined) {
@@ -662,18 +694,20 @@ export function WidgetRenderer({
                                     },
                                 }));
                             } else {
-                                /* Form 파일 변경 */
-                                setPopupFileValues(prev => ({ ...prev, [fieldId]: files }));
+                                /* Form 파일 변경 — widgetId별 구조 */
+                                setPopupFileValuesMap(prev => ({
+                                    ...prev,
+                                    [wid]: { ...(prev[wid] ?? {}), [fieldId]: files },
+                                }));
                             }
                         }}
-                        onRemoveExisting={(_, fieldId, fileId) => {
-                            setPopupExistingFileIds(prev => ({
+                        onRemoveExisting={(wid, fieldId, fileId) => {
+                            setPopupExistingMetaMap(prev => ({
                                 ...prev,
-                                [fieldId]: (prev[fieldId] || []).filter(id => id !== fileId),
-                            }));
-                            setPopupExistingMeta(prev => ({
-                                ...prev,
-                                [fieldId]: (prev[fieldId] || []).filter(m => m.id !== fileId),
+                                [wid]: {
+                                    ...(prev[wid] ?? {}),
+                                    [fieldId]: (prev[wid]?.[fieldId] ?? []).filter(m => m.id !== fileId),
+                                },
                             }));
                         }}
                     />

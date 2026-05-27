@@ -18,6 +18,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { useCodeStore } from '@/store/useCodeStore';
+import { usePageTitleStore } from '@/store/usePageTitleStore';
 import { PageGridRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { AnyWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
@@ -32,6 +33,7 @@ import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types
 
 interface WidgetConfig {
     widgetItems: PageWidgetItem[];
+    pageTitle?: string;
 }
 
 /* ══════════════════════════════════════════ */
@@ -48,6 +50,7 @@ const DEFAULT_PAGE_SIZE = 10;
 export default function WidgetRendererPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = React.use(params);
     const { groups: codeGroups, fetchGroups } = useCodeStore();
+    const setPageTitle = usePageTitleStore(s => s.setPageTitle);
 
     /* 템플릿 로딩 상태 */
     const [loading, setLoading] = useState(true);
@@ -160,9 +163,17 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params });
             /* contentKey 기반 구조: dataJson 내 값이 object면 flat-map으로 펼쳐 테이블 row 구성 */
-            const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
+            const rows = (res.data.content as {
+                    id: number;
+                    groupId?: string | null;
+                    dataJson: Record<string, unknown>;
+                    createdAt?: string | null;
+                    createdBy?: string | null;
+                    updatedAt?: string | null;
+                    updatedBy?: string | null;
+                }[])
                 .map(item => {
-                    const flat: Record<string, unknown> = { _id: item.id };
+                    const flat: Record<string, unknown> = { _id: item.id, _groupId: item.groupId ?? null };
                     Object.entries(item.dataJson ?? {}).forEach(([k, v]) => {
                         if (k === 'id') return; /* id는 _id로 이미 처리 */
                         if (v && typeof v === 'object' && !Array.isArray(v)) {
@@ -171,6 +182,11 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                             flat[k] = v;
                         }
                     });
+                    /* 감사 컬럼 — 테이블에서 createdAt/createdBy/updatedAt/updatedBy 키로 사용 가능 */
+                    flat['createdAt'] = item.createdAt ?? null;
+                    flat['createdBy'] = item.createdBy ?? null;
+                    flat['updatedAt'] = item.updatedAt ?? null;
+                    flat['updatedBy'] = item.updatedBy ?? null;
                     return flat;
                 });
 
@@ -206,6 +222,8 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 const config = JSON.parse(res.data.configJson) as WidgetConfig;
                 const items = config.widgetItems || [];
                 setWidgetItems(items);
+                /* 빌더에서 설정한 페이지 제목을 전역 스토어에 저장 (메뉴명 없을 때 폴백으로 사용) */
+                setPageTitle(config.pageTitle || '');
 
                 /* 초기 데이터 fetch — DB Slug가 설정된 모든 Table 위젯 */
                 const fieldsMap = buildSearchFieldsMap(items);

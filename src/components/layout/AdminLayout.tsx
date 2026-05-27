@@ -3,6 +3,7 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { RouteTracker } from './RouteTracker';
 import { usePathname } from 'next/navigation';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { useMenuStore } from '@/store/useMenuStore';
@@ -23,6 +24,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <AuthProvider>
+            <RouteTracker />
             <div className="flex min-h-screen">
                 <Sidebar />
                 <div className={`flex-1 flex flex-col bg-gray-50 min-w-0 overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-[70px]' : 'ml-[220px]'}`}>

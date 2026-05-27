@@ -80,15 +80,15 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
             setOptions(PREVIEW_OPTIONS as OptionItem[]);
             return;
         }
-        if (!widget.connectedSlug) return;
-        /* 전체 목록 한 번에 로드 (페이징 없음) */
-        api.get(`/page-data/${widget.connectedSlug}`, { params: { size: 9999 } })
+        if (!widget.sourceSlug) return;
+        /* 호출 slug에서 전체 목록 한 번에 로드 (페이징 없음) */
+        api.get(`/page-data/${widget.sourceSlug}`, { params: { size: 9999 } })
             .then(res => {
                 const rows = (res.data.content ?? []) as { dataJson: Record<string, unknown> }[];
                 setOptions(rows.map(r => ({ id: Number(r.dataJson['id'] ?? 0), ...r.dataJson })));
             })
             .catch(() => {});
-    }, [isPreview, widget.connectedSlug]);
+    }, [isPreview, widget.sourceSlug]);
 
     /* ── live: 외부 selectedIds 동기화 ── */
     useEffect(() => {

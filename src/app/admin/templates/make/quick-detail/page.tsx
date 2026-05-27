@@ -227,10 +227,12 @@ export default function QuickDetailBuilderPage() {
                     {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
                     <OutputModePanel
                         outputMode={om.outputMode}
+                        pageTitle={om.pageTitle}
                         layerType={om.layerType}
                         layerTitle={om.layerTitle}
                         layerWidth={om.layerWidth}
                         onOutputModeChange={om.setOutputMode}
+                        onPageTitleChange={om.setPageTitle}
                         onLayerTypeChange={om.setLayerType}
                         onLayerTitleChange={om.setLayerTitle}
                         onLayerWidthChange={om.setLayerWidth}
@@ -410,6 +412,7 @@ export default function QuickDetailBuilderPage() {
                 onDescChange={tm.setSaveModalDesc}
                 onConfirm={() => tm.handleSaveConfirm(buildWidgetItems(), {
                     outputMode: om.outputMode,
+                    pageTitle:  om.pageTitle,
                     layerType:  om.layerType,
                     layerTitle: om.layerTitle,
                     layerWidth: om.layerWidth,

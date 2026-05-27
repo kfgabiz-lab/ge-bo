@@ -123,7 +123,7 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                             type="text"
                             className={INPUT_CLS}
                             value={widget.fieldId ?? ''}
-                            placeholder="id"
+                            placeholder="폼key.id"
                             onChange={e => onChange({ ...widget, fieldId: e.target.value || undefined })}
                         />
                     </div>
@@ -133,7 +133,7 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                             type="text"
                             className={INPUT_CLS}
                             value={widget.fieldCode ?? ''}
-                            placeholder="code"
+                            placeholder="폼key.code"
                             onChange={e => onChange({ ...widget, fieldCode: e.target.value || undefined })}
                         />
                     </div>
@@ -143,7 +143,7 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                             type="text"
                             className={INPUT_CLS}
                             value={widget.fieldTitle ?? ''}
-                            placeholder="name"
+                            placeholder="폼key.컬럼명"
                             onChange={e => onChange({ ...widget, fieldTitle: e.target.value || undefined })}
                         />
                     </div>
@@ -153,7 +153,7 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                             type="text"
                             className={INPUT_CLS}
                             value={widget.fieldDesc ?? ''}
-                            placeholder="description"
+                            placeholder="폼key.컬럼명"
                             onChange={e => onChange({ ...widget, fieldDesc: e.target.value || undefined })}
                         />
                     </div>

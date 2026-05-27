@@ -167,15 +167,19 @@ export interface SubListWidget {
 
 /**
  * 다중선택 위젯
- * 연결된 slug에서 옵션 목록을 가져와 체크박스 드롭다운으로 다중 선택하고,
+ * 호출 slug에서 옵션 목록을 가져와 체크박스 드롭다운으로 다중 선택하고,
  * 선택된 항목의 ID 배열을 contentKey로 저장한다.
+ * - sourceSlug  : 드롭다운 옵션을 가져올 slug (호출 slug)
+ * - connectedSlug: 저장 시 연결되는 slug (연결 slug)
  */
 export interface MultiSelectWidget {
     type: 'multiselect';
     widgetId: string;
     /** dataJson 저장 키 (예: "relatedUsers") */
     contentKey: string;
-    /** 옵션 목록을 가져올 slug */
+    /** 드롭다운 옵션 목록을 가져올 slug (호출 slug) */
+    sourceSlug: string;
+    /** 저장 시 연결되는 slug (연결 slug) */
     connectedSlug: string;
     /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
     labelFields: string;

@@ -29,7 +29,7 @@ const SEARCH_WIDGET: SearchWidget = {
             id: 'r1',
             cols: 4,
             fields: [
-                { id: 'f1', type: 'input',  label: 'Key',     colSpan: 1, placeholder: '번역 키 검색' },
+                { id: 'f1', type: 'input',  label: 'Key',     colSpan: 1, placeholder: 'Key 검색' },
                 { id: 'f2', type: 'input',  label: '한국어', colSpan: 1, placeholder: '한국어 검색' },
                 { id: 'f3', type: 'input',  label: '영어',   colSpan: 1, placeholder: '영어 검색' },
                 { id: 'f4', type: 'select', label: '사용여부', colSpan: 1, options: ['전체', '사용', '미사용'] },

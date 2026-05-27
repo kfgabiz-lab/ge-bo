@@ -94,7 +94,7 @@ export default function SlugRegistryPage() {
     const fetchList = useCallback(async (page = 0, typ = filterType, kw = filterKeyword) => {
         setLoading(true);
         try {
-            const params: Record<string, string> = { page: String(page), size: '20', sort: 'slug,asc' };
+            const params: Record<string, string> = { page: String(page), size: '20', sort: 'createdAt,desc' };
             if (typ) params.type    = typ;
             if (kw)  params.keyword = kw;
             const res = await api.get<PageResponse>('/slug-registry', { params });
@@ -252,19 +252,21 @@ export default function SlugRegistryPage() {
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[130px]">타입</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap">설명</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[70px]">사용</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap w-[130px]">생성일</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap w-[90px]">생성자</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[80px]">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="py-16 text-center">
+                                    <td colSpan={8} className="py-16 text-center">
                                         <Loader2 className="w-5 h-5 animate-spin text-slate-300 mx-auto" />
                                     </td>
                                 </tr>
                             ) : items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
+                                    <td colSpan={8} className="py-16 text-center text-sm text-slate-400">
                                         등록된 slug가 없습니다
                                     </td>
                                 </tr>
@@ -286,6 +288,10 @@ export default function SlugRegistryPage() {
                                                 {item.active ? 'Y' : 'N'}
                                             </span>
                                         </td>
+                                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                                            {item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-slate-500">{item.createdBy || '-'}</td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex items-center justify-center gap-1">
                                                 <button onClick={() => openEdit(item)} title="수정" className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-all">

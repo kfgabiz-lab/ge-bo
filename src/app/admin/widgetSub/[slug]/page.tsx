@@ -12,8 +12,9 @@ import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/re
 
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { validateFormFields } from '@/app/admin/templates/make/_shared/utils';
+import { validateFormFields, buildDataJson } from '@/app/admin/templates/make/_shared/utils';
 import { useCodeStore } from '@/store/useCodeStore';
+import { usePageTitleStore } from '@/store/usePageTitleStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMenuPageSlug } from '@/hooks/useMenuPageSlug';
 import PageLayout from '@/components/layout/PageLayout';
@@ -30,6 +31,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const searchParams  = useSearchParams();
     const dataSlug      = useMenuPageSlug(slug);
     const { groups: codeGroups, fetchGroups } = useCodeStore();
+    const setPageTitle = usePageTitleStore(s => s.setPageTitle);
 
     /* ── 기본 상태 ── */
     const [loading,     setLoading]     = useState(true);
@@ -212,7 +214,15 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params: reqParams });
             /* contentKey 기반 구조: dataJson 내 값이 object면 flat-map으로 펼쳐 테이블 row 구성 */
-            const rows = (res.data.content as { id: number; groupId?: string | null; dataJson: Record<string, unknown> }[])
+            const rows = (res.data.content as {
+                id: number;
+                groupId?: string | null;
+                dataJson: Record<string, unknown>;
+                createdAt?: string | null;
+                createdBy?: string | null;
+                updatedAt?: string | null;
+                updatedBy?: string | null;
+            }[])
                 .map(item => {
                     /* _id: 단건 PK, _groupId: 다중 slug 그룹 ID (수정 버튼 URL 파라미터에 사용) */
                     const flat: Record<string, unknown> = { _id: item.id, _groupId: item.groupId ?? null };
@@ -224,6 +234,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                             flat[k] = v;
                         }
                     });
+                    /* 감사 컬럼 — 테이블에서 createdAt/createdBy/updatedAt/updatedBy 키로 사용 가능 */
+                    flat['createdAt'] = item.createdAt ?? null;
+                    flat['createdBy'] = item.createdBy ?? null;
+                    flat['updatedAt'] = item.updatedAt ?? null;
+                    flat['updatedBy'] = item.updatedBy ?? null;
                     return flat;
                 });
             const hasMore = res.data.last === false;
@@ -258,6 +273,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 const raw = JSON.parse(res.data.configJson) as Record<string, unknown>;
                 const items: PageWidgetItem[] = raw.widgetItems ? raw.widgetItems as PageWidgetItem[] : [];
                 setWidgetItems(items);
+                /* 빌더에서 설정한 페이지 제목을 전역 스토어에 저장 (메뉴명 없을 때 폴백으로 사용) */
+                setPageTitle((raw.pageTitle as string) || '');
 
                 /* Table 위젯 초기 데이터 fetch */
                 const fieldsMap = buildSearchFieldsMap(items);
@@ -329,10 +346,23 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
             }
         } else {
-            /* 신규 모드 — 이전 편집값 초기화 */
+            /* 신규 모드 — hidden 필드 defaultValue + URL params(initialValues) 적용 */
             setCurrentGroupId(null);
-            setFormValuesMap({});
             setMultiSelectValuesMap({});
+            const initMap: Record<string, Record<string, string>> = {};
+            formWidgets.forEach(fw => {
+                const vals: Record<string, string> = {};
+                fw.fields.forEach(f => {
+                    if (f.type !== 'hidden') return;
+                    const key = f.fieldKey || f.label || '';
+                    const defaultVal = (f as { defaultValue?: string }).defaultValue ?? '';
+                    const urlVal = key ? searchParams.get(key) : null;
+                    /* URL 파라미터 우선, 없으면 defaultValue */
+                    vals[f.id] = urlVal ?? defaultVal;
+                });
+                initMap[fw.widgetId] = vals;
+            });
+            setFormValuesMap(initMap);
         }
     }, [widgetItems, searchParams, restoreFromDataJson]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -512,66 +542,64 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     }
                 }
 
-                /* 2. data_json 구성 */
-                const dataJson: Record<string, unknown> = {};
-                const pkKeys: string[] = [];
-
+                /* 2. SubList rows 처리 — 파일 업로드 후 processedRows 확정 */
+                const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
                 for (const w of widgets) {
-                    if (w.type === 'form') {
-                        const fw = w as FormWidget;
-                        const rawValues = formValuesMap[fw.widgetId] ?? {};
-                        const section: Record<string, unknown> = {};
-                        fw.fields.forEach(f => {
-                            const key = f.fieldKey || f.label;
-                            if (!key) return;
-                            if (f.type === 'file' || f.type === 'image') {
-                                const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map(m => m.id);
-                                section[key] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
-                            } else {
-                                section[key] = rawValues[f.id] ?? '';
+                    if (w.type !== 'sublist') continue;
+                    const sw = w as SubListWidget;
+                    const processedRows: Record<string, unknown>[] = [];
+                    for (const row of (subListRowsMap[sw.widgetId] ?? [])) {
+                        const { _rowId, ...rest } = row;
+                        const processedRow: Record<string, unknown> = { ...rest };
+                        for (const col of (sw.columns ?? [])) {
+                            if (!['file', 'image'].includes(col.type)) continue;
+                            const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
+                            const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
+                            const allIds = [...existingIds];
+                            for (const file of newFiles) {
+                                const fd = new FormData();
+                                fd.append('file', file);
+                                fd.append('templateSlug', connectedSlug);
+                                fd.append('fieldKey', col.key);
+                                const uploadRes = await api.post('/page-files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                                const newId = uploadRes.data.id;
+                                allIds.push(newId);
+                                newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), newId];
                             }
-                            if (f.isPk) pkKeys.push(key);
-                        });
-                        if (fw.contentKey) dataJson[fw.contentKey] = section;
-                        else Object.assign(dataJson, section);
-
-                    } else if (w.type === 'multiselect') {
-                        /* MultiSelect — 선택된 ID 배열을 contentKey로 저장 */
-                        const mw = w as MultiSelectWidget;
-                        if (mw.contentKey) {
-                            dataJson[mw.contentKey] = multiSelectValuesMap[mw.widgetId] ?? [];
+                            processedRow[col.key] = allIds;
                         }
+                        processedRows.push(processedRow);
+                    }
+                    processedSubListRowsMap[sw.widgetId] = processedRows;
+                }
 
-                    } else if (w.type === 'sublist') {
-                        const sw = w as SubListWidget;
-                        const processedRows: Record<string, unknown>[] = [];
-                        for (const row of (subListRowsMap[sw.widgetId] ?? [])) {
-                            const { _rowId, ...rest } = row;
-                            const processedRow: Record<string, unknown> = { ...rest };
-                            for (const col of (sw.columns ?? [])) {
-                                if (!['file', 'image'].includes(col.type)) continue;
-                                const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
-                                const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
-                                const allIds = [...existingIds];
-                                for (const file of newFiles) {
-                                    const fd = new FormData();
-                                    fd.append('file', file);
-                                    fd.append('templateSlug', connectedSlug);
-                                    fd.append('fieldKey', col.key);
-                                    const uploadRes = await api.post('/page-files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-                                    const newId = uploadRes.data.id;
-                                    allIds.push(newId);
-                                    newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), newId];
-                                }
-                                processedRow[col.key] = allIds;
-                            }
-                            processedRows.push(processedRow);
-                        }
-                        const section: Record<string, unknown> = { rows: processedRows };
-                        if (sw.contentKey) dataJson[sw.contentKey] = section;
-                        else dataJson.rows = processedRows;
+                /* 3. formFileIdsMap 구성 — 기존 meta ID + 신규 업로드 ID 합산 */
+                const formFileIdsMap: Record<string, Record<string, number[]>> = {};
+                for (const w of widgets) {
+                    if (w.type !== 'form') continue;
+                    const fw = w as FormWidget;
+                    formFileIdsMap[fw.widgetId] = {};
+                    for (const f of fw.fields) {
+                        if (f.type !== 'file' && f.type !== 'image') continue;
+                        const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map(m => m.id);
+                        formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
                     }
                 }
+
+                /* 4. data_json 구성 — 공통 함수 사용 */
+                const multiSelectMap: Record<string, number[]> = {};
+                for (const w of widgets) {
+                    if (w.type !== 'multiselect') continue;
+                    const mw = w as MultiSelectWidget;
+                    multiSelectMap[mw.widgetId] = multiSelectValuesMap[mw.widgetId] ?? [];
+                }
+                const { dataJson, pkKeys } = buildDataJson(
+                    widgets as Parameters<typeof buildDataJson>[0],
+                    formValuesMap,
+                    formFileIdsMap,
+                    processedSubListRowsMap,
+                    multiSelectMap,
+                );
 
                 /* 3. 저장 (생성 or 수정) */
                 let savedDataId: number;

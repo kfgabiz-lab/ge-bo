@@ -198,6 +198,69 @@ export const getTemplateLabel = (t: {
 };
 
 /**
+ * Form/SubList/MultiSelect 위젯 목록으로 page_data.dataJson 구성
+ * - page 모드(widgetSub/[slug]/page.tsx)와 popup 모드(WidgetRenderer.tsx) 공통 사용
+ * - contentKey 있으면 해당 키로 중첩 저장, 없으면 root에 flat 저장
+ *
+ * @param widgets           저장 대상 위젯 목록 (type/widgetId/fields/contentKey)
+ * @param formValuesMap     widgetId → { fieldId: 값 } 폼 필드 값 맵
+ * @param formFileIdsMap    widgetId → { fieldId: number[] } 파일 ID 맵 (기존+신규 합산 완료)
+ * @param subListRowsMap    widgetId → 행 배열 (_rowId 제거, 파일 컬럼 ID 배열 완성 상태)
+ * @param multiSelectMap    widgetId → number[] 선택된 ID 배열
+ * @returns { dataJson, pkKeys }
+ *
+ * @example
+ * const { dataJson, pkKeys } = buildDataJson(widgets, formValuesMap, formFileIdsMap, subListRowsMap, multiSelectMap);
+ */
+export function buildDataJson(
+    widgets: Array<{
+        type: string;
+        widgetId?: string;
+        fields?: import('./components/builder/FormBuilder').FormFieldItem[];
+        contentKey?: string;
+    }>,
+    formValuesMap: Record<string, Record<string, string>>,
+    formFileIdsMap: Record<string, Record<string, number[]>>,
+    subListRowsMap: Record<string, Record<string, unknown>[]>,
+    multiSelectMap: Record<string, number[]>,
+): { dataJson: Record<string, unknown>; pkKeys: string[] } {
+    const dataJson: Record<string, unknown> = {};
+    const pkKeys: string[] = [];
+
+    for (const w of widgets) {
+        if (w.type === 'form') {
+            const rawValues = formValuesMap[w.widgetId ?? ''] ?? {};
+            const fileIds   = formFileIdsMap[w.widgetId ?? ''] ?? {};
+            const section: Record<string, unknown> = {};
+            (w.fields ?? []).forEach(f => {
+                const key = f.fieldKey || f.label;
+                if (!key) return;
+                if (f.type === 'file' || f.type === 'image') {
+                    section[key] = fileIds[f.id] ?? [];
+                } else {
+                    section[key] = rawValues[f.id] ?? '';
+                }
+                if (f.isPk) pkKeys.push(key);
+            });
+            if (w.contentKey) dataJson[w.contentKey] = section;
+            else Object.assign(dataJson, section);
+
+        } else if (w.type === 'multiselect') {
+            if (w.contentKey) {
+                dataJson[w.contentKey] = multiSelectMap[w.widgetId ?? ''] ?? [];
+            }
+
+        } else if (w.type === 'sublist') {
+            const rows = subListRowsMap[w.widgetId ?? ''] ?? [];
+            if (w.contentKey) dataJson[w.contentKey] = { rows };
+            else dataJson.rows = rows;
+        }
+    }
+
+    return { dataJson, pkKeys };
+}
+
+/**
  * 유튜브/Vimeo URL → embed URL 변환
  * @example toEmbedUrl("https://youtube.com/watch?v=...") // "https://www.youtube.com/embed/..."
  */

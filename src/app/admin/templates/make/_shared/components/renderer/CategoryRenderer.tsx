@@ -138,16 +138,35 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             const titleKey = widget.fieldTitle || 'name';
             const descKey  = widget.fieldDesc  || 'description';
 
+            /**
+             * dot notation 필드 읽기 유틸
+             * - '폼key.컬럼명' 형태면 dataJson[폼key][컬럼명] 으로 중첩 접근
+             * - 일반 키면 dataJson[키] 로 바로 접근
+             */
+            const readField = (dataJson: Record<string, unknown>, fieldKey: string): unknown => {
+                const dotIdx = fieldKey.indexOf('.');
+                if (dotIdx !== -1) {
+                    const parentKey = fieldKey.slice(0, dotIdx);
+                    const childKey  = fieldKey.slice(dotIdx + 1);
+                    const section   = dataJson[parentKey];
+                    if (section && typeof section === 'object' && !Array.isArray(section)) {
+                        return (section as Record<string, unknown>)[childKey];
+                    }
+                    return undefined;
+                }
+                return dataJson[fieldKey];
+            };
+
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
                 .map(item => ({
                     /* ID: dataJson의 설정 키 값 또는 item.id */
-                    id: item.dataJson[idKey] != null ? Number(item.dataJson[idKey]) : item.id,
-                    name: String(item.dataJson[titleKey] ?? ''),
+                    id: readField(item.dataJson, idKey) != null ? Number(readField(item.dataJson, idKey)) : item.id,
+                    name: String(readField(item.dataJson, titleKey) ?? ''),
                     depth: Number(item.dataJson.depth ?? widget.depth),
                     parentId: item.dataJson.parentId != null ? Number(item.dataJson.parentId) : null,
                     sortOrder: item.dataJson.sortOrder != null ? Number(item.dataJson.sortOrder) : undefined,
-                    code: item.dataJson[codeKey] != null ? String(item.dataJson[codeKey]) : undefined,
-                    description: item.dataJson[descKey] != null ? String(item.dataJson[descKey]) : undefined,
+                    code: readField(item.dataJson, codeKey) != null ? String(readField(item.dataJson, codeKey)) : undefined,
+                    description: readField(item.dataJson, descKey) != null ? String(readField(item.dataJson, descKey)) : undefined,
                 }))
                 /* sortOrder 기준 오름차순 정렬 — sortOrder 없는 항목은 뒤로 */
                 .sort((a, b) => {

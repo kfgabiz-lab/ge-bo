@@ -914,10 +914,15 @@ export function FieldRenderer({
                                 onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                             />
                         </div>
-                        {/* URL 입력 시 하단 embed */}
-                        {embedUrl && (
+                        {/* embed URL 있으면 iframe, 없으면 미리보기 placeholder */}
+                        {embedUrl ? (
                             <div className="flex-1 overflow-hidden">
                                 <iframe src={embedUrl} className="w-full h-full" allowFullScreen title="video-preview" />
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-300 pointer-events-none">
+                                <Film className="w-6 h-6" />
+                                <span className="text-[11px]">URL 입력 시 미리보기가 표시됩니다</span>
                             </div>
                         )}
                     </div>

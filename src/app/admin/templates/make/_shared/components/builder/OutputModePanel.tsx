@@ -35,10 +35,13 @@ const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
 
 interface OutputModePanelProps {
     outputMode: OutputMode;
+    /** page 모드 전용 제목 */
+    pageTitle: string;
     layerType: LayerType;
     layerTitle: string;
     layerWidth: LayerWidth;
     onOutputModeChange: (v: OutputMode) => void;
+    onPageTitleChange: (v: string) => void;
     onLayerTypeChange: (v: LayerType) => void;
     onLayerTitleChange: (v: string) => void;
     onLayerWidthChange: (v: LayerWidth) => void;
@@ -49,8 +52,8 @@ interface OutputModePanelProps {
  * 불러오기 드롭다운 바로 아래에 배치한다.
  */
 export function OutputModePanel({
-    outputMode, layerType, layerTitle, layerWidth,
-    onOutputModeChange, onLayerTypeChange, onLayerTitleChange, onLayerWidthChange,
+    outputMode, pageTitle, layerType, layerTitle, layerWidth,
+    onOutputModeChange, onPageTitleChange, onLayerTypeChange, onLayerTitleChange, onLayerWidthChange,
 }: OutputModePanelProps) {
     return (
         <>
@@ -77,6 +80,20 @@ export function OutputModePanel({
                     <LayoutTemplate className="w-3 h-3" />LayerPopup
                 </button>
             </div>
+
+            {/* 상세페이지 설정 — page 선택 시만 표시 */}
+            {outputMode === 'page' && (
+                <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-1 block">페이지 제목</label>
+                    <input
+                        type="text"
+                        value={pageTitle}
+                        onChange={e => onPageTitleChange(e.target.value)}
+                        placeholder="페이지 제목 입력"
+                        className={inputCls}
+                    />
+                </div>
+            )}
 
             {/* LayerPopup 설정 — layerpopup 선택 시만 표시 */}
             {outputMode === 'layerpopup' && (
