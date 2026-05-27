@@ -16,8 +16,6 @@
  *   <MultiSelectBuilder widget={widget} onChange={setWidget} slugOptions={slugOptions} />
  */
 
-import { useState, useEffect } from 'react';
-import api from '@/lib/api';
 import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { ToggleRow } from './fields/_ToggleRow';
 import { SlugSelectField } from './fields';
@@ -31,34 +29,6 @@ interface MultiSelectBuilderProps {
 }
 
 export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelectBuilderProps) {
-    /* connectedSlug에서 가져온 필드 목록 (표시 필드 선택용) */
-    const [fieldOptions, setFieldOptions] = useState<string[]>([]);
-
-    /* 호출 slug 변경 시 해당 slug의 첫 번째 레코드 필드 목록 로드 */
-    useEffect(() => {
-        if (!widget.sourceSlug) {
-            setFieldOptions([]);
-            return;
-        }
-        api.get(`/page-data/${widget.sourceSlug}`, { params: { size: 1 } })
-            .then(res => {
-                const first = (res.data.content ?? [])[0] as { dataJson?: Record<string, unknown> } | undefined;
-                if (!first?.dataJson) return;
-                /* id 필드는 표시 필드로 사용하지 않으므로 제외 */
-                const keys = Object.keys(first.dataJson).filter(k => k !== 'id');
-                setFieldOptions(keys);
-            })
-            .catch(() => setFieldOptions([]));
-    }, [widget.sourceSlug]);
-
-    /* 필드 선택 시 labelFields에 쉼표로 추가 (중복 무시) */
-    const handleFieldSelect = (field: string) => {
-        const current = widget.labelFields ? widget.labelFields.split(',').map(f => f.trim()) : [];
-        if (current.includes(field)) return;
-        const next = [...current, field].join(',');
-        onChange({ ...widget, labelFields: next });
-    };
-
     return (
         <div className="space-y-3 pt-1">
 
@@ -82,31 +52,25 @@ export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelec
                 />
             </div>
 
-            {/* 호출 Slug | 표시 필드 */}
-            <div className="grid grid-cols-2 gap-2">
-                <SlugSelectField
-                    label="호출 Slug"
-                    value={widget.sourceSlug ?? ''}
-                    onChange={slug => onChange({ ...widget, sourceSlug: slug })}
-                    slugOptions={slugOptions}
+            {/* 호출 Slug */}
+            <SlugSelectField
+                label="호출 Slug"
+                value={widget.sourceSlug ?? ''}
+                onChange={slug => onChange({ ...widget, sourceSlug: slug })}
+                slugOptions={slugOptions}
+            />
+
+            {/* 표시 필드 — 호출 Slug 아래 단독 행 */}
+            <div>
+                <label className={LABEL_CLS}>표시 필드 <span className="text-red-400">*</span></label>
+                {/* dot notation 쉼표 구분 → live에서 ' > '로 연결 표시 */}
+                <input
+                    type="text"
+                    value={widget.labelFields ?? ''}
+                    onChange={e => onChange({ ...widget, labelFields: e.target.value })}
+                    placeholder="예: contentsKey.name, contentsKey.dept"
+                    className={INPUT_CLS}
                 />
-                <div>
-                    <label className={LABEL_CLS}>표시 필드 <span className="text-red-400">*</span></label>
-                    {/* 호출 slug의 필드 목록에서 선택 — 선택 시 labelFields에 쉼표로 추가 */}
-                    <select
-                        value=""
-                        onChange={e => handleFieldSelect(e.target.value)}
-                        disabled={fieldOptions.length === 0}
-                        className={INPUT_CLS}
-                    >
-                        <option value="" disabled>
-                            {fieldOptions.length === 0 ? '호출 Slug 선택 필요' : `필드 선택 (${widget.labelFields || '없음'})`}
-                        </option>
-                        {fieldOptions.map(f => (
-                            <option key={f} value={f}>{f}</option>
-                        ))}
-                    </select>
-                </div>
             </div>
 
             {/* 타이틀 | 설명 */}

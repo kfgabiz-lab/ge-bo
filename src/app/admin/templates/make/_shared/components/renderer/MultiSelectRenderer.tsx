@@ -53,11 +53,21 @@ export interface MultiSelectRendererProps {
     onChange?: (ids: number[]) => void;
 }
 
-/* ── 유틸: labelFields로 표시 텍스트 생성 ── */
+/* ── 유틸: dot notation 경로로 중첩 객체 값 접근 (예: "form.title" → item['form']['title']) ── */
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+    return path.split('.').reduce<unknown>((acc, key) => {
+        if (acc !== null && typeof acc === 'object') {
+            return (acc as Record<string, unknown>)[key];
+        }
+        return undefined;
+    }, obj);
+}
+
+/* ── 유틸: labelFields로 표시 텍스트 생성 (dot notation 지원) ── */
 function buildLabel(item: OptionItem, labelFields: string): string {
     return labelFields
         .split(',')
-        .map(f => String(item[f.trim()] ?? ''))
+        .map(f => String(getNestedValue(item as Record<string, unknown>, f.trim()) ?? ''))
         .filter(Boolean)
         .join(' > ');
 }
