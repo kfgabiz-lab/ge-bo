@@ -1,6 +1,6 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '@/store/authStore';
-import { useSiteStore } from '@/store/useSiteStore';
+﻿import axios, { InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/store/auth-store';
+import { useSiteStore } from '@/store/use-site-store';
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;

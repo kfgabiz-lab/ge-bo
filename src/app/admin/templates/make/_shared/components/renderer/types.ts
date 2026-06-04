@@ -21,12 +21,6 @@ export type RendererMode = 'preview' | 'live';
 
 /* ── 위젯 데이터 타입 ── */
 
-/** 텍스트 위젯 */
-export interface TextWidget {
-    type: 'text';
-    content: string;
-}
-
 /**
  * 공간영역 아이템
  * SearchFieldConfig를 기반으로 'textarea' | 'action-button' 타입을 사용한다.
@@ -75,6 +69,8 @@ export interface CategoryWidget {
     parentWidgetId?: string;
     /** 이 depth 레이블 (예: '대분류', '중분류') */
     label?: string;
+    /** 레이블 다국어 키 */
+    labelMsgKey?: string;
     /** 카드에 표시할 필드 키 매핑 — 미설정 시 기본값 사용 */
     /** 고유 ID 필드 키 (카드 미노출, 기본: 'id') */
     fieldId?: string;
@@ -138,9 +134,13 @@ export interface SubListColumn {
     id: string;                    // 컬럼 고유 ID (자동 생성)
     key: string;                   // 데이터 키 (영문 필수)
     label: string;                 // 헤더 표시명
+    labelMsgKey?: string;          // 헤더 다국어 키
     type: SubListColumnType;       // 셀 입력 타입
     required?: boolean;            // 필수 여부
     placeholder?: string;          // 입력 placeholder
+    placeholderMsgKey?: string;    // placeholder 다국어 키
+    description?: string;          // 필드 설명
+    descriptionMsgKey?: string;    // 필드 설명 다국어 키
     options?: string[];            // select 타입 전용 옵션 목록
     codeGroup?: string;            // 공통코드 그룹 연결 (select 타입)
     maxFileCount?: number;         // file/image 타입 최대 파일 수 (기본 1)
@@ -159,7 +159,9 @@ export interface SubListWidget {
     connectedSlug?: string;       // 저장 시 호출할 API slug (Button 위젯과 연결)
     contentKey: string;           // 이 SubList 데이터의 식별 키 (영문 필수)
     title?: string;               // 헤더 타이틀 (예: '코드 상세')
+    titleMsgKey?: string;         // 헤더 타이틀 다국어 키
     addButtonLabel?: string;      // 추가 버튼 텍스트 (기본 '추가')
+    addButtonLabelMsgKey?: string; // 추가 버튼 다국어 키
     maxRows?: number;             // 최대 행 수 (0 = 제한 없음)
     showBorder?: boolean;         // 테두리 표시 여부 (기본 true)
     columns: SubListColumn[];     // 컬럼 설정 목록
@@ -184,10 +186,40 @@ export interface MultiSelectWidget {
     /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
     labelFields: string;
     placeholder?: string;
+    placeholderMsgKey?: string;   // placeholder 다국어 키
     title?: string;
+    titleMsgKey?: string;         // 타이틀 다국어 키
     description?: string;
+    descriptionMsgKey?: string;   // 설명 다국어 키
     showBorder?: boolean;
     bgColor?: string;
+}
+
+/* ── Tab 위젯 타입 ── */
+
+/** 탭 아이템 — 개별 탭 설정 */
+export interface TabItem {
+    /** 고유 ID (자동 생성) */
+    id: string;
+    /** 탭 레이블 */
+    label: string;
+    /** 탭 레이블 다국어 키 */
+    labelMsgKey?: string;
+    /** 연결 페이지 slug */
+    pageSlug?: string;
+    /** preview 모드에서 직접 렌더링할 위젯 아이템 목록 */
+    items?: {
+        colSpan: number;
+        rowSpan: number;
+        widget: AnyWidget;
+    }[];
+}
+
+/** 탭 컨텐츠 위젯 */
+export interface TabWidget {
+    type: 'tab';
+    widgetId: string;
+    tabs: TabItem[];
 }
 
 /**
@@ -195,14 +227,14 @@ export interface MultiSelectWidget {
  * FormWidget, TableWidget은 각 builder 파일에서 import
  */
 export type AnyWidget =
-    | TextWidget
     | SearchWidget
     | TableWidget
     | FormWidget
     | SpaceWidget
     | CategoryWidget
     | SubListWidget
-    | MultiSelectWidget;
+    | MultiSelectWidget
+    | TabWidget;
 
 /* ── 핸들러 타입 ── */
 

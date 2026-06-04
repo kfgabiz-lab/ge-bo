@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * JPA 엔티티 조회 페이지
@@ -6,8 +6,8 @@
  * - 오른쪽: 선택한 엔티티의 필드 상세 정보
  */
 
-import { EntityList } from '@/components/database/EntityList';
-import { EntityFields } from '@/components/database/EntityFields';
+import { EntityList } from '@/components/database/entity-list';
+import { EntityFields } from '@/components/database/entity-fields';
 
 export default function DatabaseEntitiesPage() {
     return (

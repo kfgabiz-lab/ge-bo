@@ -35,6 +35,7 @@ import api from '@/lib/api';
 import { RendererContainer } from './RendererContainer';
 import type { CategoryWidget } from './types';
 import type { RendererMode } from './types';
+import { useI18n } from '@/hooks/use-i18n';
 
 /** 카테고리 항목 하나 */
 interface CategoryItem {
@@ -98,6 +99,7 @@ function parseParams(params?: string): Record<string, string> {
 export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onPopupOpen, refreshTick }: CategoryRendererProps) {
     const isPreview = mode === 'preview';
     const router = useRouter();
+    const { t } = useI18n();
 
     /* ── 상태 ── */
     const [items, setItems]               = useState<CategoryItem[]>([]);
@@ -352,7 +354,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             {/* 헤더: 레이블 + 등록 버튼 */}
             <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200 flex-shrink-0">
                 <span className="text-xs font-semibold text-slate-700">
-                    {widget.label || `카테고리 (depth ${widget.depth})`}
+                    {widget.labelMsgKey ? t(widget.labelMsgKey) : (widget.label || `카테고리 (depth ${widget.depth})`)}
                 </span>
                 {/* 등록 버튼 — preview: 항상 표시 / live 인라인: 상위 선택 후 표시 / live popup·path: 항상 표시 */}
                 {(widget.allowCreate !== false) && (isPreview || !parentNotSelected || widget.createConnType === 'popup' || widget.createConnType === 'path') && (

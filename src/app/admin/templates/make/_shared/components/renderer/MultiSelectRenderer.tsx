@@ -26,6 +26,7 @@ import { ChevronDown, X, Search } from 'lucide-react';
 import api from '@/lib/api';
 import { RendererContainer } from './RendererContainer';
 import type { MultiSelectWidget, RendererMode } from './types';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
 const PREVIEW_OPTIONS = [
@@ -74,6 +75,7 @@ function buildLabel(item: OptionItem, labelFields: string): string {
 
 export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }: MultiSelectRendererProps) {
     const isPreview = mode === 'preview';
+    const { t } = useI18n();
     const labelFields = widget.labelFields || 'name';
 
     /* ── 상태 ── */
@@ -148,13 +150,17 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
             <div className="p-3 flex flex-col gap-3 h-full">
 
                 {/* 타이틀 */}
-                {widget.title && (
-                    <p className="text-sm font-medium text-slate-700">{widget.title}</p>
+                {(widget.titleMsgKey || widget.title) && (
+                    <p className="text-sm font-medium text-slate-700">
+                        {widget.titleMsgKey ? t(widget.titleMsgKey) : widget.title}
+                    </p>
                 )}
 
                 {/* 설명 */}
-                {widget.description && (
-                    <p className="text-xs text-slate-500">{widget.description}</p>
+                {(widget.descriptionMsgKey || widget.description) && (
+                    <p className="text-xs text-slate-500">
+                        {widget.descriptionMsgKey ? t(widget.descriptionMsgKey) : widget.description}
+                    </p>
                 )}
 
                 {/* 드롭다운 영역 */}
@@ -170,7 +176,7 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
                         <span className={selected.length > 0 ? 'text-slate-800' : 'text-slate-400'}>
                             {selected.length > 0
                                 ? `${selected.length}개 선택됨`
-                                : (widget.placeholder ?? '항목을 선택하세요')}
+                                : (widget.placeholderMsgKey ? t(widget.placeholderMsgKey) : (widget.placeholder ?? '항목을 선택하세요'))}
                         </span>
                         <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     </button>

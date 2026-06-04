@@ -33,6 +33,7 @@ import { SearchRowConfig, CodeGroupDef } from '../../types';
 import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { RendererMode } from './types';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface SearchRendererProps {
     mode: RendererMode;
@@ -60,6 +61,7 @@ export function SearchRenderer({
     codeGroups = [],
 }: SearchRendererProps) {
     const isPreview = mode === 'preview';
+    const { t } = useI18n();
 
     /* 행이 없을 때 — preview는 안내 텍스트, live는 null */
     if (!rows.length) {
@@ -97,13 +99,13 @@ export function SearchRenderer({
                     onClick={isPreview ? undefined : onReset}
                     className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"
                 >
-                    <RotateCcw className="w-3 h-3" /> 초기화
+                    <RotateCcw className="w-3 h-3" /> {t('common.btn.reset')}
                 </button>
                 <button
                     onClick={isPreview ? undefined : onSearch}
                     className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"
                 >
-                    <Search className="w-3 h-3" /> 검색
+                    <Search className="w-3 h-3" /> {t('common.btn.search')}
                 </button>
             </RendererContainer>
         );
@@ -123,15 +125,15 @@ export function SearchRenderer({
                         {row.fields.map(field => (
                             <SearchField
                                 key={field.id}
-                                /* dateRange: label ~ label2 형식으로 표시 */
+                                /* dateRange: label ~ label2 형식으로 표시 / msgKey 우선 처리 */
                                 label={
                                     field.type === 'dateRange'
-                                        ? `${field.label} ~ ${field.label2 || ''}`
-                                        : (field.label || undefined)
+                                        ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
+                                        : (field.labelMsgKey ? t(field.labelMsgKey) : (field.label || undefined))
                                 }
                                 colSpan={field.colSpan}
                                 required={field.required}
-                                description={field.description}
+                                description={field.descriptionMsgKey ? t(field.descriptionMsgKey) : field.description}
                             >
                                 <FieldRenderer
                                     mode={mode}

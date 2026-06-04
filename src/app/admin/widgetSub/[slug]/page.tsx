@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -13,11 +13,12 @@ import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/re
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { validateFormFields, buildDataJson } from '@/app/admin/templates/make/_shared/utils';
-import { useCodeStore } from '@/store/useCodeStore';
-import { usePageTitleStore } from '@/store/usePageTitleStore';
+import { useCodeStore } from '@/store/use-code-store';
+import { usePageTitleStore } from '@/store/use-page-title-store';
+import { useI18n } from '@/hooks/use-i18n';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMenuPageSlug } from '@/hooks/useMenuPageSlug';
-import PageLayout from '@/components/layout/PageLayout';
+import { useMenuPageSlug } from '@/hooks/use-menu-page-slug';
+import PageLayout from '@/components/layout/page-layout';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -32,6 +33,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const dataSlug      = useMenuPageSlug(slug);
     const { groups: codeGroups, fetchGroups } = useCodeStore();
     const setPageTitle = usePageTitleStore(s => s.setPageTitle);
+    const { t } = useI18n();
 
     /* ── 기본 상태 ── */
     const [loading,     setLoading]     = useState(true);
@@ -273,8 +275,10 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 const raw = JSON.parse(res.data.configJson) as Record<string, unknown>;
                 const items: PageWidgetItem[] = raw.widgetItems ? raw.widgetItems as PageWidgetItem[] : [];
                 setWidgetItems(items);
-                /* 빌더에서 설정한 페이지 제목을 전역 스토어에 저장 (메뉴명 없을 때 폴백으로 사용) */
-                setPageTitle((raw.pageTitle as string) || '');
+                /* 빌더에서 설정한 페이지 제목을 전역 스토어에 저장 (메뉴명 없을 때 폴백으로 사용)
+                 * pageTitleMsgKey 우선 → 없으면 pageTitle 직접 텍스트 사용 */
+                const msgKey = (raw.pageTitleMsgKey as string) || '';
+                setPageTitle(msgKey ? t(msgKey) : ((raw.pageTitle as string) || ''));
 
                 /* Table 위젯 초기 데이터 fetch */
                 const fieldsMap = buildSearchFieldsMap(items);

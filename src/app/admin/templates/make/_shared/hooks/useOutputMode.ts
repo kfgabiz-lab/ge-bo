@@ -20,15 +20,19 @@ export interface OutputModeValue {
     outputMode: OutputMode;
     /** page 모드 전용 제목 */
     pageTitle: string;
+    pageTitleMsgKey: string;       // 페이지 제목 다국어 키
     layerType: LayerType;
     layerTitle: string;
+    layerTitleMsgKey: string;      // 팝업 제목 다국어 키
     layerWidth: LayerWidth;
     /** 우측 드로어 여부 — layerpopup + right 조합일 때 true */
     isRightDrawer: boolean;
     setOutputMode: (v: OutputMode) => void;
     setPageTitle: (v: string) => void;
+    setPageTitleMsgKey: (v: string) => void;
     setLayerType: (v: LayerType) => void;
     setLayerTitle: (v: string) => void;
+    setLayerTitleMsgKey: (v: string) => void;
     setLayerWidth: (v: LayerWidth) => void;
     /**
      * 저장된 configJson에서 outputMode 관련 값 일괄 복원
@@ -38,25 +42,29 @@ export interface OutputModeValue {
 }
 
 export function useOutputMode(): OutputModeValue {
-    const [outputMode, setOutputMode] = useState<OutputMode>('page');
-    const [pageTitle, setPageTitle]   = useState('');
-    const [layerType, setLayerType]   = useState<LayerType>('center');
-    const [layerTitle, setLayerTitle] = useState('');
-    const [layerWidth, setLayerWidth] = useState<LayerWidth>('md');
+    const [outputMode, setOutputMode]             = useState<OutputMode>('page');
+    const [pageTitle, setPageTitle]               = useState('');
+    const [pageTitleMsgKey, setPageTitleMsgKey]   = useState('');
+    const [layerType, setLayerType]               = useState<LayerType>('center');
+    const [layerTitle, setLayerTitle]             = useState('');
+    const [layerTitleMsgKey, setLayerTitleMsgKey] = useState('');
+    const [layerWidth, setLayerWidth]             = useState<LayerWidth>('md');
 
     const isRightDrawer = outputMode === 'layerpopup' && layerType === 'right';
 
     const restore = (cfg: Record<string, unknown>) => {
-        setOutputMode((cfg.outputMode as OutputMode)  || 'page');
-        setPageTitle ((cfg.pageTitle   as string)     || '');
-        setLayerType ((cfg.layerType  as LayerType)   || 'center');
-        setLayerTitle((cfg.layerTitle  as string)     || '');
-        setLayerWidth((cfg.layerWidth  as LayerWidth) || 'md');
+        setOutputMode     ((cfg.outputMode      as OutputMode)  || 'page');
+        setPageTitle      ((cfg.pageTitle       as string)      || '');
+        setPageTitleMsgKey((cfg.pageTitleMsgKey as string)      || '');
+        setLayerType      ((cfg.layerType       as LayerType)   || 'center');
+        setLayerTitle     ((cfg.layerTitle      as string)      || '');
+        setLayerTitleMsgKey((cfg.layerTitleMsgKey as string)    || '');
+        setLayerWidth     ((cfg.layerWidth      as LayerWidth)  || 'md');
     };
 
     return {
-        outputMode, pageTitle, layerType, layerTitle, layerWidth, isRightDrawer,
-        setOutputMode, setPageTitle, setLayerType, setLayerTitle, setLayerWidth,
+        outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth, isRightDrawer,
+        setOutputMode, setPageTitle, setPageTitleMsgKey, setLayerType, setLayerTitle, setLayerTitleMsgKey, setLayerWidth,
         restore,
     };
 }

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * ============================================================
@@ -13,12 +13,12 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import PageLayout from '@/components/layout/PageLayout';
+import PageLayout from '@/components/layout/page-layout';
 import { Loader2, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { useCodeStore } from '@/store/useCodeStore';
-import { usePageTitleStore } from '@/store/usePageTitleStore';
+import { useCodeStore } from '@/store/use-code-store';
+import { usePageTitleStore } from '@/store/use-page-title-store';
 import { PageGridRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { AnyWidget, PageContentItem, PageWidgetItem, PageTableData } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
@@ -26,6 +26,7 @@ import type { FormWidget } from '@/app/admin/templates/make/_shared/components/b
 import type { SubListWidget } from '@/app/admin/templates/make/_shared/components/renderer/types';
 import type { SubListRow } from '@/app/admin/templates/make/_shared/components/renderer/SubListRenderer';
 import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types';
+import { buildDataJson } from '@/app/admin/templates/make/_shared/utils';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                      */
@@ -358,16 +359,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 const formWidget = widget as FormWidget;
                 if (!formWidget.connectedSlug) continue;
 
-                const rawValues = formValuesMap[widgetId] ?? {};
-                const dataJson: Record<string, string> = {};
-                const pkKeys: string[] = [];
-                formWidget.fields.forEach(f => {
-                    const key = f.fieldKey || f.label;
-                    if (key) {
-                        dataJson[key] = rawValues[f.id] ?? '';
-                        if (f.isPk) pkKeys.push(key);
-                    }
-                });
+                const { dataJson, pkKeys } = buildDataJson([formWidget], formValuesMap, {}, {}, {});
 
                 try {
                     if (action === 'save') {

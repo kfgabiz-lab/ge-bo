@@ -1,6 +1,5 @@
 'use client';
 
-import { TextareaField } from './fields/TextareaField';
 import { SearchWidgetBuilder } from './SearchWidgetBuilder';
 import { TableBuilder } from './TableBuilder';
 import { FormBuilder } from './FormBuilder';
@@ -8,6 +7,7 @@ import { SpaceBuilder } from './SpaceBuilder';
 import { CategoryBuilder } from './CategoryBuilder';
 import { SubListBuilder } from './SubListBuilder';
 import { MultiSelectBuilder } from './MultiSelectBuilder';
+import { TabBuilder } from './TabBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 import type { ContentWidgetOption } from './fields/ActionButtonField';
@@ -44,19 +44,6 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
     const { slugOptions, pageTemplates = [], searchWidgets = [], contentWidgets, formWidgets = [], maxColSpan, categoryWidgets = [], actionButtonOnly } = context;
 
     switch (widget.type) {
-        case 'text':
-            return (
-                <div className="pt-1">
-                    <TextareaField
-                        values={widget as any}
-                        onChange={patch => onChange({ ...widget, ...patch })}
-                        colSpanMode={{ type: 'button', options: [1, 2, 3, 4, 5] }}
-                        codeGroups={[]}
-                        codeGroupsLoading={false}
-                    />
-                </div>
-            );
-
         case 'search':
             return (
                 <SearchWidgetBuilder
@@ -124,6 +111,15 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     widget={widget}
                     onChange={w => onChange(w)}
                     slugOptions={slugOptions}
+                />
+            );
+
+        case 'tab':
+            return (
+                <TabBuilder
+                    widget={widget}
+                    onChange={w => onChange(w)}
+                    pageTemplates={pageTemplates}
                 />
             );
 

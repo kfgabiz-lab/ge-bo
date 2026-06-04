@@ -28,14 +28,19 @@ import type { RendererMode } from './types';
 import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { CodeGroupDef, SearchFieldConfig } from '../../types';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface FormRendererProps {
     mode: RendererMode;
     fields: FormFieldItem[];
     /** 폼 섹션 타이틀 — 1행 영역 상단에 표시 (선택) */
     title?: string;
+    /** 타이틀 다국어 키 */
+    titleMsgKey?: string;
     /** 타이틀 아래 설명 — 타이틀과 함께 1행 안에 표시 (선택) */
     description?: string;
+    /** 설명 다국어 키 */
+    descriptionMsgKey?: string;
     /** 테두리 표시 여부 (기본 true) */
     showBorder?: boolean;
     /** 바탕색 CSS 값 ('none' 또는 미설정 시 투명) */
@@ -65,7 +70,9 @@ export function FormRenderer({
     mode,
     fields,
     title,
+    titleMsgKey,
     description,
+    descriptionMsgKey,
     showBorder = true,
     bgColor,
     contentColSpan = 12,
@@ -79,6 +86,7 @@ export function FormRenderer({
     onRemoveExisting,
 }: FormRendererProps) {
     const isPreview = mode === 'preview';
+    const { t } = useI18n();
 
     if (!fields.length) {
         return (
@@ -92,13 +100,19 @@ export function FormRenderer({
         /* RendererContainer — grid 배치 공통 처리 (contentColSpan 전달 시 CSS Grid 활성화) */
         <RendererContainer showBorder={showBorder} bgColor={bgColor} contentColSpan={contentColSpan}>
             {/* 타이틀 — grid item으로 전체 너비 차지 (1행 고정) */}
-            {title && (
+            {(titleMsgKey || title) && (
                 <div
                     className="flex flex-col justify-center px-3"
                     style={{ gridColumn: `span ${contentColSpan}`, gridRow: 'span 1' }}
                 >
-                    <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-                    {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+                    <h3 className="text-sm font-bold text-slate-900">
+                        {titleMsgKey ? t(titleMsgKey) : title}
+                    </h3>
+                    {(descriptionMsgKey || description) && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            {descriptionMsgKey ? t(descriptionMsgKey) : description}
+                        </p>
+                    )}
                 </div>
             )}
             {/* 필드들 — gridColumn/gridRow로 자리만 지정, 나머지는 RendererContainer grid가 처리 */}
@@ -111,16 +125,16 @@ export function FormRenderer({
                         gridRow: `span ${f.rowSpan}`,
                     }}
                 >
-                    {/* 라벨 */}
-                    {f.label && (
+                    {/* 라벨 — labelMsgKey 있으면 t(key), 없으면 label 직접 표시 */}
+                    {(f.labelMsgKey || f.label) && (
                         <label className="block text-xs font-medium text-slate-700 flex-shrink-0">
-                            {f.label}
+                            {f.labelMsgKey ? t(f.labelMsgKey) : f.label}
                             {f.required && <span className="text-red-500 ml-0.5">*</span>}
                         </label>
                     )}
-                    {/* 설명 — description 유무와 무관하게 항상 동일 높이 예약 → input 위치 정렬 */}
+                    {/* 설명 — descriptionMsgKey 우선, 없으면 description 직접 표시 */}
                     <p className="text-[10px] text-slate-400 mb-0.5 flex-shrink-0 leading-tight truncate min-h-[13px]">
-                        {f.description}
+                        {f.descriptionMsgKey ? t(f.descriptionMsgKey) : f.description}
                     </p>
                     {/* 필드 렌더링 */}
                     <div className="flex-1 min-h-0">

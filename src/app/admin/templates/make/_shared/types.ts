@@ -14,7 +14,8 @@ export type SearchFieldType =
     | 'file' | 'image' | 'video' | 'media' // 파일 업로드 및 미디어 타입
     | 'editor'          // 위지윅 에디터
     | 'hidden'          // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
-    | 'color';          // 색상 선택 (Preset 원형 버튼)
+    | 'color'           // 색상 선택 (Preset 원형 버튼)
+    | 'message-key-select'; // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -25,12 +26,16 @@ export interface SearchFieldConfig {
     id: string;
     type: SearchFieldType;
     label: string;
+    labelMsgKey?: string;    // 라벨 다국어 키 (있으면 t(key), 없으면 label 표시)
     label2?: string;        // dateRange 두 번째 라벨
+    label2MsgKey?: string;  // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
     placeholder?: string;
+    placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
     /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
     description?: string;
+    descriptionMsgKey?: string; // 설명 다국어 키 (있으면 t(key), 없으면 description 표시)
     colSpan: 1 | 2 | 3 | 4 | 5;
     rowSpan?: number;
     required?: boolean;
@@ -112,7 +117,7 @@ export interface RowConfig {
 export interface CodeGroupDef {
     groupCode: string;
     groupName: string;
-    details: { code: string; name: string; active: boolean }[];
+    details: { code: string; name: string; nameMsgKey?: string; active: boolean }[];
 }
 
 /* ── 테이블 컬럼 관련 타입 ── */
@@ -134,6 +139,7 @@ export interface CellOption {
 export interface TableColumnConfig {
     id: string;
     header: string;
+    headerMsgKey?: string;    // 헤더명 다국어 키 (있으면 t(key), 없으면 header 표시)
     accessor: string;
     width?: number;
     widthUnit?: 'px' | '%';
@@ -145,7 +151,9 @@ export interface TableColumnConfig {
     badgeShape?: 'round' | 'square';    // badge 모양
     isNumber?: boolean;                 // 숫자 포맷 여부
     trueText?: string;                  // boolean 타입 true 텍스트
+    trueTextMsgKey?: string;           // boolean true 텍스트 다국어 키
     falseText?: string;                 // boolean 타입 false 텍스트
+    falseTextMsgKey?: string;          // boolean false 텍스트 다국어 키
     actions?: ('edit' | 'detail' | 'delete')[]; // 프리셋 액션 버튼
     customActions?: { id: string; label: string; color: string }[]; // 커스텀 버튼
     editPopupSlug?: string;             // 수정 버튼 연결 LAYER slug (관리자방식)

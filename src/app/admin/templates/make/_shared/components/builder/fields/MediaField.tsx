@@ -17,6 +17,7 @@ export const MediaField = (props: FieldEditProps) => {
             {...props}
             onChange={onChange}
             label={values.label}
+            labelMsgKey={values.labelMsgKey}
             fieldKey={values.fieldKey}
             colSpan={values.colSpan}
             rowSpan={values.rowSpan}
@@ -24,6 +25,7 @@ export const MediaField = (props: FieldEditProps) => {
             isPk={values.isPk}
             required={values.required}
             description={values.description}
+            descriptionMsgKey={values.descriptionMsgKey}
             readonly={values.readonly}
         >
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">

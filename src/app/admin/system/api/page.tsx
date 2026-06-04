@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * API 정보 관리 페이지
@@ -10,9 +10,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Search, X, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import { useCodeStore } from '@/store/useCodeStore';
-import { useEntityStore } from '@/store/useEntityStore';
-import { EntityInfoPopup } from '@/components/database/EntityInfoPopup';
+import { useCodeStore } from '@/store/use-code-store';
+import { useEntityStore } from '@/store/use-entity-store';
+import { EntityInfoPopup } from '@/components/database/entity-info-popup';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                       */

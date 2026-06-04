@@ -20,11 +20,13 @@
  *   />
  */
 
-import { FileText, LayoutTemplate, PanelRight } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, LayoutTemplate, PanelRight, Globe } from 'lucide-react';
 import type { LayerType, LayerWidth } from '../../types';
 import type { OutputMode } from '../../hooks/useOutputMode';
 import { inputCls, selectCls } from '../../styles';
 import { SelectArrow } from '../SelectArrow';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 
 const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
     { value: 'sm', label: 'Small — 380px' },
@@ -37,13 +39,17 @@ interface OutputModePanelProps {
     outputMode: OutputMode;
     /** page 모드 전용 제목 */
     pageTitle: string;
+    pageTitleMsgKey: string;
     layerType: LayerType;
     layerTitle: string;
+    layerTitleMsgKey: string;
     layerWidth: LayerWidth;
     onOutputModeChange: (v: OutputMode) => void;
     onPageTitleChange: (v: string) => void;
+    onPageTitleMsgKeyChange: (v: string) => void;
     onLayerTypeChange: (v: LayerType) => void;
     onLayerTitleChange: (v: string) => void;
+    onLayerTitleMsgKeyChange: (v: string) => void;
     onLayerWidthChange: (v: LayerWidth) => void;
 }
 
@@ -52,9 +58,13 @@ interface OutputModePanelProps {
  * 불러오기 드롭다운 바로 아래에 배치한다.
  */
 export function OutputModePanel({
-    outputMode, pageTitle, layerType, layerTitle, layerWidth,
-    onOutputModeChange, onPageTitleChange, onLayerTypeChange, onLayerTitleChange, onLayerWidthChange,
+    outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
+    onOutputModeChange, onPageTitleChange, onPageTitleMsgKeyChange,
+    onLayerTypeChange, onLayerTitleChange, onLayerTitleMsgKeyChange, onLayerWidthChange,
 }: OutputModePanelProps) {
+    /* 제목 다국어 모드 — BuilderI18nModeProvider 외부이므로 자체 state로 관리 */
+    const [i18nMode, setI18nMode] = useState(true);
+
     return (
         <>
             {/* 출력 모드 탭 */}
@@ -84,14 +94,32 @@ export function OutputModePanel({
             {/* 상세페이지 설정 — page 선택 시만 표시 */}
             {outputMode === 'page' && (
                 <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
-                    <label className="text-[10px] font-semibold text-slate-500 mb-1 block">페이지 제목</label>
-                    <input
-                        type="text"
-                        value={pageTitle}
-                        onChange={e => onPageTitleChange(e.target.value)}
-                        placeholder="페이지 제목 입력"
-                        className={inputCls}
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-semibold text-slate-500">페이지 제목</label>
+                        <button
+                            onClick={() => setI18nMode(v => !v)}
+                            className={`p-1 rounded transition-all ${i18nMode ? 'text-blue-500 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                            title="다국어 모드"
+                        >
+                            <Globe className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={pageTitleMsgKey}
+                            onChange={onPageTitleMsgKeyChange}
+                            resourceType="WORD"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={pageTitle}
+                            onChange={e => onPageTitleChange(e.target.value)}
+                            placeholder="페이지 제목 입력"
+                            className={inputCls}
+                        />
+                    )}
                 </div>
             )}
 
@@ -123,14 +151,32 @@ export function OutputModePanel({
 
                     {/* 팝업 제목 */}
                     <div>
-                        <label className="text-[10px] font-semibold text-slate-500 mb-1 block">팝업 제목</label>
-                        <input
-                            type="text"
-                            value={layerTitle}
-                            onChange={e => onLayerTitleChange(e.target.value)}
-                            placeholder="팝업 제목 입력"
-                            className={inputCls}
-                        />
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-semibold text-slate-500">팝업 제목</label>
+                            <button
+                                onClick={() => setI18nMode(v => !v)}
+                                className={`p-1 rounded transition-all ${i18nMode ? 'text-blue-500 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                                title="다국어 모드"
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                        {i18nMode ? (
+                            <MessageKeySelector
+                                value={layerTitleMsgKey}
+                                onChange={onLayerTitleMsgKeyChange}
+                                resourceType="WORD"
+                                size="sm"
+                            />
+                        ) : (
+                            <input
+                                type="text"
+                                value={layerTitle}
+                                onChange={e => onLayerTitleChange(e.target.value)}
+                                placeholder="팝업 제목 입력"
+                                className={inputCls}
+                            />
+                        )}
                     </div>
 
                     {/* 팝업 너비 — 중앙 팝업에서만 표시 */}

@@ -1,102 +1,24 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import PageLayout from '@/components/layout/PageLayout';
-import { GridCell } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { SpaceWidget } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { TableActionHandlers } from '@/app/admin/templates/make/_shared/components/renderer/types';
-import { useSiteStore } from '@/store/useSiteStore';
+import { useSiteStore } from '@/store/use-site-store';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 상수 ── */
-
 const PAGE_SIZE = 20;
 
-/** 공간영역 — 홈페이지 추가 버튼 */
-const SPACE_WIDGET: SpaceWidget = {
-    type: 'space',
-    widgetId: 'sites-space',
-    align: 'right',
-    showBorder: false,
-    items: [
-        {
-            id: 's1',
-            type: 'action-button',
-            label: '홈페이지 추가',
-            colSpan: 1,
-            color: 'black',
-            connType: 'close',
-        },
-    ],
-};
-
-/** 테이블 위젯 설정 */
-const TABLE_WIDGET: TableWidget = {
-    type: 'table',
-    widgetId: 'sites-table',
-    contentKey: 'sitesList',
-    displayMode: 'pagination',
-    pageSize: PAGE_SIZE,
-    connectedSearchIds: [],
-    connectedSlug: '',
-    columns: [
-        {
-            id: 'c1',
-            header: '홈페이지명',
-            accessor: 'name',
-            cellType: 'text',
-            align: 'left',
-            sortable: true,
-        },
-        {
-            id: 'c2',
-            header: '도메인',
-            accessor: 'domain',
-            cellType: 'text',
-            align: 'left',
-            sortable: false,
-        },
-        {
-            id: 'c2-1',
-            header: '설명',
-            accessor: 'description',
-            cellType: 'text',
-            align: 'left',
-            sortable: false,
-        },
-        {
-            id: 'c3',
-            header: '사용여부',
-            accessor: 'isActive',
-            cellType: 'badge',
-            align: 'center',
-            sortable: false,
-            width: 100,
-            cellOptions: [
-                { value: 'true',  text: '사용',   color: 'green' },
-                { value: 'false', text: '미사용', color: 'gray'  },
-            ],
-        },
-        {
-            id: 'c4',
-            header: '관리',
-            accessor: '_actions',
-            cellType: 'actions',
-            align: 'center',
-            sortable: false,
-            width: 100,
-            actions: ['edit', 'delete'],
-        },
-    ],
-};
-
 /* ── 페이지 컴포넌트 ── */
-
 export default function SitesPage() {
     const router = useRouter();
+    const { t } = useI18n();
     const { sites, isLoading, fetchSites, deleteSite } = useSiteStore();
 
     const [currentPage, setCurrentPage] = useState(0);
@@ -106,6 +28,84 @@ export default function SitesPage() {
     useEffect(() => {
         fetchSites();
     }, [fetchSites]);
+
+    /* 공간영역 — 홈페이지 추가 버튼 */
+    const SPACE_WIDGET: SpaceWidget = useMemo(() => ({
+        type: 'space',
+        widgetId: 'sites-space',
+        align: 'right',
+        showBorder: false,
+        items: [
+            {
+                id: 's1',
+                type: 'action-button',
+                label: t('site.btn.add'),
+                colSpan: 1,
+                color: 'black',
+                connType: 'close',
+            },
+        ],
+    }), [t]);
+
+    /* 테이블 위젯 설정 */
+    const TABLE_WIDGET: TableWidget = useMemo(() => ({
+        type: 'table',
+        widgetId: 'sites-table',
+        contentKey: 'sitesList',
+        displayMode: 'pagination',
+        pageSize: PAGE_SIZE,
+        connectedSearchIds: [],
+        connectedSlug: '',
+        columns: [
+            {
+                id: 'c1',
+                header: t('site.label.name'),
+                accessor: 'name',
+                cellType: 'text',
+                align: 'left',
+                sortable: true,
+            },
+            {
+                id: 'c2',
+                header: t('common.label.domain'),
+                accessor: 'domain',
+                cellType: 'text',
+                align: 'left',
+                sortable: false,
+            },
+            {
+                id: 'c2-1',
+                header: t('common.label.description'),
+                accessor: 'description',
+                cellType: 'text',
+                align: 'left',
+                sortable: false,
+            },
+            {
+                id: 'c3',
+                header: t('common.label.isActive'),
+                accessor: 'isActive',
+                cellType: 'badge',
+                align: 'center',
+                sortable: false,
+                width: 100,
+                cellOptions: [
+                    { value: 'true',  text: t('common.status.active'),   color: 'green' },
+                    { value: 'false', text: t('common.status.inactive'), color: 'gray'  },
+                ],
+            },
+            {
+                id: 'c4',
+                header: t('common.label.manage'),
+                accessor: '_actions',
+                cellType: 'actions',
+                align: 'center',
+                sortable: false,
+                width: 100,
+                actions: ['edit', 'delete'],
+            },
+        ],
+    }), [t]);
 
     /* 정렬 */
     const sortedSites = useMemo(() => {
@@ -137,15 +137,15 @@ export default function SitesPage() {
             router.push(`/admin/settings/sites/${row.id}`);
         },
         onDelete: async (id) => {
-            if (!confirm('해당 홈페이지를 삭제하시겠습니까?')) return;
+            if (!confirm(t('site.confirm.delete'))) return;
             try {
                 await deleteSite(id);
-                toast.success('홈페이지가 삭제되었습니다.');
+                toast.success(t('common.deleted'));
             } catch {
                 /* store에서 toast 처리 */
             }
         },
-    }), [router, deleteSite]);
+    }), [router, deleteSite, t]);
 
     return (
         <PageLayout mode="live">
@@ -168,6 +168,7 @@ export default function SitesPage() {
                     tableData={pagedSites.map(s => ({
                         ...s,
                         id: s.id,
+                        name: t(s.name),
                         isActive: String(s.isActive),
                     })) as unknown as Record<string, unknown>[]}
                     tableLoading={isLoading}

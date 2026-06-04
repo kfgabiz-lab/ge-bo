@@ -12,7 +12,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, GripVertical, Pencil, X } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
+import { Plus, GripVertical, Pencil, X, Globe } from 'lucide-react';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor,
     useSensor, useSensors,
@@ -51,12 +54,13 @@ export interface FormFieldItem extends Omit<SearchFieldConfig, 'colSpan'> {
 }
 
 /** 폼 위젯 — 플랫 필드 목록 (row 개념 없음, 각 필드 col/row 개별 지정) */
-export interface FormWidget {
-    type: 'form';
+export interface FormWidget {    type: 'form';
     widgetId: string;
     contentKey: string;
     title?: string;             // 폼 섹션 타이틀 (예: 권한 및 보안)
+    titleMsgKey?: string;       // 타이틀 다국어 키
     description?: string;       // 타이틀 아래 설명 (예: 필수 입력 항목은 * 로 표시됩니다.)
+    descriptionMsgKey?: string; // 설명 다국어 키
     showBorder?: boolean;       // 테두리 표시 여부 (기본 true)
     bgColor?: string;           // 바탕색 (기본 none)
     connectedSlug?: string;     // 연결 slug (API 엔드포인트 연동 대상)
@@ -108,6 +112,7 @@ function SortableFormField({
         attributes, listeners, setNodeRef, setActivatorNodeRef,
         transform, transition, isDragging,
     } = useSortable({ id: field.id });
+    const { t } = useI18n();
 
     return (
         <div
@@ -130,10 +135,10 @@ function SortableFormField({
                 {/* 라벨 (hidden은 fieldKey 표시) */}
                 <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
                     {field.type === 'dateRange'
-                        ? `${field.label || ''} ~ ${field.label2 || ''}`
+                        ? `${field.labelMsgKey ? t(field.labelMsgKey) : (field.label || '')} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
                         : field.type === 'hidden'
                             ? (field.fieldKey || <span className="italic text-slate-300">Key 없음</span>)
-                            : (field.label || <span className="italic text-slate-300">라벨 없음</span>)
+                            : (field.labelMsgKey ? t(field.labelMsgKey) : (field.label || <span className="italic text-slate-300">라벨 없음</span>))
                     }
                 </span>
                 {field.required && <span className="text-red-500 text-[10px] flex-shrink-0">*</span>}
@@ -177,6 +182,7 @@ interface FormBuilderProps {
 
 /** Form 위젯 필드 설정 빌더 */
 export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: FormBuilderProps) {
+    const { i18nMode } = useBuilderI18nMode();
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -241,31 +247,35 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
     const renderFieldComponent = (f: FormFieldItem) => {
         const props = {
             values: {
-                label:         f.label || '',
-                label2:        f.label2,
-                fieldKey:      f.fieldKey || '',
-                colSpan:       f.colSpan,
-                rowSpan:       f.rowSpan,
-                placeholder:   f.placeholder,
-                description:   f.description,
-                required:      f.required,
-                options:       f.options,
-                codeGroupCode: f.codeGroupCode,
-                multiSelect:   f.multiSelect,
-                minLength:     f.minLength,
-                maxLength:     f.maxLength,
-                pattern:       f.pattern,
-                patternDesc:   f.patternDesc,
-                minSelect:     f.minSelect,
-                maxSelect:     f.maxSelect,
-                isPk:          f.isPk,
-                readonly:      f.readonly,
-                maxFileCount:      f.maxFileCount,
-                maxFileSizeMB:     f.maxFileSizeMB,
-                maxTotalSizeMB:    f.maxTotalSizeMB,
-                fileTypeMode:      f.fileTypeMode,
-                allowedExtensions: f.allowedExtensions,
-                videoMode:           f.videoMode,
+                label:              f.label || '',
+                labelMsgKey:        f.labelMsgKey,
+                label2:             f.label2,
+                label2MsgKey:       f.label2MsgKey,
+                fieldKey:           f.fieldKey || '',
+                colSpan:            f.colSpan,
+                rowSpan:            f.rowSpan,
+                placeholder:        f.placeholder,
+                placeholderMsgKey:  f.placeholderMsgKey,
+                description:        f.description,
+                descriptionMsgKey:  f.descriptionMsgKey,
+                required:           f.required,
+                options:            f.options,
+                codeGroupCode:      f.codeGroupCode,
+                multiSelect:        f.multiSelect,
+                minLength:          f.minLength,
+                maxLength:          f.maxLength,
+                pattern:            f.pattern,
+                patternDesc:        f.patternDesc,
+                minSelect:          f.minSelect,
+                maxSelect:          f.maxSelect,
+                isPk:               f.isPk,
+                readonly:           f.readonly,
+                maxFileCount:       f.maxFileCount,
+                maxFileSizeMB:      f.maxFileSizeMB,
+                maxTotalSizeMB:     f.maxTotalSizeMB,
+                fileTypeMode:       f.fileTypeMode,
+                allowedExtensions:  f.allowedExtensions,
+                videoMode:          f.videoMode,
                 mediaImageMaxSizeMB: f.mediaImageMaxSizeMB,
                 mediaVideoMaxSizeMB: f.mediaVideoMaxSizeMB,
             } satisfies FieldEditValues,
@@ -349,23 +359,41 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className="text-[10px] font-medium text-slate-500 mb-1 block">타이틀</label>
-                    <input
-                        type="text"
-                        value={widget.title ?? ''}
-                        onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
-                        placeholder="예: 권한 및 보안"
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
-                    />
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={widget.titleMsgKey ?? ''}
+                            onChange={key => onChange({ ...widget, titleMsgKey: key || undefined })}
+                            resourceType="WORD"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={widget.title ?? ''}
+                            onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
+                            placeholder="예: 권한 및 보안"
+                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                        />
+                    )}
                 </div>
                 <div>
                     <label className="text-[10px] font-medium text-slate-500 mb-1 block">설명</label>
-                    <input
-                        type="text"
-                        value={widget.description ?? ''}
-                        onChange={e => onChange({ ...widget, description: e.target.value || undefined })}
-                        placeholder="예: 필수 항목은 * 로 표시됩니다."
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
-                    />
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={widget.descriptionMsgKey ?? ''}
+                            onChange={key => onChange({ ...widget, descriptionMsgKey: key || undefined })}
+                            resourceType="SENTENCE"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={widget.description ?? ''}
+                            onChange={e => onChange({ ...widget, description: e.target.value || undefined })}
+                            placeholder="예: 필수 항목은 * 로 표시됩니다."
+                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                        />
+                    )}
                 </div>
             </div>
 

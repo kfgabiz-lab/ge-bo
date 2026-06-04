@@ -8,6 +8,8 @@
 import React from 'react';
 import { ColSpanMode } from './types';
 import { ToggleRow } from './_ToggleRow';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
 /** 필드 input 공통 클래스 */
 export const INPUT_CLS = 'w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900';
@@ -21,11 +23,17 @@ interface FieldBaseProps {
     colSpanMode: ColSpanMode;
     /** dateRange 전용 두 번째 라벨 값 */
     label2?: string;
+    /** dateRange 두 번째 라벨 다국어 키 */
+    label2MsgKey?: string;
     /** true 시 라벨 텍스트가 "라벨 1"로 표시되고 라벨2 입력 영역 노출 */
     showLabel2?: boolean;
     rowSpan?: number;
     rowSpanConfig?: { min: number; max: number };
     autoFocus?: boolean;
+    /** 라벨 다국어 키 — 설정 시 MessageKeySelector 모드로 표시 */
+    labelMsgKey?: string;
+    /** 설명 다국어 키 */
+    descriptionMsgKey?: string;
     /** 라벨 선택 입력 여부 — true 시 라벨 입력란의 * 숨김 */
     labelOptional?: boolean;
     /** 한 줄 배치 모드 (공간영역 등에서 사용) */
@@ -40,7 +48,7 @@ interface FieldBaseProps {
     isPk?: boolean;
     /** 읽기 전용 여부 — Form 빌더(input 모드)일 때만 표시 */
     readonly?: boolean;
-    onChange: (updates: Partial<{ label: string; label2: string; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; description: string }>) => void;
+    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
 }
@@ -48,15 +56,18 @@ interface FieldBaseProps {
 /** 라벨|Key 한 줄 + ColSpan + (RowSpan) — 모든 필드 컴포넌트 공통 베이스 */
 export function FieldBase(props: FieldBaseProps) {
     const {
-        label, label2, showLabel2, fieldKey,
+        label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, required, description, isPk, readonly, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, required, description, descriptionMsgKey, isPk, readonly, onChange, onLabelKeyDown,
         children
     } = props;
 
     /* Form 빌더 여부 — input 타입 colSpan 사용 시 한 줄 레이아웃 + PK 표시 */
     const isFormMode = colSpanMode.type === 'input';
+
+    /* 전역 다국어 모드 — SizeSettingPanel의 🌐 토글로 제어 */
+    const { i18nMode } = useBuilderI18nMode();
 
     return (
         <>
@@ -66,15 +77,26 @@ export function FieldBase(props: FieldBaseProps) {
                     <label className={LABEL_CLS}>
                         {showLabel2 ? '라벨 1' : '라벨'} {!labelOptional && <span className="text-red-400">*</span>}
                     </label>
-                    <input
-                        type="text"
-                        value={label}
-                        onChange={e => onChange({ label: e.target.value })}
-                        onKeyDown={onLabelKeyDown}
-                        placeholder="라벨을 입력하세요"
-                        className={INPUT_CLS}
-                        autoFocus={autoFocus}
-                    />
+                    {i18nMode ? (
+                        /* 다국어 키 모드 — MessageKeySelector */
+                        <MessageKeySelector
+                            value={labelMsgKey ?? ''}
+                            onChange={key => onChange({ labelMsgKey: key })}
+                            resourceType="WORD"
+                            size="sm"
+                        />
+                    ) : (
+                        /* 직접 입력 모드 */
+                        <input
+                            type="text"
+                            value={label}
+                            onChange={e => onChange({ label: e.target.value })}
+                            onKeyDown={onLabelKeyDown}
+                            placeholder="라벨을 입력하세요"
+                            className={INPUT_CLS}
+                            autoFocus={autoFocus}
+                        />
+                    )}
                 </div>
                 <div>
                     <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
@@ -91,26 +113,44 @@ export function FieldBase(props: FieldBaseProps) {
             {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}
             <div>
                 <label className={LABEL_CLS}>설명 <span className="text-slate-300 font-normal">(선택)</span></label>
-                <input
-                    type="text"
-                    value={description ?? ''}
-                    onChange={e => onChange({ description: e.target.value || undefined })}
-                    placeholder="예: 설명을 입력 해주세요."
-                    className={INPUT_CLS}
-                />
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={descriptionMsgKey ?? ''}
+                        onChange={key => onChange({ descriptionMsgKey: key })}
+                        resourceType="SENTENCE"
+                        size="sm"
+                    />
+                ) : (
+                    <input
+                        type="text"
+                        value={description ?? ''}
+                        onChange={e => onChange({ description: e.target.value || undefined })}
+                        placeholder="예: 설명을 입력 해주세요."
+                        className={INPUT_CLS}
+                    />
+                )}
             </div>
 
             {/* 라벨 2 (dateRange 전용) */}
             {showLabel2 && (
                 <div>
                     <label className={LABEL_CLS}>라벨 2 <span className="text-red-400">*</span></label>
-                    <input
-                        type="text"
-                        value={label2 || ''}
-                        onChange={e => onChange({ label2: e.target.value })}
-                        placeholder="예: 종료일"
-                        className={INPUT_CLS}
-                    />
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={props.label2MsgKey ?? ''}
+                            onChange={key => onChange({ label2MsgKey: key })}
+                            resourceType="WORD"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={label2 || ''}
+                            onChange={e => onChange({ label2: e.target.value })}
+                            placeholder="예: 종료일"
+                            className={INPUT_CLS}
+                        />
+                    )}
                 </div>
             )}
 

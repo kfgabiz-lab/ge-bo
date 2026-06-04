@@ -104,6 +104,7 @@ export function ActionButtonField({
     return (
         <FieldBase
             label={values.label}
+            labelMsgKey={values.labelMsgKey}
             fieldKey={values.fieldKey || ''}
             colSpan={values.colSpan}
             colSpanMode={colSpanMode}

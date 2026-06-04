@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * FieldRenderer — 공통 단일 필드 렌더러
@@ -18,13 +18,15 @@
  */
 
 import React, { useRef } from 'react';
+import { useI18n } from '@/hooks/use-i18n';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import dynamic from 'next/dynamic';
 import { Calendar, Paperclip, Film, Plus, X } from 'lucide-react';
 import { Image as ImageIcon } from 'lucide-react';
 
 /* 에디터는 SSR 불가 — 클라이언트에서만 로드 */
-const WysiwygEditor = dynamic(() => import('@/components/common/WysiwygEditor'), { ssr: false });
-import { ROW_HEIGHT } from '@/components/layout/GridCell';
+const WysiwygEditor = dynamic(() => import('@/components/common/wysiwyg-editor'), { ssr: false });
+import { ROW_HEIGHT } from '@/components/layout/grid-cell';
 import { SearchFieldConfig, CodeGroupDef } from '../../types';
 import { inputCls, selectCls } from '../../styles';
 import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS } from '../../constants';
@@ -149,7 +151,8 @@ const resolveOptions = (field: SearchFieldConfig, codeGroups: CodeGroupDef[]): s
         return codeGroups
             .find(g => g.groupCode === field.codeGroupCode)
             ?.details.filter(d => d.active)
-            .map(d => `${d.name}:${d.code}`) ?? [];
+            /* nameMsgKey 있으면 msgKey를 text로 저장 → FieldRenderer에서 t(text)로 번역 */
+            .map(d => `${d.nameMsgKey ? d.nameMsgKey : d.name}:${d.code}`) ?? [];
     }
     return field.options ?? [];
 };
@@ -318,6 +321,7 @@ export function FieldRenderer({
     onRemoveExisting,
 }: FieldRendererProps) {
     const isPreview = mode === 'preview';
+    const { t } = useI18n();
     /* live 모드에서 읽기 전용 여부 */
     const isReadOnly = !isPreview && !!field.readonly;
     /* 읽기 전용 스타일 — 입력 불가 시각적 표시 */
@@ -337,7 +341,11 @@ export function FieldRenderer({
                     type="text"
                     disabled={isPreview}
                     readOnly={isReadOnly}
-                    placeholder={field.placeholder || '입력하세요'}
+                    placeholder={
+                        field.placeholderMsgKey
+                            ? t(field.placeholderMsgKey)
+                            : (field.placeholder || '입력하세요')
+                    }
                     className={`${inputCls}${readonlyCls}`}
                     value={value}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
@@ -354,10 +362,10 @@ export function FieldRenderer({
                         value={value}
                         onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                     >
-                        <option value="">{field.placeholder || '선택하세요'}</option>
+                        <option value="">{field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || t('common.select.placeholder'))}</option>
                         {opts.map(opt => {
                             const { text, value: val } = parseOpt(opt);
-                            return <option key={opt} value={val}>{text}</option>;
+                            return <option key={opt} value={val}>{t(text)}</option>;
                         })}
                     </select>
                     <SelectArrow />
@@ -432,7 +440,7 @@ export function FieldRenderer({
                                     onChange={isReadOnly ? undefined : () => onChange?.(val)}
                                     className="w-4 h-4 cursor-pointer"
                                 />
-                                <span className="text-sm text-slate-700">{text}</span>
+                                <span className="text-sm text-slate-700">{t(text)}</span>
                             </label>
                         );
                     })}
@@ -466,7 +474,7 @@ export function FieldRenderer({
                                     }}
                                     className="w-4 h-4 rounded cursor-pointer"
                                 />
-                                <span className="text-sm text-slate-700">{text}</span>
+                                <span className="text-sm text-slate-700">{t(text)}</span>
                             </label>
                         );
                     })}
@@ -503,7 +511,7 @@ export function FieldRenderer({
                                         : 'text-slate-500 border-slate-200 hover:bg-slate-100'
                                         }`}
                                 >
-                                    {text}
+                                    {t(text)}
                                 </button>
                             );
                         })}
@@ -528,7 +536,7 @@ export function FieldRenderer({
                                     : 'text-slate-500 border-slate-200 hover:bg-slate-100 disabled:cursor-default'
                                     }`}
                             >
-                                {text}
+                                {t(text)}
                             </button>
                         );
                     })}
@@ -560,7 +568,7 @@ export function FieldRenderer({
                     readOnly={isReadOnly}
                     className={`${inputCls} resize-none h-full${readonlyCls}`}
                     value={value}
-                    placeholder={field.placeholder || '텍스트를 입력하세요'}
+                    placeholder={field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요')}
                     onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
                 />
             );
@@ -601,7 +609,7 @@ export function FieldRenderer({
                     onClick={onButtonClick}
                     className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] min-w-[72px] w-full whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
                 >
-                    {field.label || '버튼'}
+                    {field.labelMsgKey ? t(field.labelMsgKey) : (field.label || '버튼')}
                 </button>
             );
         }
@@ -1280,6 +1288,16 @@ export function FieldRenderer({
         /* ── hidden ── 화면에 렌더링하지 않음 — 저장 시 defaultValue로 자동 포함 */
         case 'hidden':
             return null;
+
+        /* ── message-key-select ── */
+        case 'message-key-select':
+            return (
+                <MessageKeySelector
+                    value={value}
+                    onChange={v => onChange?.(v)}
+                    disabled={isPreview}
+                />
+            );
 
         default:
             return null;

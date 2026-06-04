@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import PageLayout from '@/components/layout/PageLayout';
-import { GridCell } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type {
     SearchWidget,

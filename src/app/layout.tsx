@@ -1,8 +1,8 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import './globals.css';
-import { AdminLayout } from '@/components/layout/AdminLayout';
+import { AdminLayout } from '@/components/layout/admin-layout';
 import { Toaster } from 'sonner';
-import { QueryProvider } from '@/components/providers/QueryProvider';
+import { QueryProvider } from '@/components/providers/query-provider';
 
 export const metadata: Metadata = {
   title: 'Global Backoffice - WeMade',

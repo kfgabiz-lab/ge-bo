@@ -20,7 +20,8 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
     return (
         <div className="space-y-1.5">
             <FieldBase
-                label={values.label} label2={values.label2} showLabel2
+                label={values.label} labelMsgKey={values.labelMsgKey}
+                label2={values.label2} label2MsgKey={values.label2MsgKey} showLabel2
                 fieldKey={values.fieldKey}
                 colSpan={values.colSpan} colSpanMode={colSpanMode}
                 rowSpan={values.rowSpan} rowSpanConfig={rowSpanConfig}
@@ -28,6 +29,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 isPk={values.isPk}
                 required={values.required}
                 description={values.description}
+                descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 hideColSpan={hideColSpan}
                 onChange={onChange}

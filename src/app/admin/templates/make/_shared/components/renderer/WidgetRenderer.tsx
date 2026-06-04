@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * WidgetRenderer — 위젯 타입별 통합 Dispatcher (최상위)
@@ -35,6 +35,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 싱글톤 ──
  * WidgetRenderer가 여러 개 마운트되어도 리스너는 하나만 등록.
@@ -51,7 +52,7 @@ if (typeof document !== 'undefined') {
     }, { capture: true });
 }
 import api from '@/lib/api';
-import { PageGridContainer } from '@/components/layout/PageGridContainer';
+import { PageGridContainer } from '@/components/layout/page-grid-container';
 import { CodeGroupDef } from '../../types';
 import { SearchRenderer } from './SearchRenderer';
 import { TableRenderer } from './TableRenderer';
@@ -60,8 +61,9 @@ import { SpaceRenderer } from './SpaceRenderer';
 import { CategoryRenderer } from './CategoryRenderer';
 import { SubListRenderer } from './SubListRenderer';
 import { MultiSelectRenderer } from './MultiSelectRenderer';
-import CenterPopupLayout from '@/components/layout/popup/CenterPopupLayout';
-import RightDrawerLayout from '@/components/layout/popup/RightDrawerLayout';
+import { TabRenderer } from './TabRenderer';
+import CenterPopupLayout from '@/components/layout/popup/center-popup-layout';
+import RightDrawerLayout from '@/components/layout/popup/right-drawer-layout';
 import type { AnyWidget, RendererMode, TableActionHandlers } from './types';
 import type { FormFieldItem } from '../builder/FormBuilder';
 import { fetchTemplateConfig } from '../../templateApi';
@@ -124,7 +126,7 @@ async function fetchAndMapFieldValues(
     return { values, existingFileIds, sourceData };
 }
 
-/** 위젯 컨테이너 기본 클래스 (text / 빈 위젯 등에 사용) */
+/** 위젯 컨테이너 기본 클래스 (빈 위젯 등 미처리 타입 fallback용) */
 const BASE_CLS =
     'h-full w-full rounded border bg-white border-slate-300 shadow-sm overflow-hidden p-2';
 
@@ -274,7 +276,8 @@ export function WidgetRenderer({
     onRefresh,
     externalPopupTrigger,
 }: WidgetRendererProps) {
-    const router = useRouter();
+    const router  = useRouter();
+    const { t }   = useI18n();
 
     /* ══════════════════════════════════════════ */
     /*  내부 팝업 상태                             */
@@ -728,7 +731,7 @@ export function WidgetRenderer({
             <RightDrawerLayout
                 open={popupOpen}
                 onClose={handlePopupClose}
-                title={popupCfg.layerTitle || ''}
+                title={popupCfg.layerTitleMsgKey ? t(popupCfg.layerTitleMsgKey) : (popupCfg.layerTitle || '')}
             >
                 {_popupBody}
             </RightDrawerLayout>
@@ -736,7 +739,7 @@ export function WidgetRenderer({
             <CenterPopupLayout
                 open={popupOpen}
                 onClose={handlePopupClose}
-                title={popupCfg?.layerTitle || ''}
+                title={popupCfg?.layerTitleMsgKey ? t(popupCfg.layerTitleMsgKey) : (popupCfg?.layerTitle || '')}
                 layerWidth={popupCfg?.layerWidth || 'md'}
             >
                 {_popupBody}
@@ -755,19 +758,6 @@ export function WidgetRenderer({
             {popupOverlay}
         </>
     );
-
-    /* ── Text ── */
-    if (widget.type === 'text') {
-        return (
-            <div className={BASE_CLS}>
-                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
-                    {widget.content || (
-                        <span className="text-slate-300 italic">텍스트 없음</span>
-                    )}
-                </p>
-            </div>
-        );
-    }
 
     /* ── Search ── */
     if (widget.type === 'search') {
@@ -862,7 +852,9 @@ export function WidgetRenderer({
                 mode={mode}
                 fields={widget.fields}
                 title={widget.title}
+                titleMsgKey={widget.titleMsgKey}
                 description={widget.description}
+                descriptionMsgKey={widget.descriptionMsgKey}
                 showBorder={widget.showBorder}
                 bgColor={widget.bgColor}
                 contentColSpan={contentColSpan}
@@ -947,6 +939,10 @@ export function WidgetRenderer({
                 onChange={ids => onMultiSelectChange?.(msWid, ids)}
             />
         );
+    }
+
+    if (widget.type === 'tab') {
+        return <TabRenderer mode={mode} widget={widget} />;
     }
 
     return <div className={BASE_CLS} />;

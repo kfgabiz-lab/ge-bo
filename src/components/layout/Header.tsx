@@ -1,33 +1,39 @@
-'use client';
+﻿'use client';
 
 import { LogOut, ChevronRight, Home, Globe, ChevronDown } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
-import { useMenuStore, MenuItem } from '@/store/useMenuStore';
-import { useNavMenusQuery } from '@/hooks/useMenuQueries';
+import { useAuthStore } from '@/store/auth-store';
+import { useMenuStore, MenuItem } from '@/store/use-menu-store';
+import { useNavMenusQuery } from '@/hooks/use-menu-queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSiteStore } from '@/store/useSiteStore';
-import { usePageTitleStore } from '@/store/usePageTitleStore';
+import { useSiteStore } from '@/store/use-site-store';
+import { usePageTitleStore } from '@/store/use-page-title-store';
+import { LanguageSelector } from '@/components/layout/language-selector';
+import { useI18n } from '@/hooks/use-i18n';
 
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
 function findMenuBreadcrumb(
     menus: MenuItem[],
     pathname: string,
+    t: (key: string) => string,
     parents: { label: string; href: string }[] = []
 ): { label: string; href: string }[] | null {
     for (const item of menus) {
+        /* nameMsgKey 있으면 locale-aware 텍스트, 없으면 name fallback */
+        const label = item.nameMsgKey ? t(item.nameMsgKey) : item.name;
         if (item.url === pathname) {
-            return [...parents, { label: item.name, href: item.url }];
+            return [...parents, { label, href: item.url }];
         }
         if (item.children && item.children.length > 0) {
             const result = findMenuBreadcrumb(
                 item.children,
                 pathname,
-                [...parents, { label: item.name, href: item.url || '#' }]
+                t,
+                [...parents, { label, href: item.url || '#' }]
             );
             if (result) return result;
         }
@@ -41,8 +47,9 @@ function SiteSelector() {
     const adminInfo = useAuthStore((state) => state.adminInfo);
     const logout = useAuthStore((state) => state.logout);
     const router = useRouter();
+    const { t } = useI18n();
     const [open, setOpen] = useState(false);
-    const [mySites, setMySites] = useState<{ id: number; name: string }[]>([]);
+    const [mySites, setMySites] = useState<{ id: number; name: string; nameMsgKey?: string }[]>([]);
     const ref = useRef<HTMLDivElement>(null);
 
     /* 마운트 시 localStorage 복원 */
@@ -57,7 +64,7 @@ function SiteSelector() {
         const fetchSites = async () => {
             try {
                 const res = await api.get(`/admins/${adminInfo.id}/sites`);
-                const sites: { id: number; name: string }[] = res.data;
+                const sites: { id: number; name: string; nameMsgKey?: string }[] = res.data;
                 setMySites(sites);
 
                 if (sites.length === 0) {
@@ -104,7 +111,9 @@ function SiteSelector() {
             >
                 <Globe className="w-3.5 h-3.5 text-slate-400" />
                 <span className="max-w-[120px] truncate">
-                    {activeSite ? activeSite.name : '홈페이지 선택'}
+                    {activeSite
+                        ? (activeSite.nameMsgKey ? t(activeSite.nameMsgKey) : activeSite.name)
+                        : t('site.selector.empty')}
                 </span>
                 <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
@@ -112,7 +121,7 @@ function SiteSelector() {
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden">
                     {mySites.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-slate-400 text-center">홈페이지 없음</div>
+                        <div className="px-3 py-2 text-xs text-slate-400 text-center">{t('site.selector.no_sites')}</div>
                     ) : (
                         mySites.map(site => (
                             <button
@@ -122,7 +131,7 @@ function SiteSelector() {
                                     activeSiteId === site.id ? 'text-slate-900 bg-slate-50 font-semibold' : 'text-slate-600'
                                 }`}
                             >
-                                {site.name}
+                                {site.nameMsgKey ? t(site.nameMsgKey) : site.name}
                             </button>
                         ))
                     )}
@@ -141,6 +150,7 @@ export function Header() {
     const queryClient = useQueryClient();
     const pageTitle = usePageTitleStore(s => s.pageTitle);
     const previousPath = usePageTitleStore(s => s.previousPath);
+    const { t } = useI18n();
 
     /* React Query 기반 네비게이션 메뉴 캐싱 연동 */
     const { data: serverNavMenus } = useNavMenusQuery();
@@ -152,7 +162,7 @@ export function Header() {
     }, [serverNavMenus, __syncQueryMenus]);
 
     /* 메뉴 트리에서 현재 경로 조회 → 없으면 URL 세그먼트 폴백 */
-    const menuCrumbs = findMenuBreadcrumb(navMenus, pathname || '');
+    const menuCrumbs = findMenuBreadcrumb(navMenus, pathname || '', t);
     /* 메뉴명이 비어있을 때 빌더 pageTitle로 대체 (우선순위: 메뉴명 > pageTitle) */
     const resolvedCrumbs = menuCrumbs?.map((c, i, arr) =>
         i === arr.length - 1 && !c.label.trim() && pageTitle
@@ -161,7 +171,7 @@ export function Header() {
     );
     /* 메뉴에 없는 페이지 — previousPath로 부모 메뉴 전체 크럼 탐색 */
     const parentCrumbs = !resolvedCrumbs && previousPath
-        ? findMenuBreadcrumb(navMenus, previousPath) ?? null
+        ? findMenuBreadcrumb(navMenus, previousPath, t) ?? null
         : null;
 
     const crumbs = resolvedCrumbs
@@ -217,6 +227,8 @@ export function Header() {
             <div className="flex items-center gap-2">
                 {/* 홈페이지 선택 드롭다운 */}
                 <SiteSelector />
+                {/* 다국어 선택 드롭다운 */}
+                <LanguageSelector />
 
                 {/* 알림 아이콘 — 추후 활성화
                 <button className="relative w-8 h-8 flex items-center justify-center rounded-sm text-gray-500 hover:bg-gray-100 hover:text-slate-900 transition-all">
@@ -232,7 +244,7 @@ export function Header() {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-sm text-xs font-semibold transition-all tracking-tight"
                 >
                     <LogOut className="w-3.5 h-3.5" />
-                    로그아웃
+                    {t('common.btn.logout')}
                 </button>
             </div>
         </header>

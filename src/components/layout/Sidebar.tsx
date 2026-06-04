@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -7,8 +7,9 @@ import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 // import { Layers } from 'lucide-react'; /* 기존 로고 — 원복 시 주석 해제 */
 import * as LucideIcons from 'lucide-react';
-import { useAuthStore } from '@/store/authStore';
-import { useMenuStore, MenuItem as DbMenu } from '@/store/useMenuStore';
+import { useAuthStore } from '@/store/auth-store';
+import { useMenuStore, MenuItem as DbMenu } from '@/store/use-menu-store';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 아이콘 동적 렌더러 ── */
 const renderIcon = (name: string, className = 'w-4 h-4') => {
@@ -21,6 +22,9 @@ const renderIcon = (name: string, className = 'w-4 h-4') => {
 /* ── 메뉴 아이템 ── */
 const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; depth?: number; isCollapsed?: boolean }) => {
     const pathname = usePathname();
+    const { t } = useI18n();
+    /* nameMsgKey 있으면 locale-aware 텍스트, 없으면 name 컬럼 fallback */
+    const displayName = item.nameMsgKey ? t(item.nameMsgKey) : item.name;
 
     /* 비노출 메뉴는 렌더링하지 않음 — 상위가 숨김이면 children도 자동으로 숨겨짐 */
     if (!item.visible) return null;
@@ -61,7 +65,7 @@ const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; dep
                 <span className={`flex-shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400 group-hover:text-slate-200'} transition-colors`}>
                     {renderIcon(item.icon, depth > 0 ? 'w-3.5 h-3.5' : 'w-4 h-4')}
                 </span>
-                {!isCollapsed && <span className="truncate">{item.name}</span>}
+                {!isCollapsed && <span className="truncate">{displayName}</span>}
             </div>
             {hasChildren && !isCollapsed && (
                 <span className="text-slate-600 flex-shrink-0">
@@ -97,6 +101,7 @@ export function Sidebar() {
     const adminInfo = useAuthStore((state) => state.adminInfo);
     const accessToken = useAuthStore((state) => state.accessToken);
     const { navMenus: rawMenus, fetchNavMenus, isSidebarCollapsed, toggleSidebar } = useMenuStore();
+    const { t } = useI18n();
 
     /* SYSTEM_ADMIN이 아니면 isSystem=true 메뉴 제외 */
     const isSystemAdmin = adminInfo?.role === 'SYSTEM_ADMIN';
@@ -147,7 +152,7 @@ export function Sidebar() {
                                 className="w-full flex items-center justify-between mb-2 px-3 group"
                             >
                                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-400 transition-colors">
-                                    {category.name}
+                                    {category.nameMsgKey ? t(category.nameMsgKey) : category.name}
                                 </span>
                                 {collapsedCategories.has(category.id)
                                     ? <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-slate-500 transition-colors" />

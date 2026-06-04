@@ -17,6 +17,7 @@
  */
 
 import React, { useState } from 'react';
+import { useI18n } from '@/hooks/use-i18n';
 import { AlignLeft, AlignCenter, AlignRight, MousePointerClick, X, GripVertical, Pencil, Plus } from 'lucide-react';
 import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { ToggleRow } from './fields/_ToggleRow';
@@ -98,6 +99,7 @@ function SortableSpaceItem({
     onRemove: () => void;
     children: React.ReactNode;
 }) {
+    const { t } = useI18n();
     const {
         attributes, listeners, setNodeRef, setActivatorNodeRef,
         transform, transition, isDragging
@@ -132,7 +134,11 @@ function SortableSpaceItem({
                         ? <AlignLeft className="w-3 h-3 inline mr-1" />
                         : <MousePointerClick className="w-3 h-3 inline mr-1" />}
                     {item.type === 'textarea' ? 'Text' : 'Button'} #{idx + 1}
-                    {item.label && <span className="ml-1.5 text-slate-400 font-normal">({item.label})</span>}
+                    {(item.labelMsgKey || item.label) && (
+                        <span className="ml-1.5 text-slate-400 font-normal">
+                            ({item.labelMsgKey ? t(item.labelMsgKey) : item.label})
+                        </span>
+                    )}
                 </span>
 
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>

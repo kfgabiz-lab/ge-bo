@@ -1,4 +1,4 @@
-import { SearchRowConfig, SearchFieldConfig, TableColumnConfig, ButtonConfig, ButtonPosition, DisplayMode, CodeGroupDef } from '../types';
+﻿import { SearchRowConfig, SearchFieldConfig, TableColumnConfig, ButtonConfig, ButtonPosition, DisplayMode, CodeGroupDef } from '../types';
 import { varName, parseOpt } from '../utils';
 
 /**
@@ -84,7 +84,7 @@ export const buildListTsxFile = (
     lines.push("import { SearchForm, SearchRow, SearchField } from '@/components/search';");
     if (hasPopup || hasBtnPopup) lines.push("import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';");
     lines.push("import api from '@/lib/api';");
-    if (hasCodeGroup) lines.push("import { useCodeStore } from '@/store/useCodeStore';");
+    if (hasCodeGroup) lines.push("import { useCodeStore } from '@/store/use-code-store';");
     /* 개발자방식 커스텀 팝업 import */
     fileLayerSlugs.forEach(slug => {
         lines.push(`import ${slug} from './${slug}';`);

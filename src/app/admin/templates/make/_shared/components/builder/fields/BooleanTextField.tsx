@@ -14,29 +14,51 @@
 import React from 'react';
 import { ColEditProps } from './col-types';
 import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
 export function BooleanTextField({ values, onChange }: ColEditProps) {
+    const { i18nMode } = useBuilderI18nMode();
+
     return (
         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
             <div>
                 <label className={LABEL_CLS}>True 텍스트</label>
-                <input
-                    type="text"
-                    value={values.trueText ?? ''}
-                    onChange={e => onChange({ trueText: e.target.value })}
-                    placeholder="공개"
-                    className={INPUT_CLS}
-                />
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={values.trueTextMsgKey ?? ''}
+                        onChange={key => onChange({ trueTextMsgKey: key })}
+                        resourceType="WORD"
+                        size="sm"
+                    />
+                ) : (
+                    <input
+                        type="text"
+                        value={values.trueText ?? ''}
+                        onChange={e => onChange({ trueText: e.target.value })}
+                        placeholder="공개"
+                        className={INPUT_CLS}
+                    />
+                )}
             </div>
             <div>
                 <label className={LABEL_CLS}>False 텍스트</label>
-                <input
-                    type="text"
-                    value={values.falseText ?? ''}
-                    onChange={e => onChange({ falseText: e.target.value })}
-                    placeholder="비공개"
-                    className={INPUT_CLS}
-                />
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={values.falseTextMsgKey ?? ''}
+                        onChange={key => onChange({ falseTextMsgKey: key })}
+                        resourceType="WORD"
+                        size="sm"
+                    />
+                ) : (
+                    <input
+                        type="text"
+                        value={values.falseText ?? ''}
+                        onChange={e => onChange({ falseText: e.target.value })}
+                        placeholder="비공개"
+                        className={INPUT_CLS}
+                    />
+                )}
             </div>
         </div>
     );

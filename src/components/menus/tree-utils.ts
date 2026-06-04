@@ -1,4 +1,4 @@
-import { MenuItem } from '@/store/useMenuStore';
+﻿import { MenuItem } from '@/store/use-menu-store';
 
 export interface FlattenedItem extends MenuItem {
     parentId: number | null;

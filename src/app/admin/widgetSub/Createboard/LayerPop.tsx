@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 // ================================================================
 // 📄 이 파일은 페이지 메이커로 자동 생성된 팝업 컴포넌트입니다.
 //
@@ -24,8 +24,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCodeStore } from '@/store/useCodeStore';
-import WysiwygEditor from '@/components/common/WysiwygEditor';
+import { useCodeStore } from '@/store/use-code-store';
+import WysiwygEditor from '@/components/common/wysiwyg-editor';
 
 interface LayerPopupProps {
     isOpen: boolean;

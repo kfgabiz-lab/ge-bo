@@ -17,6 +17,8 @@
 import React from 'react';
 import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { SlugSelectField } from './fields';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
 import type { CategoryWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 
@@ -32,6 +34,7 @@ export interface CategoryBuilderProps {
 }
 
 export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWidgets = [], pageTemplates = [] }: CategoryBuilderProps) {
+    const { i18nMode } = useBuilderI18nMode();
     /** 상위로 연결 가능한 위젯 목록 — 자기 자신 제외, depth가 더 낮은 것만 */
     const parentCandidates = categoryWidgets.filter(
         w => w.widgetId !== widget.widgetId && w.depth < widget.depth
@@ -101,13 +104,22 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                 </div>
                 <div className="flex-1">
                     <label className={LABEL_CLS}>레이블</label>
-                    <input
-                        type="text"
-                        className={INPUT_CLS}
-                        value={widget.label ?? ''}
-                        placeholder="예: 대분류"
-                        onChange={e => onChange({ ...widget, label: e.target.value || undefined })}
-                    />
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={widget.labelMsgKey ?? ''}
+                            onChange={key => onChange({ ...widget, labelMsgKey: key || undefined })}
+                            resourceType="WORD"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            className={INPUT_CLS}
+                            value={widget.label ?? ''}
+                            placeholder="예: 대분류"
+                            onChange={e => onChange({ ...widget, label: e.target.value || undefined })}
+                        />
+                    )}
                 </div>
             </div>
 

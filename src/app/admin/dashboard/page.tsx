@@ -1,17 +1,16 @@
-"use client";
+﻿"use client";
 
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/auth-store";
+import PageLayout from "@/components/layout/page-layout";
 
 export default function DashboardPage() {
     const adminInfo = useAuthStore((state) => state.adminInfo);
 
     return (
+        <PageLayout mode="live" noGrid>
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-slate-800">대시보드</h1>
-                <div className="text-sm text-slate-500">
-                    반갑습니다, <span className="font-semibold text-blue-600">{adminInfo?.name || '관리자'}</span>님!
-                </div>
+            <div className="flex justify-end text-sm text-slate-500">
+                반갑습니다, <span className="font-semibold text-blue-600 ml-1">{adminInfo?.name || '관리자'}</span>님!
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -37,5 +36,6 @@ export default function DashboardPage() {
                 <p className="text-slate-400 italic">차트 및 상세 KPI 데이터 로딩 중...</p>
             </div>
         </div>
+        </PageLayout>
     );
 }

@@ -16,6 +16,7 @@ import {
     ChevronUp, ChevronDown, X, Pencil,
 } from 'lucide-react';
 import { CodeGroupDef, SearchFieldType, SearchFieldConfig, SearchRowConfig } from '../types';
+import { useI18n } from '@/hooks/use-i18n';
 import { needsOptions as sharedNeedsOptions, createIdGenerator } from '../utils';
 import { RowHeader } from './RowHeader';
 import { FieldPickerTypeList } from './FieldPickerTypeList';
@@ -72,6 +73,7 @@ const uid = createIdGenerator('sb');
 /* ══════════════════════════════════════════ */
 
 export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
+    const { t } = useI18n();
 
     /* ── DnD: rows prop을 그대로 쓰되, 변경 시 onChange 호출 ── */
     const rowsSetter = useCallback<React.Dispatch<React.SetStateAction<SearchRowConfig[]>>>(
@@ -188,9 +190,9 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
     /** 추가 버튼 비활성화 여부 */
     const isAddDisabled = (): boolean => {
         if (!pendingType || !pendingValues) return true;
-        const { label, label2, fieldKey, codeGroupCode, options } = pendingValues;
-        if (!label.trim() || !fieldKey?.trim()) return true;
-        if (pendingType === 'dateRange' && !label2?.trim()) return true;
+        const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options } = pendingValues;
+        if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
+        if (pendingType === 'dateRange' && (!label2?.trim() && !label2MsgKey?.trim())) return true;
         if (needsOptions(pendingType)) {
             const hasCodeGroup = !!codeGroupCode;
             const hasOptions = !!options?.some(o => o.trim());
@@ -205,7 +207,9 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
         if (isAddDisabled()) return;
 
         const {
-            label, label2, fieldKey, placeholder,
+            label, labelMsgKey, label2, label2MsgKey,
+            fieldKey, placeholder, placeholderMsgKey,
+            description, descriptionMsgKey,
             colSpan, required, options, codeGroupCode, multiSelect,
             minLength, maxLength, pattern, patternDesc, minSelect, maxSelect,
         } = pendingValues;
@@ -214,9 +218,14 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             id: uid(),
             type: pendingType,
             label: label.trim(),
+            labelMsgKey: labelMsgKey?.trim() || undefined,
             label2: pendingType === 'dateRange' ? label2?.trim() : undefined,
+            label2MsgKey: pendingType === 'dateRange' ? (label2MsgKey?.trim() || undefined) : undefined,
             fieldKey: fieldKey?.trim() || undefined,
             placeholder: placeholder?.trim() || (pendingType === 'input' ? '입력하세요' : pendingType === 'select' ? '전체' : ''),
+            placeholderMsgKey: placeholderMsgKey?.trim() || undefined,
+            description: description?.trim() || undefined,
+            descriptionMsgKey: descriptionMsgKey?.trim() || undefined,
             colSpan: colSpan as 1|2|3|4|5,
             required: required || undefined,
             options: options?.length ? options : undefined,
@@ -342,7 +351,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                     </span>
                                                                     <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">{field.type}</span>
                                                                     <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
-                                                                        {field.type === 'dateRange' ? `${field.label} ~ ${field.label2 || ''}` : field.label}
+                                                                        {field.type === 'dateRange'
+                                                                            ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
+                                                                            : (field.labelMsgKey ? t(field.labelMsgKey) : field.label)
+                                                                        }
                                                                     </span>
                                                                     {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
                                                                     {field.colSpan > 1 && <span className="text-[10px] text-slate-400">×{field.colSpan}</span>}
@@ -360,22 +372,26 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                         {renderFieldComponent(
                                                                             field.type,
                                                                             {
-                                                                                label:         field.label,
-                                                                                label2:        field.label2,
-                                                                                fieldKey:      field.fieldKey || '',
-                                                                                colSpan:       field.colSpan,
-                                                                                placeholder:   field.placeholder,
-                                                                                description:   field.description,
-                                                                                required:      field.required,
-                                                                                options:       field.options,
-                                                                                codeGroupCode: field.codeGroupCode,
-                                                                                multiSelect:   field.multiSelect,
-                                                                                minLength:     field.minLength,
-                                                                                maxLength:     field.maxLength,
-                                                                                pattern:       field.pattern,
-                                                                                patternDesc:   field.patternDesc,
-                                                                                minSelect:     field.minSelect,
-                                                                                maxSelect:     field.maxSelect,
+                                                                                label:              field.label,
+                                                                                labelMsgKey:        field.labelMsgKey,
+                                                                                label2:             field.label2,
+                                                                                label2MsgKey:       field.label2MsgKey,
+                                                                                fieldKey:           field.fieldKey || '',
+                                                                                colSpan:            field.colSpan,
+                                                                                placeholder:        field.placeholder,
+                                                                                placeholderMsgKey:  field.placeholderMsgKey,
+                                                                                description:        field.description,
+                                                                                descriptionMsgKey:  field.descriptionMsgKey,
+                                                                                required:           field.required,
+                                                                                options:            field.options,
+                                                                                codeGroupCode:      field.codeGroupCode,
+                                                                                multiSelect:        field.multiSelect,
+                                                                                minLength:          field.minLength,
+                                                                                maxLength:          field.maxLength,
+                                                                                pattern:            field.pattern,
+                                                                                patternDesc:        field.patternDesc,
+                                                                                minSelect:          field.minSelect,
+                                                                                maxSelect:          field.maxSelect,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

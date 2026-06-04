@@ -24,10 +24,11 @@ export interface PageWidgetItem {
 
 /** 팝업 템플릿 설정 파싱 결과 */
 export interface TemplatePopupConfig {
-    outputMode:  'page' | 'layerpopup';
-    layerType?:  'center' | 'right';
-    layerTitle?: string;
-    layerWidth?: 'sm' | 'md' | 'lg' | 'xl';
+    outputMode:       'page' | 'layerpopup';
+    layerType?:       'center' | 'right';
+    layerTitle?:      string;
+    layerTitleMsgKey?: string;
+    layerWidth?:      'sm' | 'md' | 'lg' | 'xl';
     /** 위젯 목록 — PageWidgetItem[] 구조 (PageGridRenderer에 바로 사용) */
     widgetItems: PageWidgetItem[];
 }
@@ -79,10 +80,11 @@ export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupCo
     }
 
     return {
-        outputMode: raw.outputMode || 'page',
-        layerType:  raw.layerType  || 'center',
-        layerTitle: raw.layerTitle || '',
-        layerWidth: raw.layerWidth || 'md',
+        outputMode:       raw.outputMode       || 'page',
+        layerType:        raw.layerType        || 'center',
+        layerTitle:       raw.layerTitle       || '',
+        layerTitleMsgKey: raw.layerTitleMsgKey || '',
+        layerWidth:       raw.layerWidth       || 'md',
         widgetItems,
     };
 }

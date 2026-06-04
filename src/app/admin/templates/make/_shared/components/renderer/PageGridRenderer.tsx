@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * PageGridRenderer — widgetItems 배열을 outer+inner 그리드로 렌더링하는 공통 컴포넌트
@@ -19,7 +19,7 @@
  */
 
 import { getSpaceGridColumn } from '../../utils';
-import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/GridCell';
+import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from './WidgetRenderer';
 import type { AnyWidget, RendererMode } from './types';
 import type { CodeGroupDef } from '../../types';

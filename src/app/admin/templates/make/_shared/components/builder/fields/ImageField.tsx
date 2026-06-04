@@ -10,9 +10,10 @@ export const ImageField = (props: FieldEditProps) => {
     const { values, onChange } = props;
 
     return (
-        <FieldBase {...props} onChange={onChange} label={values.label} fieldKey={values.fieldKey} colSpan={values.colSpan} rowSpan={values.rowSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
+        <FieldBase {...props} onChange={onChange} label={values.label} labelMsgKey={values.labelMsgKey} fieldKey={values.fieldKey} colSpan={values.colSpan} rowSpan={values.rowSpan} colSpanMode={props.colSpanMode} isPk={values.isPk}
                 required={values.required}
                 description={values.description}
+                descriptionMsgKey={values.descriptionMsgKey}
         readonly={values.readonly}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">이미지 등록 설정</p>

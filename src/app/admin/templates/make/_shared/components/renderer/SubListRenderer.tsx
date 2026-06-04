@@ -27,6 +27,7 @@ import { RendererContainer } from './RendererContainer';
 import { FieldRenderer } from './FieldRenderer';
 import type { RendererMode, SubListWidget, SubListColumn } from './types';
 import type { SearchFieldConfig, CodeGroupDef } from '../../types';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* 파일 업로드가 필요한 컬럼 타입 */
 const FILE_COL_TYPES = ['file', 'image'] as const;
@@ -63,6 +64,7 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
         label: '',
         colSpan: 1,
         placeholder: col.placeholder,
+        placeholderMsgKey: col.placeholderMsgKey,
         options: col.options,
         codeGroupCode: col.codeGroup,
         required: col.required,
@@ -82,6 +84,7 @@ export function SubListRenderer({
     onFileChange: externalOnFileChange,
 }: SubListRendererProps) {
     const visibleColumns = widget.columns;
+    const { t } = useI18n();
 
     /* 공통코드 목록 */
     const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
@@ -213,8 +216,10 @@ export function SubListRenderer({
         onChange?.(updated);
     }, [rows, onChange, visibleColumns]);
 
-    /* addButtonLabel 기본값 */
-    const addLabel = widget.addButtonLabel ?? '추가';
+    /* addButtonLabel — MsgKey 우선, 없으면 직접 텍스트, 없으면 기본값 */
+    const addLabel = widget.addButtonLabelMsgKey
+        ? t(widget.addButtonLabelMsgKey)
+        : (widget.addButtonLabel ?? '추가');
 
     /* preview 모드 — 빈 샘플 행 1개 표시 */
     const previewRows: SubListRow[] = [{ _rowId: 'preview-1' }];
@@ -229,9 +234,9 @@ export function SubListRenderer({
 
                     {/* 왼쪽: 타이틀 + 행 수 */}
                     <div className="flex items-center gap-2 min-w-0">
-                        {widget.title && (
+                        {(widget.titleMsgKey || widget.title) && (
                             <span className="text-sm font-semibold text-slate-800 truncate">
-                                {widget.title}
+                                {widget.titleMsgKey ? t(widget.titleMsgKey) : widget.title}
                             </span>
                         )}
                         <span className="text-xs text-slate-400 font-medium whitespace-nowrap">
@@ -264,7 +269,7 @@ export function SubListRenderer({
                                         className="px-3 py-2 text-left font-semibold text-slate-600 whitespace-nowrap"
                                         style={{ minWidth: 80 }}
                                     >
-                                        {col.label}
+                                        {col.labelMsgKey ? t(col.labelMsgKey) : col.label}
                                         {col.required && (
                                             <span className="ml-0.5 text-red-500">*</span>
                                         )}

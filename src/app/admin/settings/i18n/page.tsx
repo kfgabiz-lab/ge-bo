@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import PageLayout from '@/components/layout/PageLayout';
-import { GridCell } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type {
     SearchWidget,
@@ -10,9 +10,9 @@ import type {
 } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { TableWidget } from '@/app/admin/templates/make/_shared/components/builder/TableBuilder';
 import type { TableActionHandlers } from '@/app/admin/templates/make/_shared/components/renderer/types';
-import { useMessageResourceStore, MessageResource } from '@/store/useMessageResourceStore';
-import { MessageResourceDrawer } from '@/components/i18n/MessageResourceDrawer';
-import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { useMessageResourceStore, MessageResource } from '@/store/use-message-resource-store';
+import { MessageResourceDrawer } from '@/components/i18n/message-resource-drawer';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 /* ── 상수 ── */
 
@@ -27,12 +27,13 @@ const SEARCH_WIDGET: SearchWidget = {
     rows: [
         {
             id: 'r1',
-            cols: 4,
+            cols: 5,
             fields: [
                 { id: 'f1', type: 'input',  label: 'Key',     colSpan: 1, placeholder: 'Key 검색' },
                 { id: 'f2', type: 'input',  label: '한국어', colSpan: 1, placeholder: '한국어 검색' },
                 { id: 'f3', type: 'input',  label: '영어',   colSpan: 1, placeholder: '영어 검색' },
-                { id: 'f4', type: 'select', label: '사용여부', colSpan: 1, options: ['전체', '사용', '미사용'] },
+                { id: 'f4', type: 'select', label: '유형',   colSpan: 1, options: ['전체', '단어', '문장'] },
+                { id: 'f5', type: 'select', label: '사용여부', colSpan: 1, options: ['전체', '사용', '미사용'] },
             ],
         },
     ],
@@ -63,21 +64,28 @@ const TABLE_WIDGET: TableWidget = {
     columns: [
         { id: 'c1', header: 'Key',     accessor: 'key',       cellType: 'text',    align: 'left',   sortable: true,  width: 200 },
         { id: 'c2', header: '한국어', accessor: 'ko',        cellType: 'text',    align: 'left',   sortable: false },
-        { id: 'c3', header: '영어',   accessor: 'en',        cellType: 'text',    align: 'left',   sortable: false },
+        { id: 'c3', header: '영어',   accessor: 'en',           cellType: 'text',    align: 'left',   sortable: false },
         {
-            id: 'c4', header: '사용여부', accessor: 'active', cellType: 'badge',   align: 'center', sortable: false, width: 90,
+            id: 'c4', header: '유형', accessor: 'resourceType', cellType: 'badge',   align: 'center', sortable: false, width: 80,
+            cellOptions: [
+                { value: 'WORD',     text: '단어', color: 'blue'   },
+                { value: 'SENTENCE', text: '문장', color: 'purple' },
+            ],
+        },
+        {
+            id: 'c5', header: '사용여부', accessor: 'active', cellType: 'badge',   align: 'center', sortable: false, width: 90,
             cellOptions: [
                 { value: 'true',  text: '사용',   color: 'green' },
                 { value: 'false', text: '미사용', color: 'gray'  },
             ],
         },
-        { id: 'c5', header: '등록일', accessor: 'createdAt', cellType: 'text',    align: 'center', sortable: true,  width: 160 },
-        { id: 'c6', header: '관리',   accessor: '_actions',  cellType: 'actions', align: 'center', sortable: false, width: 100, actions: ['edit', 'delete'] },
+        { id: 'c6', header: '등록일', accessor: 'createdAt', cellType: 'text',    align: 'center', sortable: true,  width: 160 },
+        { id: 'c7', header: '관리',   accessor: '_actions',  cellType: 'actions', align: 'center', sortable: false, width: 100, actions: ['edit', 'delete'] },
     ],
 };
 
 /** 검색 필드 초기값 */
-const INITIAL_SEARCH: Record<string, string> = { f1: '', f2: '', f3: '', f4: '전체' };
+const INITIAL_SEARCH: Record<string, string> = { f1: '', f2: '', f3: '', f4: '전체', f5: '전체' };
 
 /* ── 페이지 컴포넌트 ── */
 
@@ -100,12 +108,13 @@ export default function I18nPage() {
 
     /* 검색 파라미터 → fetchItems 호출용 변환 */
     const buildSearchParams = useCallback((search: Record<string, string>, page: number) => ({
-        key:    search.f1 ?? '',
-        ko:     search.f2 ?? '',
-        en:     search.f3 ?? '',
-        active: search.f4 ?? '전체',
+        key:          search.f1 ?? '',
+        ko:           search.f2 ?? '',
+        en:           search.f3 ?? '',
+        resourceType: search.f4 ?? '전체',
+        active:       search.f5 ?? '전체',
         page,
-        size:   PAGE_SIZE,
+        size:         PAGE_SIZE,
     }), []);
 
     /* 페이지 진입 시 목록 조회 */
@@ -171,12 +180,13 @@ export default function I18nPage() {
     /* 테이블 데이터 — active를 string으로 변환 (badge cellType 호환) */
     const tableData = useMemo(() =>
         items.map(item => ({
-            _id:       item.id,
-            key:       item.key,
-            ko:        item.ko,
-            en:        item.en ?? '',
-            active:    String(item.active),
-            createdAt: item.createdAt ? item.createdAt.replace('T', ' ').substring(0, 16) : '',
+            _id:          item.id,
+            key:          item.key,
+            ko:           item.ko,
+            en:           item.en ?? '',
+            resourceType: item.resourceType ?? 'WORD',
+            active:       String(item.active),
+            createdAt:    item.createdAt ? item.createdAt.replace('T', ' ').substring(0, 16) : '',
         })) as unknown as Record<string, unknown>[],
     [items]);
 

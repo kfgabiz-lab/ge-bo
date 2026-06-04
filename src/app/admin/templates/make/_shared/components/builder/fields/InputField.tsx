@@ -13,18 +13,25 @@ import React from 'react';
 import { FieldEditProps } from './types';
 import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { ValidationSection } from '../../ValidationSection';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
 export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
+    const { i18nMode } = useBuilderI18nMode();
+
     return (
         <div className="space-y-1.5">
             <FieldBase
-                label={values.label} fieldKey={values.fieldKey}
+                label={values.label}
+                labelMsgKey={values.labelMsgKey}
+                fieldKey={values.fieldKey}
                 colSpan={values.colSpan} colSpanMode={colSpanMode}
                 rowSpan={values.rowSpan} rowSpanConfig={rowSpanConfig}
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}
                 isPk={values.isPk}
                 required={values.required}
                 description={values.description}
+                descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
@@ -32,9 +39,18 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
             {/* Placeholder */}
             <div>
                 <label className={LABEL_CLS}>Placeholder</label>
-                <input type="text" value={values.placeholder || ''}
-                    onChange={e => onChange({ placeholder: e.target.value })}
-                    className={INPUT_CLS} />
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={values.placeholderMsgKey ?? ''}
+                        onChange={key => onChange({ placeholderMsgKey: key })}
+                        resourceType="SENTENCE"
+                        size="sm"
+                    />
+                ) : (
+                    <input type="text" value={values.placeholder || ''}
+                        onChange={e => onChange({ placeholder: e.target.value })}
+                        className={INPUT_CLS} />
+                )}
             </div>
             {/* 유효성검사 (필수항목 + 최소/최대 글자 + 정규식) */}
             <ValidationSection

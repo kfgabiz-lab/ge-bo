@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * ============================================================
@@ -16,6 +16,7 @@ import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
+
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
 import { TemplateLoader } from '../_shared/components/builder/TemplateLoader';
 import { PageGridRenderer } from '../_shared/components/renderer';
@@ -24,7 +25,7 @@ import { toSlug } from '../_shared/utils';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem } from '../_shared/types';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
-import PageLayout from '@/components/layout/PageLayout';
+import PageLayout from '@/components/layout/page-layout';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -237,21 +238,23 @@ export default function QuickListBuilderPage() {
                                     onToggle={() => setEditingContentId(editingContentId === 'fixed-search' ? null : 'fixed-search')}
                                 />
                                 {editingContentId === 'fixed-search' && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50">
-                                        <SizeSettingPanel
-                                            colSpan={searchContent.colSpan}
-                                            rowSpan={searchContent.rowSpan}
-                                            onColSpanChange={(v: number) => updateSize(setSearchContent, v, searchContent.rowSpan)}
-                                            onRowSpanChange={(v: number) => updateSize(setSearchContent, searchContent.colSpan, v)}
-                                        />
-                                        <div className="px-3 pb-2 pt-1">
-                                            <CommonBuilderDispatcher
-                                                widget={searchContent.widget}
-                                                onChange={w => setSearchContent(prev => ({ ...prev, widget: w as typeof searchContent.widget }))}
-                                                context={{ slugOptions, pageTemplates }}
+
+                                        <div className="border-t border-slate-100 bg-slate-50/50">
+                                            <SizeSettingPanel
+                                                colSpan={searchContent.colSpan}
+                                                rowSpan={searchContent.rowSpan}
+                                                onColSpanChange={(v: number) => updateSize(setSearchContent, v, searchContent.rowSpan)}
+                                                onRowSpanChange={(v: number) => updateSize(setSearchContent, searchContent.colSpan, v)}
                                             />
+                                            <div className="px-3 pb-2 pt-1">
+                                                <CommonBuilderDispatcher
+                                                    widget={searchContent.widget}
+                                                    onChange={w => setSearchContent(prev => ({ ...prev, widget: w as typeof searchContent.widget }))}
+                                                    context={{ slugOptions, pageTemplates }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+
                                 )}
                             </div>
 
@@ -267,21 +270,23 @@ export default function QuickListBuilderPage() {
                                     onToggle={() => setEditingContentId(editingContentId === 'fixed-space' ? null : 'fixed-space')}
                                 />
                                 {editingContentId === 'fixed-space' && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50">
-                                        <SizeSettingPanel
-                                            colSpan={spaceContent.colSpan}
-                                            rowSpan={spaceContent.rowSpan}
-                                            onColSpanChange={(v: number) => updateSize(setSpaceContent, v, spaceContent.rowSpan)}
-                                            onRowSpanChange={(v: number) => updateSize(setSpaceContent, spaceContent.colSpan, v)}
-                                        />
-                                        <div className="px-3 pb-2 pt-1">
-                                            <CommonBuilderDispatcher
-                                                widget={spaceContent.widget}
-                                                onChange={w => setSpaceContent(prev => ({ ...prev, widget: w as typeof spaceContent.widget }))}
-                                                context={{ slugOptions, pageTemplates, actionButtonOnly: true }}
+
+                                        <div className="border-t border-slate-100 bg-slate-50/50">
+                                            <SizeSettingPanel
+                                                colSpan={spaceContent.colSpan}
+                                                rowSpan={spaceContent.rowSpan}
+                                                onColSpanChange={(v: number) => updateSize(setSpaceContent, v, spaceContent.rowSpan)}
+                                                onRowSpanChange={(v: number) => updateSize(setSpaceContent, spaceContent.colSpan, v)}
                                             />
+                                            <div className="px-3 pb-2 pt-1">
+                                                <CommonBuilderDispatcher
+                                                    widget={spaceContent.widget}
+                                                    onChange={w => setSpaceContent(prev => ({ ...prev, widget: w as typeof spaceContent.widget }))}
+                                                    context={{ slugOptions, pageTemplates, actionButtonOnly: true }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+
                                 )}
                             </div>
 
@@ -297,28 +302,30 @@ export default function QuickListBuilderPage() {
                                     onToggle={() => setEditingContentId(editingContentId === 'fixed-table' ? null : 'fixed-table')}
                                 />
                                 {editingContentId === 'fixed-table' && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50">
-                                        <SizeSettingPanel
-                                            colSpan={tableContent.colSpan}
-                                            rowSpan={tableContent.rowSpan}
-                                            onColSpanChange={(v: number) => updateSize(setTableContent, v, tableContent.rowSpan)}
-                                            onRowSpanChange={(v: number) => updateSize(setTableContent, tableContent.colSpan, v)}
-                                        />
-                                        <div className="px-3 pb-2 pt-1">
-                                            <CommonBuilderDispatcher
-                                                widget={tableContent.widget}
-                                                onChange={w => setTableContent(prev => ({ ...prev, widget: w as typeof tableContent.widget }))}
-                                                context={{
-                                                    slugOptions,
-                                                    pageTemplates,
-                                                    searchWidgets: [{
-                                                        widgetId: searchContent.widget.widgetId,
-                                                        contentKey: searchContent.widget.contentKey,
-                                                    }],
-                                                }}
+
+                                        <div className="border-t border-slate-100 bg-slate-50/50">
+                                            <SizeSettingPanel
+                                                colSpan={tableContent.colSpan}
+                                                rowSpan={tableContent.rowSpan}
+                                                onColSpanChange={(v: number) => updateSize(setTableContent, v, tableContent.rowSpan)}
+                                                onRowSpanChange={(v: number) => updateSize(setTableContent, tableContent.colSpan, v)}
                                             />
+                                            <div className="px-3 pb-2 pt-1">
+                                                <CommonBuilderDispatcher
+                                                    widget={tableContent.widget}
+                                                    onChange={w => setTableContent(prev => ({ ...prev, widget: w as typeof tableContent.widget }))}
+                                                    context={{
+                                                        slugOptions,
+                                                        pageTemplates,
+                                                        searchWidgets: [{
+                                                            widgetId: searchContent.widget.widgetId,
+                                                            contentKey: searchContent.widget.contentKey,
+                                                        }],
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+
                                 )}
                             </div>
                         </div>

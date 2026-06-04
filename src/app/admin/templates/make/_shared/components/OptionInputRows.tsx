@@ -1,30 +1,46 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 
 interface OptionInputRowsProps {
     /** { text, value } 형식의 옵션 목록 */
     options: { text: string; value: string }[];
     /** 옵션 목록 변경 핸들러 */
     onChange: (options: { text: string; value: string }[]) => void;
+    /**
+     * 다국어 모드 — true 시 텍스트 입력란을 MessageKeySelector로 전환
+     * 선택한 msgKey가 text 부분에 저장되고 렌더러에서 t(text)로 표시됨
+     */
+    i18nMode?: boolean;
 }
 
 /**
  * text:value 형식의 옵션 입력 행 컴포넌트 (select/radio/checkbox 공통)
  * - 1개 이하일 때 삭제 버튼 disabled
- * @example <OptionInputRows options={opts} onChange={setOpts} />
+ * - i18nMode=true: 텍스트 입력 → MessageKeySelector (다국어 키 선택)
+ * @example <OptionInputRows options={opts} onChange={setOpts} i18nMode={i18nMode} />
  */
-export const OptionInputRows = ({ options, onChange }: OptionInputRowsProps) => (
+export const OptionInputRows = ({ options, onChange, i18nMode = false }: OptionInputRowsProps) => (
     <div className="space-y-1.5">
         {options.map((opt, i) => (
             <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-1">
-                <input
-                    type="text"
-                    placeholder="텍스트"
-                    value={opt.text}
-                    onChange={e => onChange(options.map((o, j) => j === i ? { ...o, text: e.target.value } : o))}
-                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
-                />
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={opt.text}
+                        onChange={key => onChange(options.map((o, j) => j === i ? { ...o, text: key } : o))}
+                        resourceType="WORD"
+                        size="sm"
+                    />
+                ) : (
+                    <input
+                        type="text"
+                        placeholder="텍스트"
+                        value={opt.text}
+                        onChange={e => onChange(options.map((o, j) => j === i ? { ...o, text: e.target.value } : o))}
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                    />
+                )}
                 <span className="text-slate-300 text-xs px-0.5">:</span>
                 <input
                     type="text"

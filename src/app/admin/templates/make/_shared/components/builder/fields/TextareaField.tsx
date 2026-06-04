@@ -28,6 +28,8 @@ export function TextareaField({
     return (
         <FieldBase
             label={values.label}
+            labelMsgKey={values.labelMsgKey}
+            descriptionMsgKey={values.descriptionMsgKey}
             fieldKey={values.fieldKey || ''}
             colSpan={values.colSpan}
             colSpanMode={colSpanMode}

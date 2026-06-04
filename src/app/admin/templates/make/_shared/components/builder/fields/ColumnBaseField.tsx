@@ -16,6 +16,8 @@
 import React from 'react';
 import { ColEditProps } from './col-types';
 import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
 interface ColumnBaseFieldProps extends ColEditProps {
     /** 추가 모드: 헤더명 input 자동 포커스 */
@@ -24,6 +26,7 @@ interface ColumnBaseFieldProps extends ColEditProps {
 
 export function ColumnBaseField({ values, onChange, autoFocus }: ColumnBaseFieldProps) {
     const isActions = values.cellType === 'actions';
+    const { i18nMode } = useBuilderI18nMode();
 
     return (
         <div className="space-y-2">
@@ -32,13 +35,22 @@ export function ColumnBaseField({ values, onChange, autoFocus }: ColumnBaseField
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className={LABEL_CLS}>헤더명 <span className="text-red-400">*</span></label>
-                        <input
-                            type="text"
-                            value={values.header ?? ''}
-                            autoFocus={autoFocus}
-                            onChange={e => onChange({ header: e.target.value })}
-                            className={INPUT_CLS}
-                        />
+                        {i18nMode ? (
+                            <MessageKeySelector
+                                value={values.headerMsgKey ?? ''}
+                                onChange={key => onChange({ headerMsgKey: key })}
+                                resourceType="WORD"
+                                size="sm"
+                            />
+                        ) : (
+                            <input
+                                type="text"
+                                value={values.header ?? ''}
+                                autoFocus={autoFocus}
+                                onChange={e => onChange({ header: e.target.value })}
+                                className={INPUT_CLS}
+                            />
+                        )}
                     </div>
                     <div>
                         <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * 데이터베이스 테이블 조회 페이지
@@ -6,8 +6,8 @@
  * - 오른쪽: 선택한 테이블의 컬럼 상세 정보
  */
 
-import { TableList } from '@/components/database/TableList';
-import { TableColumns } from '@/components/database/TableColumns';
+import { TableList } from '@/components/database/table-list';
+import { TableColumns } from '@/components/database/table-columns';
 
 export default function DatabaseTablesPage() {
     return (

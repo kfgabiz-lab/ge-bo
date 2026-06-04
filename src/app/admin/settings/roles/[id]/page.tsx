@@ -4,11 +4,12 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import PageLayout from '@/components/layout/PageLayout';
-import { GridCell } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { SpaceWidget } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 타입 ── */
 
@@ -26,39 +27,12 @@ interface Role {
 
 const COLOR_PRESETS = ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6b7280'];
 
-/** 공간영역 위젯 — 취소 / 저장 버튼 */
-const SPACE_WIDGET: SpaceWidget = {
-    type: 'space',
-    widgetId: 'roles-detail-space',
-    align: 'right',
-    showBorder: false,
-    items: [
-        {
-            id: 's1',
-            type: 'action-button',
-            label: '취소',
-            colSpan: 1,
-            color: 'gray',
-            connType: 'close',
-        },
-        {
-            id: 's2',
-            type: 'action-button',
-            label: '저장',
-            colSpan: 1,
-            color: 'black',
-            connType: 'content',
-            connectedContentWidgetIds: ['roles-detail-form'],
-            contentAction: 'save',
-        },
-    ],
-};
-
 /* ── 페이지 컴포넌트 ── */
 
 export default function RolesDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const { t } = useI18n();
     const id = params.id as string;
     const isNew = id === 'new';
 
@@ -73,50 +47,78 @@ export default function RolesDetailPage() {
         color: COLOR_PRESETS[0],
     });
 
-    /* FormWidget — isNew에 따라 코드 필드 readonly 결정 */
+    /** 공간영역 위젯 — 취소 / 저장 버튼 */
+    const SPACE_WIDGET: SpaceWidget = useMemo(() => ({
+        type: 'space',
+        widgetId: 'roles-detail-space',
+        align: 'right',
+        showBorder: false,
+        items: [
+            {
+                id: 's1',
+                type: 'action-button',
+                label: t('common.btn.cancel'),
+                colSpan: 1,
+                color: 'gray',
+                connType: 'close',
+            },
+            {
+                id: 's2',
+                type: 'action-button',
+                label: t('common.btn.save'),
+                colSpan: 1,
+                color: 'black',
+                connType: 'content',
+                connectedContentWidgetIds: ['roles-detail-form'],
+                contentAction: 'save',
+            },
+        ],
+    }), [t]);
+
+    /** 기본 정보 폼 위젯 */
     const FORM_WIDGET: FormWidget = useMemo(() => ({
         type: 'form',
         widgetId: 'roles-detail-form',
         contentKey: 'rolesDetailForm',
-        title: isNew ? '권한 등록' : '권한 수정',
-        description: '필수 입력 항목은 * 로 표시됩니다.',
+        title: isNew ? t('role.title.new') : t('role.title.edit'),
+        description: t('admin.description'),
         showBorder: true,
         fields: [
             {
                 id: 'code',
                 type: 'input',
-                label: '권한 코드',
+                label: t('role.label.code'),
                 colSpan: 6,
                 rowSpan: 1,
                 required: isNew,
                 fieldKey: 'code',
                 placeholder: 'SUPER_ADMIN',
-                description: '영문 대문자, 숫자, _만 사용 가능합니다.',
+                description: t('validation.code.code.format'),
                 readonly: !isNew,
             },
             {
                 id: 'displayName',
                 type: 'input',
-                label: '표시명',
+                label: t('common.label.displayName'),
                 colSpan: 6,
                 rowSpan: 1,
                 required: true,
                 fieldKey: 'displayName',
-                placeholder: '표시명 입력',
+                placeholder: t('role.placeholder.displayName'),
             },
             {
                 id: 'description',
                 type: 'input',
-                label: '설명',
+                label: t('common.label.description'),
                 colSpan: 12,
                 rowSpan: 1,
                 fieldKey: 'description',
-                placeholder: '권한 설명 (선택)',
+                placeholder: t('role.placeholder.description'),
             },
             {
                 id: 'color',
                 type: 'color',
-                label: '색상',
+                label: t('common.label.color'),
                 colSpan: 12,
                 rowSpan: 1,
                 required: true,
@@ -124,7 +126,7 @@ export default function RolesDetailPage() {
                 options: COLOR_PRESETS,
             },
         ],
-    }), [isNew]);
+    }), [isNew, t]);
 
     /* 수정 모드: 기존 데이터 로드 */
     useEffect(() => {
@@ -141,14 +143,14 @@ export default function RolesDetailPage() {
                     color: role.color ?? COLOR_PRESETS[0],
                 });
             } catch {
-                toast.error('권한 정보를 불러오지 못했습니다.');
+                toast.error(t('role.error.load'));
                 router.back();
             } finally {
                 setLoading(false);
             }
         };
         load();
-    }, [id, isNew, router]);
+    }, [id, isNew, router, t]);
 
     /* 폼 필드 변경 핸들러 */
     const handleFormChange = useCallback((fieldId: string, value: string) => {
@@ -161,15 +163,15 @@ export default function RolesDetailPage() {
 
         /* 클라이언트 유효성 검증 */
         if (isNew && !formValues.code?.trim()) {
-            toast.error('권한 코드를 입력해주세요.');
+            toast.error(t('validation.role.code.required'));
             return;
         }
         if (!formValues.displayName?.trim()) {
-            toast.error('표시명을 입력해주세요.');
+            toast.error(t('validation.role.displayName.required'));
             return;
         }
         if (!formValues.color) {
-            toast.error('색상을 선택해주세요.');
+            toast.error(t('validation.role.color.required'));
             return;
         }
 
@@ -182,28 +184,28 @@ export default function RolesDetailPage() {
                     description: formValues.description || null,
                     color: formValues.color,
                 });
-                toast.success('권한이 등록되었습니다.');
+                toast.success(t('role.created'));
             } else {
                 await api.patch(`/roles/${id}`, {
                     displayName: formValues.displayName,
                     description: formValues.description || null,
                     color: formValues.color,
                 });
-                toast.success('권한이 수정되었습니다.');
+                toast.success(t('role.updated'));
             }
             router.push('/admin/settings/roles');
         } catch (e: unknown) {
             const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '저장 중 오류가 발생했습니다.');
+            toast.error(msg ?? t('admin.error.save'));
         } finally {
             setSaving(false);
         }
-    }, [formValues, id, isNew, router, saving]);
+    }, [formValues, id, isNew, router, saving, t]);
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <span className="text-sm text-slate-400">불러오는 중...</span>
+                <span className="text-sm text-slate-400">{t('common.loading')}</span>
             </div>
         );
     }
@@ -221,7 +223,7 @@ export default function RolesDetailPage() {
                 />
             </GridCell>
 
-            {/* 공간영역 — 취소/저장 버튼 (align:'right', 버튼 2개 → 11번째 칸부터 2칸 배치) */}
+            {/* 공간영역 — 취소/저장 버튼 */}
             <GridCell colSpan={2} colStart={11} rowSpan={1}>
                 <WidgetRenderer
                     mode="live"

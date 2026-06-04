@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * TableRenderer — 테이블 전체 렌더러 (헤더 + 바디)
@@ -39,6 +39,7 @@
 
 import { useRef, useEffect } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import { TableCellRenderer } from './TableCellRenderer';
 import { RendererContainer } from './RendererContainer';
@@ -101,6 +102,7 @@ export function TableRenderer({
 }: TableRendererProps) {
     const isPreview = mode === 'preview';
     const isScroll = (displayMode ?? 'pagination') === 'scroll';
+    const { t } = useI18n();
 
     /* 무한스크롤 sentinel — scroll+live 모드 스크롤 컨테이너 내부에 배치 */
     const sentinelRef = useRef<HTMLDivElement>(null);
@@ -190,17 +192,15 @@ export function TableRenderer({
             {/* 총 건수 / 표시 범위 (preview: 샘플값, live: 실제값) */}
             <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
                 <p className="text-xs text-slate-500">
-                    중 <span className="font-semibold text-slate-700">
-                        {isPreview ? '00' : totalElements.toLocaleString()}
-                    </span>건
+                    {t('common.pagination.total', { count: isPreview ? '00' : totalElements.toLocaleString() })}
                 </p>
                 <p className="text-xs text-slate-400">
                     {isPreview
-                        ? `1–${pageSize} 표시 중`
+                        ? t('common.pagination.showing', { start: '1', end: String(pageSize) })
                         : totalElements > 0
                             ? isScroll
-                                ? `1–${Math.min((currentPage + 1) * (pageSize || DEFAULT_PAGE_SIZE), totalElements)} 표시 중`
-                                : `${currentPage * (pageSize || DEFAULT_PAGE_SIZE) + 1}–${Math.min((currentPage + 1) * (pageSize || DEFAULT_PAGE_SIZE), totalElements)} 표시 중`
+                                ? t('common.pagination.showing', { start: '1', end: String(Math.min((currentPage + 1) * (pageSize || DEFAULT_PAGE_SIZE), totalElements)) })
+                                : t('common.pagination.showing', { start: String(currentPage * (pageSize || DEFAULT_PAGE_SIZE) + 1), end: String(Math.min((currentPage + 1) * (pageSize || DEFAULT_PAGE_SIZE), totalElements)) })
                             : ''
                     }
                 </p>
@@ -239,12 +239,12 @@ export function TableRenderer({
                                             } : undefined}
                                             className={`flex items-center justify-center gap-1 w-full transition-colors ${isPreview ? 'cursor-default' : 'hover:text-slate-900'}`}
                                         >
-                                            {col.header || (col.cellType === 'actions' ? '액션' : '—')}
+                                            {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
                                             <SortIcon sorted={isPreview ? false : (sortKey === col.accessor ? sortDir : false)} />
                                         </button>
                                     ) : (
                                         <span className="flex items-center justify-center gap-1">
-                                            {col.header || (col.cellType === 'actions' ? '액션' : '—')}
+                                            {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
                                         </span>
                                     )}
                                 </th>
@@ -327,12 +327,12 @@ export function TableRenderer({
                         {hasMore ? (
                             <div className="flex flex-col items-center gap-2">
                                 <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
-                                <span className="text-[10px] text-slate-400 font-medium tracking-tight">항목 더 불러오는 중...</span>
+                                <span className="text-[10px] text-slate-400 font-medium tracking-tight">{t('common.pagination.loading_more')}</span>
                             </div>
                         ) : data.length > 0 ? (
                             <div className="py-2">
                                 <span className="text-[10px] text-slate-400 font-medium bg-slate-50 px-4 py-1.5 rounded-full border border-slate-100 shadow-sm">
-                                    모든 항목을 불러왔습니다 (총 {totalElements.toLocaleString()}건)
+                                    {t('common.pagination.all_loaded', { count: totalElements.toLocaleString() })}
                                 </span>
                             </div>
                         ) : null}
@@ -358,7 +358,7 @@ export function TableRenderer({
                         onClick={() => onPageChange?.(currentPage - 1)}
                         className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
-                        이전
+                        {t('common.btn.prev')}
                     </button>
                     {isPreview ? (
                         /* preview: 샘플 페이지 버튼 3개 (1번 활성) */
@@ -390,7 +390,7 @@ export function TableRenderer({
                         onClick={() => onPageChange?.(currentPage + 1)}
                         className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
-                        다음
+                        {t('common.btn.next')}
                     </button>
                 </div>
             )}

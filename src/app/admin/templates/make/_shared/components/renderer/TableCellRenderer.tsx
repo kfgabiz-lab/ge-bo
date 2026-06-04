@@ -18,6 +18,7 @@
 
 import React from 'react';
 import { Pencil, Eye, Trash2, Paperclip } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
 
@@ -73,6 +74,7 @@ export function TableCellRenderer({
     handlers,
 }: TableCellRendererProps) {
     const isPreview = mode === 'preview';
+    const { t } = useI18n();
     const value = row[col.accessor];
 
     switch (col.cellType) {
@@ -113,7 +115,10 @@ export function TableCellRenderer({
             const boolVal = isPreview ? (rowIndex % 2 === 0) : Boolean(value);
             return (
                 <span className={`text-sm ${boolVal ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
-                    {boolVal ? (col.trueText || '공개') : (col.falseText || '비공개')}
+                    {boolVal
+                        ? (col.trueTextMsgKey ? t(col.trueTextMsgKey) : (col.trueText || '공개'))
+                        : (col.falseTextMsgKey ? t(col.falseTextMsgKey) : (col.falseText || '비공개'))
+                    }
                 </span>
             );
         }

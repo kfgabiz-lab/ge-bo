@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * ============================================================
@@ -15,6 +15,7 @@ import { Save, Wand2 } from 'lucide-react';
 import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
+
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
 import { OutputModePanel } from '../_shared/components/builder/OutputModePanel';
 import { PreviewWrapper } from '../_shared/components/builder/PreviewWrapper';
@@ -27,8 +28,8 @@ import { SaveModal } from '../_shared/components/TemplateModals';
 import { TemplateItem } from '../_shared/types';
 import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
-import PageLayout from '@/components/layout/PageLayout';
-import { ROW_HEIGHT } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { ROW_HEIGHT } from '@/components/layout/grid-cell';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -264,22 +265,24 @@ export default function QuickDetailBuilderPage() {
                                     onToggle={() => setEditingContentId(editingContentId === 'fixed-form' ? null : 'fixed-form')}
                                 />
                                 {editingContentId === 'fixed-form' && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50">
-                                        <SizeSettingPanel
-                                            colSpan={formContent.colSpan}
-                                            rowSpan={formContent.rowSpan}
-                                            maxColSpan={om.isRightDrawer ? 2 : 12}
-                                            onColSpanChange={v => updateFormSize(v, formContent.rowSpan)}
-                                            onRowSpanChange={v => updateFormSize(formContent.colSpan, v)}
-                                        />
-                                        <div className="px-3 pb-2 pt-1">
-                                            <CommonBuilderDispatcher
-                                                widget={formContent.widget}
-                                                onChange={w => setFormContent(prev => ({ ...prev, widget: w as FormWidget }))}
-                                                context={{ slugOptions, pageTemplates: mainLayerTemplates, maxColSpan: om.isRightDrawer ? 2 : 12 }}
+
+                                        <div className="border-t border-slate-100 bg-slate-50/50">
+                                            <SizeSettingPanel
+                                                colSpan={formContent.colSpan}
+                                                rowSpan={formContent.rowSpan}
+                                                maxColSpan={om.isRightDrawer ? 2 : 12}
+                                                onColSpanChange={v => updateFormSize(v, formContent.rowSpan)}
+                                                onRowSpanChange={v => updateFormSize(formContent.colSpan, v)}
                                             />
+                                            <div className="px-3 pb-2 pt-1">
+                                                <CommonBuilderDispatcher
+                                                    widget={formContent.widget}
+                                                    onChange={w => setFormContent(prev => ({ ...prev, widget: w as FormWidget }))}
+                                                    context={{ slugOptions, pageTemplates: mainLayerTemplates, maxColSpan: om.isRightDrawer ? 2 : 12 }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+
                                 )}
                             </div>
 
@@ -295,33 +298,35 @@ export default function QuickDetailBuilderPage() {
                                     onToggle={() => setEditingContentId(editingContentId === 'fixed-space' ? null : 'fixed-space')}
                                 />
                                 {editingContentId === 'fixed-space' && (
-                                    <div className="border-t border-slate-100 bg-slate-50/50">
-                                        <SizeSettingPanel
-                                            colSpan={spaceContent.colSpan}
-                                            rowSpan={spaceContent.rowSpan}
-                                            maxColSpan={om.isRightDrawer ? 2 : 12}
-                                            onColSpanChange={v => updateSpaceSize(v, spaceContent.rowSpan)}
-                                            onRowSpanChange={v => updateSpaceSize(spaceContent.colSpan, v)}
-                                        />
-                                        <div className="px-3 pb-2 pt-1">
-                                            <CommonBuilderDispatcher
-                                                widget={spaceContent.widget}
-                                                onChange={w => setSpaceContent(prev => ({ ...prev, widget: w as SpaceWidget }))}
-                                                context={{
-                                                    slugOptions,
-                                                    pageTemplates: mainLayerTemplates,
-                                                    contentWidgets: [{
-                                                        type: 'form' as const,
-                                                        widgetId: formWidgetRef.widgetId,
-                                                        contentKey: formWidgetRef.contentKey,
-                                                        connectedSlug: formWidgetRef.connectedSlug,
-                                                    }],
-                                                    actionButtonOnly: true,
-                                                    maxColSpan: om.isRightDrawer ? 2 : 12,
-                                                }}
+
+                                        <div className="border-t border-slate-100 bg-slate-50/50">
+                                            <SizeSettingPanel
+                                                colSpan={spaceContent.colSpan}
+                                                rowSpan={spaceContent.rowSpan}
+                                                maxColSpan={om.isRightDrawer ? 2 : 12}
+                                                onColSpanChange={v => updateSpaceSize(v, spaceContent.rowSpan)}
+                                                onRowSpanChange={v => updateSpaceSize(spaceContent.colSpan, v)}
                                             />
+                                            <div className="px-3 pb-2 pt-1">
+                                                <CommonBuilderDispatcher
+                                                    widget={spaceContent.widget}
+                                                    onChange={w => setSpaceContent(prev => ({ ...prev, widget: w as SpaceWidget }))}
+                                                    context={{
+                                                        slugOptions,
+                                                        pageTemplates: mainLayerTemplates,
+                                                        contentWidgets: [{
+                                                            type: 'form' as const,
+                                                            widgetId: formWidgetRef.widgetId,
+                                                            contentKey: formWidgetRef.contentKey,
+                                                            connectedSlug: formWidgetRef.connectedSlug,
+                                                        }],
+                                                        actionButtonOnly: true,
+                                                        maxColSpan: om.isRightDrawer ? 2 : 12,
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
+
                                 )}
                             </div>
                         </div>

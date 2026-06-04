@@ -20,6 +20,8 @@ import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { ToggleRow } from './fields/_ToggleRow';
 import { SlugSelectField } from './fields';
 import { BG_COLOR_OPTIONS } from './SpaceBuilder';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
 import type { MultiSelectWidget } from '../renderer/types';
 
 interface MultiSelectBuilderProps {
@@ -29,6 +31,8 @@ interface MultiSelectBuilderProps {
 }
 
 export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelectBuilderProps) {
+    const { i18nMode } = useBuilderI18nMode();
+
     return (
         <div className="space-y-3 pt-1">
 
@@ -77,24 +81,63 @@ export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelec
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className={LABEL_CLS}>타이틀</label>
-                    <input
-                        type="text"
-                        value={widget.title ?? ''}
-                        onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
-                        placeholder="예: 담당자 선택"
-                        className={INPUT_CLS}
-                    />
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={widget.titleMsgKey ?? ''}
+                            onChange={key => onChange({ ...widget, titleMsgKey: key || undefined })}
+                            resourceType="WORD"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={widget.title ?? ''}
+                            onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
+                            placeholder="예: 담당자 선택"
+                            className={INPUT_CLS}
+                        />
+                    )}
                 </div>
                 <div>
                     <label className={LABEL_CLS}>설명</label>
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={widget.descriptionMsgKey ?? ''}
+                            onChange={key => onChange({ ...widget, descriptionMsgKey: key || undefined })}
+                            resourceType="SENTENCE"
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={widget.description ?? ''}
+                            onChange={e => onChange({ ...widget, description: e.target.value || undefined })}
+                            placeholder="예: 복수 선택 가능"
+                            className={INPUT_CLS}
+                        />
+                    )}
+                </div>
+            </div>
+
+            {/* Placeholder */}
+            <div>
+                <label className={LABEL_CLS}>Placeholder</label>
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={widget.placeholderMsgKey ?? ''}
+                        onChange={key => onChange({ ...widget, placeholderMsgKey: key || undefined })}
+                        resourceType="SENTENCE"
+                        size="sm"
+                    />
+                ) : (
                     <input
                         type="text"
-                        value={widget.description ?? ''}
-                        onChange={e => onChange({ ...widget, description: e.target.value || undefined })}
-                        placeholder="예: 복수 선택 가능"
+                        value={widget.placeholder ?? ''}
+                        onChange={e => onChange({ ...widget, placeholder: e.target.value || undefined })}
+                        placeholder="예: 항목을 선택하세요"
                         className={INPUT_CLS}
                     />
-                </div>
+                )}
             </div>
 
             {/* 테두리 | 바탕색 */}

@@ -1,3 +1,3 @@
-export { SearchForm } from './SearchForm';
-export { SearchRow } from './SearchRow';
-export { SearchField } from './SearchField';
+export { SearchForm } from './search-form';
+export { SearchRow } from './search-row';
+export { SearchField } from './search-field';

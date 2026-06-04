@@ -4,15 +4,16 @@
  * 크기 설정 패널 — 컨텐츠 행의 Col/Row 수 입력 공통 UI
  *
  * 사용법:
- *   <SizeSettingPanel
- *     colSpan={colSpan} rowSpan={rowSpan}
- *     maxColSpan={12} maxRowSpan={20}
- *     onColSpanChange={v => setColSpan(v)}
- *     onRowSpanChange={v => setRowSpan(v)}
- *   />
+ *   // 컨텐츠 레벨 (🌐 없음)
+ *   <SizeSettingPanel colSpan={colSpan} rowSpan={rowSpan} ... />
+ *
+ *   // 위젯 레벨 (🌐 포함 — BuilderI18nModeProvider 안에서 사용)
+ *   <SizeSettingPanel colSpan={colSpan} rowSpan={rowSpan} showI18nToggle ... />
  */
 
 import React from 'react';
+import { Globe } from 'lucide-react';
+import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
 
 interface SizeSettingPanelProps {
     colSpan: number;
@@ -21,6 +22,8 @@ interface SizeSettingPanelProps {
     maxColSpan?: number;
     /** Row 최대값 (기본 20) */
     maxRowSpan?: number;
+    /** 다국어 모드 토글 버튼 표시 여부 — 위젯 레벨에서만 true */
+    showI18nToggle?: boolean;
     onColSpanChange: (v: number) => void;
     onRowSpanChange: (v: number) => void;
 }
@@ -30,9 +33,12 @@ export function SizeSettingPanel({
     rowSpan,
     maxColSpan = 12,
     maxRowSpan = 20,
+    showI18nToggle = false,
     onColSpanChange,
     onRowSpanChange,
 }: SizeSettingPanelProps) {
+    const { i18nMode, toggleI18nMode } = useBuilderI18nMode();
+
     return (
         <div className="px-3 pt-2 pb-1.5 border-b border-slate-100 flex items-center gap-2">
             <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">크기</span>
@@ -63,6 +69,22 @@ export function SizeSettingPanel({
                     className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
                 />
             </div>
+
+            {/* 다국어 모드 토글 — showI18nToggle=true일 때만 표시 (위젯 레벨 전용) */}
+            {showI18nToggle && (
+                <button
+                    type="button"
+                    title={i18nMode ? '직접 입력 모드로 전환' : '다국어 키 모드로 전환'}
+                    onClick={toggleI18nMode}
+                    className={`flex-shrink-0 p-1 rounded transition-all ${
+                        i18nMode
+                            ? 'text-blue-500 bg-blue-50 hover:bg-blue-100'
+                            : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
+                    }`}
+                >
+                    <Globe className="w-3.5 h-3.5" />
+                </button>
+            )}
         </div>
     );
 }

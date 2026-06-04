@@ -1,49 +1,21 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import PageLayout from '@/components/layout/PageLayout';
-import { GridCell } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { SpaceWidget } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { FormWidget } from '@/app/admin/templates/make/_shared/components/builder/FormBuilder';
-import { useSiteStore } from '@/store/useSiteStore';
-
-/* ── 공간영역 — 취소 / 저장 ── */
-
-const SPACE_WIDGET: SpaceWidget = {
-    type: 'space',
-    widgetId: 'sites-detail-space',
-    align: 'right',
-    showBorder: false,
-    items: [
-        {
-            id: 's1',
-            type: 'action-button',
-            label: '취소',
-            colSpan: 1,
-            color: 'gray',
-            connType: 'close',
-        },
-        {
-            id: 's2',
-            type: 'action-button',
-            label: '저장',
-            colSpan: 1,
-            color: 'black',
-            connType: 'content',
-            connectedContentWidgetIds: ['sites-detail-form'],
-            contentAction: 'save',
-        },
-    ],
-};
+import { useSiteStore } from '@/store/use-site-store';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 페이지 컴포넌트 ── */
-
 export default function SiteDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const { t } = useI18n();
     const id = params.id as string;
     const isNew = id === 'new';
 
@@ -53,35 +25,62 @@ export default function SiteDetailPage() {
     const [saving, setSaving] = useState(false);
 
     const [formValues, setFormValues] = useState<Record<string, string>>({
-        name: '',
+        nameMsgKey: '',
         description: '',
         domain: '',
         isActive: 'true',
     });
+
+    /* 공간영역 — 취소 / 저장 */
+    const SPACE_WIDGET: SpaceWidget = useMemo(() => ({
+        type: 'space',
+        widgetId: 'sites-detail-space',
+        align: 'right',
+        showBorder: false,
+        items: [
+            {
+                id: 's1',
+                type: 'action-button',
+                label: t('common.btn.cancel'),
+                colSpan: 1,
+                color: 'gray',
+                connType: 'close',
+            },
+            {
+                id: 's2',
+                type: 'action-button',
+                label: t('common.btn.save'),
+                colSpan: 1,
+                color: 'black',
+                connType: 'content',
+                connectedContentWidgetIds: ['sites-detail-form'],
+                contentAction: 'save',
+            },
+        ],
+    }), [t]);
 
     /* 폼 위젯 — isNew에 따라 타이틀 변경 */
     const FORM_WIDGET: FormWidget = useMemo(() => ({
         type: 'form',
         widgetId: 'sites-detail-form',
         contentKey: 'sitesDetailForm',
-        title: isNew ? '홈페이지 등록' : '홈페이지 수정',
-        description: '필수 입력 항목은 * 로 표시됩니다.',
+        title: isNew ? t('site.title.new') : t('site.title.edit'),
+        description: t('site.description'),
         showBorder: true,
         fields: [
             {
-                id: 'name',
-                type: 'input',
-                label: '홈페이지명',
-                colSpan: 8,
+                id: 'nameMsgKey',
+                type: 'message-key-select',
+                label: t('site.label.name'),
+                colSpan: 12,
                 rowSpan: 1,
                 required: true,
-                fieldKey: 'name',
-                placeholder: '예: 북미홈페이지',
+                fieldKey: 'nameMsgKey',
             },
             {
                 id: 'isActive',
                 type: 'select',
-                label: '사용여부',
+                label: t('common.label.isActive'),
                 colSpan: 4,
                 rowSpan: 1,
                 required: true,
@@ -91,25 +90,25 @@ export default function SiteDetailPage() {
             {
                 id: 'domain',
                 type: 'input',
-                label: '도메인',
+                label: t('common.label.domain'),
                 colSpan: 12,
                 rowSpan: 1,
                 required: false,
                 fieldKey: 'domain',
-                placeholder: '예: www.example.com',
+                placeholder: t('site.placeholder.domain'),
             },
             {
                 id: 'description',
                 type: 'input',
-                label: '설명',
+                label: t('common.label.description'),
                 colSpan: 12,
                 rowSpan: 1,
                 required: false,
                 fieldKey: 'description',
-                placeholder: '선택사항',
+                placeholder: t('common.field.optional'),
             },
         ],
-    }), [isNew]);
+    }), [isNew, t]);
 
     /* 수정 모드: 기존 데이터 로드 */
     useEffect(() => {
@@ -121,20 +120,20 @@ export default function SiteDetailPage() {
                 const res = await api.get(`/sites/${id}`);
                 const site = res.data;
                 setFormValues({
-                    name: site.name ?? '',
+                    nameMsgKey: site.nameMsgKey ?? '',
                     description: site.description ?? '',
                     domain: site.domain ?? '',
                     isActive: String(site.isActive),
                 });
             } catch {
-                toast.error('홈페이지 정보를 불러오지 못했습니다.');
+                toast.error(t('site.load_error'));
                 router.back();
             } finally {
                 setLoading(false);
             }
         };
         load();
-    }, [id, isNew, router]);
+    }, [id, isNew, router, t]);
 
     /* 폼 필드 변경 */
     const handleFormChange = useCallback((fieldId: string, value: string) => {
@@ -145,15 +144,15 @@ export default function SiteDetailPage() {
     const handleContentAction = useCallback(async (_widgetIds: string[], action: 'save' | 'delete') => {
         if (action !== 'save' || saving) return;
 
-        if (!formValues.name?.trim()) {
-            toast.error('홈페이지명을 입력해주세요.');
+        if (!formValues.nameMsgKey?.trim()) {
+            toast.error(t('validation.site.name.required'));
             return;
         }
 
         setSaving(true);
         try {
             const payload = {
-                name: formValues.name.trim(),
+                nameMsgKey: formValues.nameMsgKey.trim(),
                 description: formValues.description?.trim() || undefined,
                 domain: formValues.domain?.trim() || undefined,
                 isActive: formValues.isActive === 'true',
@@ -161,10 +160,10 @@ export default function SiteDetailPage() {
 
             if (isNew) {
                 await createSite(payload);
-                toast.success('홈페이지가 등록되었습니다.');
+                toast.success(t('site.created'));
             } else {
                 await updateSite(Number(id), payload);
-                toast.success('홈페이지가 수정되었습니다.');
+                toast.success(t('site.updated'));
             }
             router.push('/admin/settings/sites');
         } catch {
@@ -172,12 +171,12 @@ export default function SiteDetailPage() {
         } finally {
             setSaving(false);
         }
-    }, [formValues, id, isNew, saving, createSite, updateSite, router]);
+    }, [formValues, id, isNew, saving, createSite, updateSite, router, t]);
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <span className="text-sm text-slate-400">불러오는 중...</span>
+                <span className="text-sm text-slate-400">{t('common.loading')}</span>
             </div>
         );
     }

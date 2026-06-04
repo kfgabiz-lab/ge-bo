@@ -18,6 +18,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Pencil } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 import api from '@/lib/api';
 import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from '../../types';
 import { createIdGenerator } from '../../utils';
@@ -82,6 +83,7 @@ interface TableBuilderProps {
 
 /** 테이블 위젯 컬럼 설정 빌더 */
 export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: TableBuilderProps) {
+    const { t } = useI18n();
     /* 컬럼 편집 아코디언 상태 */
     const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
 
@@ -277,7 +279,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                 'bg-slate-200 text-slate-600'
                             }`}>{col.cellType}</span>
                             <span className="text-[10px] text-slate-700 flex-1 truncate font-medium">
-                                {col.header || (col.cellType === 'actions' ? '액션' : '—')}
+                                {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
                             </span>
                             <button
                                 onClick={() => { setEditingColumnId(editingColumnId === col.id ? null : col.id); if (col.cellType === 'actions') loadLayerTemplates(); }}

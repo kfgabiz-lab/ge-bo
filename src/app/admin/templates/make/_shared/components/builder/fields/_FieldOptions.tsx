@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { CodeGroupDef } from '../../../types';
 import { OptionInputRows, stringsToOpts, optsToStrings } from '../../OptionInputRows';
 import { CodeGroupSelector } from '../../CodeGroupSelector';
+import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
 interface FieldOptionsProps {
     options?: string[];
@@ -24,6 +25,7 @@ interface FieldOptionsProps {
  */
 export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoading, onChange }: FieldOptionsProps) {
     const [mode, setMode] = useState<'manual' | 'code'>(codeGroupCode ? 'code' : 'manual');
+    const { i18nMode } = useBuilderI18nMode();
 
     const handleModeChange = (next: 'manual' | 'code') => {
         setMode(next);
@@ -61,6 +63,7 @@ export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoa
                 <OptionInputRows
                     options={stringsToOpts(options || [])}
                     onChange={opts => onChange({ options: optsToStrings(opts), codeGroupCode: undefined })}
+                    i18nMode={i18nMode}
                 />
             )}
         </div>

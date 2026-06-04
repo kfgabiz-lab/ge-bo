@@ -19,13 +19,15 @@ export function RadioField({ values, onChange, colSpanMode, rowSpanConfig, codeG
     return (
         <div className="space-y-1.5">
             <FieldBase
-                label={values.label} fieldKey={values.fieldKey}
+                label={values.label} labelMsgKey={values.labelMsgKey}
+                fieldKey={values.fieldKey}
                 colSpan={values.colSpan} colSpanMode={colSpanMode}
                 rowSpan={values.rowSpan} rowSpanConfig={rowSpanConfig}
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}
                 isPk={values.isPk}
                 required={values.required}
                 description={values.description}
+                descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 onChange={onChange}
             />

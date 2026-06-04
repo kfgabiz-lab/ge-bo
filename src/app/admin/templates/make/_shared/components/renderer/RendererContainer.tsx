@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * RendererContainer — 모든 렌더러 공통 최상위 컨테이너
@@ -27,7 +27,7 @@
  *   </RendererContainer>
  */
 
-import { ROW_HEIGHT, GAP_SIZE } from '@/components/layout/GridCell';
+import { ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';
 
 interface RendererContainerProps {
     children: React.ReactNode;

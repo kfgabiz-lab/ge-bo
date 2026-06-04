@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 /**
  * ============================================================
  *  [위젯 만들기] — 위젯 기반 페이지 레이아웃 구성 도구
  * ============================================================
  *  - 위젯 추가 시 Row(높이) × Col(12칸 기준 너비) 지정
- *  - 위젯 타입: Text / Search / Table / Form / Button
+ *  - 위젯 타입: Search / Table / Form / Space / Category / SubList / MultiSelect / Tab
  *  - 전체 12칸 그리드에 위젯이 순서대로 배치됨
  * ============================================================
  */
@@ -15,7 +15,7 @@ import {
     Plus, Trash2, X, Save, Wand2,
     Search as SearchIcon, Table2, FileText,
     AlignLeft, Layers, List, CheckSquare,
-    GripVertical,
+    GripVertical, PanelTop,
 } from 'lucide-react';
 
 import {
@@ -28,6 +28,7 @@ import {
 import api from '@/lib/api';
 import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
 import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
+import { BuilderI18nModeProvider } from '../_shared/contexts/BuilderI18nModeContext';
 import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
 import { OutputModePanel } from '../_shared/components/builder/OutputModePanel';
 import { PreviewWrapper } from '../_shared/components/builder/PreviewWrapper';
@@ -35,11 +36,11 @@ import { TemplateLoader } from '../_shared/components/builder/TemplateLoader';
 import { PageGridRenderer } from '../_shared/components/renderer';
 import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
-import type { SearchWidget, SpaceWidget, TextWidget, CategoryWidget, SubListWidget, MultiSelectWidget } from '../_shared/components/renderer';
+import type { SearchWidget, SpaceWidget, CategoryWidget, SubListWidget, MultiSelectWidget, TabWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug } from '../_shared/utils';
-import PageLayout from '@/components/layout/PageLayout';
+import PageLayout from '@/components/layout/page-layout';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
 import { TemplateItem } from '../_shared/types';
@@ -50,13 +51,13 @@ import { toast } from 'sonner';
 /* ══════════════════════════════════════════ */
 
 /** 페이지 위젯 타입 */
-type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'sublist' | 'multiselect';
+type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'sublist' | 'multiselect' | 'tab';
 
-/* TextWidget, SearchWidget, SpaceItem, SpaceWidget → renderer/types에서 import */
+/* SearchWidget, SpaceItem, SpaceWidget → renderer/types에서 import */
 /* FormFieldItem, FormWidget → FormBuilder에서 import */
 
 /** 위젯 합집합 타입 */
-type PageWidget = TextWidget | SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget | SubListWidget | MultiSelectWidget;
+type PageWidget = SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget | SubListWidget | MultiSelectWidget | TabWidget;
 
 /**
  * 위젯 셀 안에 배치되는 컨텐츠 아이템
@@ -105,6 +106,7 @@ const WIDGET_META: Record<PageWidgetType, {
     category: { label: '카테고리', color: 'text-cyan-700',   bg: 'bg-cyan-50',    border: 'border-cyan-200',    previewBg: 'bg-cyan-50/50',    desc: '카테고리 계층 관리' },
     sublist:     { label: '서브리스트', color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200', previewBg: 'bg-indigo-50/50', desc: '다건 행 입력 목록' },
     multiselect: { label: '다중선택',   color: 'text-teal-700',   bg: 'bg-teal-50',   border: 'border-teal-200',   previewBg: 'bg-teal-50/50',   desc: '체크박스 드롭다운 다중 선택' },
+    tab:         { label: '탭',         color: 'text-pink-700',   bg: 'bg-pink-50',   border: 'border-pink-200',   previewBg: 'bg-pink-50/50',   desc: '탭 컨텐츠 영역' },
 };
 
 /** 위젯 타입별 아이콘 컴포넌트 */
@@ -116,6 +118,7 @@ const WIDGET_ICON: Record<PageWidgetType, React.ReactNode> = {
     category:    <Layers      className="w-3.5 h-3.5" />,
     sublist:     <List        className="w-3.5 h-3.5" />,
     multiselect: <CheckSquare className="w-3.5 h-3.5" />,
+    tab:         <PanelTop    className="w-3.5 h-3.5" />,
 };
 
 /** 공간영역 버튼 색상 옵션 */
@@ -295,6 +298,7 @@ export default function PageBuilderPage() {
                 case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
                 case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true } as SubListWidget;
                 case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', sourceSlug: '', connectedSlug: '', labelFields: 'name' } as MultiSelectWidget;
+                case 'tab':         return { type: 'tab', widgetId: id, tabs: [{ id: `tab-${Date.now()}-0`, label: '탭 1', pageSlug: '' }] } as TabWidget;
             }
         })();
         const parent = widgetItems.find(i => i.id === itemId);
@@ -408,7 +412,7 @@ export default function PageBuilderPage() {
             const fieldKeys: string[] = [];
             sw.rows.forEach(row => {
                 row.fields.forEach(f => {
-                    if (!f.label?.trim()) errors.push(`[Search:${label}] 필드 라벨 미입력`);
+                    if (!f.label?.trim() && !f.labelMsgKey?.trim()) errors.push(`[Search:${label}] 필드 라벨 미입력`);
                     if (!f.fieldKey?.trim()) {
                         errors.push(`[Search:${label}] 필드 Key 미입력`);
                     } else {
@@ -430,7 +434,7 @@ export default function PageBuilderPage() {
             const fieldKeys: string[] = [];
             fw.fields.forEach(f => {
                 /* editor/hidden 타입은 라벨 불필요 — 나머지 타입만 필수 검사 */
-                if (f.type !== 'editor' && f.type !== 'hidden' && !f.label?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
+                if (f.type !== 'editor' && f.type !== 'hidden' && !f.label?.trim() && !f.labelMsgKey?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
                 if (!f.fieldKey?.trim()) {
                     errors.push(`[Form:${label}] 필드 Key 미입력`);
                 } else {
@@ -463,11 +467,13 @@ export default function PageBuilderPage() {
         await tm.handleSaveConfirm(
             widgetItems as unknown as import('../_shared/templateApi').PageWidgetItem[],
             {
-                outputMode: om.outputMode,
-                pageTitle:  om.pageTitle,
-                layerType:  om.layerType,
-                layerTitle: om.layerTitle,
-                layerWidth: om.layerWidth,
+                outputMode:         om.outputMode,
+                pageTitle:          om.pageTitle,
+                pageTitleMsgKey:    om.pageTitleMsgKey || undefined,
+                layerType:          om.layerType,
+                layerTitle:         om.layerTitle,
+                layerTitleMsgKey:   om.layerTitleMsgKey || undefined,
+                layerWidth:         om.layerWidth,
             },
         );
     };
@@ -518,13 +524,17 @@ export default function PageBuilderPage() {
                     <OutputModePanel
                         outputMode={om.outputMode}
                         pageTitle={om.pageTitle}
+                        pageTitleMsgKey={om.pageTitleMsgKey}
                         layerType={om.layerType}
                         layerTitle={om.layerTitle}
+                        layerTitleMsgKey={om.layerTitleMsgKey}
                         layerWidth={om.layerWidth}
                         onOutputModeChange={om.setOutputMode}
                         onPageTitleChange={om.setPageTitle}
+                        onPageTitleMsgKeyChange={om.setPageTitleMsgKey}
                         onLayerTypeChange={om.setLayerType}
                         onLayerTitleChange={om.setLayerTitle}
+                        onLayerTitleMsgKeyChange={om.setLayerTitleMsgKey}
                         onLayerWidthChange={om.setLayerWidth}
                     />
 
@@ -546,6 +556,7 @@ export default function PageBuilderPage() {
                                 {widgetItems.map((item, idx) => (
                                     <SortableRowWrapper key={item.id} id={item.id}>
                                         {(handleProps) => (
+                                            <BuilderI18nModeProvider>
                                             <div className="border border-slate-200 rounded-lg overflow-hidden">
 
                                                 {/* ── 위젯 셀 헤더 ── */}
@@ -597,11 +608,12 @@ export default function PageBuilderPage() {
                                                 {editingItemId === item.id && (
                                                     <div className="bg-white">
 
-                                                        {/* 위젯 크기 설정 — 우측 드로어 모드일 때 maxColSpan 2로 제한 */}
+                                                        {/* 위젯 크기 설정 — showI18nToggle로 🌐 버튼 표시 */}
                                                         <SizeSettingPanel
                                                             colSpan={item.colSpan}
                                                             rowSpan={item.rowSpan}
                                                             maxColSpan={om.isRightDrawer ? 2 : 12}
+                                                            showI18nToggle
                                                             onColSpanChange={v => updateWidgetSize(item.id, v, item.rowSpan)}
                                                             onRowSpanChange={v => updateWidgetSize(item.id, item.colSpan, v)}
                                                         />
@@ -693,6 +705,7 @@ export default function PageBuilderPage() {
                                                     </div>
                                                 )}
                                             </div>
+                                            </BuilderI18nModeProvider>
                                         )}
                                     </SortableRowWrapper>
                                 ))}
@@ -774,6 +787,7 @@ export default function PageBuilderPage() {
                             outputMode={om.outputMode}
                             layerType={om.layerType}
                             layerTitle={om.layerTitle}
+                            layerTitleMsgKey={om.layerTitleMsgKey}
                             layerWidth={om.layerWidth}
                         >
                             {widgetItems.length === 0 ? (

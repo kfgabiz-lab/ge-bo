@@ -15,13 +15,17 @@ export type ColSpanMode =
 /** 공통 필드 편집 값 */
 export interface FieldEditValues {
     label: string;
+    labelMsgKey?: string;    // 라벨 다국어 키 (있으면 t(key) 표시, 없으면 label 표시)
     label2?: string;         // dateRange 전용 두 번째 라벨
+    label2MsgKey?: string;   // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
     colSpan: number;
     rowSpan?: number;        // form/layer 전용 행 높이
     placeholder?: string;   // input/select 전용
+    placeholderMsgKey?: string; // placeholder 다국어 키
     /** 라벨 하단 설명 텍스트 — 렌더러에서 라벨 바로 아래 회색 소형 텍스트로 표시 */
     description?: string;
+    descriptionMsgKey?: string; // 설명 다국어 키
     required?: boolean;
     options?: string[];      // select/radio/checkbox/button 전용 ("텍스트:값" 형식)
     codeGroupCode?: string;  // 공통코드 그룹 코드

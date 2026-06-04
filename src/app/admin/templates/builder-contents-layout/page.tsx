@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * Builder 컨텐츠 레이아웃 가이드 페이지
@@ -9,8 +9,8 @@
  */
 
 import { useState } from 'react';
-import PageLayout from '@/components/layout/PageLayout';
-import { GridCell } from '@/components/layout/GridCell';
+import PageLayout from '@/components/layout/page-layout';
+import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '../make/_shared/components/renderer';
 import type {
     SearchWidget,
@@ -18,6 +18,7 @@ import type {
     CategoryWidget,
     SubListWidget,
     MultiSelectWidget,
+    TabWidget,
     AnyWidget,
 } from '../make/_shared/components/renderer';
 import type { TableWidget } from '../make/_shared/components/builder/TableBuilder';
@@ -35,6 +36,7 @@ const TABS = [
     { key: 'category',    label: '카테고리' },
     { key: 'sublist',     label: '서브리스트' },
     { key: 'multiselect', label: '다중선택' },
+    { key: 'tab',         label: '탭' },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -159,6 +161,7 @@ const SAMPLE_FORM: FormWidget = {
         { id: 'ff12', type: 'video', label: '동영상',        colSpan: 12, rowSpan: 2, videoMode: 'file' },
         { id: 'ff13', type: 'video', label: '동영상 URL',    colSpan: 12, rowSpan: 2, videoMode: 'url' },
         { id: 'ff14', type: 'media',  label: '컨텐츠 업로드', colSpan: 12, rowSpan: 2, required: true },
+        { id: 'ff16', type: 'editor', label: '내용',          colSpan: 12, rowSpan: 5 },
         {
             id: 'ff15', type: 'color', label: '색상',         colSpan: 12, rowSpan: 1,
             options: ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6b7280'],
@@ -223,6 +226,24 @@ const SAMPLE_MULTISELECT: MultiSelectWidget = {
     showBorder: true,
 };
 
+/** 기본정보 탭용 간단 폼 — 핵심 필드만 추출 */
+const SAMPLE_FORM_SIMPLE: FormWidget = {
+    type: 'form',
+    widgetId: 'guide-form-simple',
+    contentKey: '',
+    title: '기본 정보',
+    showBorder: true,
+    fields: [
+        { id: 'sf1', type: 'input',  label: '이름',     colSpan: 6, rowSpan: 1, required: true, placeholder: '이름을 입력하세요' },
+        { id: 'sf2', type: 'input',  label: '이메일',   colSpan: 6, rowSpan: 1, required: true, placeholder: 'email@example.com' },
+        { id: 'sf3', type: 'select', label: '부서',     colSpan: 4, rowSpan: 1, options: ['개발팀', '기획팀', '디자인팀', '마케팅팀'] },
+        { id: 'sf4', type: 'select', label: '직급',     colSpan: 4, rowSpan: 1, options: ['사원', '대리', '과장', '차장', '부장'] },
+        { id: 'sf5', type: 'date',   label: '입사일',   colSpan: 4, rowSpan: 1 },
+        { id: 'sf6', type: 'radio',  label: '고용형태', colSpan: 6, rowSpan: 1, options: ['정규직', '계약직', '파견직'] },
+        { id: 'sf7', type: 'button', label: '상태',     colSpan: 6, rowSpan: 1, options: ['활성', '비활성', '대기', '잠금'] },
+    ],
+};
+
 /** 서브리스트 — 코드 상세 목록 샘플 (코드값/코드명/정렬/기타/사용) */
 const SAMPLE_SUBLIST: SubListWidget = {
     type: 'sublist',
@@ -242,6 +263,38 @@ const SAMPLE_SUBLIST: SubListWidget = {
     ],
 };
 
+/** 탭 컨텐츠 — 기본정보/상세정보/기타 3탭 구성 샘플 */
+const SAMPLE_TAB: TabWidget = {
+    type: 'tab',
+    widgetId: 'guide-tab',
+    tabs: [
+        {
+            id: 'tab1',
+            label: '기본정보',
+            items: [
+                { widget: SAMPLE_FORM_SIMPLE, colSpan: 12, rowSpan: 9 },
+                { widget: SAMPLE_SPACE,       colSpan: 12, rowSpan: 2 },
+            ],
+        },
+        {
+            id: 'tab2',
+            label: '상세정보',
+            items: [
+                { widget: SAMPLE_FORM,  colSpan: 12, rowSpan: 21 },
+                { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2  },
+            ],
+        },
+        {
+            id: 'tab3',
+            label: '기타',
+            items: [
+                { widget: SAMPLE_SUBLIST,     colSpan: 12, rowSpan: 5 },
+                { widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 },
+            ],
+        },
+    ],
+};
+
 /* ══════════════════════════════════════════ */
 /*  탭별 위젯 + 그리드 크기 매핑              */
 /* ══════════════════════════════════════════ */
@@ -253,7 +306,7 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
         { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 16 }],
+    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 21 }],
     space:    [{ widget: SAMPLE_SPACE,    colSpan: 12, rowSpan: 2 }],
     category: [
         { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },
@@ -266,6 +319,9 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
     ],
     multiselect: [
         { widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 },
+    ],
+    tab: [
+        { widget: SAMPLE_TAB, colSpan: 12, rowSpan: 6 },
     ],
 };
 

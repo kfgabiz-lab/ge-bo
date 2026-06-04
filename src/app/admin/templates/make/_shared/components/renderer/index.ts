@@ -28,7 +28,6 @@ export { PageGridRenderer }    from './PageGridRenderer';
 /* 타입 export */
 export type {
     RendererMode,
-    TextWidget,
     SpaceItem,
     SpaceWidget,
     SearchWidget,
@@ -37,6 +36,8 @@ export type {
     SubListColumn,
     SubListColumnType,
     MultiSelectWidget,
+    TabItem,
+    TabWidget,
     AnyWidget,
     TableActionHandlers,
     SearchHandlers,

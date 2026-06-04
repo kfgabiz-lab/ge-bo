@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * ============================================================
@@ -253,7 +253,7 @@ const generateSearchCode = (rows: SearchRowConfig[], collapsible: boolean): stri
     /* ══════════════════════════════════════ */
     /* 공통코드 연동 필드 존재 여부 */
     if (allFields.some(f => f.codeGroupCode)) {
-        lines.push("/* ※ 아래 import 필요: import { useCodeStore } from '@/store/useCodeStore'; */");
+        lines.push("/* ※ 아래 import 필요: import { useCodeStore } from '@/store/use-code-store'; */");
         lines.push('const { groups } = useCodeStore();');
         lines.push('');
     }

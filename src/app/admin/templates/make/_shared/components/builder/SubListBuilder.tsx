@@ -19,6 +19,9 @@ import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import type { CodeGroupDef } from '../../types';
 import { Plus, GripVertical, Pencil, X } from 'lucide-react';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
+import { useI18n } from '@/hooks/use-i18n';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor,
     useSensor, useSensors,
@@ -70,17 +73,21 @@ interface SubListBuilderProps {
  */
 function toFieldValues(col: SubListColumn): FieldEditValues {
     return {
-        label:        col.label,
-        fieldKey:     col.key,
-        colSpan:      1,
-        rowSpan:      1,
-        placeholder:  col.placeholder,
-        required:     col.required,
-        options:      col.options,
-        codeGroupCode: col.codeGroup,
-        maxFileCount:  col.maxFileCount,
-        maxFileSizeMB: col.maxFileSizeMB,
-        fileTypeMode:  col.fileTypeMode as FieldEditValues['fileTypeMode'],
+        label:            col.label,
+        labelMsgKey:      col.labelMsgKey,
+        fieldKey:         col.key,
+        colSpan:          1,
+        rowSpan:          1,
+        placeholder:      col.placeholder,
+        placeholderMsgKey: col.placeholderMsgKey,
+        description:      col.description,
+        descriptionMsgKey: col.descriptionMsgKey,
+        required:         col.required,
+        options:          col.options,
+        codeGroupCode:    col.codeGroup,
+        maxFileCount:     col.maxFileCount,
+        maxFileSizeMB:    col.maxFileSizeMB,
+        fileTypeMode:     col.fileTypeMode as FieldEditValues['fileTypeMode'],
     };
 }
 
@@ -91,15 +98,19 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
  */
 function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColumn> {
     const patch: Partial<SubListColumn> = {};
-    if (updates.label         !== undefined) patch.label        = updates.label;
-    if (updates.fieldKey      !== undefined) patch.key          = updates.fieldKey;
-    if (updates.placeholder   !== undefined) patch.placeholder  = updates.placeholder;
-    if (updates.required      !== undefined) patch.required     = updates.required;
-    if (updates.options       !== undefined) patch.options      = updates.options;
-    if (updates.codeGroupCode !== undefined) patch.codeGroup    = updates.codeGroupCode;
-    if (updates.maxFileCount  !== undefined) patch.maxFileCount  = updates.maxFileCount;
-    if (updates.maxFileSizeMB !== undefined) patch.maxFileSizeMB = updates.maxFileSizeMB;
-    if (updates.fileTypeMode  !== undefined) patch.fileTypeMode  = updates.fileTypeMode;
+    if (updates.label             !== undefined) patch.label             = updates.label;
+    if (updates.labelMsgKey       !== undefined) patch.labelMsgKey       = updates.labelMsgKey;
+    if (updates.fieldKey          !== undefined) patch.key               = updates.fieldKey;
+    if (updates.placeholder       !== undefined) patch.placeholder       = updates.placeholder;
+    if (updates.placeholderMsgKey !== undefined) patch.placeholderMsgKey = updates.placeholderMsgKey;
+    if (updates.description       !== undefined) patch.description       = updates.description;
+    if (updates.descriptionMsgKey !== undefined) patch.descriptionMsgKey = updates.descriptionMsgKey;
+    if (updates.required          !== undefined) patch.required          = updates.required;
+    if (updates.options           !== undefined) patch.options           = updates.options;
+    if (updates.codeGroupCode     !== undefined) patch.codeGroup         = updates.codeGroupCode;
+    if (updates.maxFileCount      !== undefined) patch.maxFileCount      = updates.maxFileCount;
+    if (updates.maxFileSizeMB     !== undefined) patch.maxFileSizeMB     = updates.maxFileSizeMB;
+    if (updates.fileTypeMode      !== undefined) patch.fileTypeMode      = updates.fileTypeMode;
     return patch;
 }
 
@@ -121,6 +132,7 @@ function SortableColumnItem({
         attributes, listeners, setNodeRef, setActivatorNodeRef,
         transform, transition, isDragging,
     } = useSortable({ id: col.id });
+    const { t } = useI18n();
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -166,7 +178,7 @@ function SortableColumnItem({
                     {col.type}
                 </span>
                 <span className="text-xs text-slate-700 flex-1 truncate">
-                    {col.label || <span className="text-slate-300 italic">라벨 없음</span>}
+                    {col.labelMsgKey ? t(col.labelMsgKey) : (col.label || <span className="text-slate-300 italic">라벨 없음</span>)}
                     {col.key && <span className="ml-1.5 text-[10px] text-slate-400">({col.key})</span>}
                 </span>
 
@@ -243,6 +255,7 @@ function ColumnEditPanel({
 /* ══════════════════════════════════════════ */
 
 export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilderProps) {
+    const { i18nMode } = useBuilderI18nMode();
     const [editingColId, setEditingColId] = useState<string | null>(null);
     const [showPicker, setShowPicker] = useState(false);
 
@@ -320,23 +333,41 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className={LABEL_CLS}>헤더 타이틀</label>
-                        <input
-                            type="text"
-                            value={widget.title ?? ''}
-                            onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
-                            placeholder="예: 코드 상세"
-                            className={INPUT_CLS}
-                        />
+                        {i18nMode ? (
+                            <MessageKeySelector
+                                value={widget.titleMsgKey ?? ''}
+                                onChange={key => onChange({ ...widget, titleMsgKey: key || undefined })}
+                                resourceType="WORD"
+                                size="sm"
+                            />
+                        ) : (
+                            <input
+                                type="text"
+                                value={widget.title ?? ''}
+                                onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
+                                placeholder="예: 코드 상세"
+                                className={INPUT_CLS}
+                            />
+                        )}
                     </div>
                     <div>
                         <label className={LABEL_CLS}>추가 버튼 텍스트</label>
-                        <input
-                            type="text"
-                            value={widget.addButtonLabel ?? ''}
-                            onChange={e => onChange({ ...widget, addButtonLabel: e.target.value || undefined })}
-                            placeholder="+ 추가"
-                            className={INPUT_CLS}
-                        />
+                        {i18nMode ? (
+                            <MessageKeySelector
+                                value={widget.addButtonLabelMsgKey ?? ''}
+                                onChange={key => onChange({ ...widget, addButtonLabelMsgKey: key || undefined })}
+                                resourceType="WORD"
+                                size="sm"
+                            />
+                        ) : (
+                            <input
+                                type="text"
+                                value={widget.addButtonLabel ?? ''}
+                                onChange={e => onChange({ ...widget, addButtonLabel: e.target.value || undefined })}
+                                placeholder="+ 추가"
+                                className={INPUT_CLS}
+                            />
+                        )}
                     </div>
                 </div>
 

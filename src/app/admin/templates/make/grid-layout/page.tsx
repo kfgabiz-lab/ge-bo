@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * ============================================================
@@ -279,7 +279,7 @@ const generateSearchCode = (rows: SearchRowConfig[], collapsible: boolean): stri
     /* ══════════════════════════════════════ */
     /* 공통코드 연동 필드 존재 여부 */
     if (allFields.some(f => f.codeGroupCode)) {
-        lines.push("/* ※ 아래 import 필요: import { useCodeStore } from '@/store/useCodeStore'; */");
+        lines.push("/* ※ 아래 import 필요: import { useCodeStore } from '@/store/use-code-store'; */");
         lines.push('const { groups } = useCodeStore();');
         lines.push('');
     }
@@ -652,14 +652,14 @@ const buildTsxFile = (
     lines.push(`import ${needsReact ? 'React, { ' : '{ '}useState, useEffect${needsScrollImports ? ', useRef' : ''}${needsReact ? ' }' : ' }'} from 'react';`);
     if (lucideIcons.length > 0) lines.push(`import { ${lucideIcons.join(', ')} } from 'lucide-react';`);
     lines.push("import { SearchForm, SearchRow, SearchField } from '@/components/search';");
-    if (hasCodeGroup) lines.push("import { useCodeStore } from '@/store/useCodeStore';");
+    if (hasCodeGroup) lines.push("import { useCodeStore } from '@/store/use-code-store';");
     /* 팝업 연결 컬럼 또는 버튼 팝업이 있을 때 WidgetRenderer import */
     if (hasPopup || hasBtnPopup) lines.push("import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';"  );
     /* toast — 항상 필요 (slug 미설정 알림 포함) */
     lines.push("import { toast } from 'sonner';");
     lines.push("import api from '@/lib/api';");
     lines.push("import { usePathname } from 'next/navigation';");
-    lines.push("import { useMenuStore, MenuItem } from '@/store/useMenuStore';");
+    lines.push("import { useMenuStore, MenuItem } from '@/store/use-menu-store';");
     /* 개발자방식 — fileLayerSlug 로컬 컴포넌트 import */
     fileLayerSlugs.forEach(slug => {
         lines.push(`import ${slug} from './${slug}';`);
