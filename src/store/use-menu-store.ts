@@ -127,8 +127,10 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     addMenu: async (menu) => {
         try {
             const res = await api.post(API_PATH, {
-                nameMsgKey: menu.nameMsgKey,
-                descriptionMsgKey: menu.descriptionMsgKey || undefined,
+                name: menu.nameMsgKey ? undefined : menu.name,
+                nameMsgKey: menu.nameMsgKey || undefined,
+                description: menu.nameMsgKey ? undefined : (menu.description || undefined),
+                descriptionMsgKey: menu.nameMsgKey ? (menu.descriptionMsgKey || undefined) : undefined,
                 url: menu.url || '',
                 icon: menu.icon,
                 parentId: menu.parentId,
@@ -153,9 +155,12 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
         try {
             const menu = get().selectedMenu;
             if (!menu) return;
+            const resolvedMsgKey = updates.nameMsgKey ?? menu.nameMsgKey;
             await api.put(`${API_PATH}/${id}`, {
-                nameMsgKey: updates.nameMsgKey ?? menu.nameMsgKey,
-                descriptionMsgKey: updates.descriptionMsgKey ?? menu.descriptionMsgKey ?? undefined,
+                name: resolvedMsgKey ? undefined : (updates.name ?? menu.name),
+                nameMsgKey: resolvedMsgKey || undefined,
+                description: resolvedMsgKey ? undefined : (updates.description ?? menu.description ?? undefined),
+                descriptionMsgKey: resolvedMsgKey ? (updates.descriptionMsgKey ?? menu.descriptionMsgKey ?? undefined) : undefined,
                 url: updates.url ?? menu.url ?? '',
                 icon: updates.icon ?? menu.icon,
                 parentId: menu.parentId,

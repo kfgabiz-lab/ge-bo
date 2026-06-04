@@ -80,6 +80,7 @@ interface PageWidgetItem {
     colSpan: number;        // 가로 점유 칸 수 (1~12, 12칸 기준)
     rowSpan: number;        // 세로 높이 배수 (1 = 80px)
     contents: PageContentItem[];  // 셀 내 컨텐츠 목록
+    i18nMode?: boolean;     // 다국어 모드 저장값 (토글 시 기록)
 }
 
 /* ══════════════════════════════════════════ */
@@ -556,7 +557,10 @@ export default function PageBuilderPage() {
                                 {widgetItems.map((item, idx) => (
                                     <SortableRowWrapper key={item.id} id={item.id}>
                                         {(handleProps) => (
-                                            <BuilderI18nModeProvider>
+                                            <BuilderI18nModeProvider
+                                                defaultMode={item.i18nMode ?? /"labelMsgKey"\s*:\s*"[^"]/.test(JSON.stringify(item.contents))}
+                                                onToggle={(newMode) => setWidgetItems(prev => prev.map(w => w.id === item.id ? { ...w, i18nMode: newMode } : w))}
+                                            >
                                             <div className="border border-slate-200 rounded-lg overflow-hidden">
 
                                                 {/* ── 위젯 셀 헤더 ── */}

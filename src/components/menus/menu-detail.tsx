@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Save, Trash2, Settings2, FolderOpen, Folder, FileText, Plus, X, Wand2, ChevronDown, Loader2 } from 'lucide-react';
+import { Save, Trash2, Settings2, FolderOpen, Folder, FileText, Plus, X, Wand2, ChevronDown, Loader2, Globe } from 'lucide-react';
 import { useMenuStore, MenuItem } from '@/store/use-menu-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { MenuRoleMatrix } from './menu-role-matrix';
@@ -143,8 +143,13 @@ const inputCls = (error: string) =>
 /*  추가 모드 / 상세 모드 모두 이 컴포넌트를 사용하여 UI를 동일하게 유지   */
 /* ══════════════════════════════════════════════════════════════ */
 interface MenuFormProps {
+    /* 다국어 모드 */
+    i18nMode: boolean;
+    toggleI18nMode: () => void;
     /* 폼 값 */
+    name: string;
     nameMsgKey: string;
+    description: string;
     descriptionMsgKey: string;
     url: string;
     icon: string;
@@ -156,7 +161,9 @@ interface MenuFormProps {
     urlError: string;
     sortOrderError?: string;
     /* 변경 핸들러 */
+    onNameChange: (v: string) => void;
     onNameMsgKeyChange: (v: string) => void;
+    onDescriptionChange: (v: string) => void;
     onDescriptionMsgKeyChange: (v: string) => void;
     onUrlChange: (v: string) => void;
     onIconChange: (v: string) => void;
@@ -184,10 +191,11 @@ interface MenuFormProps {
 }
 
 function MenuForm({
-    nameMsgKey, descriptionMsgKey,
+    i18nMode, toggleI18nMode,
+    name, nameMsgKey, description, descriptionMsgKey,
     url, icon, sortOrder, visible, linkedTemplateName,
     nameMsgKeyError, urlError, sortOrderError = '',
-    onNameMsgKeyChange, onDescriptionMsgKeyChange,
+    onNameChange, onNameMsgKeyChange, onDescriptionChange, onDescriptionMsgKeyChange,
     onUrlChange, onIconChange, onSortOrderChange, onVisibleChange,
     onTemplateSelect, onLinkedTemplateNameChange,
     onUrlBlur, onSortBlur,
@@ -235,17 +243,45 @@ function MenuForm({
                 )}
             </div>
 
-            {/* 메뉴명 다국어 키 선택 */}
+            {/* 메뉴명 — i18nMode에 따라 다국어 키 선택 ↔ 직접 입력 전환 */}
             <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
-                    {t('menu.label.name')}
-                    <span className="text-red-500">*</span>
-                </label>
-                <MessageKeySelector
-                    value={nameMsgKey}
-                    onChange={onNameMsgKeyChange}
-                    resourceType="WORD"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                        {t('menu.label.name')}
+                        <span className="text-red-500">*</span>
+                    </label>
+                    {/* 🌐 다국어 모드 토글 */}
+                    <button
+                        type="button"
+                        title={i18nMode ? '직접 입력 모드로 전환' : '다국어 키 모드로 전환'}
+                        onClick={toggleI18nMode}
+                        className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ${
+                            i18nMode
+                                ? 'text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100'
+                                : 'text-slate-400 bg-slate-50 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                    >
+                        <Globe className="w-3 h-3" />
+                        {i18nMode ? '다국어' : '직접입력'}
+                    </button>
+                </div>
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={nameMsgKey}
+                        onChange={onNameMsgKeyChange}
+                        resourceType="WORD"
+                    />
+                ) : (
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={e => onNameChange(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
+                        className={inputCls(nameMsgKeyError)}
+                        placeholder={t('menu.label.name')}
+                        maxLength={50}
+                    />
+                )}
                 {nameMsgKeyError && <p className="text-[11px] text-red-500 mt-1">{nameMsgKeyError}</p>}
             </div>
 
@@ -274,16 +310,27 @@ function MenuForm({
                 {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
             </div>
 
-            {/* 메뉴 설명 다국어 키 선택 (WORD+SENTENCE 전체) */}
+            {/* 메뉴 설명 — i18nMode에 따라 다국어 키 선택 ↔ 직접 입력 전환 */}
             <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
                     {t('common.label.description')}
                     <span className="ml-1.5 text-[10px] text-slate-400 font-normal">{t('common.field.optional')}</span>
                 </label>
-                <MessageKeySelector
-                    value={descriptionMsgKey}
-                    onChange={onDescriptionMsgKeyChange}
-                />
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={descriptionMsgKey}
+                        onChange={onDescriptionMsgKeyChange}
+                    />
+                ) : (
+                    <textarea
+                        value={description}
+                        onChange={e => onDescriptionChange(e.target.value)}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none"
+                        rows={3}
+                        placeholder={t('common.label.description')}
+                        maxLength={500}
+                    />
+                )}
             </div>
 
             {/* 아이콘 + 정렬 순서 + 노출 여부 — 3컬럼 */}
@@ -340,7 +387,10 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
     const queryClient = useQueryClient();
     const { t } = useI18n();
     /* URL 유무로 폴더/프로그램 판단 (상세 모드와 동일한 방식) */
+    const [i18nMode, setI18nMode] = useState(true);
+    const [name, setName] = useState('');
     const [nameMsgKey, setNameMsgKey] = useState('');
+    const [description, setDescription] = useState('');
     const [descriptionMsgKey, setDescriptionMsgKey] = useState('');
     const [url, setUrl] = useState('');
     const [icon, setIcon] = useState('');
@@ -364,7 +414,8 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
 
     const handleSubmit = async () => {
         if (isSubmitting) return;
-        const ne = !nameMsgKey ? t('validation.name.required') : '';
+        const nameValue = i18nMode ? nameMsgKey : name;
+        const ne = !nameValue.trim() ? t('validation.name.required') : '';
         const ue = isProgramActive ? validateUrl(url, t) || (!url.trim() ? t('validation.url.required') : '') : '';
         setNameMsgKeyError(ne);
         setUrlError(ue);
@@ -373,9 +424,10 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
         setIsSubmitting(true);
         try {
             const createdMenu = await addMenu({
-                name: '',
-                nameMsgKey,
-                descriptionMsgKey: descriptionMsgKey || undefined,
+                name: i18nMode ? '' : name.trim(),
+                nameMsgKey: i18nMode ? nameMsgKey : '',
+                description: i18nMode ? '' : description.trim(),
+                descriptionMsgKey: i18nMode ? (descriptionMsgKey || undefined) : undefined,
                 url: url.trim(),
                 icon,
                 parentId,
@@ -383,7 +435,7 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
                 sortOrder: Number(sortOrder),
                 visible,
             });
-            toast.success(t('menu.created', { name: nameMsgKey }));
+            toast.success(t('menu.created', { name: i18nMode ? nameMsgKey : name }));
             await queryClient.invalidateQueries({ queryKey: ['menus', menuType] });
             await onCreated(createdMenu);
         } catch {
@@ -427,7 +479,7 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !nameMsgKey}
+                        disabled={isSubmitting || (i18nMode ? !nameMsgKey : !name.trim())}
                         className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
                         <Plus className="w-3.5 h-3.5" />{isSubmitting ? t('common.btn.saving') : t('menu.btn.add')}
@@ -437,7 +489,11 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
 
             {/* 공통 폼 */}
             <MenuForm
+                i18nMode={i18nMode}
+                toggleI18nMode={() => { setI18nMode(v => !v); setNameMsgKeyError(''); }}
+                name={name}
                 nameMsgKey={nameMsgKey}
+                description={description}
                 descriptionMsgKey={descriptionMsgKey}
                 url={url}
                 icon={icon}
@@ -446,7 +502,9 @@ function CreateMenuForm({ parentId, parentDepth, menuType, onCancel, onCreated, 
                 linkedTemplateName={linkedTemplateName}
                 nameMsgKeyError={nameMsgKeyError}
                 urlError={urlError}
+                onNameChange={v => { setName(v); if (nameMsgKeyError) setNameMsgKeyError(''); }}
                 onNameMsgKeyChange={v => { setNameMsgKey(v); if (nameMsgKeyError) setNameMsgKeyError(''); }}
+                onDescriptionChange={setDescription}
                 onDescriptionMsgKeyChange={setDescriptionMsgKey}
                 onUrlChange={v => { setUrl(v); if (urlError) setUrlError(''); }}
                 onIconChange={setIcon}
@@ -476,7 +534,10 @@ export function MenuDetail() {
     const { t } = useI18n();
 
     /* 로컬 편집 상태 */
+    const [i18nMode, setI18nMode] = useState(true);
+    const [name, setName] = useState('');
     const [nameMsgKey, setNameMsgKey] = useState('');
+    const [description, setDescription] = useState('');
     const [descriptionMsgKey, setDescriptionMsgKey] = useState('');
     const [url, setUrl] = useState('');
     const [icon, setIcon] = useState('');
@@ -499,7 +560,12 @@ export function MenuDetail() {
     /* 선택 메뉴 변경 시 로컬 상태 동기화 */
     useEffect(() => {
         if (selectedMenu) {
+            /* nameMsgKey 있으면 다국어 모드, 없으면 직접입력 모드 */
+            const hasMsgKey = !!selectedMenu.nameMsgKey;
+            setI18nMode(hasMsgKey);
+            setName(hasMsgKey ? '' : (selectedMenu.name ?? ''));
             setNameMsgKey(selectedMenu.nameMsgKey ?? '');
+            setDescription(hasMsgKey ? '' : (selectedMenu.description ?? ''));
             setDescriptionMsgKey(selectedMenu.descriptionMsgKey ?? '');
             setUrl(selectedMenu.url || '');
             setIcon(selectedMenu.icon);
@@ -637,7 +703,8 @@ export function MenuDetail() {
     /* 저장 */
     const handleSave = async () => {
         if (isSubmitting) return;
-        const ne = !nameMsgKey ? t('validation.name.required') : '';
+        const nameValue = i18nMode ? nameMsgKey : name;
+        const ne = !nameValue.trim() ? t('validation.name.required') : '';
         const ue = validateUrl(url, t);
         const se = validateSortOrder(sortOrder, t);
         setNameMsgKeyError(ne);
@@ -647,13 +714,13 @@ export function MenuDetail() {
             if (ue) urlRef.current?.focus();
             return;
         }
-        if (!isDirty) { toast.success(t('menu.no_change')); return; }
-
         setIsSubmitting(true);
         try {
             await updateMenu(selectedMenu.id, {
-                nameMsgKey,
-                descriptionMsgKey: descriptionMsgKey || undefined,
+                name: i18nMode ? '' : name.trim(),
+                nameMsgKey: i18nMode ? nameMsgKey : '',
+                description: i18nMode ? '' : description.trim(),
+                descriptionMsgKey: i18nMode ? (descriptionMsgKey || undefined) : undefined,
                 url: (url || '').endsWith('/') && (url || '').length > 1 ? (url || '').replace(/\/+$/, '') : (url || ''),
                 icon,
                 sortOrder: Number(sortOrder),
@@ -662,6 +729,7 @@ export function MenuDetail() {
             toast.success(t('menu.updated'));
             setIsDirty(false);
             await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
+            await queryClient.invalidateQueries({ queryKey: ['menus', 'nav'] });
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg || t('menu.save_error'));
@@ -682,6 +750,7 @@ export function MenuDetail() {
             await deleteMenu(selectedMenu.id);
             toast.success(t('common.deleted'));
             await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
+            await queryClient.invalidateQueries({ queryKey: ['menus', 'nav'] });
         } catch (err: unknown) {
             const msg2 = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             toast.error(msg2 || t('menu.delete_error'));
@@ -724,7 +793,11 @@ export function MenuDetail() {
             <div className="flex-1 overflow-y-auto">
                 {/* 공통 폼 — overflow 없이 내용만 */}
                 <MenuForm
+                    i18nMode={i18nMode}
+                    toggleI18nMode={() => { setI18nMode(v => !v); setNameMsgKeyError(''); }}
+                    name={name}
                     nameMsgKey={nameMsgKey}
+                    description={description}
                     descriptionMsgKey={descriptionMsgKey}
                     url={url}
                     icon={icon}
@@ -734,7 +807,9 @@ export function MenuDetail() {
                     nameMsgKeyError={nameMsgKeyError}
                     urlError={urlError}
                     sortOrderError={sortOrderError}
+                    onNameChange={v => { setName(v); if (nameMsgKeyError) setNameMsgKeyError(''); }}
                     onNameMsgKeyChange={v => { setNameMsgKey(v); if (nameMsgKeyError) setNameMsgKeyError(''); }}
+                    onDescriptionChange={setDescription}
                     onDescriptionMsgKeyChange={setDescriptionMsgKey}
                     onUrlChange={handleUrlChange}
                     onIconChange={setIcon}

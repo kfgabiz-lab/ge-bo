@@ -34,13 +34,31 @@ const BuilderI18nModeContext = createContext<BuilderI18nModeContextValue>({
     toggleI18nMode: () => {},
 });
 
-/** 빌더 다국어 모드 Provider — 컨텐츠 편집 섹션 단위로 래핑 */
-export function BuilderI18nModeProvider({ children }: { children: React.ReactNode }) {
-    /* 기본값 true — 처음부터 다국어 모드 ON */
-    const [i18nMode, setI18nMode] = useState(true);
+/** 빌더 다국어 모드 Provider — 컨텐츠 편집 섹션 단위로 래핑
+ * defaultMode: 위젯 로드 시 i18nMode 저장값 또는 labelMsgKey 감지로 결정한 초기값
+ * onToggle: 토글 시 부모에서 widgetItem.i18nMode를 업데이트하는 콜백 */
+export function BuilderI18nModeProvider({
+    children,
+    defaultMode = true,
+    onToggle,
+}: {
+    children: React.ReactNode;
+    defaultMode?: boolean;
+    onToggle?: (newMode: boolean) => void;
+}) {
+    const [i18nMode, setI18nMode] = useState(defaultMode);
+
+    /* defaultMode 변경 시 (위젯 전환) 동기화 */
+    React.useEffect(() => { setI18nMode(defaultMode); }, [defaultMode]);
+
+    const handleToggle = () => {
+        const newMode = !i18nMode;
+        setI18nMode(newMode);
+        onToggle?.(newMode);
+    };
 
     return (
-        <BuilderI18nModeContext.Provider value={{ i18nMode, toggleI18nMode: () => setI18nMode(v => !v) }}>
+        <BuilderI18nModeContext.Provider value={{ i18nMode, toggleI18nMode: handleToggle }}>
             {children}
         </BuilderI18nModeContext.Provider>
     );
