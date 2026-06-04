@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+    /* 빌드 시 고정 환경변수 — .env 파일 없이 clone 후 바로 실행 가능 */
+    env: {
+        NEXT_PUBLIC_RECAPTCHA_SITE_KEY: '6LfNdAYtAAAAAO7LTBq3y52lRcUtiyAEDIpMCQxH',
+    },
     basePath: '/bo',
     reactStrictMode: false,
     /* Turbopack 기본 사용 — 별도 webpack 설정 불필요 */

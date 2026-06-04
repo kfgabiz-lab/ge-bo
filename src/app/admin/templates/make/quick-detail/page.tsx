@@ -229,13 +229,17 @@ export default function QuickDetailBuilderPage() {
                     <OutputModePanel
                         outputMode={om.outputMode}
                         pageTitle={om.pageTitle}
+                        pageTitleMsgKey={om.pageTitleMsgKey}
                         layerType={om.layerType}
                         layerTitle={om.layerTitle}
+                        layerTitleMsgKey={om.layerTitleMsgKey}
                         layerWidth={om.layerWidth}
                         onOutputModeChange={om.setOutputMode}
                         onPageTitleChange={om.setPageTitle}
+                        onPageTitleMsgKeyChange={om.setPageTitleMsgKey}
                         onLayerTypeChange={om.setLayerType}
                         onLayerTitleChange={om.setLayerTitle}
+                        onLayerTitleMsgKeyChange={om.setLayerTitleMsgKey}
                         onLayerWidthChange={om.setLayerWidth}
                     />
 

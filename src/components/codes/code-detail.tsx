@@ -94,7 +94,7 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
                 <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-md hover:bg-white transition-all">{t('common.btn.cancel')}</button>
-                <button onClick={handleSubmit} disabled={isSubmitting || !groupCode.trim() || !groupName.trim()}
+                <button onClick={handleSubmit} disabled={isSubmitting || !groupCode.trim() || !groupNameMsgKey.trim()}
                     className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                     {isSubmitting ? t('common.loading') : t('code.title.groupNew')}
                 </button>

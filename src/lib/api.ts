@@ -6,7 +6,7 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const BASE_URL = '/api/v1';
 
 /**
  * Axios 기본 인스턴스

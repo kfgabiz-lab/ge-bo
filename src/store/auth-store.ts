@@ -19,7 +19,7 @@ interface AuthState {
     initFromStorage: () => Promise<void>;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const BASE_URL = '/api/v1';
 
 /**
  * 로그인 세션 전역 상태 - Zustand
