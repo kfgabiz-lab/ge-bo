@@ -151,6 +151,10 @@ interface WidgetRendererProps {
     formValues?: Record<string, string>;
     /** Form 필드값 변경 핸들러 */
     onFormValuesChange?: (fieldId: string, value: string) => void;
+    /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 */
+    allFormValues?: Record<string, string>;
+    /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
+    allFieldKeyToId?: Record<string, string>;
     /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
@@ -240,6 +244,8 @@ export function WidgetRenderer({
     /* form */
     formValues = {},
     onFormValuesChange,
+    allFormValues,
+    allFieldKeyToId,
     onContentAction,
     onClose,
     /* file */
@@ -861,6 +867,8 @@ export function WidgetRenderer({
                 codeGroups={codeGroups}
                 values={formValues}
                 onChangeValues={onFormValuesChange}
+                allFormValues={allFormValues}
+                allFieldKeyToId={allFieldKeyToId}
                 fileValues={fileValues}
                 existingFileMeta={existingFileMeta}
                 imgBlobUrls={imgBlobUrls}

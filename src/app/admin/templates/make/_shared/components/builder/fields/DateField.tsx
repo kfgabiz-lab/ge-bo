@@ -28,6 +28,7 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
+                hideCondition={values.hideCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />

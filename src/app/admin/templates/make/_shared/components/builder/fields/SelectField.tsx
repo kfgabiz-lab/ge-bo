@@ -32,6 +32,7 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
+                hideCondition={values.hideCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />

@@ -53,6 +53,9 @@ export interface FieldEditValues {
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부
+    /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 숨김
+     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) */
+    hideCondition?: string;
     /* ── 파일 업로드 & 비디오 설정 (Layer 전용) ── */
     maxFileCount?: number;       // 최대 파일 수
     maxFileSizeMB?: number;      // 개당 최대 용량

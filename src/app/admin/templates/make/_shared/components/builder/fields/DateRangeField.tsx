@@ -31,6 +31,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
+                hideCondition={values.hideCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />

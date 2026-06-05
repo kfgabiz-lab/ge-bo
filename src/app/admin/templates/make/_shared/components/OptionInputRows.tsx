@@ -83,4 +83,4 @@ export const stringsToOpts = (strs: string[]): { text: string; value: string }[]
  * @example optsToStrings([{ text: '전체', value: 'all' }]) // ['전체:all']
  */
 export const optsToStrings = (opts: { text: string; value: string }[]): string[] =>
-    opts.map(o => `${o.text.trim()}:${o.value.trim() || o.text.trim()}`);
+    opts.map(o => `${o.text.trim()}:${o.value.trim()}`);

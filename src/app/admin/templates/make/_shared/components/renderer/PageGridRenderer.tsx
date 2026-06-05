@@ -18,11 +18,13 @@
  *   </PageLayout>
  */
 
+import { useMemo } from 'react';
 import { getSpaceGridColumn } from '../../utils';
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from './WidgetRenderer';
 import type { AnyWidget, RendererMode } from './types';
 import type { CodeGroupDef } from '../../types';
+import type { FormWidget } from '../builder/FormBuilder';
 
 /* ── 공유 타입 (generated/[slug], widget/[slug], 빌더 미리보기 모두 사용) ── */
 
@@ -166,6 +168,20 @@ export function PageGridRenderer({
     multiSelectValuesMap,
     onMultiSelectChange,
 }: PageGridRendererProps) {
+    /* ── cross-form hideCondition 평가용 통합 맵 ──
+     * 페이지 내 모든 Form 위젯의 fieldKey → fieldId, values를 하나로 합산 */
+    const allFieldKeyToId = useMemo(() => {
+        const map: Record<string, string> = {};
+        widgetItems.flatMap(item => item.contents.map(c => c.widget))
+            .filter((w): w is FormWidget => w.type === 'form')
+            .forEach(w => w.fields?.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; }));
+        return map;
+    }, [widgetItems]);
+
+    const allFormValues = useMemo(() => {
+        return Object.assign({}, ...Object.values(formValuesMap ?? {})) as Record<string, string>;
+    }, [formValuesMap]);
+
     /* ── 카테고리 dbSlug 상속 맵 ──
      * depth 2+ 위젯은 dbSlug가 없으므로 parentWidgetId 체인을 타고 올라가 상위 dbSlug 상속.
      * widgetId → resolvedDbSlug */
@@ -248,6 +264,8 @@ export function PageGridRenderer({
                                         /* 폼 */
                                         formValues={formValuesMap?.[wid] ?? {}}
                                         onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
+                                        allFormValues={allFormValues}
+                                        allFieldKeyToId={allFieldKeyToId}
                                         onContentAction={onContentAction}
                                         onClose={onClose}
                                         /* SubList */

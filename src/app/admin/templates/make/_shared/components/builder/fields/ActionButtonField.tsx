@@ -112,6 +112,7 @@ export function ActionButtonField({
             rowSpanConfig={rowSpanConfig}
             compact={compact}
             autoFocus={autoFocus}
+            hideCondition={values.hideCondition}
             onChange={onChange}
             onLabelKeyDown={onLabelKeyDown}
         >

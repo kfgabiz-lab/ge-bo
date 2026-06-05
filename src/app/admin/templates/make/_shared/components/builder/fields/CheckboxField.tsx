@@ -30,6 +30,7 @@ export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, co
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
+                hideCondition={values.hideCondition}
                 onChange={onChange}
             />
             {/* 옵션 */}

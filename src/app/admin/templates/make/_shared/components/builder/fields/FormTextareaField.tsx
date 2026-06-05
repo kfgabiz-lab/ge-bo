@@ -35,6 +35,7 @@ export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
+                hideCondition={values.hideCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />

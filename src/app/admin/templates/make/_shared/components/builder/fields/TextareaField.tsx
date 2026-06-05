@@ -40,6 +40,7 @@ export function TextareaField({
             isPk={values.isPk}
                 required={values.required}
                 readonly={values.readonly}
+                hideCondition={values.hideCondition}
             onChange={onChange}
             onLabelKeyDown={onLabelKeyDown}
         >

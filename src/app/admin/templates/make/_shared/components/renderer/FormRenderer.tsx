@@ -23,6 +23,7 @@
  *   />
  */
 
+import { useMemo } from 'react';
 import type { FormFieldItem } from '../builder/FormBuilder';
 import type { RendererMode } from './types';
 import { FieldRenderer } from './FieldRenderer';
@@ -53,6 +54,10 @@ interface FormRendererProps {
     values?: Record<string, string>;
     /** 필드값 변경 핸들러 — live 모드에서 외부로 값 전달 */
     onChangeValues?: (fieldId: string, value: string) => void;
+    /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 (fieldId → value) */
+    allFormValues?: Record<string, string>;
+    /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
+    allFieldKeyToId?: Record<string, string>;
     /* ── 파일/이미지/비디오 전용 (live 모드) ── */
     /** 새로 선택한 파일 목록 (fieldId → File[]) */
     fileValues?: Record<string, File[]>;
@@ -79,6 +84,8 @@ export function FormRenderer({
     codeGroups = [],
     values = {},
     onChangeValues,
+    allFormValues,
+    allFieldKeyToId,
     fileValues,
     existingFileMeta,
     imgBlobUrls,
@@ -87,6 +94,32 @@ export function FormRenderer({
 }: FormRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
+
+    /* fieldKey → fieldId 역매핑 테이블 — hideCondition 평가에 사용 */
+    const keyToId = useMemo(() => {
+        const map: Record<string, string> = {};
+        fields.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; });
+        return map;
+    }, [fields]);
+
+    /** hideCondition 평가 — "key=v1,key2=v2" AND 복수 조건 지원
+     *  cross-form 참조: allFieldKeyToId/allFormValues로 다른 Form 위젯 필드도 조회 */
+    const shouldHide = (f: FormFieldItem): boolean => {
+        if (isPreview || !f.hideCondition) return false;
+        /* 전체 페이지 역매핑 + 현재 폼 역매핑 합산 (현재 폼 우선) */
+        const resolvedKeyToId = { ...(allFieldKeyToId ?? {}), ...keyToId };
+        /* 전체 페이지 values + 현재 폼 values 합산 (현재 폼 우선) */
+        const resolvedValues = { ...(allFormValues ?? {}), ...values };
+        return f.hideCondition.split(',').every(cond => {
+            const eqIdx = cond.indexOf('=');
+            if (eqIdx === -1) return false;
+            const key = cond.slice(0, eqIdx).trim();
+            const val = cond.slice(eqIdx + 1).trim();
+            const fieldId = resolvedKeyToId[key];
+            if (!fieldId) return false;
+            return (resolvedValues[fieldId] ?? '') === val;
+        });
+    };
 
     if (!fields.length) {
         return (
@@ -116,7 +149,10 @@ export function FormRenderer({
                 </div>
             )}
             {/* 필드들 — gridColumn/gridRow로 자리만 지정, 나머지는 RendererContainer grid가 처리 */}
-            {fields.map(f => (
+            {fields.map(f => {
+                /* live 모드에서 hideCondition 조건 충족 시 렌더링 skip */
+                if (shouldHide(f)) return null;
+                return (
                 <div
                     key={f.id}
                     className="flex flex-col px-3 min-w-0"
@@ -152,7 +188,8 @@ export function FormRenderer({
                         />
                     </div>
                 </div>
-            ))}
+                );
+            })}
         </RendererContainer>
     );
 }

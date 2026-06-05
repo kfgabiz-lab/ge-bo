@@ -14,7 +14,8 @@ export const ImageField = (props: FieldEditProps) => {
                 required={values.required}
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
-        readonly={values.readonly}>
+        readonly={values.readonly}
+        hideCondition={values.hideCondition}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">이미지 등록 설정</p>
 
