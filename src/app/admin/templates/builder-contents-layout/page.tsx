@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 /**
  * Builder 컨텐츠 레이아웃 가이드 페이지
@@ -45,7 +45,7 @@ type TabKey = typeof TABS[number]['key'];
 /*  샘플 위젯 데이터                           */
 /* ══════════════════════════════════════════ */
 
-/** 검색폼 — input / select / date / dateRange / checkbox / radio / button 필드 포함 */
+/** 검색폼 — input / select / date / dateRange / yearMonth / yearMonthRange / checkbox / radio / button 필드 포함 */
 const SAMPLE_SEARCH: SearchWidget = {
     type: 'search',
     widgetId: 'guide-search',
@@ -71,6 +71,13 @@ const SAMPLE_SEARCH: SearchWidget = {
             fields: [
                 { id: 'f6', type: 'radio',  label: '우선순위', colSpan: 1, options: ['높음', '중간', '낮음'] },
                 { id: 'f7', type: 'button', label: '유형',     colSpan: 1, options: ['전체', '공지', '일반', '긴급'] },
+            ],
+        },
+        {
+            id: 'r4', cols: 3,
+            fields: [
+                { id: 'f8', type: 'yearMonth',      label: '년월',        colSpan: 1 },
+                { id: 'f9', type: 'yearMonthRange', label: '기간(년월)', colSpan: 2 },
             ],
         },
     ],
@@ -138,7 +145,7 @@ const SAMPLE_TABLE: TableWidget = {
     ],
 };
 
-/** 폼 — input / select / date / dateRange / radio / checkbox / button / file / image 필드 포함 */
+/** 폼 — input / select / date / dateRange / yearMonth / yearMonthRange / radio / checkbox / button / file / image 필드 포함 */
 const SAMPLE_FORM: FormWidget = {
     type: 'form',
     widgetId: 'guide-form',
@@ -147,15 +154,17 @@ const SAMPLE_FORM: FormWidget = {
     description: '필수 입력 항목은 * 로 표시됩니다.',
     showBorder: true,
     fields: [
-        { id: 'ff1',  type: 'input',     label: '이름',           colSpan: 6,  rowSpan: 1, required: true,  placeholder: '이름을 입력하세요', description: '실명을 입력해주세요. 다른 사용자에게 표시됩니다.' },
-        { id: 'ff2',  type: 'input',     label: '이메일',          colSpan: 6,  rowSpan: 1, required: true,  placeholder: 'email@example.com' },
-        { id: 'ff3',  type: 'select',    label: '부서',            colSpan: 4,  rowSpan: 1, options: ['개발팀', '기획팀', '디자인팀', '마케팅팀'] },
-        { id: 'ff4',  type: 'select',    label: '직급',            colSpan: 4,  rowSpan: 1, options: ['사원', '대리', '과장', '차장', '부장'] },
-        { id: 'ff5',  type: 'date',      label: '입사일',          colSpan: 4,  rowSpan: 1 },
-        { id: 'ff6',  type: 'dateRange', label: '계약기간',         colSpan: 6,  rowSpan: 1 },
-        { id: 'ff7',  type: 'radio',     label: '고용형태',         colSpan: 6,  rowSpan: 1, options: ['정규직', '계약직', '파견직'] },
-        { id: 'ff8',  type: 'checkbox',  label: '권한',            colSpan: 6,  rowSpan: 1, options: ['읽기', '쓰기', '삭제', '관리'] },
-        { id: 'ff9',  type: 'button',    label: '상태',            colSpan: 6,  rowSpan: 1, options: ['활성', '비활성', '대기', '잠금'] },
+        { id: 'ff1',  type: 'input',          label: '이름',           colSpan: 6,  rowSpan: 1, required: true,  placeholder: '이름을 입력하세요', description: '실명을 입력해주세요. 다른 사용자에게 표시됩니다.' },
+        { id: 'ff2',  type: 'input',          label: '이메일',          colSpan: 6,  rowSpan: 1, required: true,  placeholder: 'email@example.com' },
+        { id: 'ff3',  type: 'select',         label: '부서',            colSpan: 4,  rowSpan: 1, options: ['개발팀', '기획팀', '디자인팀', '마케팅팀'] },
+        { id: 'ff4',  type: 'select',         label: '직급',            colSpan: 4,  rowSpan: 1, options: ['사원', '대리', '과장', '차장', '부장'] },
+        { id: 'ff5',  type: 'date',           label: '입사일',          colSpan: 4,  rowSpan: 1 },
+        { id: 'ff17', type: 'yearMonth',      label: '정산년월',        colSpan: 6,  rowSpan: 1 },
+        { id: 'ff18', type: 'yearMonthRange', label: '계약기간(년월)',  colSpan: 6,  rowSpan: 1 },
+        { id: 'ff6',  type: 'dateRange',      label: '계약기간',        colSpan: 6,  rowSpan: 1 },
+        { id: 'ff7',  type: 'radio',          label: '고용형태',        colSpan: 6,  rowSpan: 1, options: ['정규직', '계약직', '파견직'] },
+        { id: 'ff8',  type: 'checkbox',       label: '권한',            colSpan: 6,  rowSpan: 1, options: ['읽기', '쓰기', '삭제', '관리'] },
+        { id: 'ff9',  type: 'button',         label: '상태',            colSpan: 6,  rowSpan: 1, options: ['활성', '비활성', '대기', '잠금'] },
         { id: 'ff10', type: 'file',  label: '첨부파일',      colSpan: 12, rowSpan: 2, maxFileCount: 3, maxFileSizeMB: 5, maxTotalSizeMB: 15, fileTypeMode: 'doc' },
         { id: 'ff11', type: 'image', label: '프로필 이미지', colSpan: 12, rowSpan: 2 },
         { id: 'ff12', type: 'video', label: '동영상',        colSpan: 12, rowSpan: 2, videoMode: 'file' },
@@ -280,7 +289,7 @@ const SAMPLE_TAB: TabWidget = {
             id: 'tab2',
             label: '상세정보',
             items: [
-                { widget: SAMPLE_FORM,  colSpan: 12, rowSpan: 21 },
+                { widget: SAMPLE_FORM,  colSpan: 12, rowSpan: 23 },
                 { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2  },
             ],
         },
@@ -302,11 +311,11 @@ const SAMPLE_TAB: TabWidget = {
 /* 탭별 위젯 배열 — 순서대로 PageLayout 그리드에 배치됨 */
 const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: number }[]> = {
     search: [
-        { widget: SAMPLE_SEARCH,        colSpan: 12, rowSpan: 4 },
+        { widget: SAMPLE_SEARCH,        colSpan: 12, rowSpan: 5 },
         { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 21 }],
+    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 23 }],
     space:    [{ widget: SAMPLE_SPACE,    colSpan: 12, rowSpan: 2 }],
     category: [
         { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },

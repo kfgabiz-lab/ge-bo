@@ -155,12 +155,14 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
         try {
             const menu = get().selectedMenu;
             if (!menu) return;
-            const resolvedMsgKey = updates.nameMsgKey ?? menu.nameMsgKey;
+            /* updates에 nameMsgKey key가 명시적으로 있으면 그 값 사용, 없으면 기존 값 폴백 */
+            const resolvedMsgKey = 'nameMsgKey' in updates ? updates.nameMsgKey : menu.nameMsgKey;
             await api.put(`${API_PATH}/${id}`, {
                 name: resolvedMsgKey ? undefined : (updates.name ?? menu.name),
                 nameMsgKey: resolvedMsgKey || undefined,
                 description: resolvedMsgKey ? undefined : (updates.description ?? menu.description ?? undefined),
-                descriptionMsgKey: resolvedMsgKey ? (updates.descriptionMsgKey ?? menu.descriptionMsgKey ?? undefined) : undefined,
+                /* updates에 descriptionMsgKey key가 명시적으로 있으면 그 값 사용, 없으면 기존 값 폴백 */
+                descriptionMsgKey: resolvedMsgKey ? ('descriptionMsgKey' in updates ? updates.descriptionMsgKey : menu.descriptionMsgKey) : undefined,
                 url: updates.url ?? menu.url ?? '',
                 icon: updates.icon ?? menu.icon,
                 parentId: menu.parentId,

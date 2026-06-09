@@ -16,7 +16,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 /* ── 상수 ── */
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 /** 검색 위젯 — key / 한국어 / 영어 / 사용여부 */
 const SEARCH_WIDGET: SearchWidget = {
@@ -92,7 +92,7 @@ const INITIAL_SEARCH: Record<string, string> = { f1: '', f2: '', f3: '', f4: '�
 export default function I18nPage() {
     const {
         items, totalElements, totalPages, currentPage,
-        isLoading, fetchItems, deleteItem, openDrawer,
+        isLoading, fetchItems, deleteItem, openDrawer, isDrawerOpen,
     } = useMessageResourceStore();
 
     /* 검색 상태 */
@@ -132,6 +132,15 @@ export default function I18nPage() {
         setAppliedSearch({ ...searchValues });
         fetchItems(buildSearchParams(searchValues, 0));
     }, [searchValues, fetchItems, buildSearchParams]);
+
+    /* Enter 키 검색 — Drawer·삭제모달 열려있을 때 제외 */
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Enter' && !isDrawerOpen && !deleteTarget) handleSearch();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [handleSearch, isDrawerOpen, deleteTarget]);
 
     /* 초기화 버튼 */
     const handleReset = useCallback(() => {
@@ -217,7 +226,7 @@ export default function I18nPage() {
                 </GridCell>
 
                 {/* 테이블 위젯 */}
-                <GridCell colSpan={12} rowSpan={7}>
+                <GridCell colSpan={12} rowSpan={8}>
                     <WidgetRenderer
                         mode="live"
                         widget={TABLE_WIDGET}

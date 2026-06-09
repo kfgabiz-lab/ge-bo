@@ -8,6 +8,7 @@
 /** 검색·폼 필드 유형 */
 export type SearchFieldType =
     | 'input' | 'select' | 'date' | 'dateRange'
+    | 'yearMonth' | 'yearMonthRange'            // 년월 선택 (저장값: YYYY-MM)
     | 'radio' | 'checkbox' | 'button'
     | 'textarea'        // 여러 줄 텍스트 표시 (Space 텍스트 아이템 등)
     | 'action-button'   // 액션 버튼 (팝업·API·경로 연결)

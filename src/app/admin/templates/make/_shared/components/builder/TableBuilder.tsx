@@ -155,13 +155,14 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     const confirmAddColumn = () => {
         const p = pendingCol;
         if (!p?.cellType) return;
-        if (p.cellType !== 'actions' && (!p.header?.trim() || !p.accessor?.trim())) return;
+        if (p.cellType !== 'actions' && ((!p.header?.trim() && !p.headerMsgKey?.trim()) || !p.accessor?.trim())) return;
 
         onChange({
             ...widget,
             columns: [...widget.columns, {
-                id:       uid(),
-                header:   p.header?.trim() ?? '',
+                id:          uid(),
+                header:      p.header?.trim() ?? '',
+                headerMsgKey: p.headerMsgKey?.trim() || undefined,
                 accessor: p.accessor?.trim() || 'actions',
                 width:    p.width,
                 widthUnit: p.widthUnit ?? 'px',
@@ -360,9 +361,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                     />
                                 )}
 
-                                {/* 추가 확정 버튼 */}
+                                {/* 추가 확정 버튼 — i18nMode 시 headerMsgKey도 유효 입력으로 인정 */}
                                 <button onClick={confirmAddColumn}
-                                    disabled={pendingCol.cellType !== 'actions' && (!pendingCol.header?.trim() || !pendingCol.accessor?.trim())}
+                                    disabled={pendingCol.cellType !== 'actions' && (
+                                        (!pendingCol.header?.trim() && !pendingCol.headerMsgKey?.trim()) ||
+                                        !pendingCol.accessor?.trim()
+                                    )}
                                     className="w-full py-1.5 text-[11px] font-semibold bg-slate-900 text-white rounded hover:bg-slate-700 disabled:opacity-40 transition-all">
                                     추가
                                 </button>

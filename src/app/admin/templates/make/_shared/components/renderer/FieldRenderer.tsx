@@ -399,6 +399,53 @@ export function FieldRenderer({
                 />
             );
 
+        /* ── yearMonth — 년월 단독 선택 (저장값: YYYY-MM) ── */
+        case 'yearMonth':
+            return (
+                <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <input
+                        type="month"
+                        readOnly={isReadOnly}
+                        className={`${inputCls} pl-9${readonlyCls}`}
+                        value={value}
+                        onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
+                    />
+                </div>
+            );
+
+        /* ── yearMonthRange — 년월 범위 선택 (저장값: YYYY-MM~YYYY-MM) ── */
+        case 'yearMonthRange': {
+            const parts = (value || '~').split('~');
+            const from  = parts[0] || '';
+            const to    = parts[1] || '';
+            return (
+                <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                            type="month"
+                            readOnly={isReadOnly}
+                            className={`${inputCls} pl-9${readonlyCls}`}
+                            value={from}
+                            onChange={isReadOnly ? undefined : e => onChange?.(`${e.target.value}~${to}`)}
+                        />
+                    </div>
+                    <span className="text-sm text-slate-400 flex-shrink-0">~</span>
+                    <div className="relative flex-1">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                            type="month"
+                            readOnly={isReadOnly}
+                            className={`${inputCls} pl-9${readonlyCls}`}
+                            value={to}
+                            onChange={isReadOnly ? undefined : e => onChange?.(`${from}~${e.target.value}`)}
+                        />
+                    </div>
+                </div>
+            );
+        }
+
         /* ── dateRange ── */
         case 'dateRange': {
             const parts = (value || '~').split('~');

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import api from '@/lib/api';
 import { useLanguageStore } from '@/store/use-language-store';
 import { useI18n } from '@/hooks/use-i18n';
@@ -149,7 +149,19 @@ export function MessageKeySelector({ value, onChange, disabled, resourceType = '
                 <span className={displayText ? 'text-slate-800' : 'text-slate-400'}>
                     {displayText || t('common.select.placeholder')}
                 </span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 flex-shrink-0 ml-2 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
+                    {/* 값 초기화 버튼 — 값이 있고 비활성화 아닐 때만 표시 */}
+                    {value && !disabled && (
+                        <span
+                            role="button"
+                            onClick={e => { e.stopPropagation(); onChange?.(''); }}
+                            className="p-0.5 text-slate-300 hover:text-slate-500 transition-colors rounded"
+                        >
+                            <X className="w-3 h-3" />
+                        </span>
+                    )}
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </div>
             </button>
 
             {/* 드롭다운 패널 — Portal로 body에 렌더링 (overflow 컨테이너 회피) */}

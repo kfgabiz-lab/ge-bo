@@ -54,7 +54,7 @@ export default function RolesSystemPage() {
     const loadRoles = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get('/roles/assignable');
+            const res = await api.get('/roles');
             setAllRoles(res.data);
         } finally {
             setLoading(false);

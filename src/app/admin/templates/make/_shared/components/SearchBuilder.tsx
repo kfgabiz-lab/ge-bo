@@ -53,13 +53,15 @@ interface SearchBuilderProps {
 
 /** 필드 유형 메타 (list/page.tsx FIELD_TYPES와 동일) */
 const FIELD_TYPES: { type: SearchFieldType; label: string; desc: string; defaultColSpan: 1 | 2 }[] = [
-    { type: 'input',     label: 'Input',      desc: '텍스트 입력',       defaultColSpan: 1 },
-    { type: 'select',    label: 'Select',     desc: '셀렉트 박스',       defaultColSpan: 1 },
-    { type: 'date',      label: 'Date',       desc: '날짜 단독',         defaultColSpan: 1 },
-    { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)', defaultColSpan: 2 },
-    { type: 'radio',     label: 'Radio',      desc: '라디오 단일선택',   defaultColSpan: 1 },
-    { type: 'checkbox',  label: 'Checkbox',   desc: '체크박스 복수선택', defaultColSpan: 1 },
-    { type: 'button',    label: 'Button',     desc: '선택 버튼',         defaultColSpan: 1 },
+    { type: 'input',          label: 'Input',            desc: '텍스트 입력',          defaultColSpan: 1 },
+    { type: 'select',         label: 'Select',           desc: '셀렉트 박스',          defaultColSpan: 1 },
+    { type: 'date',           label: 'Date',             desc: '날짜 단독',            defaultColSpan: 1 },
+    { type: 'dateRange',      label: 'Date Range',       desc: '날짜 범위 (from~to)',  defaultColSpan: 2 },
+    { type: 'yearMonth',      label: 'Year Month',       desc: '년월 단독',            defaultColSpan: 1 },
+    { type: 'yearMonthRange', label: 'Year Month Range', desc: '년월 범위 (from~to)',  defaultColSpan: 2 },
+    { type: 'radio',          label: 'Radio',            desc: '라디오 단일선택',      defaultColSpan: 1 },
+    { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',    defaultColSpan: 1 },
+    { type: 'button',         label: 'Button',           desc: '선택 버튼',            defaultColSpan: 1 },
 ];
 
 /** 옵션이 필요한 필드 타입 여부 */
@@ -192,7 +194,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
         if (!pendingType || !pendingValues) return true;
         const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options } = pendingValues;
         if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
-        if (pendingType === 'dateRange' && (!label2?.trim() && !label2MsgKey?.trim())) return true;
+        if ((pendingType === 'dateRange' || pendingType === 'yearMonthRange') && (!label2?.trim() && !label2MsgKey?.trim())) return true;
         if (needsOptions(pendingType)) {
             const hasCodeGroup = !!codeGroupCode;
             const hasOptions = !!options?.some(o => o.trim());
@@ -219,8 +221,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             type: pendingType,
             label: label.trim(),
             labelMsgKey: labelMsgKey?.trim() || undefined,
-            label2: pendingType === 'dateRange' ? label2?.trim() : undefined,
-            label2MsgKey: pendingType === 'dateRange' ? (label2MsgKey?.trim() || undefined) : undefined,
+            label2: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? label2?.trim() : undefined,
+            label2MsgKey: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (label2MsgKey?.trim() || undefined) : undefined,
             fieldKey: fieldKey?.trim() || undefined,
             placeholder: placeholder?.trim() || (pendingType === 'input' ? '입력하세요' : pendingType === 'select' ? '전체' : ''),
             placeholderMsgKey: placeholderMsgKey?.trim() || undefined,
@@ -274,7 +276,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             colSpanMode: {
                 type: 'button' as const,
                 options: [1, 2, 3, 4, 5],
-                minSpan: type === 'dateRange' ? 2 : 1,
+                minSpan: (type === 'dateRange' || type === 'yearMonthRange') ? 2 : 1,
             },
             codeGroups,
             codeGroupsLoading,
@@ -282,14 +284,16 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             onLabelKeyDown: extra?.onLabelKeyDown,
         };
         switch (type) {
-            case 'input':     return <InputField {...props} />;
-            case 'select':    return <SelectField {...props} />;
-            case 'date':      return <DateField {...props} />;
-            case 'dateRange': return <DateRangeField {...props} />;
-            case 'radio':     return <RadioField {...props} />;
-            case 'checkbox':  return <CheckboxField {...props} />;
-            case 'button':    return <ButtonField {...props} />;
-            default:          return null;
+            case 'input':          return <InputField {...props} />;
+            case 'select':         return <SelectField {...props} />;
+            case 'date':           return <DateField {...props} />;
+            case 'dateRange':      return <DateRangeField {...props} />;
+            case 'yearMonth':      return <DateField {...props} />;
+            case 'yearMonthRange': return <DateRangeField {...props} />;
+            case 'radio':          return <RadioField {...props} />;
+            case 'checkbox':       return <CheckboxField {...props} />;
+            case 'button':         return <ButtonField {...props} />;
+            default:               return null;
         }
     };
 
@@ -351,7 +355,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                     </span>
                                                                     <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">{field.type}</span>
                                                                     <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
-                                                                        {field.type === 'dateRange'
+                                                                        {(field.type === 'dateRange' || field.type === 'yearMonthRange')
                                                                             ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
                                                                             : (field.labelMsgKey ? t(field.labelMsgKey) : field.label)
                                                                         }
@@ -427,7 +431,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                 {
                                                                     autoFocus: true,
                                                                     onLabelKeyDown: e => {
-                                                                        if (e.key === 'Enter' && pendingType !== 'dateRange') confirmAddField();
+                                                                        if (e.key === 'Enter' && pendingType !== 'dateRange' && pendingType !== 'yearMonthRange') confirmAddField();
                                                                         if (e.key === 'Escape') cancelAddField();
                                                                     },
                                                                 }

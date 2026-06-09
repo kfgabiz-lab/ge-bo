@@ -46,7 +46,7 @@ export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig
                     <MessageKeySelector
                         value={values.placeholderMsgKey ?? ''}
                         onChange={key => onChange({ placeholderMsgKey: key })}
-                        resourceType="SENTENCE"
+                        resourceType={undefined}
                         size="sm"
                     />
                 ) : (

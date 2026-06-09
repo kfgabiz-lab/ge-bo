@@ -41,8 +41,10 @@ export const CommonFieldDispatcher = (props: CommonFieldDispatcherProps) => {
         case 'input':
         case 'text': return <InputField {...fieldProps} />;
         case 'select': return <SelectField {...fieldProps} />;
-        case 'date': return <DateField {...fieldProps} />;
-        case 'dateRange': return <DateRangeField {...fieldProps} />;
+        case 'date':           return <DateField {...fieldProps} />;
+        case 'dateRange':      return <DateRangeField {...fieldProps} />;
+        case 'yearMonth':      return <DateField {...fieldProps} />;
+        case 'yearMonthRange': return <DateRangeField {...fieldProps} />;
         case 'radio': return <RadioField {...fieldProps} />;
         case 'checkbox': return <CheckboxField {...fieldProps} />;
         case 'textarea': return <TextareaField {...fieldProps} />;

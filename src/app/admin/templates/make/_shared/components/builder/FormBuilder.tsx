@@ -74,20 +74,22 @@ export interface FormWidget {    type: 'form';
 
 /** Form 위젯 지원 필드 타입 */
 const FORM_FIELD_TYPES: FieldTypeItem[] = [
-    { type: 'input',     label: 'Input',      desc: '텍스트 입력',              defaultColSpan: 1 },
-    { type: 'select',    label: 'Select',     desc: '셀렉트 박스',              defaultColSpan: 1 },
-    { type: 'date',      label: 'Date',       desc: '날짜 단독',                defaultColSpan: 1 },
-    { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)',      defaultColSpan: 2 },
-    { type: 'radio',     label: 'Radio',      desc: '라디오 단일선택',          defaultColSpan: 1 },
-    { type: 'checkbox',  label: 'Checkbox',   desc: '체크박스 복수선택',        defaultColSpan: 1 },
-    { type: 'button',    label: 'Button',     desc: '선택 버튼',                defaultColSpan: 1 },
-    { type: 'editor',    label: 'Editor',     desc: '위지윅 에디터',            defaultColSpan: 2 },
-    { type: 'file',      label: 'File',       desc: '파일 업로드',              defaultColSpan: 2 },
-    { type: 'image',     label: 'Image',      desc: '이미지 등록',              defaultColSpan: 2 },
-    { type: 'video',     label: 'Video',      desc: 'URL · 파일 업로드',        defaultColSpan: 2 },
-    { type: 'media',     label: '미디어',     desc: '이미지·동영상 통합',        defaultColSpan: 2 },
-    { type: 'textarea',  label: 'Textarea',   desc: '여러 줄 텍스트 입력',      defaultColSpan: 2 },
-    { type: 'hidden',    label: 'Hidden',     desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
+    { type: 'input',          label: 'Input',            desc: '텍스트 입력',              defaultColSpan: 1 },
+    { type: 'select',         label: 'Select',           desc: '셀렉트 박스',              defaultColSpan: 1 },
+    { type: 'date',           label: 'Date',             desc: '날짜 단독',                defaultColSpan: 1 },
+    { type: 'dateRange',      label: 'Date Range',       desc: '날짜 범위 (from~to)',      defaultColSpan: 2 },
+    { type: 'yearMonth',      label: 'Year Month',       desc: '년월 단독',                defaultColSpan: 1 },
+    { type: 'yearMonthRange', label: 'Year Month Range', desc: '년월 범위 (from~to)',      defaultColSpan: 2 },
+    { type: 'radio',          label: 'Radio',            desc: '라디오 단일선택',          defaultColSpan: 1 },
+    { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',        defaultColSpan: 1 },
+    { type: 'button',         label: 'Button',           desc: '선택 버튼',                defaultColSpan: 1 },
+    { type: 'editor',         label: 'Editor',           desc: '위지윅 에디터',            defaultColSpan: 2 },
+    { type: 'file',           label: 'File',             desc: '파일 업로드',              defaultColSpan: 2 },
+    { type: 'image',          label: 'Image',            desc: '이미지 등록',              defaultColSpan: 2 },
+    { type: 'video',          label: 'Video',            desc: 'URL · 파일 업로드',        defaultColSpan: 2 },
+    { type: 'media',          label: '미디어',           desc: '이미지·동영상 통합',        defaultColSpan: 2 },
+    { type: 'textarea',       label: 'Textarea',         desc: '여러 줄 텍스트 입력',      defaultColSpan: 2 },
+    { type: 'hidden',         label: 'Hidden',           desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
 ];
 
 const uid = createIdGenerator('fb');
@@ -293,11 +295,13 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
         };
 
         switch (f.type) {
-            case 'input':     return <InputField {...props} />;
-            case 'select':    return <SelectField {...props} />;
-            case 'date':      return <DateField {...props} />;
-            case 'dateRange': return <DateRangeField {...props} />;
-            case 'radio':     return <RadioField {...props} />;
+            case 'input':          return <InputField {...props} />;
+            case 'select':         return <SelectField {...props} />;
+            case 'date':           return <DateField {...props} />;
+            case 'dateRange':      return <DateRangeField {...props} />;
+            case 'yearMonth':      return <DateField {...props} />;
+            case 'yearMonthRange': return <DateRangeField {...props} />;
+            case 'radio':          return <RadioField {...props} />;
             case 'checkbox':  return <CheckboxField {...props} />;
             case 'button':    return <ButtonField {...props} />;
             case 'editor':    return <EditorField {...props} />;

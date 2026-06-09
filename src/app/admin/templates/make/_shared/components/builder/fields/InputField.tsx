@@ -44,7 +44,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                     <MessageKeySelector
                         value={values.placeholderMsgKey ?? ''}
                         onChange={key => onChange({ placeholderMsgKey: key })}
-                        resourceType="SENTENCE"
+                        resourceType={undefined}
                         size="sm"
                     />
                 ) : (

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -118,6 +118,15 @@ export function Sidebar() {
             return next;
         });
     };
+
+    /* 메뉴가 처음 로드될 때(0 → N개) 모든 카테고리를 접힌 상태로 초기화 */
+    const prevMenusLengthRef = useRef(0);
+    useEffect(() => {
+        if (prevMenusLengthRef.current === 0 && menus.length > 0) {
+            setCollapsedCategories(new Set(menus.map(cat => cat.id)));
+        }
+        prevMenusLengthRef.current = menus.length;
+    }, [menus]);
 
     /* 메뉴 조회 (로그인 후) */
     useEffect(() => {
