@@ -42,6 +42,7 @@ export interface SearchFieldConfig {
     options?: string[];
     minLength?: number;
     maxLength?: number;
+    showCharCount?: boolean;    // 글자수 표시 여부 (input/textarea 전용)
     pattern?: string;
     patternDesc?: string;
     minSelect?: number;

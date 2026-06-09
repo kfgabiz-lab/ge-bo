@@ -441,6 +441,11 @@ export default function PageBuilderPage() {
                 } else {
                     fieldKeys.push(f.fieldKey.trim());
                 }
+                /* 글자수 표시 ON + 최대 글자 미설정 검사 */
+                if ((f.type === 'input' || f.type === 'textarea') && f.showCharCount && !f.maxLength) {
+                    const fieldLabel = f.label || f.fieldKey || '?';
+                    errors.push(`[Form:${label}] '${fieldLabel}' 필드: 글자수 표시 사용 시 최대 글자를 설정해주세요`);
+                }
             });
             /* 내부 fieldKey 중복 */
             const dupFieldKeys = fieldKeys.filter((k, i) => fieldKeys.indexOf(k) !== i);

@@ -11,7 +11,7 @@ import { TableColumns } from '@/components/database/table-columns';
 
 export default function DatabaseTablesPage() {
     return (
-        <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+        <div className="flex flex-col h-[calc(100vh-120px)]">
             {/* 페이지 헤더 */}
             <div className="flex items-center justify-between mb-6">
                 <div>

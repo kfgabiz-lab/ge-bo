@@ -5,6 +5,7 @@
  * - 위젯 빌더 connectedSlug 연동용 slug 사전 등록/조회/수정/삭제
  * - type 필터 / 키워드 검색 지원
  * - 수정 시 slug 변경 불가
+ * - PAGE_DATA 타입에 한해 slug_entity 연동 select box 제공
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,10 +24,20 @@ interface SlugRegistry {
     type: string;
     description: string | null;
     active: boolean;
+    entityId: number | null;
+    entitySlug: string | null;
+    entityName: string | null;
     createdBy: string;
     createdAt: string;
     updatedBy: string;
     updatedAt: string;
+}
+
+/** slug_entity/active API 응답 */
+interface SlugEntityOption {
+    id: number;
+    slug: string;
+    name: string;
 }
 
 interface PageResponse {
@@ -44,6 +55,7 @@ const EMPTY_FORM = {
     type: 'PAGE_DATA',
     description: '',
     active: true,
+    entityId: null as number | null,
 };
 
 /* ══════════════════════════════════════════ */
@@ -90,6 +102,16 @@ export default function SlugRegistryPage() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
 
+    /* entity 목록 (PAGE_DATA select box용) */
+    const [entityOptions, setEntityOptions] = useState<SlugEntityOption[]>([]);
+
+    /* ── 활성 entity 목록 조회 (마운트 1회) ── */
+    useEffect(() => {
+        api.get<SlugEntityOption[]>('/slug-entity/active')
+            .then(res => setEntityOptions(res.data))
+            .catch(() => { /* entity 목록 실패 시 select box 비움 — 무시 */ });
+    }, []);
+
     /* ── 목록 조회 ── */
     const fetchList = useCallback(async (page = 0, typ = filterType, kw = filterKeyword) => {
         setLoading(true);
@@ -130,11 +152,12 @@ export default function SlugRegistryPage() {
     const openEdit = (item: SlugRegistry) => {
         setEditTarget(item);
         setForm({
-            slug:        item.slug,            // 표시용 (수정 불가)
+            slug:        item.slug,
             name:        item.name,
             type:        item.type,
             description: item.description ?? '',
             active:      item.active,
+            entityId:    item.entityId ?? null,
         });
         setModalOpen(true);
     };
@@ -152,6 +175,8 @@ export default function SlugRegistryPage() {
                 type:        form.type,
                 description: form.description.trim() || null,
                 active:      form.active,
+                /* PAGE_DATA 타입일 때만 entityId 전송, 나머지는 null */
+                entityId:    form.type === 'PAGE_DATA' ? form.entityId : null,
             };
             if (editTarget) {
                 await api.put(`/slug-registry/${editTarget.id}`, body);
@@ -250,6 +275,7 @@ export default function SlugRegistryPage() {
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap">Slug</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap">별칭</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[130px]">타입</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap w-[140px]">Entity</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap">설명</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[70px]">사용</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap w-[130px]">생성일</th>
@@ -260,13 +286,13 @@ export default function SlugRegistryPage() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={8} className="py-16 text-center">
+                                    <td colSpan={9} className="py-16 text-center">
                                         <Loader2 className="w-5 h-5 animate-spin text-slate-300 mx-auto" />
                                     </td>
                                 </tr>
                             ) : items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="py-16 text-center text-sm text-slate-400">
+                                    <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
                                         등록된 slug가 없습니다
                                     </td>
                                 </tr>
@@ -280,7 +306,18 @@ export default function SlugRegistryPage() {
                                                 {item.type}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-slate-500 max-w-[240px] truncate" title={item.description ?? ''}>
+                                        {/* Entity 컬럼 — PAGE_DATA에만 표시, 나머지는 '-' */}
+                                        <td className="px-4 py-3">
+                                            {item.type === 'PAGE_DATA' && item.entityName ? (
+                                                <span className="inline-flex flex-col">
+                                                    <span className="text-xs font-medium text-slate-700">{item.entityName}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono">{item.entitySlug}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-300">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-slate-500 max-w-[200px] truncate" title={item.description ?? ''}>
                                             {item.description || '-'}
                                         </td>
                                         <td className="px-4 py-3 text-center">
@@ -352,10 +389,8 @@ export default function SlugRegistryPage() {
                                     {editTarget && <span className="ml-2 text-[10px] font-normal text-slate-400">(등록 후 변경 불가)</span>}
                                 </label>
                                 {editTarget ? (
-                                    /* 수정 시 — 읽기 전용 표시 */
                                     <input type="text" value={form.slug} readOnly className={readonlyCls} />
                                 ) : (
-                                    /* 등록 시 — 직접 입력 */
                                     <input
                                         type="text"
                                         value={form.slug}
@@ -381,13 +416,50 @@ export default function SlugRegistryPage() {
                                 <div>
                                     <label className="block text-xs font-semibold text-slate-600 mb-1.5">타입 <span className="text-red-400">*</span></label>
                                     <div className="relative">
-                                        <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={selectCls}>
+                                        <select
+                                            value={form.type}
+                                            onChange={e => setForm(f => ({
+                                                ...f,
+                                                type: e.target.value,
+                                                /* 타입 변경 시 entity 선택 초기화 */
+                                                entityId: e.target.value === 'PAGE_DATA' ? f.entityId : null,
+                                            }))}
+                                            className={selectCls}
+                                        >
                                             {SLUG_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                                         </select>
                                         <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Entity 선택 — PAGE_DATA 타입일 때만 표시 */}
+                            {form.type === 'PAGE_DATA' && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                                        Entity 연결
+                                        <span className="ml-1.5 text-[10px] font-normal text-slate-400">(선택)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            value={form.entityId ?? ''}
+                                            onChange={e => setForm(f => ({
+                                                ...f,
+                                                entityId: e.target.value ? Number(e.target.value) : null,
+                                            }))}
+                                            className={selectCls}
+                                        >
+                                            <option value="">연결 안 함</option>
+                                            {entityOptions.map(e => (
+                                                <option key={e.id} value={e.id}>
+                                                    {e.name} ({e.slug})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* 설명 */}
                             <div>

@@ -265,6 +265,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 multiSelect:        f.multiSelect,
                 minLength:          f.minLength,
                 maxLength:          f.maxLength,
+                showCharCount:      f.showCharCount,
                 pattern:            f.pattern,
                 patternDesc:        f.patternDesc,
                 minSelect:          f.minSelect,

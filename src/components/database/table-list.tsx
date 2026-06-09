@@ -11,6 +11,12 @@ import React, { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useDatabaseStore } from '@/store/use-database-store';
 
+/* 선택 상태별 테이블 행 스타일 상수 */
+const ITEM_SELECTED = 'w-full flex items-center justify-between px-2.5 py-2 rounded-md text-left transition-all bg-slate-900 text-white';
+const ITEM_DEFAULT  = 'w-full flex items-center justify-between px-2.5 py-2 rounded-md text-left transition-all hover:bg-slate-50 text-slate-700';
+const COUNT_SELECTED = 'text-[10px] shrink-0 ml-2 text-white/60';
+const COUNT_DEFAULT  = 'text-[10px] shrink-0 ml-2 text-slate-400';
+
 export function TableList() {
     const { tables, selectedTable, selectTable, isLoading, fetchTables } = useDatabaseStore();
     const [search, setSearch] = useState('');
@@ -71,18 +77,14 @@ export function TableList() {
                                 <button
                                     key={table.tableName}
                                     onClick={() => selectTable(isSelected ? null : table)}
-                                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-left transition-all ${
-                                        isSelected
-                                            ? 'bg-slate-900 text-white'
-                                            : 'hover:bg-slate-50 text-slate-700'
-                                    }`}
+                                    className={isSelected ? ITEM_SELECTED : ITEM_DEFAULT}
                                 >
                                     {/* 테이블명 */}
                                     <span className="text-[11px] font-mono font-medium truncate flex-1">
                                         {table.tableName}
                                     </span>
                                     {/* 컬럼 수 */}
-                                    <span className={`text-[10px] shrink-0 ml-2 ${isSelected ? 'text-white/60' : 'text-slate-400'}`}>
+                                    <span className={isSelected ? COUNT_SELECTED : COUNT_DEFAULT}>
                                         {table.columnCount}
                                     </span>
                                 </button>

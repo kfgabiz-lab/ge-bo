@@ -60,6 +60,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                     required: values.required ?? false,
                     minLength: values.minLength,
                     maxLength: values.maxLength,
+                    showCharCount: values.showCharCount,
                     pattern: values.pattern ?? '',
                     patternDesc: values.patternDesc ?? '',
                 }}

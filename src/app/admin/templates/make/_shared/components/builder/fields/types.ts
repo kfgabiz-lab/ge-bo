@@ -32,6 +32,7 @@ export interface FieldEditValues {
     multiSelect?: boolean;   // button 전용 다중선택 여부
     minLength?: number;
     maxLength?: number;
+    showCharCount?: boolean;  // 글자수 표시 여부 (input/textarea 전용)
     pattern?: string;
     patternDesc?: string;
     minSelect?: number;

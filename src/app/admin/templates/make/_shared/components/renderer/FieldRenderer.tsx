@@ -335,8 +335,8 @@ export function FieldRenderer({
     switch (field.type) {
 
         /* ── input ── */
-        case 'input':
-            return (
+        case 'input': {
+            const inputEl = (
                 <input
                     type="text"
                     disabled={isPreview}
@@ -346,11 +346,25 @@ export function FieldRenderer({
                             ? t(field.placeholderMsgKey)
                             : (field.placeholder || '입력하세요')
                     }
+                    maxLength={field.showCharCount && field.maxLength ? field.maxLength : undefined}
                     className={`${inputCls}${readonlyCls}`}
                     value={value}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                 />
             );
+            /* 글자수 표시 ON + maxLength 설정된 경우: 카운터 표시 */
+            if (field.showCharCount && field.maxLength) {
+                return (
+                    <div>
+                        {inputEl}
+                        <div className="text-right text-[10px] text-slate-400 mt-0.5">
+                            {value.length}/{field.maxLength}
+                        </div>
+                    </div>
+                );
+            }
+            return inputEl;
+        }
 
         /* ── select ── */
         case 'select':
@@ -562,6 +576,25 @@ export function FieldRenderer({
                 );
             }
             /* onChange 있으면 편집 가능한 textarea (FormRenderer 등 입력 컨텍스트) */
+            /* 글자수 표시 ON + maxLength 설정된 경우: 카운터 표시 */
+            if (field.showCharCount && field.maxLength) {
+                return (
+                    <div className="flex flex-col h-full">
+                        <textarea
+                            disabled={isPreview}
+                            readOnly={isReadOnly}
+                            className={`${inputCls} resize-none flex-1 min-h-0${readonlyCls}`}
+                            value={value}
+                            maxLength={field.maxLength}
+                            placeholder={field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요')}
+                            onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
+                        />
+                        <div className="text-right text-[10px] text-slate-400 mt-0.5">
+                            {value.length}/{field.maxLength}
+                        </div>
+                    </div>
+                );
+            }
             return (
                 <textarea
                     disabled={isPreview}

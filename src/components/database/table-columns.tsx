@@ -9,6 +9,10 @@
 import React from 'react';
 import { useDatabaseStore } from '@/store/use-database-store';
 
+/* NULL 여부 배지 스타일 상수 */
+const NULL_BADGE_NULLABLE  = 'inline-block px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-400';
+const NULL_BADGE_NOT_NULL  = 'inline-block px-1.5 py-0.5 rounded text-[10px] bg-red-50 text-red-500 font-semibold';
+
 export function TableColumns() {
     const { selectedTable, isColumnsLoading } = useDatabaseStore();
 
@@ -76,11 +80,7 @@ export function TableColumns() {
 
                                     {/* NULL 여부 */}
                                     <td className="px-4 py-2.5 text-center">
-                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${
-                                            col.isNullable
-                                                ? 'bg-slate-100 text-slate-400'
-                                                : 'bg-red-50 text-red-500 font-semibold'
-                                        }`}>
+                                        <span className={col.isNullable ? NULL_BADGE_NULLABLE : NULL_BADGE_NOT_NULL}>
                                             {col.isNullable ? 'Y' : 'N'}
                                         </span>
                                     </td>

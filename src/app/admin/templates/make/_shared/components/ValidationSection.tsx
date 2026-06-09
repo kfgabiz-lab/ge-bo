@@ -1,9 +1,12 @@
 'use client';
 
+import { ToggleRow } from './builder/fields/_ToggleRow';
+
 export interface ValidationValues {
     required?: boolean;  // _FieldBase에서 처리 — ValidationSection에서는 미사용
     minLength?: number;
     maxLength?: number;
+    showCharCount?: boolean;  // 글자수 표시 여부 (input/textarea 전용)
     pattern: string;
     patternDesc: string;
     minSelect?: number;
@@ -28,10 +31,16 @@ interface ValidationSectionProps {
  */
 export const ValidationSection = ({ fieldType, values, onChange }: ValidationSectionProps) => (
     <div className="space-y-2">
-        {/* input 전용: 최소/최대 글자, 정규식 */}
+        {/* input 전용: 글자수 표시 + 최소/최대 글자, 정규식 */}
         {fieldType === 'input' && (
             <div className="space-y-1.5 pt-1 border-t border-slate-100">
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Validation</p>
+                {/* 글자수 표시 토글 */}
+                <ToggleRow
+                    label="글자수 표시"
+                    value={values.showCharCount ?? false}
+                    onChange={v => onChange({ showCharCount: v })}
+                />
                 <div className="grid grid-cols-2 gap-1.5">
                     <div>
                         <label className="text-[10px] text-slate-500 mb-0.5 block">최소 글자</label>
