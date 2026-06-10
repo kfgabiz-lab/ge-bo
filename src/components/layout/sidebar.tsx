@@ -34,8 +34,8 @@ const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; dep
     /* 활성 상태 판단 */
     const isDirectActive = hasUrl && item.url === pathname;
     const isChildActive = hasChildren && item.children?.some(child =>
-        child.url === pathname || pathname?.startsWith(child.url || '') ||
-        (child.children && child.children.some(gc => gc.url === pathname || pathname?.startsWith(gc.url || '')))
+        (child.url && (child.url === pathname || pathname?.startsWith(child.url))) ||
+        (child.children && child.children.some(gc => gc.url && (gc.url === pathname || pathname?.startsWith(gc.url))))
     );
     const isActive = isDirectActive || isChildActive;
     const [isOpen, setIsOpen] = useState(isActive ?? false);
