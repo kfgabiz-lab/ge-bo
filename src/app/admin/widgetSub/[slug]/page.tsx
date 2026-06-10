@@ -141,10 +141,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     const section = (fw.contentKey && dataJson[fw.contentKey])
                         ? dataJson[fw.contentKey] as Record<string, unknown>
                         : dataJson;
+                    /* image 타입만 imageFieldIds에 포함 — media는 파일별 mimeType으로 개별 판별 */
                     const imageFieldIds = new Set(fw.fields.filter(f => f.type === 'image').map(f => f.id));
                     const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
                     fw.fields.forEach(f => {
-                        if (!f.fieldKey || (f.type !== 'file' && f.type !== 'image')) return;
+                        if (!f.fieldKey || (f.type !== 'file' && f.type !== 'image' && f.type !== 'media')) return;
                         const ids = section[f.fieldKey];
                         if (!Array.isArray(ids)) return;
                         metaByFieldId[f.id] = (ids as number[]).map(id => {
@@ -152,6 +153,13 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                             return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
                         });
                         if (imageFieldIds.has(f.id)) {
+                            (ids as number[]).forEach(id => {
+                                api.get(`/page-files/${id}`, { responseType: 'blob' })
+                                    .then(blobRes => setImgBlobUrls(prev => ({ ...prev, [id]: URL.createObjectURL(blobRes.data) })))
+                                    .catch(() => {});
+                            });
+                        } else if (f.type === 'media') {
+                            /* media 타입: 이미지·동영상 모두 blob URL 생성 (이미지→img, 동영상→video) */
                             (ids as number[]).forEach(id => {
                                 api.get(`/page-files/${id}`, { responseType: 'blob' })
                                     .then(blobRes => setImgBlobUrls(prev => ({ ...prev, [id]: URL.createObjectURL(blobRes.data) })))
@@ -584,7 +592,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     const fw = w as FormWidget;
                     formFileIdsMap[fw.widgetId] = {};
                     for (const f of fw.fields) {
-                        if (f.type !== 'file' && f.type !== 'image') continue;
+                        if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
                         const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map(m => m.id);
                         formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
                     }
@@ -654,10 +662,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                             if (w.type !== 'form') continue;
                             const fw = w as FormWidget;
                             const section = fw.contentKey ? dataJson[fw.contentKey] as Record<string, unknown> : dataJson;
+                            /* image 타입만 imageFieldIds에 포함 — media는 파일별 mimeType으로 개별 판별 */
                             const imageFieldIds = new Set(fw.fields.filter(f => f.type === 'image').map(f => f.id));
                             const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
                             fw.fields.forEach(f => {
-                                if (!f.fieldKey || (f.type !== 'file' && f.type !== 'image')) return;
+                                if (!f.fieldKey || (f.type !== 'file' && f.type !== 'image' && f.type !== 'media')) return;
                                 const ids = section[f.fieldKey];
                                 if (!Array.isArray(ids)) return;
                                 metaByFieldId[f.id] = (ids as number[]).map(id => {
@@ -665,6 +674,14 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                                     return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
                                 });
                                 if (imageFieldIds.has(f.id)) {
+                                    (ids as number[]).forEach(id => {
+                                        if (imgBlobUrls[id]) return;
+                                        api.get(`/page-files/${id}`, { responseType: 'blob' })
+                                            .then(blobRes => setImgBlobUrls(prev => ({ ...prev, [id]: URL.createObjectURL(blobRes.data) })))
+                                            .catch(() => {});
+                                    });
+                                } else if (f.type === 'media') {
+                                    /* media 타입: 이미지·동영상 모두 blob URL 생성 (이미지→img, 동영상→video) */
                                     (ids as number[]).forEach(id => {
                                         if (imgBlobUrls[id]) return;
                                         api.get(`/page-files/${id}`, { responseType: 'blob' })

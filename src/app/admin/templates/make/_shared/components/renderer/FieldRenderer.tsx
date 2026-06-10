@@ -1163,7 +1163,8 @@ export function FieldRenderer({
         case 'media': {
             /* rowSpan 기반 명시적 높이 계산 */
             const mediaRowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 2;
-            const mediaHeight = `${mediaRowSpan * ROW_HEIGHT - (field.label ? 44 : 24)}px`;
+            const mediaHeightPx = mediaRowSpan * ROW_HEIGHT - (field.label ? 44 : 24);
+            const mediaHeight = `${mediaHeightPx}px`;
 
             /* 기능용 확장자 배열 — accept 문자열 생성에 사용 (FILE_TYPE_PRESETS 고정) */
             const imgExts  = FILE_TYPE_PRESETS.image.split(',');
@@ -1188,9 +1189,11 @@ export function FieldRenderer({
                 return exts.map(e => e.toLowerCase()).includes(ext);
             };
 
-            /* 현재 파일 목록 (신규) */
+            /* 신규 파일 목록 */
             const mediaFiles = fileList ?? [];
-            const hasFile = mediaFiles.length > 0;
+            /* 기존 저장 파일 (최대 1개) */
+            const existingMedia = existingFileMeta?.[0] ?? null;
+            const hasFile = mediaFiles.length > 0 || !!existingMedia;
 
             /* preview 또는 live 빈 상태 공통 UI */
             const mediaPlaceholder = (
@@ -1222,8 +1225,27 @@ export function FieldRenderer({
                         style={{ height: mediaHeight }}
                         className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden pointer-events-none"
                     >
-                        {hasFile ? (
-                            /* preview에서 파일이 있는 경우: 파일명 + 제거 불가 표시 */
+                        {existingMedia ? (
+                            /* 기존 저장 파일 표시 */
+                            <div className="flex-1 relative overflow-hidden">
+                                {isImageFile(existingMedia.origName, imgExts) ? (
+                                    /* 이미지: blob URL 있으면 미리보기, 로딩 중이면 아이콘 */
+                                    imgBlobUrls?.[existingMedia.id]
+                                        ? <img src={imgBlobUrls[existingMedia.id]} alt={existingMedia.origName} className="w-full h-full object-contain" />
+                                        : <div className="w-full h-full flex items-center justify-center bg-slate-50"><ImageIcon className="w-6 h-6 text-slate-300" /></div>
+                                ) : (
+                                    /* 동영상: blob URL 있으면 video 재생, 로딩 중이면 아이콘 */
+                                    imgBlobUrls?.[existingMedia.id]
+                                        ? <video src={imgBlobUrls[existingMedia.id]} controls playsInline preload="auto" style={{ width: '100%', height: '100%', display: 'block' }} />
+                                        : <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
+                                            <Film className="w-6 h-6 text-slate-300" />
+                                            <span className="text-xs font-medium truncate max-w-full px-4">{existingMedia.origName}</span>
+                                            <span className="text-[10px] text-slate-400">{fmtSize(existingMedia.fileSize)}</span>
+                                          </div>
+                                )}
+                            </div>
+                        ) : hasFile ? (
+                            /* preview에서 신규 파일이 있는 경우: 파일명 표시 */
                             <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-hidden">
                                 {mediaFiles.map((file, idx) => {
                                     const isImg = isImageFile(file.name, imgExts);
@@ -1250,17 +1272,23 @@ export function FieldRenderer({
             }
 
             /* live 모드 */
-            const canAdd = !isReadOnly && mediaFiles.length === 0;
+            const canAdd = !isReadOnly && mediaFiles.length === 0 && !existingMedia;
             const mediaAccept = toAccept([...imgExts, ...vidExts]);
 
-            /* 파일 선택 처리 — 이미지/동영상 구분 없이 accept로 제한 */
+            /* 파일 선택 처리 — 확장자 체크 + 이미지/동영상 크기 개별 검증 */
             const handleMediaSelect = (selected: File[]) => {
                 const { valid, rejected } = filterByAccept(selected, mediaAccept);
                 if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
-                if (valid.length > 0) {
-                    /* 파일 1개만 허용 (이미지 또는 동영상 중 하나) */
-                    onFileChange?.([valid[0]]);
+                if (valid.length === 0) return;
+
+                const file = valid[0];
+                const isImg = isImageFile(file.name, imgExts);
+                const maxMB = isImg ? imgMaxMB : vidMaxMB;
+                if (file.size > maxMB * 1024 * 1024) {
+                    toast.warning(`${isImg ? '이미지' : '동영상'} 파일은 최대 ${maxMB}MB까지 업로드 가능합니다.`);
+                    return;
                 }
+                onFileChange?.([file]);
             };
 
             /* live 빈 상태 */
@@ -1296,7 +1324,49 @@ export function FieldRenderer({
                 );
             }
 
-            /* live 파일 선택 후 — 이미지면 img 미리보기, 동영상이면 아이콘+파일명 */
+            /* live 파일 있는 상태 — 기존 파일 우선, 없으면 신규 파일 */
+            if (existingMedia) {
+                /* 기존 저장 파일 표시 — origName 확장자로 이미지/동영상 판별 */
+                const existingIsImg = isImageFile(existingMedia.origName, imgExts);
+                const existingBlobUrl = imgBlobUrls?.[existingMedia.id];
+                return (
+                    <div
+                        style={{ height: mediaHeight, isolation: 'isolate' }}
+                        className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
+                    >
+                        <div className="flex-1 relative overflow-hidden">
+                            {existingIsImg ? (
+                                existingBlobUrl
+                                    ? /* 이미지: blob URL 미리보기 */
+                                      <img src={existingBlobUrl} alt={existingMedia.origName} className="w-full h-full object-contain" />
+                                    : /* 이미지 blob URL 로딩 중: 아이콘 표시 */
+                                      <div className="w-full h-full flex items-center justify-center bg-slate-50"><ImageIcon className="w-6 h-6 text-slate-300" /></div>
+                            ) : (
+                                existingBlobUrl
+                                    ? /* 동영상: blob URL로 video 재생 */
+                                      <video src={existingBlobUrl} controls playsInline preload="auto" style={{ width: '100%', height: '100%', display: 'block' }} />
+                                    : /* 동영상 blob URL 로딩 중: 아이콘 표시 */
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
+                                          <Film className="w-6 h-6 text-slate-300" />
+                                          <span className="text-[10px] text-slate-400">로딩 중...</span>
+                                      </div>
+                            )}
+                            {/* 기존 파일 제거 버튼 */}
+                            {!isReadOnly && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRemoveExisting?.(existingMedia.id)}
+                                    className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                                >
+                                    <X className="w-3 h-3 text-white" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            /* live 신규 파일 선택 후 — 이미지면 img 미리보기, 동영상이면 아이콘+파일명 */
             const selectedFile = mediaFiles[0];
             const selectedIsImg = isImageFile(selectedFile.name, imgExts);
 
@@ -1313,14 +1383,10 @@ export function FieldRenderer({
                                 className="w-full h-full object-contain"
                             />
                         ) : (
-                            /* 동영상: 아이콘 + 파일명 */
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
-                                <Film className="w-6 h-6 text-slate-400" />
-                                <span className="text-xs font-medium truncate max-w-full px-4">{selectedFile.name}</span>
-                                <span className="text-[10px] text-slate-400">{fmtSize(selectedFile.size)}</span>
-                            </div>
+                            /* 동영상: 비디오 플레이어 미리보기 */
+                            <FileVideoPreview file={selectedFile} cellHeight={mediaHeightPx} />
                         )}
-                        {/* 파일 제거 버튼 */}
+                        {/* 신규 파일 제거 버튼 */}
                         {!isReadOnly && (
                             <button
                                 type="button"

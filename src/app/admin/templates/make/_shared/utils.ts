@@ -90,10 +90,10 @@ export const validateFormFields = (
         const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
 
         if (f.required) {
-            const empty = (f.type === 'file' || f.type === 'image') ? fileCount === 0 : !val;
+            const empty = (f.type === 'file' || f.type === 'image' || f.type === 'media') ? fileCount === 0 : !val;
             if (empty) { toast.warning(`'${label}' 항목은 필수 입력입니다.`); return false; }
         }
-        if (val && f.type !== 'file' && f.type !== 'image' && f.type !== 'video') {
+        if (val && f.type !== 'file' && f.type !== 'image' && f.type !== 'video' && f.type !== 'media') {
             if (f.minLength && val.length < f.minLength) {
                 toast.warning(`'${label}' 항목은 최소 ${f.minLength}자 이상 입력해야 합니다.`); return false;
             }
@@ -109,14 +109,14 @@ export const validateFormFields = (
                 }
             } catch { /* 잘못된 패턴 무시 */ }
         }
-        if ((f.type === 'file' || f.type === 'image') && f.maxFileCount && fileCount > f.maxFileCount) {
+        if ((f.type === 'file' || f.type === 'image' || f.type === 'media') && f.maxFileCount && fileCount > f.maxFileCount) {
             toast.warning(`'${label}' 항목은 최대 ${f.maxFileCount}개까지 첨부 가능합니다.`); return false;
         }
-        if ((f.type === 'file' || f.type === 'image') && f.maxFileSizeMB) {
+        if ((f.type === 'file' || f.type === 'image' || f.type === 'media') && f.maxFileSizeMB) {
             const over = (fileValues[f.id] || []).find(file => file.size > f.maxFileSizeMB! * 1024 * 1024);
             if (over) { toast.warning(`'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`); return false; }
         }
-        if ((f.type === 'file' || f.type === 'image') && f.maxTotalSizeMB) {
+        if ((f.type === 'file' || f.type === 'image' || f.type === 'media') && f.maxTotalSizeMB) {
             const total = (fileValues[f.id] || []).reduce((s, file) => s + file.size, 0);
             if (total > f.maxTotalSizeMB * 1024 * 1024) {
                 toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
@@ -235,7 +235,7 @@ export function buildDataJson(
             (w.fields ?? []).forEach(f => {
                 const key = f.fieldKey || f.label;
                 if (!key) return;
-                if (f.type === 'file' || f.type === 'image') {
+                if (f.type === 'file' || f.type === 'image' || f.type === 'media') {
                     section[key] = fileIds[f.id] ?? [];
                 } else {
                     section[key] = rawValues[f.id] ?? '';

@@ -58,7 +58,14 @@ export default function LoginForm() {
         setIsLoading(true);
         try {
             const response = await api.post("/auth/login", { ...data, recaptchaToken });
-            const { tempToken: token, requireTotpSetup, requireTotpVerify } = response.data;
+            const { tempToken: token, requireTotpSetup, requireTotpVerify, accessToken, adminInfo } = response.data;
+
+            /* 2FA 비활성화 — 바로 로그인 처리 */
+            if (accessToken && adminInfo) {
+                login(accessToken, adminInfo);
+                router.push("/admin/dashboard");
+                return;
+            }
 
             /* 2FA 단계로 전환 */
             setTempToken(token);

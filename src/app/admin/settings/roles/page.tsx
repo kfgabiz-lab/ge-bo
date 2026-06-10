@@ -41,9 +41,9 @@ export default function RolesSystemPage() {
     const [allRoles, setAllRoles] = useState<Role[]>([]);
     const [loading, setLoading] = useState(true);
 
-    /* 검색 상태 — 내부값 기준(all/system/general) */
-    const [searchValues, setSearchValues] = useState<Record<string, string>>({ f1: '', f2: 'all' });
-    const [appliedSearch, setAppliedSearch] = useState<Record<string, string>>({ f1: '', f2: 'all' });
+    /* 검색 상태 */
+    const [searchValues, setSearchValues] = useState<Record<string, string>>({ f1: '' });
+    const [appliedSearch, setAppliedSearch] = useState<Record<string, string>>({ f1: '' });
 
     /* 페이지·정렬 상태 */
     const [currentPage, setCurrentPage] = useState(0);
@@ -82,19 +82,6 @@ export default function RolesSystemPage() {
                         label: t('common.label.displayName'),
                         colSpan: 1,
                         placeholder: t('role.placeholder.search'),
-                    },
-                    {
-                        id: 'f2',
-                        type: 'select',
-                        label: t('common.label.type'),
-                        colSpan: 1,
-                        /* 내부값: 'all'/'system'/'general' */
-                        options: ['all', 'system', 'general'],
-                        optionLabels: {
-                            all:     t('common.label.all'),
-                            system:  t('common.label.dbsystem'),
-                            general: t('common.type.general'),
-                        },
                     },
                 ],
             },
@@ -155,17 +142,6 @@ export default function RolesSystemPage() {
                 sortable: false,
             },
             {
-                id: 'c4',
-                header: t('common.label.type'),
-                accessor: 'isSystem',
-                cellType: 'boolean',
-                align: 'center',
-                sortable: false,
-                trueText: t('common.label.dbsystem'),
-                falseText: t('common.type.general'),
-                width: 80,
-            },
-            {
                 id: 'c5',
                 header: t('common.label.memberCount'),
                 accessor: 'memberCount',
@@ -187,19 +163,12 @@ export default function RolesSystemPage() {
         ],
     }), [t]);
 
-    /* 클라이언트 필터링 — 내부값(all/system/general) 기준 */
+    /* 클라이언트 필터링 */
     const filteredRoles = useMemo(() => {
         const keyword = appliedSearch.f1?.trim().toLowerCase() ?? '';
-        const type    = appliedSearch.f2 ?? 'all';
-
-        return allRoles.filter(role => {
-            const matchName = keyword === '' || role.displayName.toLowerCase().includes(keyword);
-            const matchType =
-                type === 'all'     ? true
-                : type === 'system'  ? role.isSystem
-                : !role.isSystem;
-            return matchName && matchType;
-        });
+        return allRoles.filter(role =>
+            keyword === '' || role.displayName.toLowerCase().includes(keyword)
+        );
     }, [allRoles, appliedSearch]);
 
     /* 클라이언트 정렬 */
@@ -234,7 +203,7 @@ export default function RolesSystemPage() {
     }, [searchValues]);
 
     const handleReset = useCallback(() => {
-        const initial = { f1: '', f2: 'all' };
+        const initial = { f1: '' };
         setSearchValues(initial);
         setAppliedSearch(initial);
         setCurrentPage(0);
