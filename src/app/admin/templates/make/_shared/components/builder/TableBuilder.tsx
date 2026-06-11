@@ -30,6 +30,7 @@ import {
     ActionsField,
     SlugSelectField,
 } from './fields';
+import { DateFormatField } from './fields/DateFormatField';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -57,6 +58,7 @@ const CELL_TYPES: { type: CellType; label: string; desc: string }[] = [
     { type: 'badge',   label: 'Badge',   desc: '배지 (아이콘/모양 옵션)' },
     { type: 'boolean', label: 'Boolean', desc: '공개/비공개' },
     { type: 'actions', label: 'Actions', desc: '액션 버튼' },
+    { type: 'date',    label: 'Date',    desc: '날짜/시간 포맷 표시' },
 ];
 
 /* CUSTOM_ACTION_COLORS — 하위 호환 re-export (TableCellRenderer 등에서 참조 가능) */
@@ -205,6 +207,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 {col.cellType === 'text'    && <TextCodeGroupField  values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
                 {col.cellType === 'boolean' && <BooleanTextField    values={col} onChange={patch} />}
                 {col.cellType === 'actions' && <ActionsField        values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
+                {col.cellType === 'date'    && <DateFormatField     values={col} onChange={patch} />}
             </div>
         );
     };
@@ -277,6 +280,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                 col.cellType === 'badge'   ? 'bg-blue-100 text-blue-600' :
                                 col.cellType === 'boolean' ? 'bg-emerald-100 text-emerald-600' :
                                 col.cellType === 'actions' ? 'bg-orange-100 text-orange-600' :
+                                col.cellType === 'date'    ? 'bg-violet-100 text-violet-600' :
                                 'bg-slate-200 text-slate-600'
                             }`}>{col.cellType}</span>
                             <span className="text-[10px] text-slate-700 flex-1 truncate font-medium">
@@ -358,6 +362,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                         layerTemplates={layerTemplates}
                                         onRequestLayerTemplates={loadLayerTemplates}
+                                    />
+                                )}
+                                {pendingCol.cellType === 'date' && (
+                                    <DateFormatField
+                                        values={pendingCol}
+                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                     />
                                 )}
 

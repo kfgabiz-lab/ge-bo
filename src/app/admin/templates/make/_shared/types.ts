@@ -129,7 +129,7 @@ export interface CodeGroupDef {
 /* ── 테이블 컬럼 관련 타입 ── */
 
 /** 셀 렌더링 타입 */
-export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file';
+export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date';
 
 /** 셀 옵션 (badge용) */
 export interface CellOption {
@@ -171,6 +171,8 @@ export interface TableColumnConfig {
     codeGroupCode?: string;
     /** 공통코드 연동 시 표시 방식: 'text'=이름 표시(기본), 'value'=코드값 표시 */
     displayAs?: 'text' | 'value';
+    /** date 타입 — 날짜 표시 포맷 (예: 'YYYY-MM-DD HH:mm') */
+    dateFormat?: string;
 }
 
 /** 불러오기 목록 아이템 */

@@ -196,6 +196,30 @@ export function TableCellRenderer({
             );
         }
 
+        /* ── date ── */
+        case 'date': {
+            if (isPreview) {
+                return <span className="text-slate-400 text-sm">2024-01-15 14:30</span>;
+            }
+            const rawVal = String(value ?? '');
+            if (!rawVal) return <span className="text-sm text-slate-400">-</span>;
+            /* dateFormat 없으면 원본값 그대로 표시 */
+            if (!col.dateFormat) return <span className="text-sm text-slate-700">{rawVal}</span>;
+            /* ISO 파싱 → 포맷 적용, 실패 시 원본값 */
+            const d = new Date(rawVal);
+            if (isNaN(d.getTime())) return <span className="text-sm text-slate-700">{rawVal}</span>;
+            const YYYY = String(d.getFullYear());
+            const MM   = String(d.getMonth() + 1).padStart(2, '0');
+            const DD   = String(d.getDate()).padStart(2, '0');
+            const HH   = String(d.getHours()).padStart(2, '0');
+            const mm   = String(d.getMinutes()).padStart(2, '0');
+            const ss   = String(d.getSeconds()).padStart(2, '0');
+            const formatted = col.dateFormat
+                .replace('YYYY', YYYY).replace('MM', MM).replace('DD', DD)
+                .replace('HH', HH).replace('mm', mm).replace('ss', ss);
+            return <span className="text-sm text-slate-700">{formatted}</span>;
+        }
+
         /* ── text (default) ── */
         default: {
             if (isPreview) {
