@@ -43,7 +43,7 @@ function buildSearchFieldsMap(items: PageWidgetItem[]): Record<string, SearchFie
   return map;
 }
 
-export function useWidgetPageState(widgetItems: PageWidgetItem[]) {
+export function useWidgetPageState(widgetItems: PageWidgetItem[], pageSlug?: string) {
   /* URL 파라미터 — 폼 필드 초기값 세팅용 */
   const searchParams = useSearchParams();
 
@@ -344,7 +344,7 @@ export function useWidgetPageState(widgetItems: PageWidgetItem[]) {
           const { dataJson, pkKeys } = buildDataJson([fw], formValuesMap, {}, {}, {});
           try {
             if (action === "save") {
-              await api.post(`/page-data/${fw.connectedSlug}`, { dataJson, ...(pkKeys.length > 0 && { pkKeys }) });
+              await api.post(`/page-data/${fw.connectedSlug}`, { dataJson, ...(pkKeys.length > 0 && { pkKeys }), ...(pageSlug && { templateSlug: pageSlug }) });
               toast.success("저장되었습니다.");
             } else {
               await api.delete(`/page-data/${fw.connectedSlug}`, {
@@ -370,10 +370,10 @@ export function useWidgetPageState(widgetItems: PageWidgetItem[]) {
             if (action === "save") {
               const cleanRows = rows.map(({ _rowId, ...rest }) => rest);
               if (storedId) {
-                await api.put(`/page-data/${sw.connectedSlug}/${storedId}`, { dataJson: { rows: cleanRows } });
+                await api.put(`/page-data/${sw.connectedSlug}/${storedId}`, { dataJson: { rows: cleanRows }, ...(pageSlug && { templateSlug: pageSlug }) });
                 toast.success("수정되었습니다.");
               } else {
-                const res = await api.post(`/page-data/${sw.connectedSlug}`, { dataJson: { rows: cleanRows } });
+                const res = await api.post(`/page-data/${sw.connectedSlug}`, { dataJson: { rows: cleanRows }, ...(pageSlug && { templateSlug: pageSlug }) });
                 sessionStorage.setItem(storageKey, String(res.data.id));
                 toast.success("저장되었습니다.");
               }
@@ -459,6 +459,7 @@ export function useWidgetPageState(widgetItems: PageWidgetItem[]) {
     categorySelections,
     onCategorySelect: handleCategorySelect,
     onRefresh: handleRefresh,
+    pageSlug,
   };
 
   return { gridProps, setSubListRowsMap };

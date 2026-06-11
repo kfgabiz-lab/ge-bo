@@ -215,9 +215,10 @@ interface WidgetRendererProps {
      * SpaceRenderer(connType='popup') 또는 TableRenderer(edit/detail) 팝업 오픈 시 참조.
      */
     dataSlug?: string;
-    /** 팝업 저장·삭제 완료 후 콜백 (목록 새로고침 등) */
     /** 팝업 저장·삭제 완료 후 콜백 — 테이블 목록 새로고침 등에 사용 */
     onRefresh?: () => void;
+    /** 현재 페이지 slug — 팝업 저장 시 templateSlug로 전달 */
+    pageSlug?: string;
     /**
      * 외부에서 팝업을 직접 트리거할 때 사용 (LIST 버튼바, test 페이지 등).
      * ts가 변경될 때마다 팝업을 오픈한다.
@@ -280,6 +281,7 @@ export function WidgetRenderer({
     /* 팝업 컨텍스트 */
     dataSlug,
     onRefresh,
+    pageSlug,
     externalPopupTrigger,
 }: WidgetRendererProps) {
     const router  = useRouter();
@@ -631,11 +633,11 @@ export function WidgetRenderer({
             /* 4단계: page_data 저장 (신규 POST / 수정 PUT) */
             let savedId: number | null = null;
             if (popupEditId) {
-                await api.put(`/page-data/${popupListSlug}/${popupEditId}`, { dataJson });
+                await api.put(`/page-data/${popupListSlug}/${popupEditId}`, { dataJson, ...(pageSlug && { templateSlug: pageSlug }) });
                 savedId = popupEditId;
                 toast.success('수정되었습니다.');
             } else {
-                const saveRes = await api.post(`/page-data/${popupListSlug}`, { dataJson });
+                const saveRes = await api.post(`/page-data/${popupListSlug}`, { dataJson, ...(pageSlug && { templateSlug: pageSlug }) });
                 savedId = saveRes.data.id;
                 toast.success('저장되었습니다.');
             }

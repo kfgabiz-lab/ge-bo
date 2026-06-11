@@ -135,7 +135,7 @@ function LiveTabPanel({ tab }: LiveTabPanelProps) {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const { gridProps } = useWidgetPageState(widgetItems);
+  const { gridProps } = useWidgetPageState(widgetItems, tab.pageSlug);
 
   /* pageSlug로 widgetItems 로드 — 최초 1회 */
   useEffect(() => {

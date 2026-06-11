@@ -366,6 +366,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                         await api.post(`/page-data/${formWidget.connectedSlug}`, {
                             dataJson,
                             ...(pkKeys.length > 0 && { pkKeys }),
+                            templateSlug: slug,
                         });
                         toast.success('저장되었습니다.');
                     } else {
@@ -394,10 +395,10 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                     if (action === 'save') {
                         const cleanRows = rows.map(({ _rowId, ...rest }) => rest);
                         if (storedId) {
-                            await api.put(`/page-data/${sublistWidget.connectedSlug}/${storedId}`, { dataJson: { rows: cleanRows } });
+                            await api.put(`/page-data/${sublistWidget.connectedSlug}/${storedId}`, { dataJson: { rows: cleanRows }, templateSlug: slug });
                             toast.success('수정되었습니다.');
                         } else {
-                            const res = await api.post(`/page-data/${sublistWidget.connectedSlug}`, { dataJson: { rows: cleanRows } });
+                            const res = await api.post(`/page-data/${sublistWidget.connectedSlug}`, { dataJson: { rows: cleanRows }, templateSlug: slug });
                             sessionStorage.setItem(storageKey, String(res.data.id));
                             toast.success('저장되었습니다.');
                         }
@@ -503,6 +504,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 categorySelections={categorySelections}
                 onCategorySelect={handleCategorySelect}
                 onRefresh={handleRefresh}
+                pageSlug={slug}
             />
         </PageLayout>
     );

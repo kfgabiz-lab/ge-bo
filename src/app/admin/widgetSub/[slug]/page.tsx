@@ -634,13 +634,14 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     : storedId;
 
                 if (slugStoredId) {
-                    await api.put(`/page-data/${connectedSlug}/${slugStoredId}`, { dataJson });
+                    await api.put(`/page-data/${connectedSlug}/${slugStoredId}`, { dataJson, templateSlug: slug });
                     savedDataId = slugStoredId;
                 } else {
                     const res = await api.post(`/page-data/${connectedSlug}`, {
                         dataJson,
                         ...(pkKeys.length > 0 && { pkKeys }),
                         ...(groupId && { groupId }),
+                        templateSlug: slug,
                     });
                     savedDataId = res.data.id;
                 }
@@ -844,6 +845,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 onLoadMore={handleLoadMore}
                 dataSlug={resolvedDataSlug}
                 onRefresh={handleRefresh}
+                pageSlug={slug}
             />
         </PageLayout>
     );

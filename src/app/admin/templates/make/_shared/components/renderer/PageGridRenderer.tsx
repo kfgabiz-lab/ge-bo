@@ -102,6 +102,8 @@ interface PageGridRendererProps {
     /* live 모드 전용 — 팝업 */
     dataSlug?: string;
     onRefresh?: () => void;
+    /** 현재 페이지의 slug — 팝업 저장 시 templateSlug로 전달 */
+    pageSlug?: string;
 
     /* live 모드 전용 — 파일 업로드 (팝업 내 form 위젯용) */
     /** widgetId → fieldId → File[] */
@@ -157,6 +159,7 @@ export function PageGridRenderer({
     onCategorySelect,
     dataSlug,
     onRefresh,
+    pageSlug,
     fileValuesMap,
     existingFileMetaMap,
     imgBlobUrls,
@@ -299,6 +302,7 @@ export function PageGridRenderer({
                                         /* 팝업 */
                                         dataSlug={dataSlug}
                                         onRefresh={onRefresh}
+                                        pageSlug={pageSlug}
                                     />
                                 </div>
                             );
