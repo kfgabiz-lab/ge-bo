@@ -68,6 +68,12 @@ export interface FieldEditValues {
     /* ── media 전용 ── */
     mediaImageMaxSizeMB?: number;    // 이미지 최대 크기 MB (기본: 5)
     mediaVideoMaxSizeMB?: number;    // 동영상 최대 크기 MB (기본: 20)
+    /* ── 기본값 설정 ── */
+    defaultValue?: string;           // 직접 텍스트 기본값
+    defaultValueMsgKey?: string;     // 다국어 기본값 키
+    defaultOptionValue?: string;     // 옵션 기본 선택값 (select·radio·checkbox)
+    defaultToday?: boolean;          // date: 오늘 날짜 자동 설정
+    disablePastDates?: boolean;      // date: 오늘 이전 날짜 비활성화
 }
 
 /**

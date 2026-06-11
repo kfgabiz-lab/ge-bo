@@ -77,8 +77,12 @@ export interface SearchFieldConfig {
     /* ── media 전용 ── */
     mediaImageMaxSizeMB?: number;   // 이미지 최대 크기 MB (기본: 5)
     mediaVideoMaxSizeMB?: number;   // 동영상 최대 크기 MB (기본: 20)
-    /* ── hidden 전용 ── */
-    defaultValue?: string;      // hidden 필드 기본값 (저장 시 자동 포함)
+    /* ── 기본값 설정 ── */
+    defaultValue?: string;          // 직접 텍스트 기본값 (hidden·input·textarea·editor 전용)
+    defaultValueMsgKey?: string;    // 다국어 기본값 키 (input·textarea·editor 전용)
+    defaultOptionValue?: string;    // 옵션 기본 선택값 (select·radio·checkbox 전용)
+    defaultToday?: boolean;         // date: 오늘 날짜 자동 설정
+    disablePastDates?: boolean;     // date: 오늘 이전 날짜 비활성화
 }
 
 /** 검색폼 행 설정 */

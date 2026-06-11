@@ -126,7 +126,6 @@ export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelec
                     <MessageKeySelector
                         value={widget.placeholderMsgKey ?? ''}
                         onChange={key => onChange({ ...widget, placeholderMsgKey: key || undefined })}
-                        resourceType="SENTENCE"
                         size="sm"
                     />
                 ) : (

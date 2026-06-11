@@ -55,6 +55,21 @@ export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig
                         className={INPUT_CLS} />
                 )}
             </div>
+            {/* 기본값 */}
+            <div>
+                <label className={LABEL_CLS}>기본값</label>
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={values.defaultValueMsgKey ?? ''}
+                        onChange={key => onChange({ defaultValueMsgKey: key || undefined })}
+                        size="sm"
+                    />
+                ) : (
+                    <input type="text" value={values.defaultValue || ''}
+                        onChange={e => onChange({ defaultValue: e.target.value || undefined })}
+                        className={INPUT_CLS} />
+                )}
+            </div>
             {/* 표시 행 수 */}
             <div>
                 <label className={LABEL_CLS}>표시 행 수</label>

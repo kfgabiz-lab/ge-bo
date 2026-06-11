@@ -13,6 +13,10 @@ interface OptionInputRowsProps {
      * 선택한 msgKey가 text 부분에 저장되고 렌더러에서 t(text)로 표시됨
      */
     i18nMode?: boolean;
+    /** 현재 기본값으로 선택된 option value */
+    defaultValue?: string;
+    /** 기본값 변경 핸들러 */
+    onDefaultChange?: (value: string) => void;
 }
 
 /**
@@ -21,10 +25,20 @@ interface OptionInputRowsProps {
  * - i18nMode=true: 텍스트 입력 → MessageKeySelector (다국어 키 선택)
  * @example <OptionInputRows options={opts} onChange={setOpts} i18nMode={i18nMode} />
  */
-export const OptionInputRows = ({ options, onChange, i18nMode = false }: OptionInputRowsProps) => (
+export const OptionInputRows = ({ options, onChange, i18nMode = false, defaultValue, onDefaultChange }: OptionInputRowsProps) => (
     <div className="space-y-1.5">
+        {/* 기본값 열 헤더 — onDefaultChange가 있을 때만 표시 */}
+        {onDefaultChange && (
+            <div className="grid grid-cols-[1fr_auto_1fr_auto_auto] items-center gap-1">
+                <span className="text-[10px] text-slate-400">텍스트</span>
+                <span />
+                <span className="text-[10px] text-slate-400">값</span>
+                <span />
+                <span className="text-[10px] text-slate-400 text-center w-8">기본</span>
+            </div>
+        )}
         {options.map((opt, i) => (
-            <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-1">
+            <div key={i} className={`grid items-center gap-1 ${onDefaultChange ? 'grid-cols-[1fr_auto_1fr_auto_auto]' : 'grid-cols-[1fr_auto_1fr_auto]'}`}>
                 {i18nMode ? (
                     <MessageKeySelector
                         value={opt.text}
@@ -56,6 +70,18 @@ export const OptionInputRows = ({ options, onChange, i18nMode = false }: OptionI
                 >
                     <X className="w-3 h-3" />
                 </button>
+                {/* 기본값 라디오버튼 — onDefaultChange가 있을 때만 표시 */}
+                {onDefaultChange && (
+                    <div className="flex justify-center w-8">
+                        <input
+                            type="radio"
+                            name="option-default"
+                            checked={defaultValue === opt.value}
+                            onChange={() => onDefaultChange(opt.value)}
+                            className="w-3.5 h-3.5 accent-slate-900 cursor-pointer"
+                        />
+                    </div>
+                )}
             </div>
         ))}
         {/* 옵션 추가 버튼 */}

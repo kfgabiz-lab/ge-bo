@@ -358,19 +358,31 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
             }
         } else {
-            /* 신규 모드 — hidden 필드 defaultValue + URL params(initialValues) 적용 */
+            /* 신규 모드 — 필드별 기본값 + URL params(initialValues) 적용 */
             setCurrentGroupId(null);
             setMultiSelectValuesMap({});
             const initMap: Record<string, Record<string, string>> = {};
+            /* 오늘 날짜 (YYYY-MM-DD) — date 필드 defaultToday에 사용 */
+            const todayStr = new Date().toISOString().slice(0, 10);
             formWidgets.forEach(fw => {
                 const vals: Record<string, string> = {};
                 fw.fields.forEach(f => {
-                    if (f.type !== 'hidden') return;
                     const key = f.fieldKey || f.label || '';
-                    const defaultVal = (f as { defaultValue?: string }).defaultValue ?? '';
                     const urlVal = key ? searchParams.get(key) : null;
-                    /* URL 파라미터 우선, 없으면 defaultValue */
-                    vals[f.id] = urlVal ?? defaultVal;
+
+                    if (f.type === 'date' && f.defaultToday) {
+                        /* 오늘 날짜 자동 설정 */
+                        vals[f.id] = urlVal ?? todayStr;
+                    } else if (f.defaultOptionValue && (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox')) {
+                        /* 옵션 기본 선택값 */
+                        vals[f.id] = urlVal ?? f.defaultOptionValue;
+                    } else if (f.defaultValueMsgKey) {
+                        /* 다국어 기본값 — 현재 언어로 번역 후 세팅 */
+                        vals[f.id] = urlVal ?? t(f.defaultValueMsgKey);
+                    } else if (f.defaultValue) {
+                        /* 직접 텍스트 기본값 (hidden 포함) */
+                        vals[f.id] = urlVal ?? f.defaultValue;
+                    }
                 });
                 initMap[fw.widgetId] = vals;
             });

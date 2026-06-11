@@ -39,7 +39,7 @@ interface Props {
  *   <MessageKeySelector value={key} onChange={v => setKey(v)} />
  *   <MessageKeySelector value={key} onChange={v => setKey(v)} size="sm" resourceType={undefined} />
  */
-export function MessageKeySelector({ value, onChange, disabled, resourceType = 'WORD', size = 'md' }: Props) {
+export function MessageKeySelector({ value, onChange, disabled, resourceType, size = 'md' }: Props) {
     const { locale } = useLanguageStore();
     const { t } = useI18n();
     const [options, setOptions] = useState<MessageOption[]>([]);

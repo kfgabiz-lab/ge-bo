@@ -32,6 +32,17 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />
+            {/* date 기본값 설정 */}
+            <ToggleRow
+                label="오늘 날짜 자동 설정"
+                value={values.defaultToday ?? false}
+                onChange={v => onChange({ defaultToday: v || undefined })}
+            />
+            <ToggleRow
+                label="오늘 이전 날짜 비활성화"
+                value={values.disablePastDates ?? false}
+                onChange={v => onChange({ disablePastDates: v || undefined })}
+            />
             {/* 필수 항목 */}
         </div>
     );

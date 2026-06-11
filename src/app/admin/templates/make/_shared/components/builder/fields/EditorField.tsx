@@ -40,6 +40,26 @@ export const EditorField = (props: FieldEditProps) => {
                     )}
                 </div>
 
+                {/* 기본값 */}
+                <div>
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">기본값</label>
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={values.defaultValueMsgKey ?? ''}
+                            onChange={key => onChange({ defaultValueMsgKey: key || undefined })}
+                            size="sm"
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={values.defaultValue || ''}
+                            onChange={e => onChange({ defaultValue: e.target.value || undefined })}
+                            placeholder="기본 내용"
+                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                        />
+                    )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className="text-[10px] font-medium text-slate-500 mb-1 block">최소 글자 수</label>

@@ -53,6 +53,21 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                         className={INPUT_CLS} />
                 )}
             </div>
+            {/* 기본값 */}
+            <div>
+                <label className={LABEL_CLS}>기본값</label>
+                {i18nMode ? (
+                    <MessageKeySelector
+                        value={values.defaultValueMsgKey ?? ''}
+                        onChange={key => onChange({ defaultValueMsgKey: key || undefined })}
+                        size="sm"
+                    />
+                ) : (
+                    <input type="text" value={values.defaultValue || ''}
+                        onChange={e => onChange({ defaultValue: e.target.value || undefined })}
+                        className={INPUT_CLS} />
+                )}
+            </div>
             {/* 유효성검사 (필수항목 + 최소/최대 글자 + 정규식) */}
             <ValidationSection
                 fieldType="input"

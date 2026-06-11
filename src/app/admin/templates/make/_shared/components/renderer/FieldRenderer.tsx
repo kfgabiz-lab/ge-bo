@@ -395,6 +395,8 @@ export function FieldRenderer({
                     readOnly={isReadOnly}
                     className={`${inputCls}${readonlyCls}`}
                     value={value}
+                    /* 오늘 이전 날짜 비활성화 설정 시 min=오늘 */
+                    min={field.disablePastDates ? new Date().toISOString().slice(0, 10) : undefined}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                 />
             );

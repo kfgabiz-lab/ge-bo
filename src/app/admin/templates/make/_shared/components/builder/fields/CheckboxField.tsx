@@ -38,6 +38,8 @@ export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, co
                 options={values.options} codeGroupCode={values.codeGroupCode}
                 codeGroups={codeGroups} codeGroupsLoading={codeGroupsLoading}
                 onChange={updates => onChange(updates)}
+                defaultOptionValue={values.defaultOptionValue}
+                onDefaultOptionChange={v => onChange({ defaultOptionValue: v || undefined })}
             />
             {/* 유효성검사 (필수항목 + 최소/최대 선택 수) */}
             <ValidationSection

@@ -283,6 +283,11 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 videoMode:          f.videoMode,
                 mediaImageMaxSizeMB: f.mediaImageMaxSizeMB,
                 mediaVideoMaxSizeMB: f.mediaVideoMaxSizeMB,
+                defaultValue:        f.defaultValue,
+                defaultValueMsgKey:  f.defaultValueMsgKey,
+                defaultOptionValue:  f.defaultOptionValue,
+                defaultToday:        f.defaultToday,
+                disablePastDates:    f.disablePastDates,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),

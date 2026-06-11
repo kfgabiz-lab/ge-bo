@@ -17,13 +17,17 @@ interface FieldOptionsProps {
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
     onChange: (updates: { options?: string[]; codeGroupCode?: string }) => void;
+    /** 현재 기본값으로 선택된 option value */
+    defaultOptionValue?: string;
+    /** 기본값 변경 핸들러 */
+    onDefaultOptionChange?: (value: string) => void;
 }
 
 /**
  * 수동 입력 / 공통코드 탭 전환 + 옵션 입력 영역
  * - 초기 mode는 codeGroupCode 유무로 결정
  */
-export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoading, onChange }: FieldOptionsProps) {
+export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoading, onChange, defaultOptionValue, onDefaultOptionChange }: FieldOptionsProps) {
     const [mode, setMode] = useState<'manual' | 'code'>(codeGroupCode ? 'code' : 'manual');
     const { i18nMode } = useBuilderI18nMode();
 
@@ -53,17 +57,39 @@ export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoa
             </div>
 
             {mode === 'code' ? (
-                <CodeGroupSelector
-                    codeGroups={codeGroups}
-                    codeGroupsLoading={codeGroupsLoading}
-                    value={codeGroupCode || ''}
-                    onChange={(code, opts) => onChange({ codeGroupCode: code, options: opts })}
-                />
+                <>
+                    <CodeGroupSelector
+                        codeGroups={codeGroups}
+                        codeGroupsLoading={codeGroupsLoading}
+                        value={codeGroupCode || ''}
+                        onChange={(code, opts) => onChange({ codeGroupCode: code, options: opts })}
+                    />
+                    {/* 코드 그룹 기본값 선택 — 코드 항목 목록 + 라디오버튼 */}
+                    {onDefaultOptionChange && options && options.length > 0 && (
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-medium text-slate-500 block">기본값</label>
+                            {stringsToOpts(options).map(opt => (
+                                <div key={opt.value} className="flex items-center justify-between px-2 py-1 bg-slate-50 rounded">
+                                    <span className="text-xs text-slate-700">{opt.text}</span>
+                                    <input
+                                        type="radio"
+                                        name="code-option-default"
+                                        checked={defaultOptionValue === opt.value}
+                                        onChange={() => onDefaultOptionChange(opt.value)}
+                                        className="w-3.5 h-3.5 accent-slate-900 cursor-pointer"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
             ) : (
                 <OptionInputRows
                     options={stringsToOpts(options || [])}
                     onChange={opts => onChange({ options: optsToStrings(opts), codeGroupCode: undefined })}
                     i18nMode={i18nMode}
+                    defaultValue={defaultOptionValue}
+                    onDefaultChange={onDefaultOptionChange}
                 />
             )}
         </div>

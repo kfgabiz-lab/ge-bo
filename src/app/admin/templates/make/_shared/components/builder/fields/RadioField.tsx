@@ -37,6 +37,8 @@ export function RadioField({ values, onChange, colSpanMode, rowSpanConfig, codeG
                 options={values.options} codeGroupCode={values.codeGroupCode}
                 codeGroups={codeGroups} codeGroupsLoading={codeGroupsLoading}
                 onChange={updates => onChange(updates)}
+                defaultOptionValue={values.defaultOptionValue}
+                onDefaultOptionChange={v => onChange({ defaultOptionValue: v || undefined })}
             />
             {/* 필수 항목 */}
         </div>
