@@ -91,27 +91,39 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
             {/* 탭 번호 헤더 */}
             <p className="text-[10px] font-semibold text-slate-500">탭 {idx + 1}</p>
 
-            {/* 레이블 */}
-            <div>
-              <label className={LABEL_CLS}>
-                레이블 <span className="text-red-400">*</span>
-              </label>
-              {i18nMode ? (
-                <MessageKeySelector
-                  value={tab.labelMsgKey ?? ''}
-                  onChange={key => handleTabChange(idx, { labelMsgKey: key || undefined })}
-                  resourceType="WORD"
-                  size="sm"
-                />
-              ) : (
+            {/* 라벨 | key — 한 줄 배치 */}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className={LABEL_CLS}>
+                  라벨 <span className="text-red-400">*</span>
+                </label>
+                {i18nMode ? (
+                  <MessageKeySelector
+                    value={tab.labelMsgKey ?? ''}
+                    onChange={key => handleTabChange(idx, { labelMsgKey: key || undefined })}
+                    resourceType="WORD"
+                    size="sm"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={tab.label}
+                    onChange={(e) => handleTabChange(idx, { label: e.target.value })}
+                    placeholder={`탭 ${idx + 1}`}
+                    className={INPUT_CLS}
+                  />
+                )}
+              </div>
+              <div className="w-24">
+                <label className={LABEL_CLS}>key</label>
                 <input
                   type="text"
-                  value={tab.label}
-                  onChange={(e) => handleTabChange(idx, { label: e.target.value })}
-                  placeholder={`탭 ${idx + 1}`}
+                  value={tab.contentKey ?? ""}
+                  onChange={(e) => handleTabChange(idx, { contentKey: e.target.value || undefined })}
+                  placeholder={`tab_${idx + 1}`}
                   className={INPUT_CLS}
                 />
-              )}
+              </div>
             </div>
 
             {/* 연결 페이지 SELECT BOX */}
@@ -130,6 +142,7 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
                 ))}
               </select>
             </div>
+
           </div>
         ))}
       </div>

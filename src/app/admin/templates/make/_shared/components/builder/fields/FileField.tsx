@@ -61,7 +61,8 @@ export const FileField = (props: FieldEditProps) => {
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
         readonly={values.readonly}
-        hideCondition={values.hideCondition}>
+        hideCondition={values.hideCondition}
+        disableCondition={values.disableCondition}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">파일 업로드 상세 설정</p>
 

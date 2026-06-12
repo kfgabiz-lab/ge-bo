@@ -28,6 +28,7 @@ export const MediaField = (props: FieldEditProps) => {
             descriptionMsgKey={values.descriptionMsgKey}
             readonly={values.readonly}
             hideCondition={values.hideCondition}
+            disableCondition={values.disableCondition}
         >
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
 

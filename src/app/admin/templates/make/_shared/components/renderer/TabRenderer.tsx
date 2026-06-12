@@ -19,14 +19,16 @@
  *   <TabRenderer mode="live" widget={tabWidget} />
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useI18n } from '@/hooks/use-i18n';
 import { fetchTemplateConfig } from "../../templateApi";
 import { PageGridRenderer } from "./PageGridRenderer";
 import type { PageWidgetItem } from "./PageGridRenderer";
 import type { TabWidget, TabItem, RendererMode } from "./types";
-import { useWidgetPageState } from "../../hooks/useWidgetPageState";
+import type { TableWidget } from "../builder/TableBuilder";
+import { useWidgetPageState, flatWidgets } from "../../hooks/useWidgetPageState";
 import { useCodeStore } from "@/store/use-code-store";
 
 interface TabRendererProps {
@@ -40,11 +42,33 @@ export function TabRenderer({ mode, widget }: TabRendererProps) {
   /* 한 번이라도 활성화된 탭 인덱스 집합 — lazy mount용 */
   const [mountedTabs, setMountedTabs] = useState<Set<number>>(new Set([0]));
   const { t } = useI18n();
+  const searchParams = useSearchParams();
+
+  /**
+   * 탭들이 같은 slug를 사용할 때 공유하는 row id
+   * - 최초 저장(POST) 후 생성된 id를 저장 → 이후 탭은 해당 id로 GET+merge+PUT
+   * - slug별로 분리 관리: Record<slug, id>
+   * - widgetSub 수정 진입 시 URL ?id를 초기값으로 세팅
+   */
+  const [sharedDataIdMap, setSharedDataIdMap] = useState<Record<string, number>>(() => {
+    const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
+    if (!urlId) return {};
+    const map: Record<string, number> = {};
+    tabs.forEach(tab => {
+      if (tab.pageSlug) map[tab.pageSlug] = urlId;
+    });
+    return map;
+  });
 
   /* 탭 클릭 시 해당 탭을 마운트 목록에 추가 */
   function handleTabClick(idx: number) {
     setActiveIdx(idx);
     setMountedTabs((prev) => new Set([...prev, idx]));
+  }
+
+  /** 탭 신규 저장 후 생성된 id를 slug별로 기록 */
+  function handleDataIdCreated(slug: string, id: number) {
+    setSharedDataIdMap((prev) => ({ ...prev, [slug]: id }));
   }
 
   return (
@@ -72,7 +96,15 @@ export function TabRenderer({ mode, widget }: TabRendererProps) {
         {tabs.map((tab, idx) => (
           <div key={tab.id} className={idx === activeIdx ? "h-full" : "hidden"}>
             {mountedTabs.has(idx) &&
-              (mode === "live" ? <LiveTabPanel tab={tab} /> : <PreviewTabPanel tab={tab} activeIdx={idx} />)}
+              (mode === "live" ? (
+                <LiveTabPanel
+                  tab={tab}
+                  sharedDataId={tab.pageSlug ? (sharedDataIdMap[tab.pageSlug] ?? null) : null}
+                  onDataIdCreated={(id) => tab.pageSlug && handleDataIdCreated(tab.pageSlug, id)}
+                />
+              ) : (
+                <PreviewTabPanel tab={tab} activeIdx={idx} />
+              ))}
           </div>
         ))}
       </div>
@@ -123,19 +155,34 @@ function PreviewTabPanel({ tab, activeIdx }: PreviewTabPanelProps) {
 
 interface LiveTabPanelProps {
   tab: TabItem;
+  /** 같은 slug 탭들이 공유하는 row id (TabRenderer 레벨에서 관리) */
+  sharedDataId: number | null;
+  /** 신규 저장 후 생성된 id를 TabRenderer로 전달 */
+  onDataIdCreated: (id: number) => void;
 }
 
 /**
  * 각 탭을 독립 컴포넌트로 분리하여 useWidgetPageState를 탭별로 독립 실행.
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
+ * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, sharedDataId, onDataIdCreated }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const { gridProps } = useWidgetPageState(widgetItems, tab.pageSlug);
+  const { gridProps } = useWidgetPageState(widgetItems, tab.pageSlug, {
+    contentKey: tab.contentKey,
+    sharedDataId,
+    onDataIdCreated,
+  });
+
+  /* 팝업 저장에 사용할 dataSlug — widgetItems의 첫 번째 table 위젯 connectedSlug */
+  const dataSlug = useMemo(() => {
+    const tw = flatWidgets(widgetItems).find((w) => w.type === "table") as TableWidget | undefined;
+    return tw?.connectedSlug;
+  }, [widgetItems]);
 
   /* pageSlug로 widgetItems 로드 — 최초 1회 */
   useEffect(() => {
@@ -172,5 +219,5 @@ function LiveTabPanel({ tab }: LiveTabPanelProps) {
 
   if (!widgetItems.length) return null;
 
-  return <PageGridRenderer mode="live" widgetItems={widgetItems} codeGroups={codeGroups} {...gridProps} />;
+  return <PageGridRenderer mode="live" widgetItems={widgetItems} codeGroups={codeGroups} dataSlug={dataSlug} {...gridProps} />;
 }

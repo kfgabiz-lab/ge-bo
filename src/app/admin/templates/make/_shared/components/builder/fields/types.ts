@@ -55,8 +55,11 @@ export interface FieldEditValues {
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부
     /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 숨김
-     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) */
+     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
     hideCondition?: string;
+    /** 동적 Disable 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 비활성화
+     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
+    disableCondition?: string;
     /* ── 파일 업로드 & 비디오 설정 (Layer 전용) ── */
     maxFileCount?: number;       // 최대 파일 수
     maxFileSizeMB?: number;      // 개당 최대 용량
@@ -73,7 +76,7 @@ export interface FieldEditValues {
     defaultValueMsgKey?: string;     // 다국어 기본값 키
     defaultOptionValue?: string;     // 옵션 기본 선택값 (select·radio·checkbox)
     defaultToday?: boolean;          // date: 오늘 날짜 자동 설정
-    disablePastDates?: boolean;      // date: 오늘 이전 날짜 비활성화
+    minDate?: string;                // date: 이 날짜 이전 날짜 비활성화 (YYYY-MM-DD)
 }
 
 /**

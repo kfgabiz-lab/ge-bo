@@ -6,7 +6,7 @@ import type { Editor as EditorInstance } from "@toast-ui/editor";
 
 /* next/dynamic ssr:false — Turbopack이 직접 import()를 빈 객체로 변환하는 이슈 우회 */
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-const ToastEditor = dynamic(() => import("@toast-ui/react-editor").then((mod) => mod.Editor), { ssr: false }) as any;
+const ToastEditor = dynamic(() => import("@toast-ui/react-editor").then((mod) => ({ default: mod.Editor })), { ssr: false }) as any;
 
 interface WysiwygEditorProps {
   initialValue?: string;

@@ -30,6 +30,7 @@ export function RadioField({ values, onChange, colSpanMode, rowSpanConfig, codeG
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
+                disableCondition={values.disableCondition}
                 onChange={onChange}
             />
             {/* 옵션 */}

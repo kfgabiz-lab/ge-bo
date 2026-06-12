@@ -82,7 +82,7 @@ export interface SearchFieldConfig {
     defaultValueMsgKey?: string;    // 다국어 기본값 키 (input·textarea·editor 전용)
     defaultOptionValue?: string;    // 옵션 기본 선택값 (select·radio·checkbox 전용)
     defaultToday?: boolean;         // date: 오늘 날짜 자동 설정
-    disablePastDates?: boolean;     // date: 오늘 이전 날짜 비활성화
+    minDate?: string;               // date: 이 날짜 이전 날짜 비활성화 (YYYY-MM-DD)
 }
 
 /** 검색폼 행 설정 */

@@ -22,6 +22,27 @@ import PageLayout from '@/components/layout/page-layout';
 
 const DEFAULT_PAGE_SIZE = 10;
 
+/**
+ * contentKey로 데이터 섹션 탐색
+ * - 1단계: dataJson 최상위에서 직접 탐색
+ * - 2단계: 탭 중첩 구조({ tabKey: { contentKey: {...} } }) 자동 감지
+ */
+function findSection(dataJson: Record<string, unknown>, contentKey: string | undefined): Record<string, unknown> {
+    if (!contentKey) return dataJson;
+    if (dataJson[contentKey] && typeof dataJson[contentKey] === 'object') {
+        return dataJson[contentKey] as Record<string, unknown>;
+    }
+    for (const val of Object.values(dataJson)) {
+        if (val && typeof val === 'object' && !Array.isArray(val)) {
+            const nested = (val as Record<string, unknown>)[contentKey];
+            if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+                return nested as Record<string, unknown>;
+            }
+        }
+    }
+    return dataJson;
+}
+
 /* ══════════════════════════════════════════ */
 /*  메인 페이지 — /admin/widgetSub/{slug}     */
 /* ══════════════════════════════════════════ */
@@ -85,10 +106,11 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         targetSublists: SubListWidget[],
         targetMultiSelects: MultiSelectWidget[] = [],
     ) => {
+        console.log('[restore] dataJson:', JSON.stringify(dataJson));
+        console.log('[restore] forms:', targetForms.map(fw => ({ widgetId: fw.widgetId, contentKey: fw.contentKey, connectedSlug: fw.connectedSlug })));
         targetForms.forEach(fw => {
-            const section = (fw.contentKey && dataJson[fw.contentKey])
-                ? dataJson[fw.contentKey] as Record<string, unknown>
-                : dataJson;
+            const section = findSection(dataJson, fw.contentKey);
+            console.log('[restore] fw.contentKey:', fw.contentKey, '→ section:', JSON.stringify(section));
             const vals: Record<string, string> = {};
             fw.fields.forEach(f => {
                 if (f.fieldKey && section[f.fieldKey] !== undefined) {
@@ -138,9 +160,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 const metaList = metaRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
 
                 targetForms.forEach(fw => {
-                    const section = (fw.contentKey && dataJson[fw.contentKey])
-                        ? dataJson[fw.contentKey] as Record<string, unknown>
-                        : dataJson;
+                    const section = findSection(dataJson, fw.contentKey);
                     /* image 타입만 imageFieldIds에 포함 — media는 파일별 mimeType으로 개별 판별 */
                     const imageFieldIds = new Set(fw.fields.filter(f => f.type === 'image').map(f => f.id));
                     const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
@@ -325,6 +345,9 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
         const queryGroupId = searchParams.get('group_id');
         const queryId      = searchParams.get('id');
+
+        console.log('[수정모드] queryId:', queryId, 'queryGroupId:', queryGroupId);
+        console.log('[수정모드] formWidgets:', formWidgets.map(fw => ({ widgetId: fw.widgetId, connectedSlug: fw.connectedSlug, contentKey: fw.contentKey })));
 
         if (queryGroupId) {
             setCurrentGroupId(queryGroupId);

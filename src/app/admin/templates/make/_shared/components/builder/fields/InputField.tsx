@@ -34,6 +34,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
+                disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />

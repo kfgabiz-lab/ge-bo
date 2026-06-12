@@ -207,6 +207,12 @@ export interface TabItem {
     labelMsgKey?: string;
     /** 연결 페이지 slug */
     pageSlug?: string;
+    /**
+     * 탭 데이터 네임스페이스 — 같은 slug의 탭끼리 data_json 내 섹션 키를 분리
+     * 예: contentKey="tab_a" → data_json = { tab_a: { ...폼데이터 } }
+     * 같은 slug를 쓰는 탭이 여러 개일 때 반드시 설정
+     */
+    contentKey?: string;
     /** preview 모드에서 직접 렌더링할 위젯 아이템 목록 */
     items?: {
         colSpan: number;

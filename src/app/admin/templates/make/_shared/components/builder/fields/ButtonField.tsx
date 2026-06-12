@@ -31,6 +31,7 @@ export function ButtonField({ values, onChange, colSpanMode, rowSpanConfig, code
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
+                disableCondition={values.disableCondition}
                 onChange={onChange}
             />
             {/* 옵션 */}

@@ -17,7 +17,7 @@
  *   <FieldRenderer mode={mode} field={f} fileList={...} onFileChange={...} />
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useId } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import dynamic from 'next/dynamic';
@@ -140,6 +140,8 @@ interface FieldRendererProps {
     onFileChange?: (files: File[]) => void;
     /** 기존 파일 제거 핸들러 */
     onRemoveExisting?: (fileId: number) => void;
+    /** 동적 Disable 조건 결과 — true 시 live 모드에서도 disabled 처리 */
+    forceDisabled?: boolean;
 }
 
 /**
@@ -319,9 +321,14 @@ export function FieldRenderer({
     imgBlobUrls,
     onFileChange,
     onRemoveExisting,
+    forceDisabled = false,
 }: FieldRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
+    /* 탭 keep-alive 환경에서 radio name 충돌 방지 — 인스턴스별 고유 prefix */
+    const uid = useId();
+    /* preview 또는 동적 Disable 조건 충족 시 비활성 */
+    const isDisabled = isPreview || forceDisabled;
     /* live 모드에서 읽기 전용 여부 */
     const isReadOnly = !isPreview && !!field.readonly;
     /* 읽기 전용 스타일 — 입력 불가 시각적 표시 */
@@ -339,7 +346,7 @@ export function FieldRenderer({
             const inputEl = (
                 <input
                     type="text"
-                    disabled={isPreview}
+                    disabled={isDisabled}
                     readOnly={isReadOnly}
                     placeholder={
                         field.placeholderMsgKey
@@ -371,7 +378,7 @@ export function FieldRenderer({
             return (
                 <div className="relative">
                     <select
-                        disabled={isPreview || isReadOnly}
+                        disabled={isDisabled || isReadOnly}
                         className={`${selectCls}${readonlyCls}`}
                         value={value}
                         onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
@@ -391,12 +398,12 @@ export function FieldRenderer({
             return (
                 <input
                     type="date"
-                    disabled={isPreview}
+                    disabled={isDisabled}
                     readOnly={isReadOnly}
                     className={`${inputCls}${readonlyCls}`}
                     value={value}
-                    /* 오늘 이전 날짜 비활성화 설정 시 min=오늘 */
-                    min={field.disablePastDates ? new Date().toISOString().slice(0, 10) : undefined}
+                    /* 설정된 날짜 이전 날짜 비활성화 */
+                    min={field.minDate}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                 />
             );
@@ -460,10 +467,11 @@ export function FieldRenderer({
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="date"
-                            disabled={isPreview}
+                            disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}
                             value={from}
+                            min={field.minDate}
                             onChange={isReadOnly ? undefined : e => onChange?.(`${e.target.value}~${to}`)}
                         />
                     </div>
@@ -472,10 +480,11 @@ export function FieldRenderer({
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="date"
-                            disabled={isPreview}
+                            disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}
                             value={to}
+                            min={from || field.minDate}
                             onChange={isReadOnly ? undefined : e => onChange?.(`${from}~${e.target.value}`)}
                         />
                     </div>
@@ -496,8 +505,8 @@ export function FieldRenderer({
                             <label key={opt} className={`flex items-center gap-2 ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}>
                                 <input
                                     type="radio"
-                                    name={`field-${field.id}`}
-                                    disabled={isPreview || isReadOnly}
+                                    name={`${uid}-field-${field.id}`}
+                                    disabled={isDisabled || isReadOnly}
                                     value={val}
                                     checked={!isPreview && value === val}
                                     onChange={isReadOnly ? undefined : () => onChange?.(val)}
@@ -526,7 +535,7 @@ export function FieldRenderer({
                             <label key={opt} className={`flex items-center gap-2 ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}>
                                 <input
                                     type="checkbox"
-                                    disabled={isPreview || isReadOnly}
+                                    disabled={isDisabled || isReadOnly}
                                     value={val}
                                     checked={!isPreview && isChecked}
                                     onChange={isReadOnly ? undefined : () => {
@@ -592,7 +601,7 @@ export function FieldRenderer({
                             <button
                                 key={opt}
                                 type="button"
-                                disabled={isPreview}
+                                disabled={isDisabled}
                                 onClick={() => onChange?.(val)}
                                 className={`px-2.5 py-2 text-xs font-medium rounded-md border transition-all ${isActive
                                     ? 'bg-slate-900 text-white border-slate-900'
@@ -630,7 +639,7 @@ export function FieldRenderer({
                 return (
                     <div className="flex flex-col h-full">
                         <textarea
-                            disabled={isPreview}
+                            disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} resize-none flex-1 min-h-0${readonlyCls}`}
                             value={value}
@@ -646,7 +655,7 @@ export function FieldRenderer({
             }
             return (
                 <textarea
-                    disabled={isPreview}
+                    disabled={isDisabled}
                     readOnly={isReadOnly}
                     className={`${inputCls} resize-none h-full${readonlyCls}`}
                     value={value}
@@ -687,7 +696,7 @@ export function FieldRenderer({
             return (
                 <button
                     type="button"
-                    disabled={isPreview}
+                    disabled={isDisabled}
                     onClick={onButtonClick}
                     className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] min-w-[72px] w-full whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
                 >
@@ -996,7 +1005,7 @@ export function FieldRenderer({
                         <div className="p-2 flex-shrink-0">
                             <input
                                 type="text"
-                                disabled={isPreview}
+                                disabled={isDisabled}
                                 readOnly={isReadOnly}
                                 className={`${inputCls}${readonlyCls} w-full`}
                                 value={value}
@@ -1427,7 +1436,7 @@ export function FieldRenderer({
                 <ColorPresetSelector
                     colors={colorOptions}
                     selectedColor={selectedColor}
-                    disabled={isPreview}
+                    disabled={isDisabled}
                     onChange={color => onChange?.(color)}
                 />
             );
@@ -1443,7 +1452,7 @@ export function FieldRenderer({
                 <MessageKeySelector
                     value={value}
                     onChange={v => onChange?.(v)}
-                    disabled={isPreview}
+                    disabled={isDisabled}
                 />
             );
 

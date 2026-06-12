@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { FieldEditProps } from './types';
-import { FieldBase } from './_FieldBase';
+import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { ToggleRow } from './_ToggleRow';
 
 export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
@@ -29,6 +29,7 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 descriptionMsgKey={values.descriptionMsgKey}
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
+                disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />
@@ -38,11 +39,15 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 value={values.defaultToday ?? false}
                 onChange={v => onChange({ defaultToday: v || undefined })}
             />
-            <ToggleRow
-                label="오늘 이전 날짜 비활성화"
-                value={values.disablePastDates ?? false}
-                onChange={v => onChange({ disablePastDates: v || undefined })}
-            />
+            <div className="flex items-center gap-2">
+                <input
+                    type="date"
+                    value={values.minDate ?? ''}
+                    onChange={e => onChange({ minDate: e.target.value || undefined })}
+                    className={INPUT_CLS}
+                />
+                <span className="text-[11px] text-slate-500 whitespace-nowrap">이전 날짜 비활성화 <span className="text-slate-300">(선택)</span></span>
+            </div>
             {/* 필수 항목 */}
         </div>
     );

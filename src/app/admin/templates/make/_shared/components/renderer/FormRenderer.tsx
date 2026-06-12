@@ -102,24 +102,40 @@ export function FormRenderer({
         return map;
     }, [fields]);
 
-    /** hideCondition 평가 — "key=v1,key2=v2" AND 복수 조건 지원
+    /** hideCondition / disableCondition 공통 평가 함수
+     *  형식: "key=값" (일치) / "key!=값" (불일치) / "k1=v1,k2=v2" (AND 복수)
      *  cross-form 참조: allFieldKeyToId/allFormValues로 다른 Form 위젯 필드도 조회 */
-    const shouldHide = (f: FormFieldItem): boolean => {
-        if (isPreview || !f.hideCondition) return false;
-        /* 전체 페이지 역매핑 + 현재 폼 역매핑 합산 (현재 폼 우선) */
+    const evalCondition = (condition: string): boolean => {
         const resolvedKeyToId = { ...(allFieldKeyToId ?? {}), ...keyToId };
-        /* 전체 페이지 values + 현재 폼 values 합산 (현재 폼 우선) */
-        const resolvedValues = { ...(allFormValues ?? {}), ...values };
-        return f.hideCondition.split(',').every(cond => {
+        const resolvedValues  = { ...(allFormValues  ?? {}), ...values  };
+        return condition.split(',').every(cond => {
+            /* != 연산자 우선 감지 — = 보다 먼저 체크해야 key에 ! 가 붙는 파싱 오류 방지 */
+            const neqIdx = cond.indexOf('!=');
+            if (neqIdx !== -1) {
+                const key     = cond.slice(0, neqIdx).trim();
+                const val     = cond.slice(neqIdx + 2).trim();
+                const fieldId = resolvedKeyToId[key];
+                if (!fieldId) return false;
+                return (resolvedValues[fieldId] ?? '') !== val;
+            }
             const eqIdx = cond.indexOf('=');
             if (eqIdx === -1) return false;
-            const key = cond.slice(0, eqIdx).trim();
-            const val = cond.slice(eqIdx + 1).trim();
+            const key     = cond.slice(0, eqIdx).trim();
+            const val     = cond.slice(eqIdx + 1).trim();
             const fieldId = resolvedKeyToId[key];
             if (!fieldId) return false;
             return (resolvedValues[fieldId] ?? '') === val;
         });
     };
+
+    /** hideCondition 평가 — "key=v1,key2=v2" AND 복수 조건 지원
+     *  cross-form 참조: allFieldKeyToId/allFormValues로 다른 Form 위젯 필드도 조회 */
+    const shouldHide    = (f: FormFieldItem): boolean =>
+        !isPreview && !!f.hideCondition    && evalCondition(f.hideCondition);
+
+    const shouldDisable = (f: FormFieldItem): boolean =>
+        !isPreview && !!f.disableCondition && evalCondition(f.disableCondition);
+
 
     if (!fields.length) {
         return (
@@ -185,6 +201,7 @@ export function FormRenderer({
                             imgBlobUrls={imgBlobUrls}
                             onFileChange={isPreview ? undefined : files => onFileChange?.(f.id, files)}
                             onRemoveExisting={isPreview ? undefined : fileId => onRemoveExisting?.(f.id, fileId)}
+                            forceDisabled={shouldDisable(f)}
                         />
                     </div>
                 </div>

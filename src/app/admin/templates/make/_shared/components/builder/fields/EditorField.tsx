@@ -16,7 +16,8 @@ export const EditorField = (props: FieldEditProps) => {
             rowSpan={values.rowSpan} rowSpanConfig={props.rowSpanConfig}
             labelOptional isPk={values.isPk} required={values.required}
             description={values.description} descriptionMsgKey={values.descriptionMsgKey} readonly={values.readonly}
-            hideCondition={values.hideCondition}>
+            hideCondition={values.hideCondition}
+            disableCondition={values.disableCondition}>
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">에디터 설정</p>
 

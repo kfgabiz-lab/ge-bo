@@ -51,7 +51,8 @@ import { BG_COLOR_OPTIONS } from './SpaceBuilder';
 export interface FormFieldItem extends Omit<SearchFieldConfig, 'colSpan'> {
     colSpan: number;        // 1~12 (12칸 그리드)
     rowSpan: number;        // 1~20 (행 높이 배수)
-    hideCondition?: string; // 동적 HIDE 조건 (예: "status=1,type=Y")
+    hideCondition?: string;    // 동적 HIDE 조건 (예: "status=1,type=Y")
+    disableCondition?: string; // 동적 Disable 조건 (예: "status=1,type=Y")
 }
 
 /** 폼 위젯 — 플랫 필드 목록 (row 개념 없음, 각 필드 col/row 개별 지정) */
@@ -275,6 +276,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 isPk:               f.isPk,
                 readonly:           f.readonly,
                 hideCondition:      f.hideCondition,
+                disableCondition:   f.disableCondition,
                 maxFileCount:       f.maxFileCount,
                 maxFileSizeMB:      f.maxFileSizeMB,
                 maxTotalSizeMB:     f.maxTotalSizeMB,
@@ -287,7 +289,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 defaultValueMsgKey:  f.defaultValueMsgKey,
                 defaultOptionValue:  f.defaultOptionValue,
                 defaultToday:        f.defaultToday,
-                disablePastDates:    f.disablePastDates,
+                minDate:             f.minDate,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),

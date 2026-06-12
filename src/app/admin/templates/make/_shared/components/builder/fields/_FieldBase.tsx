@@ -50,7 +50,9 @@ interface FieldBaseProps {
     readonly?: boolean;
     /** 동적 HIDE 조건 — Form 빌더(input 모드)일 때만 표시 */
     hideCondition?: string;
-    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; hideCondition: string | undefined; description: string; descriptionMsgKey: string | undefined }>) => void;
+    /** 동적 Disable 조건 — Form 빌더(input 모드)일 때만 표시 */
+    disableCondition?: string;
+    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; hideCondition: string | undefined; disableCondition: string | undefined; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
 }
@@ -61,7 +63,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, required, description, descriptionMsgKey, isPk, readonly, hideCondition, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, required, description, descriptionMsgKey, isPk, readonly, hideCondition, disableCondition, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -230,17 +232,29 @@ export function FieldBase(props: FieldBaseProps) {
                 )}
             </div>
 
-            {/* 동적 HIDE 조건 — Form 모드에서만 표시 */}
+            {/* 동적 HIDE 조건 | 동적 Disable 조건 — Form 모드에서만, 한 줄 2열 배치 */}
             {isFormMode && (
-                <div>
-                    <label className={LABEL_CLS}>동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span></label>
-                    <input
-                        type="text"
-                        value={hideCondition ?? ''}
-                        onChange={e => onChange({ hideCondition: e.target.value || undefined })}
-                        placeholder="예: status=1 또는 status=1,type=Y"
-                        className={INPUT_CLS}
-                    />
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className={LABEL_CLS}>동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span></label>
+                        <input
+                            type="text"
+                            value={hideCondition ?? ''}
+                            onChange={e => onChange({ hideCondition: e.target.value || undefined })}
+                            placeholder="예: status=1 / status!=0"
+                            className={INPUT_CLS}
+                        />
+                    </div>
+                    <div>
+                        <label className={LABEL_CLS}>동적 Disable 조건 <span className="text-slate-300 font-normal">(선택)</span></label>
+                        <input
+                            type="text"
+                            value={disableCondition ?? ''}
+                            onChange={e => onChange({ disableCondition: e.target.value || undefined })}
+                            placeholder="예: status=1 / status!=0"
+                            className={INPUT_CLS}
+                        />
+                    </div>
                 </div>
             )}
 

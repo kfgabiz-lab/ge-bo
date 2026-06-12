@@ -41,6 +41,7 @@ export function TextareaField({
                 required={values.required}
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
+                disableCondition={values.disableCondition}
             onChange={onChange}
             onLabelKeyDown={onLabelKeyDown}
         >

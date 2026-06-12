@@ -99,6 +99,7 @@ export function ColorField({
                 description={values.description}
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
+                disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
                 onChange={onChange}
             />
