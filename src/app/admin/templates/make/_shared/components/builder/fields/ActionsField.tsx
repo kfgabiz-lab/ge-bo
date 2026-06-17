@@ -85,6 +85,27 @@ export function ActionsField({ values, onChange, layerTemplates, onRequestLayerT
                                 placeholder="연결 경로 (예: LayerPopup)"
                                 className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
                             />
+                            {/* 파라미터 입력 — 연결(팝업 또는 경로)이 설정된 경우에만 표시 */}
+                            {(action === 'edit'
+                                ? (values.editPopupSlug || values.editFileLayerSlug)
+                                : (values.detailPopupSlug || values.detailFileLayerSlug)
+                            ) && (
+                                <div className="space-y-0.5">
+                                    <input
+                                        type="text"
+                                        value={action === 'edit' ? (values.editParams ?? '') : (values.detailParams ?? '')}
+                                        onChange={e => onChange(action === 'edit'
+                                            ? { editParams: e.target.value || undefined }
+                                            : { detailParams: e.target.value || undefined }
+                                        )}
+                                        placeholder="파라미터 (예: title,temp1=1,temp2=abc)"
+                                        className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
+                                    />
+                                    <p className="text-[9px] text-slate-400 px-0.5">
+                                        쉼표 구분 · =없으면 row 필드값 · =있으면 고정값
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

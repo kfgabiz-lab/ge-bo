@@ -324,6 +324,12 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
                     const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
                     if (start || end) initVals[f.id] = `${start}~${end}`;
+                } else if ((f.type === 'select' || f.type === 'radio' || f.type === 'checkbox') && f.defaultOptionValue) {
+                    /* 옵션 기본 선택값 — select·radio·checkbox 전용 */
+                    initVals[f.id] = f.defaultOptionValue;
+                } else if (f.defaultValue) {
+                    /* 직접 텍스트 기본값 — input·hidden 등 */
+                    initVals[f.id] = f.defaultValue;
                 }
             });
         });
@@ -347,6 +353,33 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         console.log('[수정모드] queryId:', queryId, 'queryGroupId:', queryGroupId);
         console.log('[수정모드] formWidgets:', formWidgets.map(fw => ({ widgetId: fw.widgetId, connectedSlug: fw.connectedSlug, contentKey: fw.contentKey })));
 
+        /** id·group_id 제외한 URL 파라미터를 fieldKey 기준으로 폼 필드에 적용
+         * - 비동기 DB 복원 완료 후 호출해야 URL 파라미터가 DB 값 위에 덮어씌워짐
+         */
+        const applyUrlParams = () => {
+            const SKIP_KEYS = new Set(['id', 'group_id']);
+            const urlOverrides: Record<string, Record<string, string>> = {};
+            formWidgets.forEach(fw => {
+                fw.fields.forEach(f => {
+                    const key = f.fieldKey || f.label || '';
+                    if (!key || SKIP_KEYS.has(key)) return;
+                    const urlVal = searchParams.get(key);
+                    if (urlVal !== null) {
+                        if (!urlOverrides[fw.widgetId]) urlOverrides[fw.widgetId] = {};
+                        urlOverrides[fw.widgetId][f.id] = urlVal;
+                    }
+                });
+            });
+            if (Object.keys(urlOverrides).length === 0) return;
+            setFormValuesMap(prev => {
+                const next = { ...prev };
+                Object.entries(urlOverrides).forEach(([wId, vals]) => {
+                    next[wId] = { ...(next[wId] ?? {}), ...vals };
+                });
+                return next;
+            });
+        };
+
         if (queryGroupId) {
             setCurrentGroupId(queryGroupId);
             const slugSet = new Set(
@@ -364,6 +397,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                         const slugSublists     = sublistWidgets.filter(sw => sw.connectedSlug === s);
                         const slugMultiSelects = multiSelectWidgets.filter(mw => mw.connectedSlug === s);
                         await restoreFromDataJson(dataJson, slugForms, slugSublists, slugMultiSelects);
+                        applyUrlParams();
                     })
                     .catch(() => {});
             });
@@ -375,23 +409,19 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     .then(async dataRes => {
                         const dataJson: Record<string, unknown> = dataRes.data.dataJson || {};
                         await restoreFromDataJson(dataJson, formWidgets, sublistWidgets, multiSelectWidgets);
+                        applyUrlParams();
                     })
                     .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
             }
         } else {
-            /* 신규 모드 — 필드별 기본값 + URL params(initialValues) 적용 */
+            /* 신규 모드 — 기본값만 처리, URL 파라미터는 applyUrlParams()에서 별도 적용 */
             setCurrentGroupId(null);
             setMultiSelectValuesMap({});
             const initMap: Record<string, Record<string, string>> = {};
-            const todayStr = new Date().toISOString().slice(0, 10);
             formWidgets.forEach(fw => {
                 const vals: Record<string, string> = {};
                 fw.fields.forEach(f => {
-                    const key = f.fieldKey || f.label || '';
-                    const urlVal = key ? searchParams.get(key) : null;
-
                     if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
-                        /* offset이 0이 아니면(양수·음수) 오늘 기준 재계산, 없으면 defaultDate 사용 */
                         let dateVal = '';
                         if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
                             const d = new Date();
@@ -400,26 +430,24 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                         } else if (f.defaultDate) {
                             dateVal = f.defaultDate;
                         }
-                        if (dateVal) vals[f.id] = urlVal ?? dateVal;
+                        if (dateVal) vals[f.id] = dateVal;
                     } else if (f.type === 'dateRange') {
                         const calcDate = (offset: number) => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
                         const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
                         const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
-                        if (start || end) vals[f.id] = urlVal ?? `${start}~${end}`;
+                        if (start || end) vals[f.id] = `${start}~${end}`;
                     } else if (f.defaultOptionValue && (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox')) {
-                        /* 옵션 기본 선택값 */
-                        vals[f.id] = urlVal ?? f.defaultOptionValue;
+                        vals[f.id] = f.defaultOptionValue;
                     } else if (f.defaultValueMsgKey) {
-                        /* 다국어 기본값 — 현재 언어로 번역 후 세팅 */
-                        vals[f.id] = urlVal ?? t(f.defaultValueMsgKey);
+                        vals[f.id] = t(f.defaultValueMsgKey);
                     } else if (f.defaultValue) {
-                        /* 직접 텍스트 기본값 (hidden 포함) */
-                        vals[f.id] = urlVal ?? f.defaultValue;
+                        vals[f.id] = f.defaultValue;
                     }
                 });
                 initMap[fw.widgetId] = vals;
             });
             setFormValuesMap(initMap);
+            applyUrlParams();
         }
     }, [widgetItems, searchParams, restoreFromDataJson]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -848,6 +876,14 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         );
     }
 
+    /* URL 파라미터 중 id·group_id 제외한 나머지를 urlParams로 변환
+     * hideCondition/disableCondition 평가 시 폼 필드 외에 URL 파라미터도 참조 가능하게 함 */
+    const SKIP_URL_KEYS = new Set(['id', 'group_id']);
+    const urlParams: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+        if (!SKIP_URL_KEYS.has(key)) urlParams[key] = value;
+    });
+
     return (
         <PageLayout mode="live">
             <PageGridRenderer
@@ -879,6 +915,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 dataSlug={resolvedDataSlug}
                 onRefresh={handleRefresh}
                 pageSlug={slug}
+                urlParams={urlParams}
             />
         </PageLayout>
     );

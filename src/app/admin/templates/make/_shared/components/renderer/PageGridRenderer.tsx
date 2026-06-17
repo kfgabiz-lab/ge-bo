@@ -138,6 +138,8 @@ interface PageGridRendererProps {
      * Space 버튼의 엑셀 다운로드 시 동일 필터 조건으로 전체 데이터 추출에 사용
      */
     currentSearchParams?: Record<string, string>;
+    /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 URL 파라미터 참조용 (key → value) */
+    urlParams?: Record<string, string>;
 }
 
 /**
@@ -179,6 +181,7 @@ export function PageGridRenderer({
     multiSelectValuesMap,
     onMultiSelectChange,
     currentSearchParams,
+    urlParams,
 }: PageGridRendererProps) {
     /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
      * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
@@ -293,6 +296,7 @@ export function PageGridRenderer({
                                         onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
                                         allFormValues={allFormValues}
                                         allFieldKeyToId={allFieldKeyToId}
+                                        urlParams={urlParams}
                                         onContentAction={onContentAction}
                                         onClose={onClose}
                                         /* SubList */

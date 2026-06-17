@@ -34,9 +34,11 @@ import { useCodeStore } from "@/store/use-code-store";
 interface TabRendererProps {
   mode: RendererMode;
   widget: TabWidget;
+  /** 탭을 포함하는 상위 페이지 slug — 저장 시 templateSlug로 사용 */
+  pageSlug?: string;
 }
 
-export function TabRenderer({ mode, widget }: TabRendererProps) {
+export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
   const { tabs } = widget;
   const [activeIdx, setActiveIdx] = useState(0);
   /* 한 번이라도 활성화된 탭 인덱스 집합 — lazy mount용 */
@@ -99,6 +101,7 @@ export function TabRenderer({ mode, widget }: TabRendererProps) {
               (mode === "live" ? (
                 <LiveTabPanel
                   tab={tab}
+                  pageSlug={pageSlug}
                   sharedDataId={tab.pageSlug ? (sharedDataIdMap[tab.pageSlug] ?? null) : null}
                   onDataIdCreated={(id) => tab.pageSlug && handleDataIdCreated(tab.pageSlug, id)}
                 />
@@ -155,6 +158,8 @@ function PreviewTabPanel({ tab, activeIdx }: PreviewTabPanelProps) {
 
 interface LiveTabPanelProps {
   tab: TabItem;
+  /** 탭을 포함하는 상위 페이지 slug — 저장 시 templateSlug로 사용 */
+  pageSlug?: string;
   /** 같은 slug 탭들이 공유하는 row id (TabRenderer 레벨에서 관리) */
   sharedDataId: number | null;
   /** 신규 저장 후 생성된 id를 TabRenderer로 전달 */
@@ -166,13 +171,13 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, sharedDataId, onDataIdCreated }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, pageSlug, sharedDataId, onDataIdCreated }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const { gridProps } = useWidgetPageState(widgetItems, tab.pageSlug, {
+  const { gridProps } = useWidgetPageState(widgetItems, pageSlug ?? tab.pageSlug, {
     contentKey: tab.contentKey,
     sharedDataId,
     onDataIdCreated,

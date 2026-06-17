@@ -246,6 +246,12 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                             const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
                             const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
                             if (start || end) initSearchVals[f.id] = `${start}~${end}`;
+                        } else if ((f.type === 'select' || f.type === 'radio' || f.type === 'checkbox') && f.defaultOptionValue) {
+                            /* 옵션 기본 선택값 — select·radio·checkbox 전용 */
+                            initSearchVals[f.id] = f.defaultOptionValue;
+                        } else if (f.defaultValue) {
+                            /* 직접 텍스트 기본값 — input·hidden 등 */
+                            initSearchVals[f.id] = f.defaultValue;
                         }
                     });
             }

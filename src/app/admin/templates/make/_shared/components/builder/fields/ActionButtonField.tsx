@@ -267,27 +267,57 @@ export function ActionButtonField({
 
                     {/* 페이지 — Quick-Detail 템플릿 선택 (팝업/상세 구분 표시) */}
                     {connType === 'popup' && (
-                        <select
-                            value={values.popupSlug ?? ''}
-                            onChange={e => onChange({ popupSlug: e.target.value || undefined })}
-                            className={SELECT_CLS}
-                        >
-                            <option value="">— 페이지 선택 —</option>
-                            {pageTemplates.map(t => (
-                                <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>
-                            ))}
-                        </select>
+                        <div className="space-y-1">
+                            <select
+                                value={values.popupSlug ?? ''}
+                                onChange={e => onChange({ popupSlug: e.target.value || undefined })}
+                                className={SELECT_CLS}
+                            >
+                                <option value="">— 페이지 선택 —</option>
+                                {pageTemplates.map(t => (
+                                    <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>
+                                ))}
+                            </select>
+                            {/* 연결 페이지가 선택된 경우에만 파라미터 입력란 노출 */}
+                            {values.popupSlug && (
+                                <div className="space-y-0.5">
+                                    <input
+                                        type="text"
+                                        value={values.params ?? ''}
+                                        onChange={e => onChange({ params: e.target.value || undefined })}
+                                        placeholder="파라미터 (예: depth=1,type=create)"
+                                        className={INPUT_CLS}
+                                    />
+                                    <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값</p>
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {/* 경로 — 직접 입력 */}
                     {connType === 'path' && (
-                        <input
-                            type="text"
-                            value={values.fileLayerSlug ?? ''}
-                            onChange={e => onChange({ fileLayerSlug: e.target.value || undefined })}
-                            placeholder="예: LayerPopup"
-                            className={INPUT_CLS}
-                        />
+                        <div className="space-y-1">
+                            <input
+                                type="text"
+                                value={values.fileLayerSlug ?? ''}
+                                onChange={e => onChange({ fileLayerSlug: e.target.value || undefined })}
+                                placeholder="예: LayerPopup"
+                                className={INPUT_CLS}
+                            />
+                            {/* 경로가 입력된 경우에만 파라미터 입력란 노출 */}
+                            {values.fileLayerSlug && (
+                                <div className="space-y-0.5">
+                                    <input
+                                        type="text"
+                                        value={values.params ?? ''}
+                                        onChange={e => onChange({ params: e.target.value || undefined })}
+                                        placeholder="파라미터 (예: depth=1,type=create)"
+                                        className={INPUT_CLS}
+                                    />
+                                    <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값</p>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

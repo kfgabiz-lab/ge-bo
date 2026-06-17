@@ -55,8 +55,8 @@ api.interceptors.response.use(
                 // Refresh 실패 시 로그아웃 처리
                 await api.post('/auth/logout', {}, { withCredentials: true }).catch(() => {});
                 useAuthStore.getState().logout();
-                if (typeof window !== 'undefined' && window.location.pathname !== '/admin/login') {
-                    window.location.href = '/admin/login';
+                if (typeof window !== 'undefined' && window.location.pathname !== '/bo/admin/login') {
+                    window.location.href = '/bo/admin/login';
                 }
             }
         }

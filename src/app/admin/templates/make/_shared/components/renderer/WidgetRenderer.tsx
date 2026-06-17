@@ -73,6 +73,36 @@ import { PageGridRenderer } from './PageGridRenderer';
 import { validateFormFields, buildDataJson } from '../../utils';
 
 /**
+ * Actions 컬럼 파라미터 문자열 → initialValues 변환
+ *
+ * 형식: "title,temp1=1,temp2=abc" (쉼표 구분)
+ *   - title     → { title: row['title'] }  (=없음: row의 해당 key 값 사용)
+ *   - temp1=1   → { temp1: '1' }           (=있음: 고정값)
+ *
+ * @param paramStr  ActionsField에서 입력한 파라미터 문자열
+ * @param row       현재 row 데이터
+ * @returns         handleInternalPopupOpen에 전달할 initialValues
+ */
+function parseActionParams(
+    paramStr: string,
+    row: Record<string, unknown>
+): Record<string, string> {
+    if (!paramStr) return {};
+    const result: Record<string, string> = {};
+    paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {
+        if (part.includes('=')) {
+            const eqIdx = part.indexOf('=');
+            const key   = part.slice(0, eqIdx).trim();
+            const val   = part.slice(eqIdx + 1).trim();
+            if (key) result[key] = val;
+        } else {
+            result[part] = String(row[part] ?? '');
+        }
+    });
+    return result;
+}
+
+/**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
  * - editId가 있으면 slug+id로 dataJson 조회 후 fieldKey 기준 매핑
  * - contentKey가 있으면 dataJson[contentKey] 섹션에서 읽음 (중첩 저장 구조 대응)
@@ -156,6 +186,8 @@ interface WidgetRendererProps {
     allFormValues?: Record<string, string>;
     /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
     allFieldKeyToId?: Record<string, string>;
+    /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 URL 파라미터 참조용 (key → value) */
+    urlParams?: Record<string, string>;
     /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
@@ -241,6 +273,8 @@ interface WidgetRendererProps {
         ts: number;
         editId?: number | null;
         listSlug?: string;
+        /** Actions 파라미터 파싱 결과 — listGenerator가 setTablePopup 시 전달 */
+        initialValues?: Record<string, string>;
     } | null;
 }
 
@@ -260,6 +294,7 @@ export function WidgetRenderer({
     onFormValuesChange,
     allFormValues,
     allFieldKeyToId,
+    urlParams,
     onContentAction,
     onClose,
     /* file */
@@ -385,8 +420,10 @@ export function WidgetRenderer({
             /* actions 타입 컬럼 제외 — 데이터 컬럼만 추출 */
             const validCols = tableWidget.columns.filter(c => c.cellType !== 'actions');
             /* headerMsgKey가 있으면 번역 텍스트 사용 — header가 빈 문자열일 때 Java split trailing 제거 방지 */
-            const headers = validCols.map(c => c.headerMsgKey ? t(c.headerMsgKey) : c.header).join(',');
-            const keys    = validCols.map(c => c.accessor).join(',');
+            const headers     = validCols.map(c => c.headerMsgKey ? t(c.headerMsgKey) : c.header).join(',');
+            const keys        = validCols.map(c => c.accessor).join(',');
+            /* 날짜 포맷 — 포맷 없는 컬럼은 빈 문자열, keys 순서와 일치 */
+            const dateFormats = validCols.map(c => c.dateFormat ?? '').join(',');
 
             /* 현재 검색 조건 포함 — page/size 제외 (export는 전체 데이터) */
             const searchQuery = { ...currentSearchParams };
@@ -394,7 +431,7 @@ export function WidgetRenderer({
             delete searchQuery['size'];
 
             const res = await api.get(`/page-data/${tableWidget.connectedSlug}/export`, {
-                params: { format: 'xlsx', headers, keys, ...searchQuery },
+                params: { format: 'xlsx', headers, keys, dateFormats, ...searchQuery },
                 responseType: 'blob',
             });
 
@@ -563,6 +600,7 @@ export function WidgetRenderer({
                 externalPopupTrigger.slug,
                 externalPopupTrigger.editId ?? null,
                 externalPopupTrigger.listSlug || dataSlug,
+                externalPopupTrigger.initialValues,
             );
         }
         // externalPopupTrigger.ts가 변경될 때마다 실행
@@ -867,13 +905,25 @@ export function WidgetRenderer({
                 const actionsCol = widget.columns.find(c => c.cellType === 'actions');
                 const slug = actionsCol?.editPopupSlug;
                 /* _groupId: 다중 slug 저장 row — group_id 파라미터로 page 이동 */
-                if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug, undefined, row._groupId as string | null); return; }
+                if (slug) {
+                    const initialValues = actionsCol?.editParams
+                        ? parseActionParams(actionsCol.editParams, row)
+                        : undefined;
+                    handleInternalPopupOpen(slug, row._id as number, dataSlug, initialValues, row._groupId as string | null);
+                    return;
+                }
                 handlers?.onEdit?.(row);
             },
             onDetail: (row) => {
                 const actionsCol = widget.columns.find(c => c.cellType === 'actions');
                 const slug = actionsCol?.detailPopupSlug;
-                if (slug) { handleInternalPopupOpen(slug, row._id as number, dataSlug); return; }
+                if (slug) {
+                    const initialValues = actionsCol?.detailParams
+                        ? parseActionParams(actionsCol.detailParams, row)
+                        : undefined;
+                    handleInternalPopupOpen(slug, row._id as number, dataSlug, initialValues);
+                    return;
+                }
                 handlers?.onDetail?.(row);
             },
             /* 외부 핸들러 우선, 없으면 connectedSlug로 직접 삭제 */
@@ -945,6 +995,7 @@ export function WidgetRenderer({
                 onChangeValues={onFormValuesChange}
                 allFormValues={allFormValues}
                 allFieldKeyToId={allFieldKeyToId}
+                urlParams={urlParams}
                 fileValues={fileValues}
                 existingFileMeta={existingFileMeta}
                 imgBlobUrls={imgBlobUrls}
@@ -967,7 +1018,7 @@ export function WidgetRenderer({
                     bgColor={widget.bgColor}
                     onContentAction={onContentAction}
                     onClose={onClose}
-                    onPopupOpen={(slug) => handleInternalPopupOpen(slug, null, dataSlug)}
+                    onPopupOpen={(slug, params) => handleInternalPopupOpen(slug, null, dataSlug, params ? parseActionParams(params, {}) : undefined)}
                     onExcelDownload={mode === 'live' ? handleExcelDownload : undefined}
                 />
                 {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
@@ -1027,7 +1078,7 @@ export function WidgetRenderer({
     }
 
     if (widget.type === 'tab') {
-        return <TabRenderer mode={mode} widget={widget} />;
+        return <TabRenderer mode={mode} widget={widget} pageSlug={pageSlug} />;
     }
 
     return <div className={BASE_CLS} />;

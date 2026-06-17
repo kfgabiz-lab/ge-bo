@@ -28,6 +28,8 @@ export const buildListTsxFile = (
     const needsArrow = columns.some(c => c.sortable);
     /* actions 컬럼 존재 여부 */
     const hasActionsCol = columns.some(c => c.cellType === 'actions');
+    /* 파라미터 설정 여부 — parseActionParams 함수 생성 여부 결정 */
+    const hasActionsParams = columns.some(c => c.editParams || c.detailParams);
     /* LAYER 팝업 연결 여부 (테이블 컬럼) */
     const hasPopup = columns.some(c => c.editPopupSlug || c.detailPopupSlug || c.editFileLayerSlug || c.detailFileLayerSlug);
     const hasPathPopup = columns.some(c => c.editFileLayerSlug || c.detailFileLayerSlug);
@@ -90,6 +92,32 @@ export const buildListTsxFile = (
         lines.push(`import ${slug} from './${slug}';`);
     });
     lines.push('');
+
+    /* 파라미터 파싱 유틸: parseActionParams — Actions 파라미터 설정이 있는 경우에만 생성 */
+    if (hasActionsParams) {
+        lines.push('/**');
+        lines.push(' * Actions 컬럼 파라미터 문자열 → 초기값 맵 변환');
+        lines.push(' * 형식: "title,temp1=1,temp2=abc"');
+        lines.push(' *   - title   → { title: row[\'title\'] }  (=없음: row 필드값 사용)');
+        lines.push(' *   - temp1=1 → { temp1: \'1\' }           (=있음: 고정값)');
+        lines.push(' */');
+        lines.push('function parseActionParams(paramStr: string, row: Record<string, unknown>): Record<string, string> {');
+        lines.push(`${ind(1)}if (!paramStr) return {};`);
+        lines.push(`${ind(1)}const result: Record<string, string> = {};`);
+        lines.push(`${ind(1)}paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {`);
+        lines.push(`${ind(2)}if (part.includes('=')) {`);
+        lines.push(`${ind(3)}const eqIdx = part.indexOf('=');`);
+        lines.push(`${ind(3)}const key = part.slice(0, eqIdx).trim();`);
+        lines.push(`${ind(3)}const val = part.slice(eqIdx + 1).trim();`);
+        lines.push(`${ind(3)}if (key) result[key] = val;`);
+        lines.push(`${ind(2)}} else {`);
+        lines.push(`${ind(3)}result[part] = String(row[part] ?? '');`);
+        lines.push(`${ind(2)}}`);
+        lines.push(`${ind(1)}});`);
+        lines.push(`${ind(1)}return result;`);
+        lines.push('}');
+        lines.push('');
+    }
 
     /* 유틸리티 함수: findMenuSlug (목록 공통) */
     lines.push('/** pathname을 기반으로 navMenus에서 해당 메뉴의 slug를 찾습니다. */');
@@ -157,7 +185,7 @@ export const buildListTsxFile = (
     }
 
     if (hasPopup) {
-        lines.push(`${ind(1)}const [tablePopup, setTablePopup] = useState<{ type: 'slug' | 'path'; value: string; editId?: number } | null>(null);`);
+        lines.push(`${ind(1)}const [tablePopup, setTablePopup] = useState<{ type: 'slug' | 'path'; value: string; editId?: number; initialValues?: Record<string, string> } | null>(null);`);
     }
     if (hasBtnPopup) {
         lines.push(`${ind(1)}const [activePopup, setActivePopup] = useState<{ type: 'slug' | 'path'; value: string } | null>(null);`);
@@ -438,17 +466,25 @@ export const buildListTsxFile = (
                     lines.push(`${ind(10)}<div className="flex items-center justify-center gap-1 flex-wrap">`);
                     (col.actions || []).forEach(action => {
                         if (action === 'edit') {
+                            /* editParams 있으면 parseActionParams 호출 코드 포함 */
+                            const editInitVal = col.editParams
+                                ? `, initialValues: parseActionParams('${col.editParams}', row)`
+                                : '';
                             const handler = col.editPopupSlug
-                                ? `{ setTablePopup({ type: 'slug', value: '${col.editPopupSlug}', editId: row.id as number }); }`
+                                ? `{ setTablePopup({ type: 'slug', value: '${col.editPopupSlug}', editId: row.id as number${editInitVal} }); }`
                                 : col.editFileLayerSlug
-                                    ? `{ setTablePopup({ type: 'path', value: '${col.editFileLayerSlug}', editId: row.id as number }); }`
+                                    ? `{ setTablePopup({ type: 'path', value: '${col.editFileLayerSlug}', editId: row.id as number${editInitVal} }); }`
                                     : `{ /* TODO: 수정 처리 */ }`;
                             lines.push(`${ind(11)}<button onClick={() => ${handler}} className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-all" title="수정"><Pencil className="w-3.5 h-3.5" /></button>`);
                         } else if (action === 'detail') {
+                            /* detailParams 있으면 parseActionParams 호출 코드 포함 */
+                            const detailInitVal = col.detailParams
+                                ? `, initialValues: parseActionParams('${col.detailParams}', row)`
+                                : '';
                             const handler = col.detailPopupSlug
-                                ? `{ setTablePopup({ type: 'slug', value: '${col.detailPopupSlug}' }); }`
+                                ? `{ setTablePopup({ type: 'slug', value: '${col.detailPopupSlug}'${detailInitVal} }); }`
                                 : col.detailFileLayerSlug
-                                    ? `{ setTablePopup({ type: 'path', value: '${col.detailFileLayerSlug}' }); }`
+                                    ? `{ setTablePopup({ type: 'path', value: '${col.detailFileLayerSlug}'${detailInitVal} }); }`
                                     : `{ /* TODO: 상세 처리 */ }`;
                             lines.push(`${ind(11)}<button onClick={() => ${handler}} className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-all" title="상세"><Eye className="w-3.5 h-3.5" /></button>`);
                         } else if (action === 'delete') {
@@ -496,7 +532,7 @@ export const buildListTsxFile = (
 
     if (hasPopup) {
         lines.push(`${ind(2)}{tablePopup?.type === 'slug' && (`);
-        lines.push(`${ind(3)}<WidgetRenderer mode="live" widget={null} dataSlug={menuSlug} onPopupSaved={() => { setTablePopup(null); fetchData(0); }} externalPopupTrigger={{ slug: tablePopup.value, ts: tablePopup.ts ?? 0, editId: tablePopup.editId, listSlug: menuSlug }} />`);
+        lines.push(`${ind(3)}<WidgetRenderer mode="live" widget={null} dataSlug={menuSlug} onPopupSaved={() => { setTablePopup(null); fetchData(0); }} externalPopupTrigger={{ slug: tablePopup.value, ts: tablePopup.ts ?? 0, editId: tablePopup.editId, listSlug: menuSlug, initialValues: tablePopup.initialValues }} />`);
         lines.push(`${ind(2)})}`);
     }
     if (hasPathPopup) {

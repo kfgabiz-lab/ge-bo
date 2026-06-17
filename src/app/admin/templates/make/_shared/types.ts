@@ -61,6 +61,7 @@ export interface SearchFieldConfig {
     connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel'; // 클릭 시 연결 방식
     popupSlug?: string;         // 연결 방식 popup: LAYER 템플릿 slug
     fileLayerSlug?: string;     // 연결 방식 path: 로컬 컴포넌트명
+    params?: string;            // 연결 시 전달할 파라미터 (popup·path 공통, 예: depth=1,type=create)
     connectedSlug?: string;     // 연결 방식 slug: DB slug (레거시)
     connectedContentWidgetIds?: string[];    // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
     excelTableWidgetId?: string;             // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
@@ -174,6 +175,8 @@ export interface TableColumnConfig {
     detailPopupSlug?: string;           // 상세 버튼 연결 LAYER slug (관리자방식)
     editFileLayerSlug?: string;         // 수정 버튼 연결 로컬 컴포넌트명 (개발자방식)
     detailFileLayerSlug?: string;       // 상세 버튼 연결 로컬 컴포넌트명 (개발자방식)
+    editParams?: string;                // 수정 버튼 파라미터 (예: title,temp1=1,temp2=abc) — editPopupSlug/editFileLayerSlug 공통
+    detailParams?: string;              // 상세 버튼 파라미터 — detailPopupSlug/detailFileLayerSlug 공통
     fileLayerSlug?: string;             // file 타입 — 파일 뷰어 LAYER slug
     /** 공통코드 연동 — text 셀에서 코드값을 이름으로 변환 */
     codeGroupCode?: string;

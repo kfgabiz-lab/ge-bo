@@ -40,8 +40,8 @@ interface SpaceRendererProps {
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
     onClose?: () => void;
-    /** 팝업 오픈 요청 — connType='popup' 버튼 클릭 시 slug 전달 */
-    onPopupOpen?: (slug: string) => void;
+    /** 페이지/팝업/경로 연결 요청 — connType='popup'·'path' 버튼 클릭 시 slug와 파라미터 문자열 전달 */
+    onPopupOpen?: (slug: string, params?: string) => void;
     /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID 전달 */
     onExcelDownload?: (tableWidgetId: string) => void;
 }
@@ -72,7 +72,9 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
                 router.back();
             }
         } else if (field.connType === 'popup' && field.popupSlug) {
-            onPopupOpen?.(field.popupSlug);
+            onPopupOpen?.(field.popupSlug, field.params);
+        } else if (field.connType === 'path' && field.fileLayerSlug) {
+            onPopupOpen?.(field.fileLayerSlug, field.params);
         } else if (field.connType === 'excel' && field.excelTableWidgetId) {
             onExcelDownload?.(field.excelTableWidgetId);
         }

@@ -58,6 +58,8 @@ interface FormRendererProps {
     allFormValues?: Record<string, string>;
     /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
     allFieldKeyToId?: Record<string, string>;
+    /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 폼 필드 외 URL 파라미터도 참조 가능 (key → value) */
+    urlParams?: Record<string, string>;
     /* ── 파일/이미지/비디오 전용 (live 모드) ── */
     /** 새로 선택한 파일 목록 (fieldId → File[]) */
     fileValues?: Record<string, File[]>;
@@ -86,6 +88,7 @@ export function FormRenderer({
     onChangeValues,
     allFormValues,
     allFieldKeyToId,
+    urlParams,
     fileValues,
     existingFileMeta,
     imgBlobUrls,
@@ -115,16 +118,20 @@ export function FormRenderer({
                 const key     = cond.slice(0, neqIdx).trim();
                 const val     = cond.slice(neqIdx + 2).trim();
                 const fieldId = resolvedKeyToId[key];
-                if (!fieldId) return false;
-                return (resolvedValues[fieldId] ?? '') !== val;
+                /* 폼 필드에 없으면 URL 파라미터에서 조회 */
+                if (fieldId) return (resolvedValues[fieldId] ?? '') !== val;
+                if (urlParams && key in urlParams) return (urlParams[key] ?? '') !== val;
+                return false;
             }
             const eqIdx = cond.indexOf('=');
             if (eqIdx === -1) return false;
             const key     = cond.slice(0, eqIdx).trim();
             const val     = cond.slice(eqIdx + 1).trim();
             const fieldId = resolvedKeyToId[key];
-            if (!fieldId) return false;
-            return (resolvedValues[fieldId] ?? '') === val;
+            /* 폼 필드에 없으면 URL 파라미터에서 조회 */
+            if (fieldId) return (resolvedValues[fieldId] ?? '') === val;
+            if (urlParams && key in urlParams) return (urlParams[key] ?? '') === val;
+            return false;
         });
     };
 
