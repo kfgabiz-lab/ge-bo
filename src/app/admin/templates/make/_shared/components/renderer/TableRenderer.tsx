@@ -264,7 +264,7 @@ export function TableRenderer({
                                     {columns.map(col => (
                                         <td
                                             key={col.id}
-                                            className="px-4 py-3 whitespace-nowrap"
+                                            className="px-4 py-3 max-w-[200px] overflow-hidden"
                                             style={{ textAlign: col.align }}
                                         >
                                             <TableCellRenderer
@@ -303,7 +303,7 @@ export function TableRenderer({
                                     {columns.map(col => (
                                         <td
                                             key={col.id}
-                                            className="px-4 py-3"
+                                            className="px-4 py-3 max-w-[200px] overflow-hidden"
                                             style={{ textAlign: col.align }}
                                         >
                                             <TableCellRenderer

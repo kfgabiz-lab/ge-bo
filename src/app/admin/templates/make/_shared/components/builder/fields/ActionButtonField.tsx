@@ -23,9 +23,9 @@ import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import type { TemplateItem } from '../../../types';
 import { getTemplateLabel } from '../../../utils';
 
-/** 컨텐츠 위젯 정보 타입 (Form + SubList + MultiSelect 공용) */
+/** 컨텐츠 위젯 정보 타입 (Form + SubList + MultiSelect + Table 공용) */
 export interface ContentWidgetOption {
-    type: 'form' | 'sublist' | 'multiselect';
+    type: 'form' | 'sublist' | 'multiselect' | 'table';
     widgetId: string;
     contentKey: string;
     title?: string;
@@ -74,11 +74,12 @@ export function ActionButtonField({
     /** 연결 타입 변경 시 연결 관련 값 초기화 */
     const handleConnTypeChange = (newType: string) => {
         onChange({
-            connType: newType as '' | 'content' | 'popup' | 'path' | 'close',
+            connType: newType as '' | 'content' | 'popup' | 'path' | 'close' | 'excel',
             popupSlug: undefined,
             fileLayerSlug: undefined,
             connectedContentWidgetIds: undefined,
             contentAction: undefined,
+            excelTableWidgetId: undefined,
         });
     };
 
@@ -159,6 +160,7 @@ export function ActionButtonField({
                     >
                         <option value="">없음</option>
                         <option value="content">컨텐츠</option>
+                        <option value="excel">엑셀 다운로드</option>
                         <option value="popup">페이지 (관리자)</option>
                         <option value="path">경로 (개발자)</option>
                         <option value="close">닫기</option>
@@ -230,6 +232,35 @@ export function ActionButtonField({
                                         <span className="text-xs text-slate-700">동작 후 이전페이지 이동</span>
                                     </label>
                                 </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 엑셀 다운로드 — 테이블 위젯 단일 선택 */}
+                    {connType === 'excel' && (
+                        <div className="space-y-1">
+                            {/* table 타입 위젯만 필터링 */}
+                            {contentWidgets.filter(w => w.type === 'table').length === 0 ? (
+                                <p className="text-[10px] text-slate-400 italic px-1">
+                                    연결 가능한 데이터테이블 위젯이 없습니다.
+                                </p>
+                            ) : (
+                                <select
+                                    value={values.excelTableWidgetId ?? ''}
+                                    onChange={e => onChange({ excelTableWidgetId: e.target.value || undefined })}
+                                    className={SELECT_CLS}
+                                >
+                                    <option value="">— 테이블 선택 —</option>
+                                    {contentWidgets
+                                        .filter(w => w.type === 'table')
+                                        .map(w => (
+                                            <option key={w.widgetId} value={w.widgetId}>
+                                                {w.title || w.contentKey || w.widgetId}
+                                                {w.connectedSlug ? ` (${w.connectedSlug})` : ''}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
                             )}
                         </div>
                     )}

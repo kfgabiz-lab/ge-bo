@@ -42,9 +42,11 @@ interface SpaceRendererProps {
     onClose?: () => void;
     /** 팝업 오픈 요청 — connType='popup' 버튼 클릭 시 slug 전달 */
     onPopupOpen?: (slug: string) => void;
+    /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID 전달 */
+    onExcelDownload?: (tableWidgetId: string) => void;
 }
 
-export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen }: SpaceRendererProps) {
+export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload }: SpaceRendererProps) {
     const router = useRouter();
     if (!items.length) {
         return (
@@ -71,8 +73,9 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
             }
         } else if (field.connType === 'popup' && field.popupSlug) {
             onPopupOpen?.(field.popupSlug);
+        } else if (field.connType === 'excel' && field.excelTableWidgetId) {
+            onExcelDownload?.(field.excelTableWidgetId);
         }
-        /* 향후: path 등 추가 */
     };
 
     return (

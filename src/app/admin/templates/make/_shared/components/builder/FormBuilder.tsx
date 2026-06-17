@@ -288,8 +288,15 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 defaultValue:        f.defaultValue,
                 defaultValueMsgKey:  f.defaultValueMsgKey,
                 defaultOptionValue:  f.defaultOptionValue,
-                defaultToday:        f.defaultToday,
-                minDate:             f.minDate,
+                defaultDateOffset:      f.defaultDateOffset,
+                defaultDate:            f.defaultDate,
+                disablePast:            f.disablePast,
+                defaultStartDateOffset: f.defaultStartDateOffset,
+                defaultStartDate:       f.defaultStartDate,
+                disableStartPast:       f.disableStartPast,
+                defaultEndDateOffset:   f.defaultEndDateOffset,
+                defaultEndDate:         f.defaultEndDate,
+                disableEndPast:         f.disableEndPast,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),
@@ -357,7 +364,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                     <input
                         type="text"
                         value={widget.contentKey}
-                        onChange={e => onChange({ ...widget, contentKey: e.target.value })}
+                        onChange={e => onChange({ ...widget, contentKey: e.target.value.replace(/\./g, '_') })}
                         placeholder="예: registerForm (페이지 내 고유)"
                         className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900"
                     />

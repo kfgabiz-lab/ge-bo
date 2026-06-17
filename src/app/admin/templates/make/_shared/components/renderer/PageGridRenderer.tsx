@@ -23,6 +23,7 @@ import { getSpaceGridColumn } from '../../utils';
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from './WidgetRenderer';
 import type { AnyWidget, RendererMode } from './types';
+import type { TableWidget } from '../builder/TableBuilder';
 import type { CodeGroupDef } from '../../types';
 import type { FormWidget } from '../builder/FormBuilder';
 
@@ -130,6 +131,13 @@ interface PageGridRendererProps {
     multiSelectValuesMap?: Record<string, number[]>;
     /** 선택 변경 콜백 — (widgetId, ids) */
     onMultiSelectChange?: (widgetId: string, ids: number[]) => void;
+
+    /* live 모드 전용 — 엑셀 다운로드 */
+    /**
+     * 현재 검색 조건 — fieldKey(paramKey) 기준 키/값 맵
+     * Space 버튼의 엑셀 다운로드 시 동일 필터 조건으로 전체 데이터 추출에 사용
+     */
+    currentSearchParams?: Record<string, string>;
 }
 
 /**
@@ -170,14 +178,30 @@ export function PageGridRenderer({
     onSubListRowsChange,
     multiSelectValuesMap,
     onMultiSelectChange,
+    currentSearchParams,
 }: PageGridRendererProps) {
+    /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
+     * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
+    const tableWidgetsMap = useMemo<Record<string, TableWidget>>(() => {
+        const map: Record<string, TableWidget> = {};
+        widgetItems.flatMap(item => item.contents.map(c => c.widget))
+            .filter((w): w is TableWidget => w.type === 'table')
+            .forEach(w => { map[w.widgetId] = w; });
+        return map;
+    }, [widgetItems]);
+
     /* ── cross-form hideCondition 평가용 통합 맵 ──
      * 페이지 내 모든 Form 위젯의 fieldKey → fieldId, values를 하나로 합산 */
     const allFieldKeyToId = useMemo(() => {
         const map: Record<string, string> = {};
         widgetItems.flatMap(item => item.contents.map(c => c.widget))
             .filter((w): w is FormWidget => w.type === 'form')
-            .forEach(w => w.fields?.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; }));
+            .forEach(w => w.fields?.forEach(f => {
+                if (!f.fieldKey) return;
+                map[f.fieldKey] = f.id;
+                /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 (예: "form1.status=Y") */
+                if (w.contentKey) map[`${w.contentKey}.${f.fieldKey}`] = f.id;
+            }));
         return map;
     }, [widgetItems]);
 
@@ -303,6 +327,9 @@ export function PageGridRenderer({
                                         dataSlug={dataSlug}
                                         onRefresh={onRefresh}
                                         pageSlug={pageSlug}
+                                        /* 엑셀 다운로드 */
+                                        tableWidgetsMap={tableWidgetsMap}
+                                        currentSearchParams={currentSearchParams}
                                     />
                                 </div>
                             );

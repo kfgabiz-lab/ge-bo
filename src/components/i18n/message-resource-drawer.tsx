@@ -85,7 +85,7 @@ export const MessageResourceDrawer = () => {
     }, [selectedItem, isDrawerOpen]);
 
     /* 기본 검색 파라미터 (목록 새로고침용) */
-    const defaultSearch = { key: '', ko: '', en: '', active: '전체', page: 0, size: 20, resourceType: 'WORD' };
+    const defaultSearch = { key: '', ko: '', en: '', active: '전체', page: 0, size: 10, resourceType: '전체' };
 
     /* 등록 제출 */
     const onCreateSubmit = async (data: CreateFormData) => {

@@ -65,6 +65,7 @@ import { TabRenderer } from './TabRenderer';
 import CenterPopupLayout from '@/components/layout/popup/center-popup-layout';
 import RightDrawerLayout from '@/components/layout/popup/right-drawer-layout';
 import type { AnyWidget, RendererMode, TableActionHandlers } from './types';
+import type { TableWidget } from '../builder/TableBuilder';
 import type { FormFieldItem } from '../builder/FormBuilder';
 import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
@@ -209,6 +210,18 @@ interface WidgetRendererProps {
     /** 카테고리 항목 선택 시 호출 — (widgetId, selectedId) */
     onCategorySelect?: (widgetId: string, selectedId: number | null) => void;
 
+    /* ── live 모드 전용 — 엑셀 다운로드 ── */
+    /**
+     * widgetId → TableWidget 맵 — Space 위젯의 엑셀 다운로드 버튼이 참조할 테이블 위젯 정보
+     * 페이지에 배치된 모든 TableWidget을 widgetId 기준으로 구성하여 전달
+     */
+    tableWidgetsMap?: Record<string, TableWidget>;
+    /**
+     * 현재 검색 파라미터 — 엑셀 다운로드 시 동일한 필터 조건으로 전체 데이터 추출
+     * page.tsx에서 관리 중인 searchParams 상태를 그대로 전달
+     */
+    currentSearchParams?: Record<string, string>;
+
     /* ── live 모드 전용 — 팝업 컨텍스트 ── */
     /**
      * 팝업 내 저장·수정·삭제 API 호출에 사용할 page-data slug.
@@ -278,6 +291,9 @@ export function WidgetRenderer({
     /* category */
     categorySelections,
     onCategorySelect,
+    /* 엑셀 다운로드 */
+    tableWidgetsMap,
+    currentSearchParams,
     /* 팝업 컨텍스트 */
     dataSlug,
     onRefresh,
@@ -352,6 +368,49 @@ export function WidgetRenderer({
         _hiddenLogCallbacks.add(logHidden);
         return () => { _hiddenLogCallbacks.delete(logHidden); };
     }, []);
+
+    /**
+     * 엑셀 다운로드 핸들러 (live 모드 전용)
+     * - tableWidgetsMap에서 위젯 정보 조회 → connectedSlug + 컬럼 추출
+     * - actions 컬럼 제외 후 headers/keys를 export API에 전달
+     * - api 인스턴스로 blob 다운로드 (인증 헤더 자동 포함)
+     */
+    const handleExcelDownload = useCallback(async (tableWidgetId: string) => {
+        const tableWidget = tableWidgetsMap?.[tableWidgetId];
+        if (!tableWidget?.connectedSlug) {
+            toast.error('다운로드할 테이블 정보가 없습니다.');
+            return;
+        }
+        try {
+            /* actions 타입 컬럼 제외 — 데이터 컬럼만 추출 */
+            const validCols = tableWidget.columns.filter(c => c.cellType !== 'actions');
+            /* headerMsgKey가 있으면 번역 텍스트 사용 — header가 빈 문자열일 때 Java split trailing 제거 방지 */
+            const headers = validCols.map(c => c.headerMsgKey ? t(c.headerMsgKey) : c.header).join(',');
+            const keys    = validCols.map(c => c.accessor).join(',');
+
+            /* 현재 검색 조건 포함 — page/size 제외 (export는 전체 데이터) */
+            const searchQuery = { ...currentSearchParams };
+            delete searchQuery['page'];
+            delete searchQuery['size'];
+
+            const res = await api.get(`/page-data/${tableWidget.connectedSlug}/export`, {
+                params: { format: 'xlsx', headers, keys, ...searchQuery },
+                responseType: 'blob',
+            });
+
+            /* 브라우저 다운로드 트리거 */
+            const url = URL.createObjectURL(res.data);
+            const a   = document.createElement('a');
+            a.href    = url;
+            a.download = `${tableWidget.connectedSlug}_export.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('엑셀 다운로드 중 오류가 발생했습니다.');
+        }
+    }, [tableWidgetsMap, currentSearchParams]);
 
     /* ── 팝업 닫기 ── */
     const handlePopupClose = useCallback(() => {
@@ -541,6 +600,19 @@ export function WidgetRenderer({
         const saveFormContents    = (popupCfg?.widgetItems ?? []).flatMap(item => item.contents).filter(c => c.widget?.type === 'form');
         const saveSublistContents = (popupCfg?.widgetItems ?? []).flatMap(item => item.contents).filter(c => c.widget?.type === 'sublist');
 
+        /* 유효성 검사 — cross-form hideCondition 평가를 위해 팝업 내 통합 values/keyToId 구성 */
+        const popupAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
+        const popupAllKeyToId: Record<string, string> = {};
+        saveFormContents.forEach(fc => {
+            const fw = fc.widget as unknown as import('../builder/FormBuilder').FormWidget;
+            (fw?.fields ?? []).forEach(f => {
+                if (!f.fieldKey) return;
+                popupAllKeyToId[f.fieldKey] = f.id;
+                /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 */
+                if (fw.contentKey) popupAllKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
+            });
+        });
+
         /* 유효성 검사 — form 위젯별로 수행 (page 모드와 동일) */
         for (const fc of saveFormContents) {
             const fw     = fc.widget as { fields?: FormFieldItem[]; widgetId?: string };
@@ -551,6 +623,8 @@ export function WidgetRenderer({
                 popupFormValuesMap[fwId] ?? {},
                 popupFileValuesMap[fwId] ?? {},
                 popupExistingMetaMap[fwId] ?? {},
+                popupAllFormValues,
+                popupAllKeyToId,
             )) return;
         }
 
@@ -894,6 +968,7 @@ export function WidgetRenderer({
                     onContentAction={onContentAction}
                     onClose={onClose}
                     onPopupOpen={(slug) => handleInternalPopupOpen(slug, null, dataSlug)}
+                    onExcelDownload={mode === 'live' ? handleExcelDownload : undefined}
                 />
                 {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
                 {popupOverlay}

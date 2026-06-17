@@ -18,7 +18,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { buildDataJson, validateFormFields } from "../utils";
+import { buildDataJson, validateFormFields, buildTableRow } from "../utils";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
 import type { AnyWidget } from "../components/renderer/types";
 import type { TableWidget } from "../components/builder/TableBuilder";
@@ -170,22 +170,7 @@ export function useWidgetPageState(
             updatedAt?: string | null;
             updatedBy?: string | null;
           }[]
-        ).map((item) => {
-          const flat: Record<string, unknown> = { _id: item.id, _groupId: item.groupId ?? null };
-          Object.entries(item.dataJson ?? {}).forEach(([k, v]) => {
-            if (k === "id") return;
-            if (v && typeof v === "object" && !Array.isArray(v)) {
-              Object.assign(flat, v);
-            } else {
-              flat[k] = v;
-            }
-          });
-          flat["createdAt"] = item.createdAt ?? null;
-          flat["createdBy"] = item.createdBy ?? null;
-          flat["updatedAt"] = item.updatedAt ?? null;
-          flat["updatedBy"] = item.updatedBy ?? null;
-          return flat;
-        });
+        ).map(buildTableRow);
 
         const hasMore = res.data.last === false;
         setTableDataMap((prev) => ({
@@ -583,7 +568,21 @@ export function useWidgetPageState(
 
         /* ── SAVE ── */
 
-        /* 유효성 검사 */
+        /* 유효성 검사 — cross-form hideCondition 평가를 위해 전체 values/keyToId 통합 구성 */
+        const allFormValues = Object.assign({}, ...Object.values(formValuesMap)) as Record<string, string>;
+        const allFieldKeyToId: Record<string, string> = {};
+        flatWidgets(widgetItems)
+          .filter(w => w.type === 'form')
+          .forEach(w => {
+            const fw = w as FormWidget;
+            fw.fields?.forEach(f => {
+              if (!f.fieldKey) return;
+              allFieldKeyToId[f.fieldKey] = f.id;
+              /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 */
+              if (fw.contentKey) allFieldKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
+            });
+          });
+
         for (const w of targetWidgets) {
           if (w.type !== "form") continue;
           const fw = w as FormWidget;
@@ -592,7 +591,9 @@ export function useWidgetPageState(
               fw.fields,
               formValuesMap[fw.widgetId] ?? {},
               fileValuesMap[fw.widgetId] ?? {},
-              existingFileMetaMap[fw.widgetId] ?? {}
+              existingFileMetaMap[fw.widgetId] ?? {},
+              allFormValues,
+              allFieldKeyToId,
             )
           )
             return;

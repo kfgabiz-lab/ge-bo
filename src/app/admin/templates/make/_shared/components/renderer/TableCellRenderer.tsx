@@ -75,7 +75,14 @@ export function TableCellRenderer({
 }: TableCellRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
-    const value = row[col.accessor];
+    /* dot notation accessor 지원 — "tab1.form1.title" 형태로 중첩 구조 접근 */
+    const value = col.accessor.includes('.')
+        ? col.accessor.split('.').reduce((acc: unknown, key) => {
+            if (acc && typeof acc === 'object' && !Array.isArray(acc))
+                return (acc as Record<string, unknown>)[key];
+            return undefined;
+        }, row as unknown)
+        : row[col.accessor];
 
     switch (col.cellType) {
 
@@ -113,12 +120,12 @@ export function TableCellRenderer({
         case 'boolean': {
             /* preview: 홀/짝 행 교번으로 true/false 샘플 표시 */
             const boolVal = isPreview ? (rowIndex % 2 === 0) : Boolean(value);
+            const boolText = boolVal
+                ? (col.trueTextMsgKey ? t(col.trueTextMsgKey) : (col.trueText || '공개'))
+                : (col.falseTextMsgKey ? t(col.falseTextMsgKey) : (col.falseText || '비공개'));
             return (
-                <span className={`text-sm ${boolVal ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
-                    {boolVal
-                        ? (col.trueTextMsgKey ? t(col.trueTextMsgKey) : (col.trueText || '공개'))
-                        : (col.falseTextMsgKey ? t(col.falseTextMsgKey) : (col.falseText || '비공개'))
-                    }
+                <span className={`text-sm truncate block ${boolVal ? 'text-emerald-600 font-medium' : 'text-slate-400'}`} title={boolText}>
+                    {boolText}
                 </span>
             );
         }
@@ -204,10 +211,10 @@ export function TableCellRenderer({
             const rawVal = String(value ?? '');
             if (!rawVal) return <span className="text-sm text-slate-400">-</span>;
             /* dateFormat 없으면 원본값 그대로 표시 */
-            if (!col.dateFormat) return <span className="text-sm text-slate-700">{rawVal}</span>;
+            if (!col.dateFormat) return <span className="text-sm text-slate-700 truncate block" title={rawVal}>{rawVal}</span>;
             /* ISO 파싱 → 포맷 적용, 실패 시 원본값 */
             const d = new Date(rawVal);
-            if (isNaN(d.getTime())) return <span className="text-sm text-slate-700">{rawVal}</span>;
+            if (isNaN(d.getTime())) return <span className="text-sm text-slate-700 truncate block" title={rawVal}>{rawVal}</span>;
             const YYYY = String(d.getFullYear());
             const MM   = String(d.getMonth() + 1).padStart(2, '0');
             const DD   = String(d.getDate()).padStart(2, '0');
@@ -217,7 +224,7 @@ export function TableCellRenderer({
             const formatted = col.dateFormat
                 .replace('YYYY', YYYY).replace('MM', MM).replace('DD', DD)
                 .replace('HH', HH).replace('mm', mm).replace('ss', ss);
-            return <span className="text-sm text-slate-700">{formatted}</span>;
+            return <span className="text-sm text-slate-700 truncate block" title={formatted}>{formatted}</span>;
         }
 
         /* ── text (default) ── */
@@ -232,14 +239,15 @@ export function TableCellRenderer({
                 const names = strVal.split(',').filter(Boolean)
                     .map(code => details.find(d => d.code === code.trim())?.name ?? code.trim())
                     .join(',');
-                return <span className="text-sm text-slate-700">{names || strVal}</span>;
+                const displayNames = names || strVal;
+                return <span className="text-sm text-slate-700 truncate block" title={displayNames}>{displayNames}</span>;
             }
             /* 숫자 포맷 — isNumber이고 실제 숫자인 경우에만 3자리 콤마 */
             const displayVal =
                 col.isNumber && strVal !== '' && !isNaN(Number(strVal))
                     ? Number(strVal).toLocaleString()
                     : strVal;
-            return <span className="text-sm text-slate-700">{displayVal}</span>;
+            return <span className="text-sm text-slate-700 truncate block" title={displayVal}>{displayVal}</span>;
         }
     }
 }

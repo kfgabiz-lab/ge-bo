@@ -58,11 +58,12 @@ export interface SearchFieldConfig {
     /* ── action-button 전용 ── */
     color?: string;             // 버튼 색상 프리셋 (black/green/...)
     bgColor?: string;           // 커스텀 배경색 (hex)
-    connType?: '' | 'content' | 'popup' | 'path' | 'close'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel'; // 클릭 시 연결 방식
     popupSlug?: string;         // 연결 방식 popup: LAYER 템플릿 slug
     fileLayerSlug?: string;     // 연결 방식 path: 로컬 컴포넌트명
     connectedSlug?: string;     // 연결 방식 slug: DB slug (레거시)
     connectedContentWidgetIds?: string[];    // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
+    excelTableWidgetId?: string;             // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
     contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
     goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
     isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
@@ -81,8 +82,15 @@ export interface SearchFieldConfig {
     defaultValue?: string;          // 직접 텍스트 기본값 (hidden·input·textarea·editor 전용)
     defaultValueMsgKey?: string;    // 다국어 기본값 키 (input·textarea·editor 전용)
     defaultOptionValue?: string;    // 옵션 기본 선택값 (select·radio·checkbox 전용)
-    defaultToday?: boolean;         // date: 오늘 날짜 자동 설정
-    minDate?: string;               // date: 이 날짜 이전 날짜 비활성화 (YYYY-MM-DD)
+    defaultDateOffset?: number;     // date: 오늘 기준 N일 전 기본값 (0=오늘)
+    defaultDate?: string;           // date: 기본값 날짜 미리보기용 (YYYY-MM-DD)
+    disablePast?: boolean;          // date: 오늘 이전 날짜 비활성화
+    defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
+    defaultStartDate?: string;      // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
+    disableStartPast?: boolean;     // dateRange: 시작일 이전 비활성화
+    defaultEndDateOffset?: number;  // dateRange: 종료일 오늘 기준 N일 전
+    defaultEndDate?: string;        // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
+    disableEndPast?: boolean;       // dateRange: 종료일 이전 비활성화
 }
 
 /** 검색폼 행 설정 */

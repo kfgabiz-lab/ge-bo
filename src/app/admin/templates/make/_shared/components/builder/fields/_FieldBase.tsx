@@ -107,7 +107,7 @@ export function FieldBase(props: FieldBaseProps) {
                     <input
                         type="text"
                         value={fieldKey}
-                        onChange={e => onChange({ fieldKey: e.target.value })}
+                        onChange={e => onChange({ fieldKey: e.target.value.replace(/\./g, '_') })}
                         placeholder="예: userName, status..."
                         className={`${INPUT_CLS} font-mono`}
                     />
@@ -241,7 +241,7 @@ export function FieldBase(props: FieldBaseProps) {
                             type="text"
                             value={hideCondition ?? ''}
                             onChange={e => onChange({ hideCondition: e.target.value || undefined })}
-                            placeholder="예: status=1 / status!=0"
+                            placeholder="예: status=1 / personal.status!=0"
                             className={INPUT_CLS}
                         />
                     </div>
@@ -251,7 +251,7 @@ export function FieldBase(props: FieldBaseProps) {
                             type="text"
                             value={disableCondition ?? ''}
                             onChange={e => onChange({ disableCondition: e.target.value || undefined })}
-                            placeholder="예: status=1 / status!=0"
+                            placeholder="예: status=1 / personal.status!=0"
                             className={INPUT_CLS}
                         />
                     </div>

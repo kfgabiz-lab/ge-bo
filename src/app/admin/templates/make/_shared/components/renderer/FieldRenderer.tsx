@@ -394,7 +394,20 @@ export function FieldRenderer({
             );
 
         /* ── date ── */
-        case 'date':
+        case 'date': {
+            /* 기본값 날짜 계산 — offset 기반 또는 직접 지정 날짜, 둘 다 없으면 오늘 */
+            const dateToday = new Date().toISOString().slice(0, 10);
+            const calcDateDefault = (offset?: number, date?: string): string => {
+                if (offset !== undefined && offset !== 0) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - offset);
+                    return d.toISOString().slice(0, 10);
+                }
+                return date ?? '';
+            };
+            const dateDefault = calcDateDefault(field.defaultDateOffset, field.defaultDate);
+            /* 토글 ON: 기본값 날짜(또는 오늘)를 고정 min으로 — 사용자가 날짜 변경해도 min은 유지 */
+            const dateMin = field.disablePast ? (dateDefault || dateToday) : undefined;
             return (
                 <input
                     type="date"
@@ -402,11 +415,11 @@ export function FieldRenderer({
                     readOnly={isReadOnly}
                     className={`${inputCls}${readonlyCls}`}
                     value={value}
-                    /* 설정된 날짜 이전 날짜 비활성화 */
-                    min={field.minDate}
+                    min={dateMin}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                 />
             );
+        }
 
         /* ── yearMonth — 년월 단독 선택 (저장값: YYYY-MM) ── */
         case 'yearMonth':
@@ -460,6 +473,21 @@ export function FieldRenderer({
             const parts = (value || '~').split('~');
             const from = parts[0] || '';
             const to = parts[1] || '';
+            const today = new Date().toISOString().slice(0, 10);
+            /* 기본값 날짜 계산 — offset 기반 또는 직접 지정 날짜 */
+            const calcRangeDefault = (offset?: number, date?: string): string => {
+                if (offset !== undefined && offset !== 0) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - offset);
+                    return d.toISOString().slice(0, 10);
+                }
+                return date ?? '';
+            };
+            const startDefault = calcRangeDefault(field.defaultStartDateOffset, field.defaultStartDate);
+            const endDefault   = calcRangeDefault(field.defaultEndDateOffset,   field.defaultEndDate);
+            /* 토글 ON: 기본값 날짜(또는 오늘)를 고정 min으로 — 토글 OFF면 무조건 undefined */
+            const startMin = field.disableStartPast ? (startDefault || today) : undefined;
+            const endMin   = field.disableEndPast   ? (endDefault   || today) : undefined;
             return (
                 /* preview/live 동일 UI — 달력 아이콘 + date input, preview는 disabled만 적용 */
                 <div className="flex items-center gap-2">
@@ -471,7 +499,7 @@ export function FieldRenderer({
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}
                             value={from}
-                            min={field.minDate}
+                            min={startMin}
                             onChange={isReadOnly ? undefined : e => onChange?.(`${e.target.value}~${to}`)}
                         />
                     </div>
@@ -484,7 +512,7 @@ export function FieldRenderer({
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}
                             value={to}
-                            min={from || field.minDate}
+                            min={endMin}
                             onChange={isReadOnly ? undefined : e => onChange?.(`${from}~${e.target.value}`)}
                         />
                     </div>

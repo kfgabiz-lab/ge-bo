@@ -67,24 +67,71 @@ export const showValidationError = (errors: string[]): void => {
 };
 
 /**
- * Form 위젯 필드 유효성 검사 (required / minLength / maxLength / pattern / 파일 개수·용량)
+ * hideCondition / disableCondition 평가 — "key=val" (일치) / "key!=val" (불일치) / AND 복수 조건 지원
+ * FormRenderer.evalCondition과 동일 로직 — validateFormFields에서 HIDE 필드 건너뜀 판단에 사용
+ * @param condition "status=1,type=Y" 형식의 조건 문자열
+ * @param keyToId   fieldKey → fieldId 역매핑
+ * @param values    fieldId → 현재값 맵
+ */
+export const evalFieldCondition = (
+    condition: string,
+    keyToId: Record<string, string>,
+    values: Record<string, string>,
+): boolean =>
+    condition.split(',').every(cond => {
+        /* != 연산자 우선 감지 */
+        const neqIdx = cond.indexOf('!=');
+        if (neqIdx !== -1) {
+            const key     = cond.slice(0, neqIdx).trim();
+            const val     = cond.slice(neqIdx + 2).trim();
+            const fieldId = keyToId[key];
+            if (!fieldId) return false;
+            return (values[fieldId] ?? '') !== val;
+        }
+        const eqIdx = cond.indexOf('=');
+        if (eqIdx === -1) return false;
+        const key     = cond.slice(0, eqIdx).trim();
+        const val     = cond.slice(eqIdx + 1).trim();
+        const fieldId = keyToId[key];
+        if (!fieldId) return false;
+        return (values[fieldId] ?? '') === val;
+    });
+
+/**
+ * Form 위젯 필드 유효성 검사 (required / minLength / maxLength / pattern / 파일 개수·용량 / 날짜 범위)
+ * - hidden 타입 / hideCondition 충족 필드는 건너뜀
+ * - dateRange / yearMonthRange: 종료가 시작보다 이전이면 오류
  * - 오류 발견 시 toast.warning 표시 후 false 반환
  * - 모든 항목 통과 시 true 반환
- * @param fields        Form 위젯의 fields 배열
- * @param values        widgetId별 필드값 맵 (fieldId → 값)
- * @param fileValues    widgetId별 신규 파일 맵 (fieldId → File[])
- * @param existingFileMeta widgetId별 기존 파일 맵 (fieldId → any[] — 개수만 사용)
- * @example if (!validateFormFields(fw.fields, vals, fVals, eMeta)) return;
+ * @param fields           Form 위젯의 fields 배열
+ * @param values           fieldId → 값 맵
+ * @param fileValues       fieldId → 신규 파일 배열 맵
+ * @param existingFileMeta fieldId → 기존 파일 메타 배열 맵 (개수만 사용)
+ * @param allValues        페이지 내 모든 Form 위젯 통합 값 — cross-form hideCondition 평가용 (선택)
+ * @param allKeyToId       페이지 내 모든 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 (선택)
+ * @example if (!validateFormFields(fw.fields, vals, fVals, eMeta, allFormValues, allFieldKeyToId)) return;
  */
 export const validateFormFields = (
     fields: import('./components/builder/FormBuilder').FormFieldItem[],
     values: Record<string, string>,
     fileValues: Record<string, File[]>,
     existingFileMeta: Record<string, unknown[]>,
+    allValues?: Record<string, string>,
+    allKeyToId?: Record<string, string>,
 ): boolean => {
+    /* fieldKey → fieldId 역매핑 (이 Form 내 필드) */
+    const keyToId: Record<string, string> = {};
+    fields.forEach(f => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
+    /* cross-form 참조 병합 — 이 Form 내부 맵이 우선 */
+    const resolvedKeyToId = { ...(allKeyToId ?? {}), ...keyToId };
+    const resolvedValues  = { ...(allValues  ?? {}), ...values  };
+
     for (const f of fields) {
-        /* hidden 필드는 유효성 검사 건너뜀 */
+        /* hidden 타입은 건너뜀 */
         if (f.type === 'hidden') continue;
+        /* hideCondition 조건 충족 시 건너뜀 */
+        if (f.hideCondition && evalFieldCondition(f.hideCondition, resolvedKeyToId, resolvedValues)) continue;
+
         const label     = f.label || f.fieldKey || f.id;
         const val       = (values[f.id] || '').trim();
         const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
@@ -122,9 +169,74 @@ export const validateFormFields = (
                 toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
             }
         }
+        /* dateRange / yearMonthRange: 종료가 시작보다 이전이면 오류 */
+        if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+            const [from, to] = (values[f.id] || '~').split('~');
+            if (from && to && from > to) {
+                toast.warning(`'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
+                return false;
+            }
+        }
     }
     return true;
 };
+
+/**
+ * API 응답 단일 item → 테이블 표시용 row 변환 (공통)
+ *
+ * dataJson 중첩 구조를 3단계로 처리:
+ *   1단계 (flat)          contentKey 없음 → fieldKey가 root에 존재, accessor: "title"
+ *   2단계 (contentKey)    contentKey 섹션 → 중복 없는 fieldKey를 root에 자동 병합
+ *                         accessor: "title"(중복 없음) 또는 "form1.title"(dot notation)
+ *   3단계 (tab+contentKey) 탭 섹션 하위 → accessor: "tab1.form1.title" (dot notation)
+ *
+ * @example
+ * buildTableRow({ id: 1, dataJson: { form1: { title: 'A', use: '1' } }, ... })
+ * // → { _id: 1, title: 'A', use: '1', form1: { title: 'A', use: '1' }, createdAt: ... }
+ */
+export function buildTableRow(item: {
+    id: number;
+    groupId?: string | null;
+    dataJson: Record<string, unknown>;
+    createdAt?: string | null;
+    createdBy?: string | null;
+    updatedAt?: string | null;
+    updatedBy?: string | null;
+}): Record<string, unknown> {
+    const { id: _omit, ...restDataJson } = item.dataJson ?? {};
+
+    /* 최상위 object 값(contentKey 섹션) 감지 */
+    const sectionEntries = Object.entries(restDataJson).filter(
+        ([, v]) => v !== null && typeof v === 'object' && !Array.isArray(v)
+    );
+
+    /* 중복 없는 fieldKey만 root에 flat 병합 */
+    const flatExtra: Record<string, unknown> = {};
+    if (sectionEntries.length > 0) {
+        const keyCount: Record<string, number> = {};
+        sectionEntries.forEach(([, section]) =>
+            Object.keys(section as Record<string, unknown>).forEach(k => {
+                keyCount[k] = (keyCount[k] ?? 0) + 1;
+            })
+        );
+        sectionEntries.forEach(([, section]) =>
+            Object.entries(section as Record<string, unknown>).forEach(([k, v]) => {
+                if (keyCount[k] === 1) flatExtra[k] = v;
+            })
+        );
+    }
+
+    return {
+        _id: item.id,
+        _groupId: item.groupId ?? null,
+        ...flatExtra,       /* 중복 없는 fieldKey flat (단순 accessor용) */
+        ...restDataJson,    /* 원본 중첩 구조 보존 (dot notation accessor용) */
+        createdAt: item.createdAt ?? null,
+        createdBy: item.createdBy ?? null,
+        updatedAt: item.updatedAt ?? null,
+        updatedBy: item.updatedBy ?? null,
+    };
+}
 
 /**
  * key 목록에서 중복된 key를 찾아 반환합니다.

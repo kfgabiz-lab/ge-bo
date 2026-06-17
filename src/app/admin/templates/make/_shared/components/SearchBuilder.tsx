@@ -214,6 +214,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             description, descriptionMsgKey,
             colSpan, required, options, codeGroupCode, multiSelect,
             minLength, maxLength, pattern, patternDesc, minSelect, maxSelect,
+            defaultValue, defaultValueMsgKey, defaultOptionValue,
+            defaultDateOffset, defaultDate, disablePast,
+            defaultStartDateOffset, defaultStartDate, disableStartPast,
+            defaultEndDateOffset, defaultEndDate, disableEndPast,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -239,6 +243,18 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             patternDesc: pendingType === 'input' && patternDesc ? patternDesc : undefined,
             minSelect: pendingType === 'checkbox' && minSelect ? minSelect : undefined,
             maxSelect: pendingType === 'checkbox' && maxSelect ? maxSelect : undefined,
+            defaultValue: defaultValue || undefined,
+            defaultValueMsgKey: defaultValueMsgKey || undefined,
+            defaultOptionValue: defaultOptionValue || undefined,
+            defaultDateOffset: defaultDateOffset ?? undefined,
+            defaultDate: defaultDate || undefined,
+            disablePast: disablePast || undefined,
+            defaultStartDateOffset: defaultStartDateOffset ?? undefined,
+            defaultStartDate: defaultStartDate || undefined,
+            disableStartPast: disableStartPast || undefined,
+            defaultEndDateOffset: defaultEndDateOffset ?? undefined,
+            defaultEndDate: defaultEndDate || undefined,
+            disableEndPast: disableEndPast || undefined,
         };
 
         onChange(rows.map(r =>
@@ -396,6 +412,18 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 patternDesc:        field.patternDesc,
                                                                                 minSelect:          field.minSelect,
                                                                                 maxSelect:          field.maxSelect,
+                                                                                defaultValue:       field.defaultValue,
+                                                                                defaultValueMsgKey: field.defaultValueMsgKey,
+                                                                                defaultOptionValue: field.defaultOptionValue,
+                                                                                defaultDateOffset:      field.defaultDateOffset,
+                                                                                defaultDate:            field.defaultDate,
+                                                                                disablePast:            field.disablePast,
+                                                                                defaultStartDateOffset: field.defaultStartDateOffset,
+                                                                                defaultStartDate:       field.defaultStartDate,
+                                                                                disableStartPast:       field.disableStartPast,
+                                                                                defaultEndDateOffset:   field.defaultEndDateOffset,
+                                                                                defaultEndDate:         field.defaultEndDate,
+                                                                                disableEndPast:         field.disableEndPast,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

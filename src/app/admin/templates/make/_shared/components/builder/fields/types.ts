@@ -45,12 +45,13 @@ export interface FieldEditValues {
     /* ── action-button 전용 ── */
     color?: string;          // 버튼 색상 프리셋
     bgColor?: string;        // 커스텀 배경색
-    connType?: '' | 'content' | 'popup' | 'path' | 'close'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel'; // 클릭 시 연결 방식
     popupSlug?: string;              // 관리자방식 팝업 slug
     fileLayerSlug?: string;          // 개발자방식 로컬 컴포넌트명
     connectedContentWidgetIds?: string[];  // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중)
     contentAction?: 'save' | 'delete';    // 컨텐츠 연결 시 동작 (저장/삭제)
     goBackAfterAction?: boolean;          // 동작 완료 후 이전 페이지 이동 / 팝업 닫기
+    excelTableWidgetId?: string;          // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부
@@ -75,8 +76,15 @@ export interface FieldEditValues {
     defaultValue?: string;           // 직접 텍스트 기본값
     defaultValueMsgKey?: string;     // 다국어 기본값 키
     defaultOptionValue?: string;     // 옵션 기본 선택값 (select·radio·checkbox)
-    defaultToday?: boolean;          // date: 오늘 날짜 자동 설정
-    minDate?: string;                // date: 이 날짜 이전 날짜 비활성화 (YYYY-MM-DD)
+    defaultDateOffset?: number;      // date: 오늘 기준 N일 전 기본값 (0=오늘)
+    defaultDate?: string;            // date: 기본값 날짜 미리보기용 (YYYY-MM-DD)
+    disablePast?: boolean;           // date: 오늘 이전 날짜 비활성화
+    defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
+    defaultStartDate?: string;       // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
+    disableStartPast?: boolean;      // dateRange: 시작일 이전 비활성화
+    defaultEndDateOffset?: number;   // dateRange: 종료일 오늘 기준 N일 전
+    defaultEndDate?: string;         // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
+    disableEndPast?: boolean;        // dateRange: 종료일 이전 비활성화
 }
 
 /**

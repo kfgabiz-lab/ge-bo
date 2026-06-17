@@ -12,7 +12,7 @@ import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/re
 
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { validateFormFields, buildDataJson } from '@/app/admin/templates/make/_shared/utils';
+import { validateFormFields, buildDataJson, buildTableRow } from '@/app/admin/templates/make/_shared/utils';
 import { useCodeStore } from '@/store/use-code-store';
 import { usePageTitleStore } from '@/store/use-page-title-store';
 import { useI18n } from '@/hooks/use-i18n';
@@ -243,34 +243,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             });
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params: reqParams });
-            /* contentKey 기반 구조: dataJson 내 값이 object면 flat-map으로 펼쳐 테이블 row 구성 */
-            const rows = (res.data.content as {
-                id: number;
-                groupId?: string | null;
-                dataJson: Record<string, unknown>;
-                createdAt?: string | null;
-                createdBy?: string | null;
-                updatedAt?: string | null;
-                updatedBy?: string | null;
-            }[])
-                .map(item => {
-                    /* _id: 단건 PK, _groupId: 다중 slug 그룹 ID (수정 버튼 URL 파라미터에 사용) */
-                    const flat: Record<string, unknown> = { _id: item.id, _groupId: item.groupId ?? null };
-                    Object.entries(item.dataJson ?? {}).forEach(([k, v]) => {
-                        if (k === 'id') return;
-                        if (v && typeof v === 'object' && !Array.isArray(v)) {
-                            Object.assign(flat, v); /* contentKey wrapper 펼치기 */
-                        } else {
-                            flat[k] = v;
-                        }
-                    });
-                    /* 감사 컬럼 — 테이블에서 createdAt/createdBy/updatedAt/updatedBy 키로 사용 가능 */
-                    flat['createdAt'] = item.createdAt ?? null;
-                    flat['createdBy'] = item.createdBy ?? null;
-                    flat['updatedAt'] = item.updatedAt ?? null;
-                    flat['updatedBy'] = item.updatedBy ?? null;
-                    return flat;
-                });
+            const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
             const hasMore = res.data.last === false;
 
             setPageTableDataMap(prev => ({
@@ -335,6 +308,31 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
      * ?id=123        : 단일 slug 수정 — 기존 방식 유지
      * 둘 다 없으면   : 신규 입력 모드 — form 값 초기화
      */
+    /* ── Search 위젯 날짜 기본값 초기화 — widgetItems 로드 시 1회 실행 ── */
+    useEffect(() => {
+        if (widgetItems.length === 0) return;
+        const calcDate = (offset: number) => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
+        const initVals: Record<string, string> = {};
+        flatWidgets(widgetItems).forEach(w => {
+            if (w.type !== 'search') return;
+            w.rows.flatMap((r: import('@/app/admin/templates/make/_shared/types').SearchRowConfig) => r.fields).forEach((f: import('@/app/admin/templates/make/_shared/types').SearchFieldConfig) => {
+                if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+                    /* offset이 0이 아니면(양수·음수) 오늘 기준 재계산, 없으면 defaultDate 사용 */
+                    const val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) ? calcDate(f.defaultDateOffset) : (f.defaultDate ?? '');
+                    if (val) initVals[f.id] = val;
+                } else if (f.type === 'dateRange') {
+                    const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+                    const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
+                    if (start || end) initVals[f.id] = `${start}~${end}`;
+                }
+            });
+        });
+        if (Object.keys(initVals).length > 0) {
+            setSearchValues(prev => ({ ...initVals, ...prev }));
+            searchValuesRef.current = { ...initVals, ...searchValuesRef.current };
+        }
+    }, [widgetItems]); // eslint-disable-line react-hooks/exhaustive-deps
+
     useEffect(() => {
         if (widgetItems.length === 0) return;
 
@@ -385,7 +383,6 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             setCurrentGroupId(null);
             setMultiSelectValuesMap({});
             const initMap: Record<string, Record<string, string>> = {};
-            /* 오늘 날짜 (YYYY-MM-DD) — date 필드 defaultToday에 사용 */
             const todayStr = new Date().toISOString().slice(0, 10);
             formWidgets.forEach(fw => {
                 const vals: Record<string, string> = {};
@@ -393,9 +390,22 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     const key = f.fieldKey || f.label || '';
                     const urlVal = key ? searchParams.get(key) : null;
 
-                    if (f.type === 'date' && f.defaultToday) {
-                        /* 오늘 날짜 자동 설정 */
-                        vals[f.id] = urlVal ?? todayStr;
+                    if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+                        /* offset이 0이 아니면(양수·음수) 오늘 기준 재계산, 없으면 defaultDate 사용 */
+                        let dateVal = '';
+                        if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
+                            const d = new Date();
+                            d.setDate(d.getDate() - f.defaultDateOffset);
+                            dateVal = d.toISOString().slice(0, 10);
+                        } else if (f.defaultDate) {
+                            dateVal = f.defaultDate;
+                        }
+                        if (dateVal) vals[f.id] = urlVal ?? dateVal;
+                    } else if (f.type === 'dateRange') {
+                        const calcDate = (offset: number) => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
+                        const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+                        const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
+                        if (start || end) vals[f.id] = urlVal ?? `${start}~${end}`;
                     } else if (f.defaultOptionValue && (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox')) {
                         /* 옵션 기본 선택값 */
                         vals[f.id] = urlVal ?? f.defaultOptionValue;

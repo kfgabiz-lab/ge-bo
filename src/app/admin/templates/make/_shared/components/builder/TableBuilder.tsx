@@ -17,7 +17,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, X, Pencil } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, GripVertical } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import api from '@/lib/api';
 import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from '../../types';
@@ -31,6 +31,16 @@ import {
     SlugSelectField,
 } from './fields';
 import { DateFormatField } from './fields/DateFormatField';
+import {
+    DndContext, closestCenter, KeyboardSensor, PointerSensor,
+    useSensor, useSensors,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+    arrayMove, SortableContext, sortableKeyboardCoordinates,
+    useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -79,6 +89,84 @@ interface TableBuilderProps {
     slugOptions: { id: number; slug: string; name: string }[];
 }
 
+/* ══════════════════════════════════════════════════════════════ */
+/*  SortableColumnItem — 드래그 가능한 컬럼 행                     */
+/* ══════════════════════════════════════════════════════════════ */
+
+function SortableColumnItem({
+    col, isEditing, onToggleEdit, onRemove, children,
+}: {
+    col: TableColumnConfig;
+    isEditing: boolean;
+    onToggleEdit: () => void;
+    onRemove: () => void;
+    children: React.ReactNode;
+}) {
+    const { t } = useI18n();
+    const {
+        attributes, listeners, setNodeRef, setActivatorNodeRef,
+        transform, transition, isDragging,
+    } = useSortable({ id: col.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    /* 셀 타입별 배지 색상 */
+    const typeBadgeCls =
+        col.cellType === 'badge'   ? 'bg-blue-100 text-blue-600' :
+        col.cellType === 'boolean' ? 'bg-emerald-100 text-emerald-600' :
+        col.cellType === 'actions' ? 'bg-orange-100 text-orange-600' :
+        col.cellType === 'date'    ? 'bg-violet-100 text-violet-600' :
+        'bg-slate-200 text-slate-600';
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="border border-slate-200 rounded-md overflow-hidden bg-white"
+        >
+            {/* 컬럼 헤더 행 */}
+            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-slate-100 transition-all">
+                {/* 드래그 핸들 */}
+                <span
+                    ref={setActivatorNodeRef}
+                    {...listeners}
+                    {...attributes}
+                    className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors flex-shrink-0"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <GripVertical className="w-3.5 h-3.5" />
+                </span>
+
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${typeBadgeCls}`}>
+                    {col.cellType}
+                </span>
+                <span className="text-[10px] text-slate-700 flex-1 truncate font-medium">
+                    {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
+                </span>
+                <button
+                    onClick={onToggleEdit}
+                    className={`p-1 rounded transition-all flex-shrink-0 ${isEditing ? 'bg-slate-200 text-slate-700' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-600'}`}
+                >
+                    <Pencil className="w-3 h-3" />
+                </button>
+                <button
+                    onClick={onRemove}
+                    className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0"
+                >
+                    <Trash2 className="w-3 h-3" />
+                </button>
+            </div>
+
+            {/* 컬럼 편집 패널 (아코디언) */}
+            {isEditing && children}
+        </div>
+    );
+}
+
 /* ══════════════════════════════════════════ */
 /*  TableBuilder 메인 컴포넌트                 */
 /* ══════════════════════════════════════════ */
@@ -102,6 +190,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     const [layerTemplates, setLayerTemplates] = useState<TemplateItem[]>([]);
     const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
 
+    /* 드래그 센서 — 3px 이상 이동 시 드래그 시작 (클릭 오인 방지) */
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    );
+
     /* 공통코드 로딩 */
     useEffect(() => {
         api.get('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
@@ -123,6 +217,15 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
         onChange({ ...widget, columns: widget.columns.filter(c => c.id !== id) });
     const updateColumn = (id: string, patch: Partial<TableColumnConfig>) =>
         onChange({ ...widget, columns: widget.columns.map(c => c.id === id ? { ...c, ...patch } : c) });
+
+    /* 드래그 종료 — arrayMove로 컬럼 순서 변경 */
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const oldIndex = widget.columns.findIndex(c => c.id === active.id);
+        const newIndex = widget.columns.findIndex(c => c.id === over.id);
+        onChange({ ...widget, columns: arrayMove(widget.columns, oldIndex, newIndex) });
+    };
 
     /* Search 연결 토글 */
     const toggleSearchConn = (searchId: string) => {
@@ -269,37 +372,35 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 </div>
             )}
 
-            {/* 테이블 컬럼 목록 (아코디언) */}
+            {/* 테이블 컬럼 목록 (드래그 정렬 + 아코디언) */}
             <div className="space-y-1">
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">테이블 컬럼</p>
-                {widget.columns.map(col => (
-                    <div key={col.id} className="border border-slate-200 rounded-md overflow-hidden">
-                        {/* 컬럼 헤더 행 */}
-                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-slate-100 transition-all">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${
-                                col.cellType === 'badge'   ? 'bg-blue-100 text-blue-600' :
-                                col.cellType === 'boolean' ? 'bg-emerald-100 text-emerald-600' :
-                                col.cellType === 'actions' ? 'bg-orange-100 text-orange-600' :
-                                col.cellType === 'date'    ? 'bg-violet-100 text-violet-600' :
-                                'bg-slate-200 text-slate-600'
-                            }`}>{col.cellType}</span>
-                            <span className="text-[10px] text-slate-700 flex-1 truncate font-medium">
-                                {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
-                            </span>
-                            <button
-                                onClick={() => { setEditingColumnId(editingColumnId === col.id ? null : col.id); if (col.cellType === 'actions') loadLayerTemplates(); }}
-                                className={`p-1 rounded transition-all flex-shrink-0 ${editingColumnId === col.id ? 'bg-slate-200 text-slate-700' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-600'}`}>
-                                <Pencil className="w-3 h-3" />
-                            </button>
-                            <button onClick={() => removeColumn(col.id)}
-                                className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0">
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        </div>
-                        {/* 컬럼 편집 패널 (아코디언) */}
-                        {editingColumnId === col.id && renderColumnEdit(col)}
-                    </div>
-                ))}
+
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                        items={widget.columns.map(c => c.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        {widget.columns.map(col => (
+                            <SortableColumnItem
+                                key={col.id}
+                                col={col}
+                                isEditing={editingColumnId === col.id}
+                                onToggleEdit={() => {
+                                    setEditingColumnId(editingColumnId === col.id ? null : col.id);
+                                    if (col.cellType === 'actions') loadLayerTemplates();
+                                }}
+                                onRemove={() => removeColumn(col.id)}
+                            >
+                                {renderColumnEdit(col)}
+                            </SortableColumnItem>
+                        ))}
+                    </SortableContext>
+                </DndContext>
 
                 {/* 컬럼 추가 다이얼로그 */}
                 {pendingCol !== null ? (

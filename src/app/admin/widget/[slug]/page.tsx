@@ -12,7 +12,7 @@
  * ============================================================
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import PageLayout from '@/components/layout/page-layout';
 import { Loader2, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
@@ -26,7 +26,7 @@ import type { FormWidget } from '@/app/admin/templates/make/_shared/components/b
 import type { SubListWidget } from '@/app/admin/templates/make/_shared/components/renderer/types';
 import type { SubListRow } from '@/app/admin/templates/make/_shared/components/renderer/SubListRenderer';
 import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types';
-import { buildDataJson } from '@/app/admin/templates/make/_shared/utils';
+import { buildDataJson, buildTableRow } from '@/app/admin/templates/make/_shared/utils';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                      */
@@ -163,33 +163,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             });
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params });
-            /* contentKey 기반 구조: dataJson 내 값이 object면 flat-map으로 펼쳐 테이블 row 구성 */
-            const rows = (res.data.content as {
-                    id: number;
-                    groupId?: string | null;
-                    dataJson: Record<string, unknown>;
-                    createdAt?: string | null;
-                    createdBy?: string | null;
-                    updatedAt?: string | null;
-                    updatedBy?: string | null;
-                }[])
-                .map(item => {
-                    const flat: Record<string, unknown> = { _id: item.id, _groupId: item.groupId ?? null };
-                    Object.entries(item.dataJson ?? {}).forEach(([k, v]) => {
-                        if (k === 'id') return; /* id는 _id로 이미 처리 */
-                        if (v && typeof v === 'object' && !Array.isArray(v)) {
-                            Object.assign(flat, v); /* contentKey wrapper 펼치기 */
-                        } else {
-                            flat[k] = v;
-                        }
-                    });
-                    /* 감사 컬럼 — 테이블에서 createdAt/createdBy/updatedAt/updatedBy 키로 사용 가능 */
-                    flat['createdAt'] = item.createdAt ?? null;
-                    flat['createdBy'] = item.createdBy ?? null;
-                    flat['updatedAt'] = item.updatedAt ?? null;
-                    flat['updatedBy'] = item.updatedBy ?? null;
-                    return flat;
-                });
+            const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
 
             const hasMore = res.data.last === false; // 백엔드 DTO에 추가된 last 필드 사용
             setPageTableDataMap(prev => ({
@@ -247,6 +221,69 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     useEffect(() => {
         tableDataMapRef.current = tableDataMap;
     }, [tableDataMap]);
+
+    /* ── Form/Search 위젯 date·dateRange 기본값 초기화 — widgetItems 로드 시 1회 ── */
+    useEffect(() => {
+        if (widgetItems.length === 0) return;
+        /* offset이 0이 아닌 경우(양수=N일 전, 음수=N일 후) 오늘 기준 재계산 */
+        const calcDate = (offset: number) => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
+
+        const initSearchVals: Record<string, string> = {};
+        const initFormMap: Record<string, Record<string, string>> = {};
+
+        flatWidgets(widgetItems).forEach(w => {
+            /* Search 위젯 — date·dateRange 기본값 */
+            if (w.type === 'search') {
+                w.rows
+                    .flatMap((r: import('@/app/admin/templates/make/_shared/types').SearchRowConfig) => r.fields)
+                    .forEach((f: SearchFieldConfig) => {
+                        if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+                            const val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0)
+                                ? calcDate(f.defaultDateOffset)
+                                : (f.defaultDate ?? '');
+                            if (val) initSearchVals[f.id] = val;
+                        } else if (f.type === 'dateRange') {
+                            const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+                            const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
+                            if (start || end) initSearchVals[f.id] = `${start}~${end}`;
+                        }
+                    });
+            }
+            /* Form 위젯 — date·dateRange 기본값 */
+            if (w.type === 'form') {
+                const fw = w as FormWidget;
+                const vals: Record<string, string> = {};
+                fw.fields.forEach(f => {
+                    if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+                        const dateVal = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0)
+                            ? calcDate(f.defaultDateOffset)
+                            : (f.defaultDate ?? '');
+                        if (dateVal) vals[f.id] = dateVal;
+                    } else if (f.type === 'dateRange') {
+                        const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+                        const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
+                        if (start || end) vals[f.id] = `${start}~${end}`;
+                    }
+                });
+                if (Object.keys(vals).length > 0) initFormMap[fw.widgetId] = vals;
+            }
+        });
+
+        if (Object.keys(initSearchVals).length > 0) {
+            setSearchValues(prev => ({ ...initSearchVals, ...prev }));
+            searchValuesRef.current = { ...initSearchVals, ...searchValuesRef.current };
+        }
+        if (Object.keys(initFormMap).length > 0) {
+            setFormValuesMap(prev => {
+                const next = { ...prev };
+                Object.entries(initFormMap).forEach(([wId, vals]) => {
+                    /* 기존 값 우선 유지 — 이미 입력된 값 덮어쓰지 않음 */
+                    next[wId] = { ...vals, ...(prev[wId] ?? {}) };
+                });
+                return next;
+            });
+        }
+    }, [widgetItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateSearchValue = useCallback((id: string, val: string) => {
         setSearchValues(prev => {
@@ -417,6 +454,21 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     }, [widgetItems, formValuesMap, subListRowsMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
+     * 현재 검색 조건 — fieldKey(paramKey) 기준 키/값 맵
+     * Space 버튼의 엑셀 다운로드 시 동일 필터 조건으로 전체 데이터 추출
+     */
+    const currentSearchParams = useMemo(() => {
+        const fieldsMap = buildSearchFieldsMap(widgetItems);
+        const params: Record<string, string> = {};
+        Object.values(fieldsMap).flat().forEach(f => {
+            const paramKey = f.fieldKey || f.label;
+            const val = searchValues[f.id];
+            if (paramKey && val && val.trim()) params[paramKey] = val;
+        });
+        return params;
+    }, [searchValues, widgetItems]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /**
      * 팝업 저장·삭제 완료 후 모든 Table 위젯 데이터 재조회
      * WidgetRenderer의 onRefresh 콜백으로 연결
      */
@@ -505,6 +557,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 onCategorySelect={handleCategorySelect}
                 onRefresh={handleRefresh}
                 pageSlug={slug}
+                currentSearchParams={currentSearchParams}
             />
         </PageLayout>
     );
