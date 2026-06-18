@@ -45,7 +45,7 @@ export interface FieldEditValues {
     /* ── action-button 전용 ── */
     color?: string;          // 버튼 색상 프리셋
     bgColor?: string;        // 커스텀 배경색
-    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave'; // 클릭 시 연결 방식
     popupSlug?: string;              // 관리자방식 팝업 slug
     fileLayerSlug?: string;          // 개발자방식 로컬 컴포넌트명
     connectedContentWidgetIds?: string[];  // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중)
@@ -53,6 +53,7 @@ export interface FieldEditValues {
     goBackAfterAction?: boolean;          // 동작 완료 후 이전 페이지 이동 / 팝업 닫기
     excelTableWidgetId?: string;          // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
     params?: string;                      // popup·path 연결 시 전달 파라미터 (예: depth=1,type=create)
+    dataSaveSlug?: string;                // 데이터저장 연결 slug (connType='datasave' 전용)
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부

@@ -82,6 +82,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     formWidgets={formWidgets}
                     actionButtonOnly={actionButtonOnly}
                     maxColSpan={maxColSpan}
+                    slugOptions={slugOptions}
                 />
             );
 

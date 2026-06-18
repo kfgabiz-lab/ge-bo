@@ -59,12 +59,18 @@ const SortIcon = ({ sorted }: { sorted: false | 'asc' | 'desc' }) => {
 interface TableRendererProps {
     mode: RendererMode;
     columns: TableColumnConfig[];
+    /** 행 다중선택 체크박스 활성화 여부 */
+    enableRowSelection?: boolean;
+    /** 현재 선택된 행 ID 배열 (외부 상태 — widgetSub page에서 관리) */
+    selectedRowIds?: number[];
+    /** 행 선택 변경 콜백 */
+    onRowsSelect?: (selectedIds: number[]) => void;
     /* live 모드 전용 props */
     data?: Record<string, unknown>[];
     isLoading?: boolean;
     sortKey?: string | null;
     sortDir?: 'asc' | 'desc';
-    onSort?: (accessor: string, dir: 'asc' | 'desc') => void;
+    onSort?: (accessor: string, dir: 'asc' | 'desc' | null) => void;
     codeGroups?: CodeGroupDef[];
     handlers?: TableActionHandlers;
     /* live 모드 페이지네이션 전용 (preview에서는 pageSize가 샘플 행 수로 사용됨) */
@@ -83,6 +89,9 @@ interface TableRendererProps {
 export function TableRenderer({
     mode,
     columns,
+    enableRowSelection = false,
+    selectedRowIds = [],
+    onRowsSelect,
     data = [],
     isLoading = false,
     sortKey,
@@ -220,6 +229,22 @@ export function TableRenderer({
                     {/* ── 헤더 ── */}
                     <thead className="sticky top-0 z-10">
                         <tr className="border-b border-slate-200 bg-slate-50/80">
+                            {/* 전체선택 체크박스 — enableRowSelection=true 일 때만 표시 */}
+                            {enableRowSelection && (
+                                <th className="w-10 px-2 py-3 text-center flex-shrink-0 sticky left-0 z-20 bg-slate-50/80">
+                                    <input
+                                        type="checkbox"
+                                        disabled={isPreview}
+                                        checked={!isPreview && data.length > 0 && data.every(row => selectedRowIds.includes(row._id as number))}
+                                        onChange={e => {
+                                            if (isPreview) return;
+                                            const allIds = data.map(row => row._id as number).filter(Boolean);
+                                            onRowsSelect?.(e.target.checked ? allIds : []);
+                                        }}
+                                        className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer disabled:cursor-default"
+                                    />
+                                </th>
+                            )}
                             {columns.map(col => (
                                 <th
                                     key={col.id}
@@ -233,8 +258,12 @@ export function TableRenderer({
                                         /* sortable 컬럼: preview는 포인터 없는 버튼, live는 클릭 가능 */
                                         <button
                                             onClick={!isPreview ? () => {
-                                                const nextDir =
-                                                    sortKey === col.accessor && sortDir === 'asc' ? 'desc' : 'asc';
+                                                const isCurrentCol = sortKey === col.accessor;
+                                                /* desc → asc → default(null) → desc 순환 */
+                                                const nextDir: 'asc' | 'desc' | null =
+                                                    !isCurrentCol ? 'desc'
+                                                    : sortDir === 'desc' ? 'asc'
+                                                    : null;
                                                 onSort?.(col.accessor, nextDir);
                                             } : undefined}
                                             className={`flex items-center justify-center gap-1 w-full transition-colors ${isPreview ? 'cursor-default' : 'hover:text-slate-900'}`}
@@ -261,6 +290,12 @@ export function TableRenderer({
                                     key={rowIdx}
                                     className="border-b border-slate-100 hover:bg-slate-50/50"
                                 >
+                                    {/* preview 체크박스 — disabled 샘플 표시 */}
+                                    {enableRowSelection && (
+                                        <td className="w-10 px-2 py-3 text-center sticky left-0 bg-white">
+                                            <input type="checkbox" disabled className="w-3.5 h-3.5 rounded border-slate-300 cursor-default" />
+                                        </td>
+                                    )}
                                     {columns.map(col => (
                                         <td
                                             key={col.id}
@@ -295,28 +330,48 @@ export function TableRenderer({
                             </tr>
                         ) : (
                             /* live: 실제 데이터 행 */
-                            data.map((row, rowIdx) => (
-                                <tr
-                                    key={(row._id as number) || rowIdx}
-                                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-all"
-                                >
-                                    {columns.map(col => (
-                                        <td
-                                            key={col.id}
-                                            className="px-4 py-3 max-w-[200px] overflow-hidden"
-                                            style={{ textAlign: col.align }}
-                                        >
-                                            <TableCellRenderer
-                                                mode="live"
-                                                col={col}
-                                                row={row}
-                                                codeGroups={codeGroups}
-                                                handlers={handlers}
-                                            />
-                                        </td>
-                                    ))}
-                                </tr>
-                            ))
+                            data.map((row, rowIdx) => {
+                                const rowId = row._id as number;
+                                const isSelected = enableRowSelection && selectedRowIds.includes(rowId);
+                                return (
+                                    <tr
+                                        key={rowId || rowIdx}
+                                        className={`border-b border-slate-100 last:border-0 transition-all ${isSelected ? 'bg-slate-50' : 'hover:bg-slate-50/50'}`}
+                                    >
+                                        {/* live 체크박스 — 개별 행 선택 */}
+                                        {enableRowSelection && (
+                                            <td className="w-10 px-2 py-3 text-center sticky left-0 bg-inherit">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={e => {
+                                                        const next = e.target.checked
+                                                            ? [...selectedRowIds, rowId]
+                                                            : selectedRowIds.filter(id => id !== rowId);
+                                                        onRowsSelect?.(next);
+                                                    }}
+                                                    className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                                                />
+                                            </td>
+                                        )}
+                                        {columns.map(col => (
+                                            <td
+                                                key={col.id}
+                                                className="px-4 py-3 max-w-[200px] overflow-hidden"
+                                                style={{ textAlign: col.align }}
+                                            >
+                                                <TableCellRenderer
+                                                    mode="live"
+                                                    col={col}
+                                                    row={row}
+                                                    codeGroups={codeGroups}
+                                                    handlers={handlers}
+                                                />
+                                            </td>
+                                        ))}
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

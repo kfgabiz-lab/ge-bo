@@ -209,9 +209,9 @@ export default function RolesSystemPage() {
         setCurrentPage(0);
     }, []);
 
-    const handleSort = useCallback((accessor: string, dir: 'asc' | 'desc') => {
+    const handleSort = useCallback((accessor: string, dir: 'asc' | 'desc' | null) => {
         setSortKey(accessor);
-        setSortDir(dir);
+        if (dir) setSortDir(dir);
     }, []);
 
     const handlePageChange = useCallback((page: number) => {

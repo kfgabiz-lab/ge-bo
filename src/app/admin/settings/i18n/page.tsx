@@ -155,9 +155,9 @@ export default function I18nPage() {
     }, [appliedSearch, fetchItems, buildSearchParams]);
 
     /* 정렬 변경 */
-    const handleSort = useCallback((accessor: string, dir: 'asc' | 'desc') => {
+    const handleSort = useCallback((accessor: string, dir: 'asc' | 'desc' | null) => {
         setSortKey(accessor);
-        setSortDir(dir);
+        if (dir) setSortDir(dir);
     }, []);
 
     /* 삭제 확인 */

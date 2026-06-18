@@ -12,7 +12,7 @@ import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/re
 
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { validateFormFields, validateSubListRows, buildDataJson, buildTableRow, uploadFiles } from '@/app/admin/templates/make/_shared/utils';
+import { validateFormFields, validateSubListRows, buildDataJson, buildTableRow, uploadFiles, applySortChange } from '@/app/admin/templates/make/_shared/utils';
 import { useCodeStore } from '@/store/use-code-store';
 import { usePageTitleStore } from '@/store/use-page-title-store';
 import { useI18n } from '@/hooks/use-i18n';
@@ -72,6 +72,9 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     /* ── 테이블별 정렬 ── */
     const [sortKeyMap, setSortKeyMap] = useState<Record<string, string | null>>({});
     const [sortDirMap, setSortDirMap] = useState<Record<string, 'asc' | 'desc'>>({});
+
+    /* ── 테이블별 선택된 행 ID ── */
+    const [tableSelectedRowsMap, setTableSelectedRowsMap] = useState<Record<string, number[]>>({});
 
     /* ── Form 위젯별 입력값 ── */
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
@@ -463,6 +466,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     /** Search 위젯과 연결된 Table 위젯 데이터 재fetch */
     const handleSearch = useCallback((searchWidgetId: string) => {
+        /* 검색 시 연결된 테이블 행 선택 초기화 */
+        setTableSelectedRowsMap({});
         const fieldsMap = buildSearchFieldsMap(widgetItems);
         const sv = searchValuesRef.current;
         flatWidgets(widgetItems).forEach(w => {
@@ -492,6 +497,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     /** 페이지 이동 */
     const handlePageChange = useCallback((tableWidgetId: string, page: number) => {
+        /* 페이지 이동 시 해당 테이블 선택 초기화 */
+        setTableSelectedRowsMap(prev => ({ ...prev, [tableWidgetId]: [] }));
         const fieldsMap = buildSearchFieldsMap(widgetItems);
         const sv = searchValuesRef.current;
         const tw = flatWidgets(widgetItems).find(w => w.type === 'table' && (w as TableWidget).widgetId === tableWidgetId) as TableWidget | undefined;
@@ -501,15 +508,14 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     }, [widgetItems, sortKeyMap, sortDirMap, fetchTableData, buildSearchFieldsMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** 정렬 변경 */
-    const handleSortChange = useCallback((tableWidgetId: string, accessor: string, dir: 'asc' | 'desc') => {
-        setSortKeyMap(prev => ({ ...prev, [tableWidgetId]: accessor }));
-        setSortDirMap(prev => ({ ...prev, [tableWidgetId]: dir }));
+    const handleSortChange = useCallback((tableWidgetId: string, accessor: string, dir: 'asc' | 'desc' | null) => {
+        const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
         const fieldsMap = buildSearchFieldsMap(widgetItems);
         const sv = searchValuesRef.current;
         const tw = flatWidgets(widgetItems).find(w => w.type === 'table' && (w as TableWidget).widgetId === tableWidgetId) as TableWidget | undefined;
         if (!tw?.connectedSlug) return;
         const searchFields = tw.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-        fetchTableData({ tableWidget: tw, connectedSlug: tw.connectedSlug, searchFields, sv, page: 0, sk: accessor, sd: dir });
+        fetchTableData({ tableWidget: tw, connectedSlug: tw.connectedSlug, searchFields, sv, page: 0, sk, sd });
     }, [widgetItems, fetchTableData, buildSearchFieldsMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** Form 필드값 변경 */
@@ -785,6 +791,133 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         }
     }, [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, imgBlobUrls, multiSelectValuesMap, router, searchParams, currentGroupId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    /**
+     * 데이터저장 버튼 핸들러 — connType='datasave' 전용
+     * 선택된 form/sublist/multiselect 위젯 데이터를 dataSaveSlug 엔드포인트에 신규 저장
+     */
+    const handleDataSave = useCallback(async (
+        connectedContentWidgetIds: string[],
+        dataSaveSlug: string,
+        goBackAfterAction?: boolean,
+    ) => {
+        if (!dataSaveSlug) return;
+        const allFlat = flatWidgets(widgetItems);
+
+        /* 대상 위젯 수집 — form / sublist / multiselect */
+        const targetWidgets = connectedContentWidgetIds
+            .map(wid => allFlat.find(w =>
+                (w.type === 'form' || w.type === 'sublist' || w.type === 'multiselect') &&
+                (w as FormWidget | SubListWidget | MultiSelectWidget).widgetId === wid
+            ))
+            .filter(Boolean) as (FormWidget | SubListWidget | MultiSelectWidget)[];
+
+        if (targetWidgets.length === 0) { toast.warning('연결된 컨텐츠 위젯이 없습니다.'); return; }
+
+        /* 유효성 검사 — Form */
+        for (const w of targetWidgets) {
+            if (w.type !== 'form') continue;
+            const fw = w as FormWidget;
+            if (!validateFormFields(fw.fields, formValuesMap[fw.widgetId] ?? {}, fileValuesMap[fw.widgetId] ?? {}, existingFileMetaMap[fw.widgetId] ?? {})) return;
+        }
+        /* 유효성 검사 — SubList */
+        if (!validateSubListRows(targetWidgets.filter(w => w.type === 'sublist'), subListRowsMap, subListFileMap)) return;
+        /* 유효성 검사 — MultiSelect */
+        for (const w of targetWidgets) {
+            if (w.type !== 'multiselect') continue;
+            const mw = w as MultiSelectWidget;
+            if (!mw.required) continue;
+            if ((multiSelectValuesMap[mw.widgetId] ?? []).length === 0) {
+                toast.warning(`'${mw.title || '다중선택'}' 항목은 필수 선택입니다.`);
+                return;
+            }
+        }
+
+        try {
+            const newFileIdsByFieldId: Record<string, number[]> = {};
+
+            /* 1. 파일 업로드 */
+            for (const w of targetWidgets) {
+                if (w.type !== 'form') continue;
+                const fw = w as FormWidget;
+                for (const [fieldId, files] of Object.entries(fileValuesMap[fw.widgetId] ?? {})) {
+                    const field = fw.fields.find(f => f.id === fieldId);
+                    if (!field?.fieldKey || !files.length) continue;
+                    newFileIdsByFieldId[fieldId] = await uploadFiles(files, dataSaveSlug, field.fieldKey);
+                }
+            }
+
+            /* 2. SubList rows 처리 */
+            const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
+            for (const w of targetWidgets) {
+                if (w.type !== 'sublist') continue;
+                const sw = w as SubListWidget;
+                const processedRows: Record<string, unknown>[] = [];
+                for (const row of (subListRowsMap[sw.widgetId] ?? [])) {
+                    const { _rowId, ...rest } = row;
+                    const processedRow: Record<string, unknown> = { ...rest };
+                    for (const col of (sw.columns ?? [])) {
+                        if (!['file', 'image'].includes(col.type)) continue;
+                        const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
+                        const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
+                        const uploadedIds = newFiles.length ? await uploadFiles(newFiles, dataSaveSlug, col.key) : [];
+                        uploadedIds.forEach(id => { newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), id]; });
+                        processedRow[col.key] = [...existingIds, ...uploadedIds];
+                    }
+                    processedRows.push(processedRow);
+                }
+                processedSubListRowsMap[sw.widgetId] = processedRows;
+            }
+
+            /* 3. formFileIdsMap 구성 */
+            const formFileIdsMap: Record<string, Record<string, number[]>> = {};
+            for (const w of targetWidgets) {
+                if (w.type !== 'form') continue;
+                const fw = w as FormWidget;
+                formFileIdsMap[fw.widgetId] = {};
+                for (const f of fw.fields) {
+                    if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+                    const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map(m => m.id);
+                    formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
+                }
+            }
+
+            /* 4. multiSelectMap 구성 */
+            const multiSelectMap: Record<string, number[]> = {};
+            for (const w of targetWidgets) {
+                if (w.type !== 'multiselect') continue;
+                const mw = w as MultiSelectWidget;
+                multiSelectMap[mw.widgetId] = multiSelectValuesMap[mw.widgetId] ?? [];
+            }
+
+            /* 5. dataJson 구성 */
+            const { dataJson, pkKeys } = buildDataJson(
+                targetWidgets as Parameters<typeof buildDataJson>[0],
+                formValuesMap,
+                formFileIdsMap,
+                processedSubListRowsMap,
+                multiSelectMap,
+            );
+
+            /* 6. dataSaveSlug에 신규 저장 */
+            const res = await api.post(`/page-data/${dataSaveSlug}`, {
+                dataJson,
+                ...(pkKeys.length > 0 && { pkKeys }),
+                templateSlug: slug,
+            });
+
+            /* 7. 업로드 파일 → page_data 연결 */
+            const allNewIds = Object.values(newFileIdsByFieldId).flat();
+            if (allNewIds.length > 0) {
+                await api.patch('/page-files/link', { fileIds: allNewIds, dataId: res.data.id });
+            }
+
+            toast.success('저장되었습니다.');
+            if (goBackAfterAction) router.back();
+        } catch {
+            toast.error('저장 중 오류가 발생했습니다.');
+        }
+    }, [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, multiSelectValuesMap, router, slug]); // eslint-disable-line react-hooks/exhaustive-deps
+
     /** 파일 선택 핸들러 — Form: rowId 없음 / SubList: rowId 있음 */
     const handleFileChange = useCallback((widgetId: string, fieldId: string, files: File[], rowId?: string) => {
         if (rowId !== undefined) {
@@ -895,6 +1028,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 formValuesMap={formValuesMap}
                 onFormValuesChange={updateFormValue}
                 onContentAction={handleContentAction}
+                onDataSave={handleDataSave}
                 subListRowsMap={subListRowsMap}
                 onSubListRowsChange={(wId, rows) => setSubListRowsMap(prev => ({ ...prev, [wId]: rows }))}
                 multiSelectValuesMap={multiSelectValuesMap}
@@ -910,6 +1044,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 onSort={handleSortChange}
                 onPageChange={handlePageChange}
                 onLoadMore={handleLoadMore}
+                tableSelectedRowsMap={tableSelectedRowsMap}
+                onTableRowsSelect={(wId, ids) => setTableSelectedRowsMap(prev => ({ ...prev, [wId]: ids }))}
                 dataSlug={resolvedDataSlug}
                 onRefresh={handleRefresh}
                 pageSlug={slug}

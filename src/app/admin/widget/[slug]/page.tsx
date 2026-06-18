@@ -26,7 +26,7 @@ import type { FormWidget } from '@/app/admin/templates/make/_shared/components/b
 import type { SubListWidget } from '@/app/admin/templates/make/_shared/components/renderer/types';
 import type { SubListRow } from '@/app/admin/templates/make/_shared/components/renderer/SubListRenderer';
 import type { SearchFieldConfig } from '@/app/admin/templates/make/_shared/types';
-import { buildDataJson, buildTableRow } from '@/app/admin/templates/make/_shared/utils';
+import { buildDataJson, buildTableRow, applySortChange } from '@/app/admin/templates/make/_shared/utils';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                      */
@@ -71,6 +71,9 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     /* 테이블별 정렬 상태 */
     const [sortKeyMap, setSortKeyMap] = useState<Record<string, string | null>>({});
     const [sortDirMap, setSortDirMap] = useState<Record<string, 'asc' | 'desc'>>({});
+
+    /* 테이블별 선택된 행 ID — key: tableWidget.widgetId, value: 선택된 행 ID 배열 */
+    const [tableSelectedRowsMap, setTableSelectedRowsMap] = useState<Record<string, number[]>>({});
 
     /* Form 위젯별 입력값 — key: formWidget.widgetId, value: {fieldId → value} */
     const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
@@ -358,21 +361,16 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     /**
      * 정렬 변경 — 해당 Table 위젯 데이터 재fetch
      */
-    const handleSortChange = useCallback((tableWidgetId: string, accessor: string, dir: 'asc' | 'desc') => {
-        setSortKeyMap(prev => ({ ...prev, [tableWidgetId]: accessor }));
-        setSortDirMap(prev => ({ ...prev, [tableWidgetId]: dir }));
-
+    const handleSortChange = useCallback((tableWidgetId: string, accessor: string, dir: 'asc' | 'desc' | null) => {
+        const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
         const fieldsMap = buildSearchFieldsMap(widgetItems);
         const sv = searchValuesRef.current;
-
         const tableWidget = flatWidgets(widgetItems).find(
             w => w.type === 'table' && (w as TableWidget).widgetId === tableWidgetId
         ) as TableWidget | undefined;
-        if (!tableWidget) return;
-        const connectedSlug = tableWidget.connectedSlug;
-        if (!connectedSlug) return;
+        if (!tableWidget?.connectedSlug) return;
         const searchFields = tableWidget.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-        fetchPageTableData({ tableWidget, connectedSlug, searchFields, sv, page: 0, sk: accessor, sd: dir });
+        fetchPageTableData({ tableWidget, connectedSlug: tableWidget.connectedSlug, searchFields, sv, page: 0, sk, sd });
     }, [widgetItems, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
@@ -559,6 +557,8 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 onSort={handleSortChange}
                 onPageChange={handlePageChange}
                 onLoadMore={handleLoadMore}
+                tableSelectedRowsMap={tableSelectedRowsMap}
+                onTableRowsSelect={(wId, ids) => setTableSelectedRowsMap(prev => ({ ...prev, [wId]: ids }))}
                 categorySelections={categorySelections}
                 onCategorySelect={handleCategorySelect}
                 onRefresh={handleRefresh}

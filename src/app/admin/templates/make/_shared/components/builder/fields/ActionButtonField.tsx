@@ -20,6 +20,8 @@
 
 import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
+import { SlugSelectField } from './SlugSelectField';
+import type { SlugOption } from './SlugSelectField';
 import type { TemplateItem } from '../../../types';
 import { getTemplateLabel } from '../../../utils';
 
@@ -49,6 +51,8 @@ export interface ActionButtonFieldProps extends FieldEditProps {
     pageTemplates: TemplateItem[];
     /** 현재 페이지의 Form + SubList 위젯 목록 — 컨텐츠 연결 다중 선택용 */
     contentWidgets?: ContentWidgetOption[];
+    /** slug 레지스트리 목록 — 데이터저장 연결slug 선택용 */
+    slugOptions?: SlugOption[];
 }
 
 /** 공통 select 스타일 */
@@ -65,6 +69,7 @@ export function ActionButtonField({
     onLabelKeyDown,
     pageTemplates,
     contentWidgets = [],
+    slugOptions = [],
 }: ActionButtonFieldProps) {
     const connType = values.connType ?? '';
 
@@ -74,12 +79,13 @@ export function ActionButtonField({
     /** 연결 타입 변경 시 연결 관련 값 초기화 */
     const handleConnTypeChange = (newType: string) => {
         onChange({
-            connType: newType as '' | 'content' | 'popup' | 'path' | 'close' | 'excel',
+            connType: newType as '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave',
             popupSlug: undefined,
             fileLayerSlug: undefined,
             connectedContentWidgetIds: undefined,
             contentAction: undefined,
             excelTableWidgetId: undefined,
+            dataSaveSlug: undefined,
         });
     };
 
@@ -97,7 +103,10 @@ export function ActionButtonField({
 
     /** 컨텐츠 아이템 표시 라벨 구성 */
     const getContentLabel = (w: ContentWidgetOption): string => {
-        const typeLabel = w.type === 'form' ? 'Form' : w.type === 'sublist' ? 'SubList' : 'MultiSelect';
+        const typeLabel = w.type === 'form' ? 'Form'
+            : w.type === 'sublist' ? 'SubList'
+            : w.type === 'table' ? 'Table'
+            : 'MultiSelect';
         const name = w.title || w.contentKey || w.widgetId;
         return `[${typeLabel}] ${name}`;
     };
@@ -160,6 +169,7 @@ export function ActionButtonField({
                     >
                         <option value="">없음</option>
                         <option value="content">컨텐츠</option>
+                        <option value="datasave">데이터저장</option>
                         <option value="excel">엑셀 다운로드</option>
                         <option value="popup">페이지 (관리자)</option>
                         <option value="path">경로 (개발자)</option>
@@ -233,6 +243,60 @@ export function ActionButtonField({
                                     </label>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* 데이터저장 — form/sublist/table/multiselect 다중 체크박스 + 연결slug */}
+                    {connType === 'datasave' && (
+                        <div className="space-y-1.5">
+                            {/* 컨텐츠 위젯 체크박스 목록 (4가지 타입 전체) */}
+                            {contentWidgets.length === 0 ? (
+                                <p className="text-[10px] text-slate-400 italic px-1">
+                                    연결 가능한 Form/SubList/Table/MultiSelect 위젯이 없습니다.
+                                </p>
+                            ) : (
+                                <div className="border border-slate-200 rounded overflow-hidden">
+                                    {contentWidgets.map(w => (
+                                        <label
+                                            key={w.widgetId}
+                                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.includes(w.widgetId)}
+                                                onChange={() => handleContentWidgetToggle(w.widgetId)}
+                                                className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                            />
+                                            <span className="text-xs text-slate-700 truncate">
+                                                {getContentLabel(w)}
+                                            </span>
+                                            {w.connectedSlug && (
+                                                <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
+                                                    {w.connectedSlug}
+                                                </span>
+                                            )}
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                            {/* 연결 slug — 저장 API 엔드포인트 */}
+                            <SlugSelectField
+                                value={values.dataSaveSlug ?? ''}
+                                onChange={slug => onChange({ dataSaveSlug: slug || undefined })}
+                                slugOptions={slugOptions}
+                                label="연결 Slug"
+                                emptyLabel="— Slug 선택 —"
+                            />
+                            {/* 동작 완료 후 이전 페이지 이동 여부 */}
+                            <label className="flex items-center gap-1.5 cursor-pointer mt-0.5">
+                                <input
+                                    type="checkbox"
+                                    checked={values.goBackAfterAction ?? false}
+                                    onChange={e => onChange({ goBackAfterAction: e.target.checked || undefined })}
+                                    className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                />
+                                <span className="text-xs text-slate-700">동작 후 이전페이지 이동</span>
+                            </label>
                         </div>
                     )}
 

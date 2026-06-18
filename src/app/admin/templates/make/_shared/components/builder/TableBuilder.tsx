@@ -20,6 +20,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, X, Pencil, GripVertical } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import api from '@/lib/api';
+import { ToggleRow } from './fields/_ToggleRow';
 import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from '../../types';
 import { createIdGenerator } from '../../utils';
 import {
@@ -56,6 +57,8 @@ export interface TableWidget {
     connectedSlug?: string;                 /* DB Slug — 데이터 API 호출 대상 */
     pageSize: number;
     displayMode: DisplayMode;              /* 표시 방식 (pagination | scroll) */
+    /** 행 다중선택 체크박스 표시 여부 (기본 false) */
+    enableRowSelection?: boolean;
 }
 
 /* ══════════════════════════════════════════ */
@@ -331,30 +334,42 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 </div>
             </div>
 
-            {/* 페이지당 건수 (pagination 모드만) */}
-            {(widget.displayMode ?? 'pagination') === 'pagination' && (
+            {/* Key | 연결 Slug — 2열 그리드 */}
+            <div className="grid grid-cols-2 gap-2">
                 <div>
-                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
-                    <input type="number" min={5} max={100} value={widget.pageSize}
-                        onChange={e => onChange({ ...widget, pageSize: Number(e.target.value) || 10 })}
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key <span className="text-red-400">*</span></label>
+                    <input type="text" value={widget.contentKey} onChange={e => onChange({ ...widget, contentKey: e.target.value })}
+                        placeholder="예: boardTable"
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
                 </div>
-            )}
-
-            {/* 컨텐츠 Key */}
-            <div>
-                <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key <span className="text-red-400">*</span></label>
-                <input type="text" value={widget.contentKey} onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                    placeholder="예: boardTable (페이지 내 고유)"
-                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
+                <SlugSelectField
+                    value={widget.connectedSlug ?? ''}
+                    onChange={slug => onChange({ ...widget, connectedSlug: slug })}
+                    slugOptions={slugOptions}
+                />
             </div>
 
-            {/* 연결 Slug — 데이터를 가져올 Slug 레지스트리 선택 */}
-            <SlugSelectField
-                value={widget.connectedSlug ?? ''}
-                onChange={slug => onChange({ ...widget, connectedSlug: slug })}
-                slugOptions={slugOptions}
-            />
+            {/* 페이지당 건수 | 체크박스 — 2열 그리드 */}
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
+                    {(widget.displayMode ?? 'pagination') === 'pagination' ? (
+                        <input type="number" min={5} max={100} value={widget.pageSize}
+                            onChange={e => onChange({ ...widget, pageSize: Number(e.target.value) || 10 })}
+                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
+                    ) : (
+                        <span className="text-[10px] text-slate-400 italic">스크롤 모드</span>
+                    )}
+                </div>
+                <div>
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">체크박스</label>
+                    <ToggleRow
+                        label={widget.enableRowSelection ? '사용' : '미사용'}
+                        value={widget.enableRowSelection ?? false}
+                        onChange={v => onChange({ ...widget, enableRowSelection: v })}
+                    />
+                </div>
+            </div>
 
             {/* 연결된 Search 위젯 */}
             {searchWidgets.length > 0 && (

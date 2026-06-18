@@ -2,6 +2,7 @@
  * 페이지 메이커 공통 유틸 함수
  * - list/page.tsx, layer/page.tsx에서 공유
  */
+import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
@@ -400,15 +401,16 @@ export const getTemplateLabel = (t: {
 };
 
 /**
- * Form/SubList/MultiSelect 위젯 목록으로 page_data.dataJson 구성
+ * Form/SubList/MultiSelect/Table 위젯 목록으로 page_data.dataJson 구성
  * - page 모드(widgetSub/[slug]/page.tsx)와 popup 모드(WidgetRenderer.tsx) 공통 사용
  * - contentKey 있으면 해당 키로 중첩 저장, 없으면 root에 flat 저장
  *
- * @param widgets           저장 대상 위젯 목록 (type/widgetId/fields/contentKey)
- * @param formValuesMap     widgetId → { fieldId: 값 } 폼 필드 값 맵
- * @param formFileIdsMap    widgetId → { fieldId: number[] } 파일 ID 맵 (기존+신규 합산 완료)
- * @param subListRowsMap    widgetId → 행 배열 (_rowId 제거, 파일 컬럼 ID 배열 완성 상태)
- * @param multiSelectMap    widgetId → number[] 선택된 ID 배열
+ * @param widgets             저장 대상 위젯 목록 (type/widgetId/fields/contentKey)
+ * @param formValuesMap       widgetId → { fieldId: 값 } 폼 필드 값 맵
+ * @param formFileIdsMap      widgetId → { fieldId: number[] } 파일 ID 맵 (기존+신규 합산 완료)
+ * @param subListRowsMap      widgetId → 행 배열 (_rowId 제거, 파일 컬럼 ID 배열 완성 상태)
+ * @param multiSelectMap      widgetId → number[] 선택된 ID 배열
+ * @param tableSelectedMap    widgetId → number[] 테이블 선택 행 ID 배열 (optional)
  * @returns { dataJson, pkKeys }
  *
  * @example
@@ -425,6 +427,7 @@ export function buildDataJson(
     formFileIdsMap: Record<string, Record<string, number[]>>,
     subListRowsMap: Record<string, Record<string, unknown>[]>,
     multiSelectMap: Record<string, number[]>,
+    tableSelectedMap?: Record<string, number[]>,
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
@@ -456,6 +459,10 @@ export function buildDataJson(
             const rows = subListRowsMap[w.widgetId ?? ''] ?? [];
             if (w.contentKey) dataJson[w.contentKey] = { rows };
             else dataJson.rows = rows;
+
+        } else if (w.type === 'table' && tableSelectedMap) {
+            /* 테이블에서 선택된 행 ID 배열을 contentKey 아래 저장 */
+            if (w.contentKey) dataJson[w.contentKey] = tableSelectedMap[w.widgetId ?? ''] ?? [];
         }
     }
 
@@ -488,3 +495,45 @@ export const getAcceptString = (mode: string, customExts: string[] = []): string
     if (mode === 'custom' && customExts.length > 0) return customExts.join(',');
     return '';
 };
+
+/**
+ * dot notation accessor로 중첩 객체에서 값 읽기 — 1/2/3단계 공통
+ * 1단계: "title"         → obj['title']
+ * 2단계: "form1.title"   → obj['form1']['title']
+ * 3단계: "tab1.form1.title" → obj['tab1']['form1']['title']
+ *
+ * 사용법: resolveAccessor(row, 'tab1.form1.title')
+ */
+export function resolveAccessor(obj: unknown, accessor: string): unknown {
+    return accessor.split('.').reduce((acc: unknown, key) => {
+        if (acc != null && typeof acc === 'object' && !Array.isArray(acc))
+            return (acc as Record<string, unknown>)[key];
+        return undefined;
+    }, obj);
+}
+
+/**
+ * 테이블 정렬 상태 공통 처리 — sortKeyMap/sortDirMap 업데이트 + fetch 파라미터 반환
+ * - dir=null : 정렬 해제 (sortKeyMap=null, sk=undefined)
+ * - dir='desc'|'asc' : 해당 컬럼 정렬 적용
+ *
+ * 사용법:
+ *   const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
+ *   fetchTableData({ ..., sk, sd });
+ */
+export function applySortChange(
+    tableWidgetId: string,
+    accessor: string,
+    dir: 'asc' | 'desc' | null,
+    setSortKeyMap: Dispatch<SetStateAction<Record<string, string | null>>>,
+    setSortDirMap: Dispatch<SetStateAction<Record<string, 'asc' | 'desc'>>>,
+): { sk: string | undefined; sd: 'asc' | 'desc' } {
+    setSortKeyMap(prev => ({ ...prev, [tableWidgetId]: dir === null ? null : accessor }));
+    if (dir !== null) {
+        setSortDirMap(prev => ({ ...prev, [tableWidgetId]: dir }));
+    }
+    return {
+        sk: dir === null ? undefined : accessor,
+        sd: dir ?? 'asc',
+    };
+}

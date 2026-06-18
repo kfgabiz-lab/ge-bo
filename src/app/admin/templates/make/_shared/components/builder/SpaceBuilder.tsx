@@ -33,6 +33,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { createIdGenerator } from '../../utils';
 import { TextareaField, ActionButtonField } from './fields';
 import type { ContentWidgetOption } from './fields/ActionButtonField';
+import type { SlugOption } from './fields/SlugSelectField';
 import type { SpaceWidget } from '../renderer/types';
 import type { SearchFieldConfig, TemplateItem } from '../../types';
 import type { FieldEditValues } from './fields/types';
@@ -84,6 +85,8 @@ interface SpaceBuilderProps {
     actionButtonOnly?: boolean;
     /** 아이템 ColSpan 최대값 (기본 12, 우측 드로어 등 좁은 공간에서 2로 제한) */
     maxColSpan?: number;
+    /** slug 레지스트리 목록 — 데이터저장 연결slug 선택용 */
+    slugOptions?: SlugOption[];
 }
 
 /** 
@@ -177,6 +180,7 @@ export function SpaceBuilder({
     formWidgets = [],
     actionButtonOnly = false,
     maxColSpan = 12,
+    slugOptions = [],
 }: SpaceBuilderProps) {
     /* formWidgets를 contentWidgets 형식으로 변환 (하위 호환) */
     const resolvedContentWidgets: ContentWidgetOption[] = contentWidgets.length > 0
@@ -304,6 +308,7 @@ export function SpaceBuilder({
                                         codeGroupsLoading={false}
                                         pageTemplates={pageTemplates}
                                         contentWidgets={resolvedContentWidgets}
+                                        slugOptions={slugOptions}
                                     />
                                 )}
                             </SortableSpaceItem>

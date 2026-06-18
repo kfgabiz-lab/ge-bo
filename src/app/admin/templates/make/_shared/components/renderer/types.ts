@@ -283,6 +283,8 @@ export interface TableActionHandlers {
     onDetail?: (row: Record<string, unknown>) => void;
     onDelete?: (id: number) => void;
     onFileClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
+    /** 행 선택 변경 — 선택된 행 ID 배열 전달 (enableRowSelection=true 전용) */
+    onRowsSelect?: (selectedIds: number[]) => void;
 }
 
 /** 검색폼 핸들러 (live 모드 전용) */

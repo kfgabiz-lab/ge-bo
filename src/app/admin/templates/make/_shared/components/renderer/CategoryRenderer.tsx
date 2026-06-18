@@ -36,6 +36,7 @@ import { RendererContainer } from './RendererContainer';
 import type { CategoryWidget } from './types';
 import type { RendererMode } from './types';
 import { useI18n } from '@/hooks/use-i18n';
+import { resolveAccessor } from '../../utils';
 
 /** 카테고리 항목 하나 */
 interface CategoryItem {
@@ -141,24 +142,9 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             const titleKey = widget.fieldTitle || 'name';
             const descKey  = widget.fieldDesc  || 'description';
 
-            /**
-             * dot notation 필드 읽기 유틸
-             * - '폼key.컬럼명' 형태면 dataJson[폼key][컬럼명] 으로 중첩 접근
-             * - 일반 키면 dataJson[키] 로 바로 접근
-             */
-            const readField = (dataJson: Record<string, unknown>, fieldKey: string): unknown => {
-                const dotIdx = fieldKey.indexOf('.');
-                if (dotIdx !== -1) {
-                    const parentKey = fieldKey.slice(0, dotIdx);
-                    const childKey  = fieldKey.slice(dotIdx + 1);
-                    const section   = dataJson[parentKey];
-                    if (section && typeof section === 'object' && !Array.isArray(section)) {
-                        return (section as Record<string, unknown>)[childKey];
-                    }
-                    return undefined;
-                }
-                return dataJson[fieldKey];
-            };
+            /* resolveAccessor: 1/2/3단계 dot notation 공통 처리 (utils.ts) */
+            const readField = (dataJson: Record<string, unknown>, fieldKey: string): unknown =>
+                resolveAccessor(dataJson, fieldKey);
 
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
                 .map(item => ({

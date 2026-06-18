@@ -82,17 +82,22 @@ interface PageGridRendererProps {
     /** (widgetId, fieldId, value) 형태로 호출 */
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean) => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;
     sortKeyMap?: Record<string, string | null>;
     sortDirMap?: Record<string, 'asc' | 'desc'>;
     /** (widgetId, accessor, dir) 형태로 호출 */
-    onSort?: (widgetId: string, accessor: string, dir: 'asc' | 'desc') => void;
+    onSort?: (widgetId: string, accessor: string, dir: 'asc' | 'desc' | null) => void;
     /** (widgetId, page) 형태로 호출 */
     onPageChange?: (widgetId: string, page: number) => void;
     /** (widgetId) 형태로 호출 */
     onLoadMore?: (widgetId: string) => void;
+    /** 테이블 행 선택 상태 — widgetId → 선택된 행 ID 배열 */
+    tableSelectedRowsMap?: Record<string, number[]>;
+    /** 테이블 행 선택 변경 콜백 — (widgetId, ids) */
+    onTableRowsSelect?: (widgetId: string, ids: number[]) => void;
 
     /* live 모드 전용 — 카테고리 */
     /** 카테고리 위젯별 선택 ID (widgetId → selectedId) */
@@ -159,12 +164,15 @@ export function PageGridRenderer({
     formValuesMap,
     onFormValuesChange,
     onContentAction,
+    onDataSave,
     tableDataMap,
     sortKeyMap,
     sortDirMap,
     onSort,
     onPageChange,
     onLoadMore,
+    tableSelectedRowsMap,
+    onTableRowsSelect,
     categorySelections,
     onCategorySelect,
     dataSlug,
@@ -298,6 +306,7 @@ export function PageGridRenderer({
                                         allFieldKeyToId={allFieldKeyToId}
                                         urlParams={urlParams}
                                         onContentAction={onContentAction}
+                                        onDataSave={onDataSave}
                                         onClose={onClose}
                                         /* SubList */
                                         subListRowsMap={subListRowsMap}
@@ -321,6 +330,8 @@ export function PageGridRenderer({
                                         onLoadMore={() => onLoadMore?.(wid)}
                                         appendLoading={td?.appendLoading}
                                         hasMore={td?.hasMore ?? true}
+                                        selectedRowIds={tableSelectedRowsMap?.[wid] ?? []}
+                                        onRowsSelect={ids => onTableRowsSelect?.(wid, ids)}
                                         /* 카테고리 */
                                         categorySelections={categorySelections}
                                         onCategorySelect={onCategorySelect}
