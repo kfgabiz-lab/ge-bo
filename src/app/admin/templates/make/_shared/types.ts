@@ -58,7 +58,7 @@ export interface SearchFieldConfig {
     /* ── action-button 전용 ── */
     color?: string;             // 버튼 색상 프리셋 (black/green/...)
     bgColor?: string;           // 커스텀 배경색 (hex)
-    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave'; // 클릭 시 연결 방식
     popupSlug?: string;         // 연결 방식 popup: LAYER 템플릿 slug
     fileLayerSlug?: string;     // 연결 방식 path: 로컬 컴포넌트명
     params?: string;            // 연결 시 전달할 파라미터 (popup·path 공통, 예: depth=1,type=create)
@@ -67,6 +67,7 @@ export interface SearchFieldConfig {
     excelTableWidgetId?: string;             // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
     contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
     goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
+    dataSaveSlug?: string;                   // 데이터저장 연결 slug (connType='datasave' 전용)
     isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
     readonly?: boolean;             // 읽기 전용 여부 (Form 전용)
     // ── 파일/이미지/비디오 전용 ──
@@ -148,6 +149,20 @@ export interface CellOption {
 }
 
 /**
+ * 수정 버튼 페이지 이동 규칙
+ * - pageSlug: 이동할 페이지 슬러그
+ * - conditionParam: 이동 조건 (예: title=1, 비어있으면 항상 이동)
+ * - passParam: 전달 파라미터 (예: id,title=abc — =없으면 row 필드값, =있으면 고정값)
+ */
+export interface EditPageRule {
+    id: string;
+    connType: 'page' | 'popup';  // page: 직접 페이지 이동 / popup: 팝업 오픈(outputMode 자동 분기)
+    pageSlug: string;
+    conditionParam: string;
+    passParam: string;
+}
+
+/**
  * 테이블 컬럼 설정
  * - list/page.tsx(빌더), [slug]/page.tsx(렌더러) 공통 사용
  */
@@ -171,6 +186,7 @@ export interface TableColumnConfig {
     falseTextMsgKey?: string;          // boolean false 텍스트 다국어 키
     actions?: ('edit' | 'detail' | 'delete')[]; // 프리셋 액션 버튼
     customActions?: { id: string; label: string; color: string }[]; // 커스텀 버튼
+    editPageRules?: EditPageRule[];      // 수정 버튼 페이지 이동 규칙 목록
     editPopupSlug?: string;             // 수정 버튼 연결 LAYER slug (관리자방식)
     detailPopupSlug?: string;           // 상세 버튼 연결 LAYER slug (관리자방식)
     editFileLayerSlug?: string;         // 수정 버튼 연결 로컬 컴포넌트명 (개발자방식)

@@ -70,7 +70,8 @@ import type { FormFieldItem } from '../builder/FormBuilder';
 import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
-import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles } from '../../utils';
+import type { PageTableData } from './PageGridRenderer';
+import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, buildTableRow } from '../../utils';
 
 /**
  * Actions 컬럼 파라미터 문자열 → initialValues 변환
@@ -190,6 +191,8 @@ interface WidgetRendererProps {
     urlParams?: Record<string, string>;
     /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
+    /** Space 위젯 버튼 클릭 시 데이터저장 동작 — connType='datasave' 전용 */
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
     onClose?: () => void;
 
@@ -207,13 +210,19 @@ interface WidgetRendererProps {
 
     /* ── live 모드 전용 — table ── */
     handlers?: TableActionHandlers;
+    /** 행 다중선택 체크박스 활성화 여부 */
+    enableRowSelection?: boolean;
+    /** 현재 선택된 행 ID 배열 */
+    selectedRowIds?: number[];
+    /** 행 선택 변경 콜백 */
+    onRowsSelect?: (selectedIds: number[]) => void;
     /** 테이블 실데이터 rows */
     tableData?: Record<string, unknown>[];
     /** 초기/검색 로딩 여부 */
     tableLoading?: boolean;
     sortKey?: string | null;
     sortDir?: 'asc' | 'desc';
-    onSort?: (accessor: string, dir: 'asc' | 'desc') => void;
+    onSort?: (accessor: string, dir: 'asc' | 'desc' | null) => void;
     totalElements?: number;
     totalPages?: number;
     currentPage?: number;
@@ -296,6 +305,7 @@ export function WidgetRenderer({
     allFieldKeyToId,
     urlParams,
     onContentAction,
+    onDataSave,
     onClose,
     /* file */
     fileValues,
@@ -305,6 +315,9 @@ export function WidgetRenderer({
     onRemoveExisting,
     /* table */
     handlers,
+    enableRowSelection,
+    selectedRowIds,
+    onRowsSelect,
     tableData,
     tableLoading,
     sortKey,
@@ -358,11 +371,19 @@ export function WidgetRenderer({
     const [popupSubListRowsMap,  setPopupSubListRowsMap]  = useState<Record<string, import('./SubListRenderer').SubListRow[]>>({});
     /* 팝업 내 SubList 파일 맵 — widgetId → rowId → colId → File[] */
     const [popupSubListFileMap,  setPopupSubListFileMap]  = useState<Record<string, Record<string, Record<string, File[]>>>>({});
+    /* 팝업 내 MultiSelect 선택 ID — widgetId → number[] */
+    const [popupMultiSelectValuesMap, setPopupMultiSelectValuesMap] = useState<Record<string, number[]>>({});
     /* 팝업 기존 파일 메타 — widgetId → { fieldId: meta[] } (page 모드 existingFileMetaMap과 동일 구조) */
     const [popupExistingMetaMap, setPopupExistingMetaMap] = useState<
         Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>
     >({});
     const [popupImgBlobUrls,     setPopupImgBlobUrls]     = useState<Record<number, string>>({});
+    /* 팝업 내 테이블 데이터 — widgetId → PageTableData */
+    const [popupTableDataMap,       setPopupTableDataMap]       = useState<Record<string, PageTableData>>({});
+    const [popupSortKeyMap,         setPopupSortKeyMap]         = useState<Record<string, string | null>>({});
+    const [popupSortDirMap,         setPopupSortDirMap]         = useState<Record<string, 'asc' | 'desc'>>({});
+    /* 팝업 내 테이블 행 선택 — widgetId → 선택된 행 ID 배열 */
+    const [popupTableSelectedRowsMap, setPopupTableSelectedRowsMap] = useState<Record<string, number[]>>({});
 
     /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 ──
      * 최신 상태를 ref로 유지하고 _hiddenLogCallbacks에 콜백 등록 */
@@ -455,6 +476,8 @@ export function WidgetRenderer({
         setPopupCfg(null);
         setPopupEditId(null);
         setPopupSubListRowsMap({});
+        setPopupMultiSelectValuesMap({});
+        setPopupTableSelectedRowsMap({});
     }, []);
 
     /**
@@ -485,6 +508,12 @@ export function WidgetRenderer({
         setPopupImgBlobUrls({});
         setPopupSubListRowsMap({});
         setPopupSubListFileMap({});
+        setPopupMultiSelectValuesMap({});
+        setPopupTableSelectedRowsMap({});
+        setPopupTableDataMap({});
+        setPopupSortKeyMap({});
+        setPopupSortDirMap({});
+        setPopupTableSelectedRowsMap({});
 
         try {
             /* 1단계: 팝업 템플릿 설정 조회 (공통 유틸) */
@@ -511,6 +540,34 @@ export function WidgetRenderer({
             /* 팝업 저장에 사용할 slug: 첫 번째 폼 위젯의 connectedSlug */
             const formConnectedSlug = (formContents[0]?.widget?.connectedSlug as string | undefined) || '';
             setPopupListSlug(formConnectedSlug);
+
+            /* table 위젯 초기 데이터 fetch — connectedSlug가 있는 테이블만 처리 */
+            const tableContents = cfg.widgetItems.flatMap(item => item.contents).filter(c => c.widget?.type === 'table');
+            if (tableContents.length > 0) {
+                const tableDataAccum: Record<string, PageTableData> = {};
+                await Promise.all(tableContents.map(async tc => {
+                    const tw = tc.widget as unknown as TableWidget & { connectedSlug?: string };
+                    if (!tw.widgetId || !tw.connectedSlug) return;
+                    try {
+                        const pageSize = tw.pageSize || 10;
+                        const res = await api.get(`/page-data/${tw.connectedSlug}`, {
+                            params: { page: '0', size: String(pageSize) },
+                        });
+                        const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
+                        tableDataAccum[tw.widgetId] = {
+                            rows,
+                            totalElements: res.data.totalElements ?? 0,
+                            totalPages:    res.data.totalPages    ?? 0,
+                            currentPage:   0,
+                            loading:       false,
+                            appendLoading: false,
+                            hasMore:       res.data.last === false,
+                            nextPage:      res.data.last === false ? 1 : 0,
+                        };
+                    } catch { /* 개별 테이블 조회 실패 무시 */ }
+                }));
+                setPopupTableDataMap(tableDataAccum);
+            }
 
             /* 2단계: row 데이터 조회 + 폼 필드 매핑 — widgetId별로 분리 (page 모드와 동일 구조) */
             const formValuesAccum: Record<string, Record<string, string>>   = {};
@@ -612,6 +669,50 @@ export function WidgetRenderer({
      * SpaceRenderer의 connType='content' 버튼이 팝업 WidgetRenderer를 통해 호출
      * widgetIds 배열의 첫 번째 Form 위젯을 기준으로 동작 (팝업 내부 단순화)
      */
+    /* 팝업 내 테이블 페이지 변경 핸들러 */
+    const handlePopupPageChange = useCallback(async (widgetId: string, page: number) => {
+        const tw = popupCfg?.widgetItems.flatMap(item => item.contents)
+            .find(c => (c.widget as { widgetId?: string })?.widgetId === widgetId && c.widget?.type === 'table')
+            ?.widget as (TableWidget & { connectedSlug?: string }) | undefined;
+        if (!tw?.connectedSlug) return;
+        const pageSize = tw.pageSize || 10;
+        const sk = popupSortKeyMap[widgetId];
+        const sd = popupSortDirMap[widgetId] ?? 'asc';
+        setPopupTableDataMap(prev => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, loading: false, appendLoading: false, hasMore: false, nextPage: 0 }), loading: true } }));
+        try {
+            const reqParams: Record<string, string> = { page: String(page), size: String(pageSize) };
+            if (sk) reqParams.sort = `${sk},${sd}`;
+            const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
+            const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
+            setPopupTableDataMap(prev => ({
+                ...prev,
+                [widgetId]: { rows, totalElements: res.data.totalElements ?? 0, totalPages: res.data.totalPages ?? 0, currentPage: page, loading: false, appendLoading: false, hasMore: res.data.last === false, nextPage: res.data.last === false ? page + 1 : page },
+            }));
+        } catch { setPopupTableDataMap(prev => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, appendLoading: false, hasMore: false, nextPage: 0 }), loading: false } })); }
+    }, [popupCfg, popupSortKeyMap, popupSortDirMap]);
+
+    /* 팝업 내 테이블 정렬 변경 핸들러 */
+    const handlePopupSortChange = useCallback(async (widgetId: string, accessor: string, dir: 'asc' | 'desc' | null) => {
+        setPopupSortKeyMap(prev => ({ ...prev, [widgetId]: dir === null ? null : accessor }));
+        if (dir) setPopupSortDirMap(prev => ({ ...prev, [widgetId]: dir }));
+        const tw = popupCfg?.widgetItems.flatMap(item => item.contents)
+            .find(c => (c.widget as { widgetId?: string })?.widgetId === widgetId && c.widget?.type === 'table')
+            ?.widget as (TableWidget & { connectedSlug?: string }) | undefined;
+        if (!tw?.connectedSlug) return;
+        const pageSize = tw.pageSize || 10;
+        setPopupTableDataMap(prev => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, loading: false, appendLoading: false, hasMore: false, nextPage: 0 }), loading: true } }));
+        try {
+            const reqParams: Record<string, string> = { page: '0', size: String(pageSize) };
+            if (dir && accessor) reqParams.sort = `${accessor},${dir}`;
+            const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
+            const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
+            setPopupTableDataMap(prev => ({
+                ...prev,
+                [widgetId]: { rows, totalElements: res.data.totalElements ?? 0, totalPages: res.data.totalPages ?? 0, currentPage: 0, loading: false, appendLoading: false, hasMore: res.data.last === false, nextPage: res.data.last === false ? 1 : 0 },
+            }));
+        } catch { setPopupTableDataMap(prev => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? { rows: [], totalElements: 0, totalPages: 0, currentPage: 0, appendLoading: false, hasMore: false, nextPage: 0 }), loading: false } })); }
+    }, [popupCfg]);
+
     const handlePopupContentAction = useCallback(async (
         _widgetIds: string[],
         action: 'save' | 'delete',
@@ -754,6 +855,163 @@ export function WidgetRenderer({
         }
     }, [popupListSlug, popupEditId, popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, handlePopupClose, onRefresh]);
 
+    /**
+     * 팝업 내 datasave 버튼 핸들러 — connType='datasave' 전용
+     * connectedContentWidgetIds에 해당하는 form/sublist 위젯 데이터를 dataSaveSlug에 POST
+     */
+    const handlePopupDataSave = useCallback(async (
+        connectedContentWidgetIds: string[],
+        dataSaveSlug: string,
+        goBackAfterAction?: boolean,
+    ) => {
+        if (!dataSaveSlug || !popupCfg) return;
+
+        const allContents = popupCfg.widgetItems.flatMap(item => item.contents);
+
+        /* 대상 위젯 수집 — form / sublist / multiselect / table */
+        const targetWidgets = connectedContentWidgetIds
+            .map(wid => {
+                const found = allContents.find(c => {
+                    const w = c.widget as { widgetId?: string; type?: string };
+                    const type = w?.type ?? '';
+                    return w?.widgetId === wid &&
+                        (type === 'form' || type === 'sublist' || type === 'multiselect' || type === 'table');
+                });
+                return found?.widget ?? null;
+            })
+            .filter((w): w is NonNullable<typeof w> => w !== null);
+
+        if (targetWidgets.length === 0) {
+            toast.warning('연결된 컨텐츠 위젯이 없습니다.');
+            return;
+        }
+
+        /* 유효성 검사 — form */
+        const popupAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
+        const popupAllKeyToId: Record<string, string> = {};
+        for (const w of targetWidgets) {
+            if ((w as { type?: string }).type !== 'form') continue;
+            const fw = w as unknown as import('../builder/FormBuilder').FormWidget;
+            (fw?.fields ?? []).forEach(f => {
+                if (!f.fieldKey) return;
+                popupAllKeyToId[f.fieldKey] = f.id;
+                if (fw.contentKey) popupAllKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
+            });
+        }
+        for (const w of targetWidgets) {
+            if ((w as { type?: string }).type !== 'form') continue;
+            const fw = w as { fields?: FormFieldItem[]; widgetId?: string };
+            const fwId = (fw as { widgetId?: string })?.widgetId ?? '';
+            if (!validateFormFields(
+                fw?.fields as FormFieldItem[] ?? [],
+                popupFormValuesMap[fwId] ?? {},
+                popupFileValuesMap[fwId] ?? {},
+                popupExistingMetaMap[fwId] ?? {},
+                popupAllFormValues,
+                popupAllKeyToId,
+            )) return;
+        }
+
+        /* 유효성 검사 — sublist */
+        const sublistWidgets = targetWidgets.filter(w => (w as { type?: string }).type === 'sublist') as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('./types').SubListColumn[] }>;
+        if (!validateSubListRows(sublistWidgets, popupSubListRowsMap, popupSubListFileMap)) return;
+
+        /* 유효성 검사 — multiselect */
+        for (const w of targetWidgets) {
+            if ((w as { type?: string }).type !== 'multiselect') continue;
+            const mw = w as { widgetId?: string; required?: boolean; title?: string };
+            if (!mw.required) continue;
+            if ((popupMultiSelectValuesMap[mw.widgetId ?? ''] ?? []).length === 0) {
+                toast.warning(`'${mw.title || '다중선택'}' 항목은 필수 선택입니다.`);
+                return;
+            }
+        }
+
+        setPopupSaving(true);
+        try {
+            const newIds: number[] = [];
+
+            /* 1단계: form 파일 업로드 */
+            const formFileIdsMap: Record<string, Record<string, number[]>> = {};
+            for (const w of targetWidgets) {
+                if ((w as { type?: string }).type !== 'form') continue;
+                const fw = w as { fields?: FormFieldItem[]; widgetId?: string };
+                const fwId = (fw as { widgetId?: string })?.widgetId ?? '';
+                const fwFields = fw?.fields as FormFieldItem[] ?? [];
+                formFileIdsMap[fwId] = {};
+                for (const f of fwFields) {
+                    if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+                    const existing = (popupExistingMetaMap[fwId]?.[f.id] ?? []).map(m => m.id);
+                    const newFiles = popupFileValuesMap[fwId]?.[f.id] ?? [];
+                    const uploadedIds = newFiles.length ? await uploadFiles(newFiles, dataSaveSlug, f.fieldKey || f.label || '') : [];
+                    newIds.push(...uploadedIds);
+                    formFileIdsMap[fwId][f.id] = [...existing, ...uploadedIds];
+                }
+            }
+
+            /* 2단계: sublist rows 처리 */
+            const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
+            for (const w of targetWidgets) {
+                if ((w as { type?: string }).type !== 'sublist') continue;
+                const sw = w as { widgetId?: string; columns?: { id: string; key: string; type: string }[] };
+                const wid = sw.widgetId ?? '';
+                const processedRows: Record<string, unknown>[] = [];
+                for (const row of (popupSubListRowsMap[wid] ?? [])) {
+                    const { _rowId, ...rest } = row;
+                    const processedRow: Record<string, unknown> = { ...rest };
+                    for (const col of (sw.columns ?? [])) {
+                        if (!['file', 'image'].includes(col.type)) continue;
+                        const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
+                        const newFiles = popupSubListFileMap[wid]?.[_rowId]?.[col.id] ?? [];
+                        const uploadedIds = newFiles.length ? await uploadFiles(newFiles, dataSaveSlug, col.key) : [];
+                        newIds.push(...uploadedIds);
+                        processedRow[col.key] = [...existingIds, ...uploadedIds];
+                    }
+                    processedRows.push(processedRow);
+                }
+                processedSubListRowsMap[wid] = processedRows;
+            }
+
+            /* 3단계: multiselect map 구성 */
+            const multiSelectMap: Record<string, number[]> = {};
+            for (const w of targetWidgets) {
+                if ((w as { type?: string }).type !== 'multiselect') continue;
+                const mw = w as { widgetId?: string };
+                multiSelectMap[mw.widgetId ?? ''] = popupMultiSelectValuesMap[mw.widgetId ?? ''] ?? [];
+            }
+
+            /* 4단계: dataJson 구성 — table 선택 행 포함 */
+            const { dataJson, pkKeys } = buildDataJson(
+                targetWidgets as Parameters<typeof buildDataJson>[0],
+                popupFormValuesMap,
+                formFileIdsMap,
+                processedSubListRowsMap,
+                multiSelectMap,
+                popupTableSelectedRowsMap,
+            );
+
+            /* 5단계: dataSaveSlug에 POST */
+            const saveRes = await api.post(`/page-data/${dataSaveSlug}`, {
+                dataJson,
+                ...(pkKeys.length > 0 && { pkKeys }),
+                ...(pageSlug && { templateSlug: pageSlug }),
+            });
+
+            /* 6단계: 업로드 파일 연결 */
+            if (newIds.length > 0 && saveRes.data.id) {
+                await api.patch('/page-files/link', { fileIds: newIds, dataId: saveRes.data.id });
+            }
+
+            toast.success('저장되었습니다.');
+            onRefresh?.();
+            handlePopupClose();
+        } catch {
+            toast.error('저장 중 오류가 발생했습니다.');
+        } finally {
+            setPopupSaving(false);
+        }
+    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, pageSlug, onRefresh, router]);
+
     /* ══════════════════════════════════════════ */
     /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
     /* ══════════════════════════════════════════ */
@@ -777,11 +1035,17 @@ export function WidgetRenderer({
                             }))
                         }
                         onContentAction={popupSaving ? undefined : handlePopupContentAction}
+                        onDataSave={popupSaving ? undefined : handlePopupDataSave}
                         onClose={handlePopupClose}
                         /* 팝업 내 SubList rows */
                         subListRowsMap={popupSubListRowsMap}
                         onSubListRowsChange={(wid, rows) =>
                             setPopupSubListRowsMap(prev => ({ ...prev, [wid]: rows }))
+                        }
+                        /* 팝업 내 MultiSelect 선택 ID */
+                        multiSelectValuesMap={popupMultiSelectValuesMap}
+                        onMultiSelectChange={(wId, ids) =>
+                            setPopupMultiSelectValuesMap(prev => ({ ...prev, [wId]: ids }))
                         }
                         /* 파일 업로드 — widgetId별 구조 직접 전달 (page 모드와 동일) */
                         fileValuesMap={popupFileValuesMap}
@@ -817,6 +1081,14 @@ export function WidgetRenderer({
                                 },
                             }));
                         }}
+                        /* 팝업 내 테이블 */
+                        tableDataMap={popupTableDataMap}
+                        sortKeyMap={popupSortKeyMap}
+                        sortDirMap={popupSortDirMap}
+                        onSort={handlePopupSortChange}
+                        onPageChange={handlePopupPageChange}
+                        tableSelectedRowsMap={popupTableSelectedRowsMap}
+                        onTableRowsSelect={(wId, ids) => setPopupTableSelectedRowsMap(prev => ({ ...prev, [wId]: ids }))}
                     />
                 </PageGridContainer>
                 {/* 저장 중 표시 */}
@@ -887,8 +1159,45 @@ export function WidgetRenderer({
         const wrappedHandlers: TableActionHandlers = {
             onEdit: (row) => {
                 const actionsCol = widget.columns.find(c => c.cellType === 'actions');
+
+                /* editPageRules 방식 — 조건 매칭 후 connType에 따라 page 이동 or 팝업 오픈 */
+                if (actionsCol?.editPageRules?.length) {
+                    /* 1단계: conditionParam 있는 규칙 중 매칭 탐색
+                     * 2단계: 매칭 없으면 conditionParam 없는 규칙(기본 경로)으로 폴백 */
+                    const matched =
+                        actionsCol.editPageRules.find(rule => {
+                            if (!rule.conditionParam) return false;
+                            const eqIdx = rule.conditionParam.indexOf('=');
+                            if (eqIdx === -1) return false;
+                            const key = rule.conditionParam.slice(0, eqIdx);
+                            const val = rule.conditionParam.slice(eqIdx + 1);
+                            return String(row[key] ?? '') === val;
+                        })
+                        ?? actionsCol.editPageRules.find(rule => !rule.conditionParam);
+                    if (matched?.pageSlug) {
+                        if ((matched.connType ?? 'popup') === 'popup') {
+                            /* popup: handleInternalPopupOpen — outputMode에 따라 자동 분기 */
+                            const initialValues = matched.passParam
+                                ? parseActionParams(matched.passParam, row)
+                                : undefined;
+                            handleInternalPopupOpen(matched.pageSlug, row._id as number, dataSlug, initialValues, row._groupId as string | null);
+                        } else {
+                            /* page: 직접 router.push — handleInternalPopupOpen 미경유 */
+                            const params = new URLSearchParams();
+                            if (row._id != null) params.set('id', String(row._id));
+                            if (matched.passParam) {
+                                Object.entries(parseActionParams(matched.passParam, row))
+                                    .forEach(([k, v]) => params.set(k, v));
+                            }
+                            const qs = params.toString() ? `?${params.toString()}` : '';
+                            router.push(`/admin/widgetSub/${matched.pageSlug}${qs}`);
+                        }
+                        return;
+                    }
+                }
+
+                /* 기존 editPopupSlug 방식 — 하위 호환 */
                 const slug = actionsCol?.editPopupSlug;
-                /* _groupId: 다중 slug 저장 row — group_id 파라미터로 page 이동 */
                 if (slug) {
                     const initialValues = actionsCol?.editParams
                         ? parseActionParams(actionsCol.editParams, row)
@@ -940,6 +1249,9 @@ export function WidgetRenderer({
                     columns={widget.columns}
                     codeGroups={codeGroups}
                     handlers={wrappedHandlers}
+                    enableRowSelection={widget.enableRowSelection}
+                    selectedRowIds={selectedRowIds}
+                    onRowsSelect={onRowsSelect}
                     pageSize={widget.pageSize}
                     displayMode={widget.displayMode}
                     data={tableData}
@@ -1001,6 +1313,7 @@ export function WidgetRenderer({
                     showBorder={widget.showBorder}
                     bgColor={widget.bgColor}
                     onContentAction={onContentAction}
+                    onDataSave={mode === 'live' ? onDataSave : undefined}
                     onClose={onClose}
                     onPopupOpen={(slug, params) => handleInternalPopupOpen(slug, null, dataSlug, params ? parseActionParams(params, {}) : undefined)}
                     onExcelDownload={mode === 'live' ? handleExcelDownload : undefined}

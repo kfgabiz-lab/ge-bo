@@ -13,21 +13,24 @@
  *     onRequestLayerTemplates={loadLayerTemplates} />
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
-import { TemplateItem } from '../../../types';
+import { TemplateItem, EditPageRule } from '../../../types';
 import { createIdGenerator, getTemplateLabel } from '../../../utils';
 import { ColEditProps, CUSTOM_ACTION_COLORS } from './col-types';
 
 /* 커스텀 액션 버튼 고유 ID 생성기 */
 const caUid = createIdGenerator('tb-ca');
 
+/* 수정 버튼 페이지 이동 규칙 고유 ID 생성기 */
+const epUid = createIdGenerator('tb-ep');
+
 /** 프리셋 액션 타입 */
-type PresetAction = 'edit' | 'detail' | 'delete';
+type PresetAction = 'edit' | 'delete';
 
 /** 프리셋 액션 한국어 라벨 */
 const ACTION_LABELS: Record<PresetAction, string> = {
-    edit: '수정', detail: '상세', delete: '삭제',
+    edit: '수정', delete: '삭제',
 };
 
 interface ActionsFieldProps extends ColEditProps {
@@ -39,75 +42,108 @@ interface ActionsFieldProps extends ColEditProps {
 export function ActionsField({ values, onChange, layerTemplates, onRequestLayerTemplates }: ActionsFieldProps) {
     const presetActions = values.actions ?? [];
     const customActions = values.customActions ?? [];
+    const editPageRules = values.editPageRules ?? [];
 
     /* 프리셋 액션 토글 */
     const toggleAction = (action: PresetAction, checked: boolean) =>
         onChange({ actions: checked ? [...presetActions, action] : presetActions.filter(a => a !== action) });
 
+    /* 기존 editPopupSlug → editPageRules 1회성 마이그레이션 */
+    useEffect(() => {
+        if (!editPageRules.length && values.editPopupSlug) {
+            onChange({
+                editPageRules: [{ id: epUid(), connType: 'popup', pageSlug: values.editPopupSlug, conditionParam: '', passParam: values.editParams ?? '' }],
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    /* 수정 페이지 이동 규칙 추가 */
+    const addEditPageRule = () =>
+        onChange({ editPageRules: [...editPageRules, { id: epUid(), connType: 'page', pageSlug: '', conditionParam: '', passParam: '' }] });
+
+    /* 수정 페이지 이동 규칙 업데이트 */
+    const updateEditPageRule = (id: string, patch: Partial<EditPageRule>) =>
+        onChange({ editPageRules: editPageRules.map(r => r.id === id ? { ...r, ...patch } : r) });
+
+    /* 수정 페이지 이동 규칙 삭제 */
+    const removeEditPageRule = (id: string) =>
+        onChange({ editPageRules: editPageRules.filter(r => r.id !== id) });
+
     return (
         <div className="space-y-1.5 pt-1 border-t border-slate-100" onClick={onRequestLayerTemplates}>
             <span className="text-[10px] font-semibold text-slate-400 uppercase">액션 버튼</span>
 
-            {/* 프리셋 체크박스 + 팝업/경로 연결 (수정·상세만) */}
-            {(['edit', 'detail', 'delete'] as const).map(action => (
+            {/* 프리셋 체크박스 — edit / delete */}
+            {(['edit', 'delete'] as const).map(action => (
                 <div key={action} className="space-y-1">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={presetActions.includes(action)}
-                            onChange={e => toggleAction(action, e.target.checked)}
-                            className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900"
-                        />
-                        <span className="text-[11px] text-slate-600">{ACTION_LABELS[action]}</span>
-                    </label>
-                    {/* 삭제 제외, 체크된 경우에만 팝업/경로 연결 UI 표시 */}
-                    {action !== 'delete' && presetActions.includes(action) && (
-                        <div className="ml-5 space-y-1">
-                            {/* 관리자방식 팝업: LAYER 템플릿 slug 선택 */}
-                            <select
-                                value={action === 'edit' ? (values.editPopupSlug ?? '') : (values.detailPopupSlug ?? '')}
-                                onChange={e => onChange(action === 'edit'
-                                    ? { editPopupSlug: e.target.value || undefined }
-                                    : { detailPopupSlug: e.target.value || undefined }
-                                )}
-                                className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-slate-900">
-                                <option value="">팝업 없음</option>
-                                {layerTemplates.map(t => <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>)}
-                            </select>
-                            {/* 개발자방식 경로: 로컬 컴포넌트명 직접 입력 */}
+                    {/* 수정: 라벨 옆에 + 추가 버튼 */}
+                    <div className="flex items-center gap-1">
+                        <label className="flex items-center gap-2 cursor-pointer flex-1">
                             <input
-                                type="text"
-                                value={action === 'edit' ? (values.editFileLayerSlug ?? '') : (values.detailFileLayerSlug ?? '')}
-                                onChange={e => onChange(action === 'edit'
-                                    ? { editFileLayerSlug: e.target.value || undefined }
-                                    : { detailFileLayerSlug: e.target.value || undefined }
-                                )}
-                                placeholder="연결 경로 (예: LayerPopup)"
-                                className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
+                                type="checkbox"
+                                checked={presetActions.includes(action)}
+                                onChange={e => toggleAction(action, e.target.checked)}
+                                className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900"
                             />
-                            {/* 파라미터 입력 — 연결(팝업 또는 경로)이 설정된 경우에만 표시 */}
-                            {(action === 'edit'
-                                ? (values.editPopupSlug || values.editFileLayerSlug)
-                                : (values.detailPopupSlug || values.detailFileLayerSlug)
-                            ) && (
-                                <div className="space-y-0.5">
-                                    <input
-                                        type="text"
-                                        value={action === 'edit' ? (values.editParams ?? '') : (values.detailParams ?? '')}
-                                        onChange={e => onChange(action === 'edit'
-                                            ? { editParams: e.target.value || undefined }
-                                            : { detailParams: e.target.value || undefined }
-                                        )}
-                                        placeholder="파라미터 (예: title,temp1=1,temp2=abc)"
-                                        className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
-                                    />
-                                    <p className="text-[9px] text-slate-400 px-0.5">
-                                        쉼표 구분 · =없으면 row 필드값 · =있으면 고정값
-                                    </p>
-                                </div>
-                            )}
+                            <span className="text-[11px] text-slate-600">{ACTION_LABELS[action]}</span>
+                        </label>
+                        {action === 'edit' && presetActions.includes('edit') && (
+                            <button
+                                onClick={e => { e.stopPropagation(); addEditPageRule(); }}
+                                className="text-slate-400 hover:text-slate-600 transition-all"
+                                title="페이지 이동 규칙 추가"
+                            >
+                                <Plus className="w-3 h-3" />
+                            </button>
+                        )}
+                    </div>
+                    {/* 수정 체크 시 페이지 이동 규칙 목록 */}
+                    {action === 'edit' && presetActions.includes('edit') && editPageRules.map(rule => (
+                        <div key={rule.id} className="ml-5 space-y-1">
+                            {/* 1행: connType select + 페이지 슬러그 select + 이동 파라미터 input */}
+                            <div className="flex items-center gap-1">
+                                <select
+                                    value={rule.connType ?? 'page'}
+                                    onChange={e => updateEditPageRule(rule.id, { connType: e.target.value as 'page' | 'popup' })}
+                                    className="w-14 shrink-0 text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-slate-900">
+                                    <option value="page">페이지</option>
+                                    <option value="popup">팝업</option>
+                                </select>
+                                <select
+                                    value={rule.pageSlug}
+                                    onChange={e => updateEditPageRule(rule.id, { pageSlug: e.target.value })}
+                                    className="flex-1 min-w-0 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-slate-900">
+                                    <option value="">슬러그 없음</option>
+                                    {layerTemplates.map(t => <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>)}
+                                </select>
+                                <input
+                                    type="text"
+                                    value={rule.conditionParam}
+                                    onChange={e => updateEditPageRule(rule.id, { conditionParam: e.target.value })}
+                                    placeholder="이동조건 (예: title=1)"
+                                    className="w-20 shrink-0 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
+                                />
+                            </div>
+                            {/* 2행: 전달 파라미터 input + x 버튼 */}
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="text"
+                                    value={rule.passParam}
+                                    onChange={e => updateEditPageRule(rule.id, { passParam: e.target.value })}
+                                    placeholder="전달 파라미터 (예: id,title=abc)"
+                                    className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
+                                />
+                                <button
+                                    onClick={e => { e.stopPropagation(); removeEditPageRule(rule.id); }}
+                                    className="text-slate-300 hover:text-red-400 transition-all"
+                                    title="규칙 삭제"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
                         </div>
-                    )}
+                    ))}
                 </div>
             ))}
 

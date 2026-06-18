@@ -17,10 +17,11 @@
  */
 
 import React from 'react';
-import { Pencil, Eye, Trash2, Paperclip } from 'lucide-react';
+import { Pencil, Trash2, Paperclip } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
+import { resolveAccessor } from '../../utils';
 
 /* ────────────────────────────────────────────────────────── */
 /*  색상 정적 맵 (Tailwind purge 방지 — 동적 문자열 사용 금지) */
@@ -76,13 +77,7 @@ export function TableCellRenderer({
     const isPreview = mode === 'preview';
     const { t } = useI18n();
     /* dot notation accessor 지원 — "tab1.form1.title" 형태로 중첩 구조 접근 */
-    const value = col.accessor.includes('.')
-        ? col.accessor.split('.').reduce((acc: unknown, key) => {
-            if (acc && typeof acc === 'object' && !Array.isArray(acc))
-                return (acc as Record<string, unknown>)[key];
-            return undefined;
-        }, row as unknown)
-        : row[col.accessor];
+    const value = resolveAccessor(row, col.accessor);
 
     switch (col.cellType) {
 
@@ -147,16 +142,7 @@ export function TableCellRenderer({
                             <Pencil className="w-3.5 h-3.5" />
                         </button>
                     )}
-                    {(col.actions || []).includes('detail') && (
-                        <button
-                            onClick={!isPreview ? () => handlers?.onDetail?.(row) : undefined}
-                            className="p-1.5 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-                            title="상세"
-                        >
-                            <Eye className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                    {(col.actions || []).includes('delete') && (
+{(col.actions || []).includes('delete') && (
                         <button
                             onClick={!isPreview ? () => handlers?.onDelete?.(row._id as number) : undefined}
                             className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
