@@ -280,6 +280,7 @@ const SAMPLE_TAB: TabWidget = {
         {
             id: 'tab1',
             label: '기본정보',
+            required: true,
             items: [
                 { widget: SAMPLE_FORM_SIMPLE, colSpan: 12, rowSpan: 9 },
                 { widget: SAMPLE_SPACE,       colSpan: 12, rowSpan: 2 },

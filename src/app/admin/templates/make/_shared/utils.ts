@@ -3,6 +3,7 @@
  * - list/page.tsx, layer/page.tsx에서 공유
  */
 import { toast } from 'sonner';
+import api from '@/lib/api';
 
 /**
  * "텍스트:값" 형식의 옵션 문자열 파싱
@@ -180,6 +181,95 @@ export const validateFormFields = (
     }
     return true;
 };
+
+/**
+ * SubList 위젯 필수 컬럼 유효성 검사
+ * - required 컬럼의 각 행 값을 검사
+ * - file/image: 기존 ID + 신규 파일 합산이 0이면 오류
+ * - 그 외: 빈 문자열이면 오류
+ * - 오류 발견 시 toast.warning 표시 후 false 반환
+ * @param widgets  SubList 위젯 배열 (type/widgetId/columns)
+ * @param rowsMap  widgetId → 행 배열 맵
+ * @param fileMap  widgetId → rowId → colId → 신규 File[] 맵
+ * @example if (!validateSubListRows(subListWidgets, subListRowsMap, subListFileMap)) return;
+ */
+export const validateSubListRows = (
+    widgets: Array<{
+        type: string;
+        widgetId?: string;
+        required?: boolean;
+        title?: string;
+        columns?: import('./components/renderer/types').SubListColumn[];
+    }>,
+    rowsMap: Record<string, { _rowId: string; [key: string]: unknown }[]>,
+    fileMap: Record<string, Record<string, Record<string, File[]>>>,
+): boolean => {
+    for (const w of widgets) {
+        if (w.type !== 'sublist') continue;
+        const wid  = w.widgetId ?? '';
+        const rows = rowsMap[wid] ?? [];
+        const cols = w.columns ?? [];
+
+        /* 위젯 레벨 required — 행이 1개도 없으면 차단 */
+        if (w.required && rows.length === 0) {
+            toast.warning(`'${w.title || '서브리스트'}' 항목은 최소 1개 이상 입력해야 합니다.`);
+            return false;
+        }
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            for (const col of cols) {
+                if (!col.required) continue;
+                const label = col.label || col.key;
+                if (col.type === 'file' || col.type === 'image') {
+                    const existingCount = Array.isArray(row[col.key]) ? (row[col.key] as number[]).length : 0;
+                    const newCount      = fileMap[wid]?.[row._rowId]?.[col.id]?.length ?? 0;
+                    if (existingCount + newCount === 0) {
+                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
+                        return false;
+                    }
+                } else {
+                    const val = String(row[col.key] ?? '').trim();
+                    if (!val) {
+                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
+};
+
+/**
+ * 파일 배열을 page-files/upload 엔드포인트에 업로드하고 ID 배열 반환
+ * - Form 필드 / SubList 컬럼 파일 업로드에 공통 사용
+ * @param files        업로드할 파일 배열
+ * @param templateSlug 저장 slug
+ * @param fieldKey     필드/컬럼 키
+ * @returns 업로드된 page_file id 배열
+ * @example const ids = await uploadFiles(files, slug, col.key);
+ */
+export async function uploadFiles(
+    files: File[],
+    templateSlug: string,
+    fieldKey: string,
+): Promise<number[]> {
+    const ids: number[] = [];
+    for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('templateSlug', templateSlug);
+        fd.append('fieldKey', fieldKey);
+        const res = await api.post('/page-files/upload', fd, {
+            transformRequest: (data: FormData, headers: { delete?: (k: string) => void }) => {
+                if (headers?.delete) headers.delete('Content-Type');
+                return data;
+            },
+        });
+        ids.push(res.data.id as number);
+    }
+    return ids;
+}
 
 /**
  * API 응답 단일 item → 테이블 표시용 row 변환 (공통)

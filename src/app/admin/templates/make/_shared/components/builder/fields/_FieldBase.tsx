@@ -40,6 +40,8 @@ interface FieldBaseProps {
     compact?: boolean;
     /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
     hideColSpan?: boolean;
+    /** hideCondition/disableCondition 입력란 숨김 — SubList 등 동적 조건 미지원 컨텍스트 */
+    hideConditionFields?: boolean;
     /** 필수 항목 여부 — 모든 필드 공통 */
     required?: boolean;
     /** 라벨 하단 설명 텍스트 */
@@ -63,7 +65,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, required, description, descriptionMsgKey, isPk, readonly, hideCondition, disableCondition, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, hideCondition, disableCondition, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -232,8 +234,8 @@ export function FieldBase(props: FieldBaseProps) {
                 )}
             </div>
 
-            {/* 동적 HIDE 조건 | 동적 Disable 조건 — Form 모드에서만, 한 줄 2열 배치 */}
-            {isFormMode && (
+            {/* 동적 HIDE 조건 | 동적 Disable 조건 — Form 모드에서만, SubList 등 미지원 컨텍스트 제외 */}
+            {isFormMode && !hideConditionFields && (
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className={LABEL_CLS}>동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span></label>

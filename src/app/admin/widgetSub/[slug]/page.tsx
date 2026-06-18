@@ -12,7 +12,7 @@ import type { AnyWidget } from '@/app/admin/templates/make/_shared/components/re
 
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { validateFormFields, buildDataJson, buildTableRow } from '@/app/admin/templates/make/_shared/utils';
+import { validateFormFields, validateSubListRows, buildDataJson, buildTableRow, uploadFiles } from '@/app/admin/templates/make/_shared/utils';
 import { useCodeStore } from '@/store/use-code-store';
 import { usePageTitleStore } from '@/store/use-page-title-store';
 import { useI18n } from '@/hooks/use-i18n';
@@ -591,6 +591,22 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 if (!validateFormFields(fw.fields, formValuesMap[fw.widgetId] ?? {}, fileValuesMap[fw.widgetId] ?? {}, existingFileMetaMap[fw.widgetId] ?? {})) return;
             }
 
+            /* 0-1. 유효성 검사 — SubList 위젯 전체 */
+            const subListWidgetsForValidation = targetWidgets.filter(w => w.type === 'sublist');
+            if (!validateSubListRows(subListWidgetsForValidation, subListRowsMap, subListFileMap)) return;
+
+            /* 0-2. 유효성 검사 — MultiSelect 위젯 전체 */
+            for (const w of targetWidgets) {
+                if (w.type !== 'multiselect') continue;
+                const mw = w as MultiSelectWidget;
+                if (!mw.required) continue;
+                const ids = multiSelectValuesMap[mw.widgetId] ?? [];
+                if (ids.length === 0) {
+                    toast.warning(`'${mw.title || '다중선택'}' 항목은 필수 선택입니다.`);
+                    return;
+                }
+            }
+
             /* 다중 slug 저장 시 confirm */
             const slugGroups = Array.from(slugGroupsMap.entries());
             if (slugGroups.length > 1 && !isUpdate) {
@@ -614,16 +630,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     for (const [fieldId, files] of Object.entries(fileValuesMap[fw.widgetId] ?? {})) {
                         const field = fw.fields.find(f => f.id === fieldId);
                         if (!field?.fieldKey || !files.length) continue;
-                        const ids: number[] = [];
-                        for (const file of files) {
-                            const fd = new FormData();
-                            fd.append('file', file);
-                            fd.append('templateSlug', connectedSlug);
-                            fd.append('fieldKey', field.fieldKey);
-                            const uploadRes = await api.post('/page-files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-                            ids.push(uploadRes.data.id);
-                        }
-                        newFileIdsByFieldId[fieldId] = ids;
+                        newFileIdsByFieldId[fieldId] = await uploadFiles(files, connectedSlug, field.fieldKey);
                     }
                 }
 
@@ -639,19 +646,10 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                         for (const col of (sw.columns ?? [])) {
                             if (!['file', 'image'].includes(col.type)) continue;
                             const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
-                            const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
-                            const allIds = [...existingIds];
-                            for (const file of newFiles) {
-                                const fd = new FormData();
-                                fd.append('file', file);
-                                fd.append('templateSlug', connectedSlug);
-                                fd.append('fieldKey', col.key);
-                                const uploadRes = await api.post('/page-files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-                                const newId = uploadRes.data.id;
-                                allIds.push(newId);
-                                newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), newId];
-                            }
-                            processedRow[col.key] = allIds;
+                            const newFiles    = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
+                            const uploadedIds = newFiles.length ? await uploadFiles(newFiles, connectedSlug, col.key) : [];
+                            uploadedIds.forEach(id => { newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), id]; });
+                            processedRow[col.key] = [...existingIds, ...uploadedIds];
                         }
                         processedRows.push(processedRow);
                     }

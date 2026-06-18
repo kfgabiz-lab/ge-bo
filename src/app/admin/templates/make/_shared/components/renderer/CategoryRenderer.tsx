@@ -43,9 +43,10 @@ interface CategoryItem {
     name: string;
     depth: number;
     parentId: number | null;
-    sortOrder?: number;     // 정렬 순번 (낮을수록 위)
-    code?: string;          // 항목 코드 (예: A-001)
-    description?: string;   // 항목 설명
+    sortOrder?: number;                         // 정렬 순번 (낮을수록 위)
+    code?: string;                              // 항목 코드 (예: A-001)
+    description?: string;                       // 항목 설명
+    _dataJson?: Record<string, unknown>;        // 원본 dataJson 보관 (드래그 정렬 시 구조 유지용)
 }
 
 interface CategoryRendererProps {
@@ -169,6 +170,8 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                     sortOrder: item.dataJson.sortOrder != null ? Number(item.dataJson.sortOrder) : undefined,
                     code: readField(item.dataJson, codeKey) != null ? String(readField(item.dataJson, codeKey)) : undefined,
                     description: readField(item.dataJson, descKey) != null ? String(readField(item.dataJson, descKey)) : undefined,
+                    /* 원본 dataJson 보관 — 드래그 정렬 시 구조 유지용 */
+                    _dataJson: item.dataJson,
                 }))
                 /* sortOrder 기준 오름차순 정렬 — sortOrder 없는 항목은 뒤로 */
                 .sort((a, b) => {
@@ -329,14 +332,11 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
         try {
             await Promise.all(
                 changed.map(item => {
+                    /* 원본 dataJson 구조를 유지하고 최상위에 sortOrder만 추가/갱신 */
                     const dataJson: Record<string, unknown> = {
-                        name: item.name,
-                        depth: item.depth,
+                        ...(item._dataJson ?? {}),
                         sortOrder: item.sortOrder,
                     };
-                    if (item.parentId != null) dataJson.parentId = item.parentId;
-                    if (item.code != null) dataJson.code = item.code;
-                    if (item.description != null) dataJson.description = item.description;
                     return api.put(`/page-data/${widget.dbSlug}/${item.id}`, { dataJson });
                 })
             );

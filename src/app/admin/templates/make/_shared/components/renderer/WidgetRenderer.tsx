@@ -70,7 +70,7 @@ import type { FormFieldItem } from '../builder/FormBuilder';
 import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
-import { validateFormFields, buildDataJson } from '../../utils';
+import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles } from '../../utils';
 
 /**
  * Actions 컬럼 파라미터 문자열 → initialValues 변환
@@ -666,6 +666,10 @@ export function WidgetRenderer({
             )) return;
         }
 
+        /* 유효성 검사 — sublist 위젯별로 수행 */
+        const subWidgetsForValidation = saveSublistContents.map(c => c.widget) as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('./types').SubListColumn[] }>;
+        if (!validateSubListRows(subWidgetsForValidation, popupSubListRowsMap, popupSubListFileMap)) return;
+
         setPopupSaving(true);
         try {
             const newIds: number[] = [];
@@ -678,22 +682,12 @@ export function WidgetRenderer({
                 const fwFields = fw?.fields as FormFieldItem[] ?? [];
                 formFileIdsMap[fwId] = {};
                 for (const f of fwFields) {
-                    if (f.type !== 'file' && f.type !== 'image') continue;
-                    const existing = (popupExistingMetaMap[fwId]?.[f.id] ?? []).map(m => m.id);
-                    const newFiles = popupFileValuesMap[fwId]?.[f.id] ?? [];
-                    const allIds   = [...existing];
-                    for (const file of newFiles) {
-                        const fd = new FormData();
-                        fd.append('file', file);
-                        fd.append('templateSlug', popupListSlug);
-                        fd.append('fieldKey', f.fieldKey || f.label || '');
-                        const uploadRes = await api.post('/page-files/upload', fd, {
-                            transformRequest: (data, headers) => { if (headers) headers.delete('Content-Type'); return data; },
-                        });
-                        allIds.push(uploadRes.data.id);
-                        newIds.push(uploadRes.data.id);
-                    }
-                    formFileIdsMap[fwId][f.id] = allIds;
+                    if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+                    const existing    = (popupExistingMetaMap[fwId]?.[f.id] ?? []).map(m => m.id);
+                    const newFiles    = popupFileValuesMap[fwId]?.[f.id] ?? [];
+                    const uploadedIds = newFiles.length ? await uploadFiles(newFiles, popupListSlug, f.fieldKey || f.label || '') : [];
+                    newIds.push(...uploadedIds);
+                    formFileIdsMap[fwId][f.id] = [...existing, ...uploadedIds];
                 }
             }
 
@@ -710,19 +704,9 @@ export function WidgetRenderer({
                         if (!['file', 'image'].includes(col.type)) continue;
                         const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
                         const newFiles    = popupSubListFileMap[wid]?.[_rowId]?.[col.id] ?? [];
-                        const allIds      = [...existingIds];
-                        for (const file of newFiles) {
-                            const fd = new FormData();
-                            fd.append('file', file);
-                            fd.append('templateSlug', popupListSlug);
-                            fd.append('fieldKey', col.key);
-                            const uploadRes = await api.post('/page-files/upload', fd, {
-                                transformRequest: (data, headers) => { if (headers) headers.delete('Content-Type'); return data; },
-                            });
-                            allIds.push(uploadRes.data.id);
-                            newIds.push(uploadRes.data.id);
-                        }
-                        processedRow[col.key] = allIds;
+                        const uploadedIds = newFiles.length ? await uploadFiles(newFiles, popupListSlug, col.key) : [];
+                        newIds.push(...uploadedIds);
+                        processedRow[col.key] = [...existingIds, ...uploadedIds];
                     }
                     processedRows.push(processedRow);
                 }

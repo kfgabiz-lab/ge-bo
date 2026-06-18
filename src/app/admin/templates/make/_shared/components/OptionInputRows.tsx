@@ -27,18 +27,8 @@ interface OptionInputRowsProps {
  */
 export const OptionInputRows = ({ options, onChange, i18nMode = false, defaultValue, onDefaultChange }: OptionInputRowsProps) => (
     <div className="space-y-1.5">
-        {/* 기본값 열 헤더 — onDefaultChange가 있을 때만 표시 */}
-        {onDefaultChange && (
-            <div className="grid grid-cols-[1fr_auto_1fr_auto_auto] items-center gap-1">
-                <span className="text-[10px] text-slate-400">텍스트</span>
-                <span />
-                <span className="text-[10px] text-slate-400">값</span>
-                <span />
-                <span className="text-[10px] text-slate-400 text-center w-8">기본</span>
-            </div>
-        )}
         {options.map((opt, i) => (
-            <div key={i} className={`grid items-center gap-1 ${onDefaultChange ? 'grid-cols-[1fr_auto_1fr_auto_auto]' : 'grid-cols-[1fr_auto_1fr_auto]'}`}>
+            <div key={i} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-1">
                 {i18nMode ? (
                     <MessageKeySelector
                         value={opt.text}
@@ -70,18 +60,6 @@ export const OptionInputRows = ({ options, onChange, i18nMode = false, defaultVa
                 >
                     <X className="w-3 h-3" />
                 </button>
-                {/* 기본값 라디오버튼 — onDefaultChange가 있을 때만 표시 */}
-                {onDefaultChange && (
-                    <div className="flex justify-center w-8">
-                        <input
-                            type="radio"
-                            name="option-default"
-                            checked={defaultValue === opt.value}
-                            onChange={() => onDefaultChange(opt.value)}
-                            className="w-3.5 h-3.5 accent-slate-900 cursor-pointer"
-                        />
-                    </div>
-                )}
             </div>
         ))}
         {/* 옵션 추가 버튼 */}
@@ -91,6 +69,22 @@ export const OptionInputRows = ({ options, onChange, i18nMode = false, defaultVa
         >
             <Plus className="w-3 h-3" />옵션 추가
         </button>
+        {/* 기본값 선택 — onDefaultChange가 있을 때만 표시 */}
+        {onDefaultChange && (
+            <div className="space-y-0.5">
+                <label className="text-[10px] font-medium text-slate-500 block">기본값</label>
+                <select
+                    value={defaultValue ?? ''}
+                    onChange={e => onDefaultChange(e.target.value)}
+                    className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900"
+                >
+                    <option value="">없음</option>
+                    {options.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.text || opt.value}</option>
+                    ))}
+                </select>
+            </div>
+        )}
     </div>
 );
 

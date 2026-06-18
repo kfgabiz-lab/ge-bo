@@ -63,14 +63,45 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
         type: col.type as SearchFieldConfig['type'],
         label: '',
         colSpan: 1,
-        placeholder: col.placeholder,
+        /* 공통 */
+        placeholder:       col.placeholder,
         placeholderMsgKey: col.placeholderMsgKey,
-        options: col.options,
-        codeGroupCode: col.codeGroup,
-        required: col.required,
-        maxFileCount: col.maxFileCount ?? 1,
-        maxFileSizeMB: col.maxFileSizeMB,
-        fileTypeMode: col.fileTypeMode ?? (col.type === 'image' ? 'image' : 'doc'),
+        description:       col.description,
+        descriptionMsgKey: col.descriptionMsgKey,
+        required:          col.required,
+        readonly:          col.readonly,
+        /* 옵션 */
+        options:           col.options,
+        codeGroupCode:     col.codeGroup,
+        /* 파일 */
+        maxFileCount:      col.maxFileCount ?? 1,
+        maxFileSizeMB:     col.maxFileSizeMB,
+        maxTotalSizeMB:    col.maxTotalSizeMB,
+        fileTypeMode:      col.fileTypeMode ?? (col.type === 'image' ? 'image' : 'doc'),
+        allowedExtensions: col.allowedExtensions,
+        /* 유효성검사 */
+        minLength:         col.minLength,
+        maxLength:         col.maxLength,
+        showCharCount:     col.showCharCount,
+        pattern:           col.pattern,
+        patternDesc:       col.patternDesc,
+        /* 기본값 */
+        defaultValue:       col.defaultValue,
+        defaultValueMsgKey: col.defaultValueMsgKey,
+        defaultOptionValue: col.defaultOptionValue,
+        /* date */
+        defaultDateOffset:  col.defaultDateOffset,
+        defaultDate:        col.defaultDate,
+        disablePast:        col.disablePast,
+        /* dateRange */
+        label2:                  col.label2,
+        label2MsgKey:            col.label2MsgKey,
+        defaultStartDateOffset:  col.defaultStartDateOffset,
+        defaultStartDate:        col.defaultStartDate,
+        disableStartPast:        col.disableStartPast,
+        defaultEndDateOffset:    col.defaultEndDateOffset,
+        defaultEndDate:          col.defaultEndDate,
+        disableEndPast:          col.disableEndPast,
     } as SearchFieldConfig;
 }
 

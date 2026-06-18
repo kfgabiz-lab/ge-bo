@@ -17,7 +17,7 @@ import { ToggleRow } from './_ToggleRow';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
-export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
+export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
     return (
         <div className="space-y-1.5">
@@ -35,6 +35,7 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
+                hideConditionFields={hideConditionFields}
                 onChange={onChange}
             />
             {/* Placeholder */}

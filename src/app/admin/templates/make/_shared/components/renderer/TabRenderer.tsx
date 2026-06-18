@@ -22,6 +22,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { toast } from 'sonner';
 import { useI18n } from '@/hooks/use-i18n';
 import { fetchTemplateConfig } from "../../templateApi";
 import { PageGridRenderer } from "./PageGridRenderer";
@@ -47,23 +48,38 @@ export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
   const searchParams = useSearchParams();
 
   /**
-   * 탭들이 같은 slug를 사용할 때 공유하는 row id
-   * - 최초 저장(POST) 후 생성된 id를 저장 → 이후 탭은 해당 id로 GET+merge+PUT
-   * - slug별로 분리 관리: Record<slug, id>
-   * - widgetSub 수정 진입 시 URL ?id를 초기값으로 세팅
+   * 탭들이 같은 connectedSlug를 사용할 때 공유하는 row id
+   * - key: connectedSlug (pageSlug가 달라도 connectedSlug가 같으면 동일 row 공유)
+   * - 최초 저장(POST) 후 생성된 id를 저장 → 이후 탭은 해당 id로 PUT
+   * - 초기화 시 connectedSlug를 모르므로 urlId는 LiveTabPanel로 별도 전달
    */
-  const [sharedDataIdMap, setSharedDataIdMap] = useState<Record<string, number>>(() => {
-    const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
-    if (!urlId) return {};
-    const map: Record<string, number> = {};
-    tabs.forEach(tab => {
-      if (tab.pageSlug) map[tab.pageSlug] = urlId;
-    });
-    return map;
-  });
+  const [sharedDataIdMap, setSharedDataIdMap] = useState<Record<string, number>>({});
+  /* URL ?id — 수정 진입 시 초기 row id */
+  const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
 
-  /* 탭 클릭 시 해당 탭을 마운트 목록에 추가 */
+  /**
+   * 저장 완료된 탭 인덱스 집합
+   * - 수정 진입(urlId 있음): 첫 번째 탭(0)을 사전 포함 (이미 저장된 상태)
+   * - 신규 진입: 빈 Set → 첫 탭 저장 후 추가
+   */
+  const [savedTabSet, setSavedTabSet] = useState<Set<number>>(
+    () => new Set(urlId ? [0] : [])
+  );
+
+  /**
+   * 탭 클릭 이동 가드 (live 모드 한정)
+   * - 이동 대상 탭보다 앞에 required=true인 미저장 탭이 있으면 이동 차단
+   */
   function handleTabClick(idx: number) {
+    if (mode === 'live' && idx > 0) {
+      /* 0번 탭만 required 대상 — idx 0의 required가 true이고 미저장이면 차단 */
+      const firstTab = tabs[0];
+      if (firstTab?.required && !savedTabSet.has(0)) {
+        const tabLabel = firstTab.labelMsgKey ? t(firstTab.labelMsgKey) : (firstTab.label || '탭 1');
+        toast.warning(`'${tabLabel}' 탭을 먼저 저장해주세요.`);
+        return;
+      }
+    }
     setActiveIdx(idx);
     setMountedTabs((prev) => new Set([...prev, idx]));
   }
@@ -71,6 +87,11 @@ export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
   /** 탭 신규 저장 후 생성된 id를 slug별로 기록 */
   function handleDataIdCreated(slug: string, id: number) {
     setSharedDataIdMap((prev) => ({ ...prev, [slug]: id }));
+  }
+
+  /** 탭 저장 성공 시 해당 탭 인덱스를 savedTabSet에 추가 */
+  function handleTabSaved(tabIdx: number) {
+    setSavedTabSet((prev) => new Set([...prev, tabIdx]));
   }
 
   return (
@@ -101,9 +122,12 @@ export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
               (mode === "live" ? (
                 <LiveTabPanel
                   tab={tab}
+                  tabIdx={idx}
                   pageSlug={pageSlug}
-                  sharedDataId={tab.pageSlug ? (sharedDataIdMap[tab.pageSlug] ?? null) : null}
-                  onDataIdCreated={(id) => tab.pageSlug && handleDataIdCreated(tab.pageSlug, id)}
+                  sharedDataIdMap={sharedDataIdMap}
+                  urlId={urlId}
+                  onDataIdCreated={handleDataIdCreated}
+                  onSaved={handleTabSaved}
                 />
               ) : (
                 <PreviewTabPanel tab={tab} activeIdx={idx} />
@@ -158,12 +182,18 @@ function PreviewTabPanel({ tab, activeIdx }: PreviewTabPanelProps) {
 
 interface LiveTabPanelProps {
   tab: TabItem;
+  /** 이 탭의 인덱스 — savedTabSet 갱신 시 사용 */
+  tabIdx: number;
   /** 탭을 포함하는 상위 페이지 slug — 저장 시 templateSlug로 사용 */
   pageSlug?: string;
-  /** 같은 slug 탭들이 공유하는 row id (TabRenderer 레벨에서 관리) */
-  sharedDataId: number | null;
-  /** 신규 저장 후 생성된 id를 TabRenderer로 전달 */
-  onDataIdCreated: (id: number) => void;
+  /** connectedSlug → row id 매핑 (TabRenderer 레벨에서 관리) */
+  sharedDataIdMap: Record<string, number>;
+  /** URL ?id — 수정 진입 시 초기 row id */
+  urlId: number | null;
+  /** 신규 저장(POST) 후 connectedSlug와 생성된 id를 TabRenderer로 전달 */
+  onDataIdCreated: (connectedSlug: string, id: number) => void;
+  /** POST/PUT 저장 성공 시 탭 인덱스를 TabRenderer로 전달 — savedTabSet 갱신 */
+  onSaved: (tabIdx: number) => void;
 }
 
 /**
@@ -171,16 +201,39 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, pageSlug, sharedDataId, onDataIdCreated }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  /**
+   * 이 탭의 connectedSlug 목록(저장 위젯 기준)을 추출하여
+   * sharedDataIdMap에서 일치하는 id를 찾거나 urlId로 폴백
+   * - widgetItems 로드 전에는 urlId 반환 (수정 진입 시 초기값 보장)
+   */
+  const sharedDataId = useMemo(() => {
+    if (!widgetItems.length) return urlId;
+    const slugs = flatWidgets(widgetItems)
+      .map(w => {
+        if (w.type === 'form' || w.type === 'sublist' || w.type === 'multiselect') {
+          return (w as { connectedSlug?: string }).connectedSlug;
+        }
+        return undefined;
+      })
+      .filter((s): s is string => !!s);
+    /* sharedDataIdMap에 등록된 slug 우선, 없으면 urlId */
+    for (const slug of slugs) {
+      if (sharedDataIdMap[slug] !== undefined) return sharedDataIdMap[slug];
+    }
+    return urlId ?? null;
+  }, [widgetItems, sharedDataIdMap, urlId]);
+
   const { gridProps } = useWidgetPageState(widgetItems, pageSlug ?? tab.pageSlug, {
     contentKey: tab.contentKey,
     sharedDataId,
     onDataIdCreated,
+    onSaved: () => onSaved(tabIdx),
   });
 
   /* 팝업 저장에 사용할 dataSlug — widgetItems의 첫 번째 table 위젯 connectedSlug */

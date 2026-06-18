@@ -61,8 +61,10 @@ interface UseWidgetPageStateOptions {
    * 최초 저장(POST) 후 생성된 id → 이후 탭 저장 시 해당 row를 수정 모드로 처리
    */
   sharedDataId?: number | null;
-  /** 신규 저장(POST) 후 생성된 id를 상위(TabRenderer)로 전달 */
-  onDataIdCreated?: (id: number) => void;
+  /** 신규 저장(POST) 후 생성된 id와 connectedSlug를 상위(TabRenderer)로 전달 */
+  onDataIdCreated?: (connectedSlug: string, id: number) => void;
+  /** 저장 성공(POST/PUT 모두) 시 상위(TabRenderer)로 알림 — savedTabSet 갱신용 */
+  onSaved?: () => void;
 }
 
 export function useWidgetPageState(
@@ -746,9 +748,11 @@ export function useWidgetPageState(
             savedDataId = res.data.id;
             /* group_id가 새로 생성된 경우 상태에 저장 */
             if (groupId && !storedGroupId) setCurrentGroupId(groupId);
-            /* 탭 신규 저장 후 생성된 id를 TabRenderer로 전달 (sharedDataId 공유) */
-            options?.onDataIdCreated?.(savedDataId);
+            /* 탭 신규 저장 후 생성된 id와 connectedSlug를 TabRenderer로 전달 (sharedDataId 공유) */
+            options?.onDataIdCreated?.(connectedSlug, savedDataId);
           }
+          /* POST/PUT 모두 성공 시 저장 완료 알림 — savedTabSet 갱신용 */
+          options?.onSaved?.();
 
           /* 7. 업로드 파일 → page_data 레코드 연결 */
           const allNewIds = Object.values(newFileIdsByFieldId).flat();

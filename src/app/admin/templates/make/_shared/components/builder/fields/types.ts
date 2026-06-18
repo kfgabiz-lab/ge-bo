@@ -52,6 +52,7 @@ export interface FieldEditValues {
     contentAction?: 'save' | 'delete';    // 컨텐츠 연결 시 동작 (저장/삭제)
     goBackAfterAction?: boolean;          // 동작 완료 후 이전 페이지 이동 / 팝업 닫기
     excelTableWidgetId?: string;          // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
+    params?: string;                      // popup·path 연결 시 전달 파라미터 (예: depth=1,type=create)
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부
@@ -112,6 +113,8 @@ export interface FieldEditProps {
     compact?: boolean;
     /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
     hideColSpan?: boolean;
+    /** hideCondition/disableCondition 입력란 숨김 — SubList 등 동적 조건 미지원 컨텍스트 */
+    hideConditionFields?: boolean;
     /** 추가 모드: 라벨 input 키 핸들러 (Enter/Escape) */
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }

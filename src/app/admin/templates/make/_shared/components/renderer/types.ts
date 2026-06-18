@@ -145,7 +145,33 @@ export interface SubListColumn {
     codeGroup?: string;            // 공통코드 그룹 연결 (select 타입)
     maxFileCount?: number;         // file/image 타입 최대 파일 수 (기본 1)
     maxFileSizeMB?: number;        // file 타입 개당 최대 용량 (MB)
+    maxTotalSizeMB?: number;       // file 타입 전체 최대 용량 (MB)
     fileTypeMode?: string;         // file 타입 허용 파일 종류 ('doc'|'image'|'video'|'custom')
+    allowedExtensions?: string[];  // file 타입 커스텀 확장자 목록
+    readonly?: boolean;            // 읽기 전용 여부
+    /* ── 유효성검사 (input/textarea 공통) ── */
+    minLength?: number;
+    maxLength?: number;
+    showCharCount?: boolean;
+    pattern?: string;
+    patternDesc?: string;
+    /* ── 기본값 ── */
+    defaultValue?: string;         // input/textarea 기본 텍스트
+    defaultValueMsgKey?: string;   // input/textarea 다국어 기본값 키
+    defaultOptionValue?: string;   // select 기본 선택값
+    /* ── date 전용 ── */
+    defaultDateOffset?: number;    // 오늘 기준 N일 전 기본값
+    defaultDate?: string;          // 기본값 날짜 미리보기 (YYYY-MM-DD)
+    disablePast?: boolean;         // 오늘 이전 날짜 비활성화
+    /* ── dateRange 전용 ── */
+    label2?: string;               // 종료일 라벨
+    label2MsgKey?: string;         // 종료일 라벨 다국어 키
+    defaultStartDateOffset?: number;
+    defaultStartDate?: string;
+    disableStartPast?: boolean;
+    defaultEndDateOffset?: number;
+    defaultEndDate?: string;
+    disableEndPast?: boolean;
 }
 
 /**
@@ -163,6 +189,7 @@ export interface SubListWidget {
     addButtonLabel?: string;      // 추가 버튼 텍스트 (기본 '추가')
     addButtonLabelMsgKey?: string; // 추가 버튼 다국어 키
     maxRows?: number;             // 최대 행 수 (0 = 제한 없음)
+    required?: boolean;           // 필수 여부 (true: 행이 1개 이상 있어야 저장 가능)
     showBorder?: boolean;         // 테두리 표시 여부 (기본 true)
     columns: SubListColumn[];     // 컬럼 설정 목록
 }
@@ -191,6 +218,7 @@ export interface MultiSelectWidget {
     titleMsgKey?: string;         // 타이틀 다국어 키
     description?: string;
     descriptionMsgKey?: string;   // 설명 다국어 키
+    required?: boolean;           // 필수 여부 (true: 최소 1개 이상 선택해야 저장 가능)
     showBorder?: boolean;
     bgColor?: string;
 }
@@ -213,6 +241,11 @@ export interface TabItem {
      * 같은 slug를 쓰는 탭이 여러 개일 때 반드시 설정
      */
     contentKey?: string;
+    /**
+     * 저장 필수 여부 — true 시 이 탭을 저장하지 않으면 다음 탭으로 이동 불가
+     * 빌더에서 첫 번째 탭에만 설정 가능
+     */
+    required?: boolean;
     /** preview 모드에서 직접 렌더링할 위젯 아이템 목록 */
     items?: {
         colSpan: number;

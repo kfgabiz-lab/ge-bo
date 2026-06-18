@@ -27,7 +27,7 @@ const INPUT_DATE_READONLY_CLS = 'w-full border border-slate-200 rounded px-2 py-
 const DATE_WRAP_CLS = 'w-[calc(var(--spacing)*25)] overflow-hidden flex-shrink-0';
 const INPUT_NUM_CLS = 'w-10 border border-slate-200 rounded px-1 py-1.5 text-xs text-center bg-white focus:outline-none focus:border-slate-900';
 
-export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
+export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
     const startOffset = values.defaultStartDateOffset ?? 0;
     const endOffset   = values.defaultEndDateOffset   ?? 0;
     /* 0이 아닌 경우(양수=이전 날짜, 음수=이후 날짜) 자동계산 */
@@ -89,6 +89,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
+                hideConditionFields={hideConditionFields}
                 onChange={onChange}
             />
             {/* 시작일 기본값 | 비활성화 */}

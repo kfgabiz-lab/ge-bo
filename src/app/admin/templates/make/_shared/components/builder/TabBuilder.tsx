@@ -126,21 +126,45 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
               </div>
             </div>
 
-            {/* 연결 페이지 SELECT BOX */}
-            <div>
-              <label className={LABEL_CLS}>연결 페이지</label>
-              <select
-                value={tab.pageSlug ?? ""}
-                onChange={(e) => handleTabChange(idx, { pageSlug: e.target.value })}
-                className={INPUT_CLS}
-              >
-                <option value="">-- 연결 없음 --</option>
-                {pageTemplates.map((t) => (
-                  <option key={t.id} value={t.slug}>
-                    {t.name} ({t.slug})
-                  </option>
-                ))}
-              </select>
+            {/* 연결 페이지 + 필수여부 — 한 줄 배치 */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className={LABEL_CLS}>연결 페이지</label>
+                <select
+                  value={tab.pageSlug ?? ""}
+                  onChange={(e) => handleTabChange(idx, { pageSlug: e.target.value })}
+                  className={INPUT_CLS}
+                >
+                  <option value="">-- 연결 없음 --</option>
+                  {pageTemplates.map((t) => (
+                    <option key={t.id} value={t.slug}>
+                      {t.name} ({t.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 필수여부 — 첫 번째 탭에만 표시 */}
+              {idx === 0 && (
+                <div className="flex-shrink-0 pb-0.5">
+                  <label className={LABEL_CLS}>필수여부</label>
+                  <div className="flex items-center h-[30px]">
+                    <input
+                      type="checkbox"
+                      id={`tab-required-${tab.id}`}
+                      checked={tab.required ?? false}
+                      onChange={(e) => handleTabChange(idx, { required: e.target.checked })}
+                      className="w-3.5 h-3.5 accent-slate-800 cursor-pointer"
+                    />
+                    <label
+                      htmlFor={`tab-required-${tab.id}`}
+                      className="ml-1 text-[11px] text-slate-600 cursor-pointer select-none"
+                    >
+                      필수
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>

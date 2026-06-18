@@ -75,6 +75,8 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
     return {
         label:            col.label,
         labelMsgKey:      col.labelMsgKey,
+        label2:           col.label2,
+        label2MsgKey:     col.label2MsgKey,
         fieldKey:         col.key,
         colSpan:          1,
         rowSpan:          1,
@@ -83,11 +85,36 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         description:      col.description,
         descriptionMsgKey: col.descriptionMsgKey,
         required:         col.required,
+        readonly:         col.readonly,
         options:          col.options,
         codeGroupCode:    col.codeGroup,
+        /* 파일 */
         maxFileCount:     col.maxFileCount,
         maxFileSizeMB:    col.maxFileSizeMB,
+        maxTotalSizeMB:   col.maxTotalSizeMB,
         fileTypeMode:     col.fileTypeMode as FieldEditValues['fileTypeMode'],
+        allowedExtensions: col.allowedExtensions,
+        /* 유효성검사 */
+        minLength:        col.minLength,
+        maxLength:        col.maxLength,
+        showCharCount:    col.showCharCount,
+        pattern:          col.pattern,
+        patternDesc:      col.patternDesc,
+        /* 기본값 */
+        defaultValue:       col.defaultValue,
+        defaultValueMsgKey: col.defaultValueMsgKey,
+        defaultOptionValue: col.defaultOptionValue,
+        /* date */
+        defaultDateOffset: col.defaultDateOffset,
+        defaultDate:       col.defaultDate,
+        disablePast:       col.disablePast,
+        /* dateRange */
+        defaultStartDateOffset: col.defaultStartDateOffset,
+        defaultStartDate:       col.defaultStartDate,
+        disableStartPast:       col.disableStartPast,
+        defaultEndDateOffset:   col.defaultEndDateOffset,
+        defaultEndDate:         col.defaultEndDate,
+        disableEndPast:         col.disableEndPast,
     };
 }
 
@@ -100,17 +127,44 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     const patch: Partial<SubListColumn> = {};
     if (updates.label             !== undefined) patch.label             = updates.label;
     if (updates.labelMsgKey       !== undefined) patch.labelMsgKey       = updates.labelMsgKey;
+    if (updates.label2            !== undefined) patch.label2            = updates.label2;
+    if (updates.label2MsgKey      !== undefined) patch.label2MsgKey      = updates.label2MsgKey;
     if (updates.fieldKey          !== undefined) patch.key               = updates.fieldKey;
     if (updates.placeholder       !== undefined) patch.placeholder       = updates.placeholder;
     if (updates.placeholderMsgKey !== undefined) patch.placeholderMsgKey = updates.placeholderMsgKey;
     if (updates.description       !== undefined) patch.description       = updates.description;
     if (updates.descriptionMsgKey !== undefined) patch.descriptionMsgKey = updates.descriptionMsgKey;
     if (updates.required          !== undefined) patch.required          = updates.required;
+    if (updates.readonly          !== undefined) patch.readonly          = updates.readonly;
     if (updates.options           !== undefined) patch.options           = updates.options;
     if (updates.codeGroupCode     !== undefined) patch.codeGroup         = updates.codeGroupCode;
+    /* 파일 */
     if (updates.maxFileCount      !== undefined) patch.maxFileCount      = updates.maxFileCount;
     if (updates.maxFileSizeMB     !== undefined) patch.maxFileSizeMB     = updates.maxFileSizeMB;
+    if (updates.maxTotalSizeMB    !== undefined) patch.maxTotalSizeMB    = updates.maxTotalSizeMB;
     if (updates.fileTypeMode      !== undefined) patch.fileTypeMode      = updates.fileTypeMode;
+    if (updates.allowedExtensions !== undefined) patch.allowedExtensions = updates.allowedExtensions;
+    /* 유효성검사 */
+    if (updates.minLength         !== undefined) patch.minLength         = updates.minLength;
+    if (updates.maxLength         !== undefined) patch.maxLength         = updates.maxLength;
+    if (updates.showCharCount     !== undefined) patch.showCharCount     = updates.showCharCount;
+    if (updates.pattern           !== undefined) patch.pattern           = updates.pattern;
+    if (updates.patternDesc       !== undefined) patch.patternDesc       = updates.patternDesc;
+    /* 기본값 */
+    if (updates.defaultValue       !== undefined) patch.defaultValue       = updates.defaultValue;
+    if (updates.defaultValueMsgKey !== undefined) patch.defaultValueMsgKey = updates.defaultValueMsgKey;
+    if (updates.defaultOptionValue !== undefined) patch.defaultOptionValue = updates.defaultOptionValue;
+    /* date */
+    if (updates.defaultDateOffset  !== undefined) patch.defaultDateOffset  = updates.defaultDateOffset;
+    if (updates.defaultDate        !== undefined) patch.defaultDate        = updates.defaultDate;
+    if (updates.disablePast        !== undefined) patch.disablePast        = updates.disablePast;
+    /* dateRange */
+    if (updates.defaultStartDateOffset !== undefined) patch.defaultStartDateOffset = updates.defaultStartDateOffset;
+    if (updates.defaultStartDate       !== undefined) patch.defaultStartDate       = updates.defaultStartDate;
+    if (updates.disableStartPast       !== undefined) patch.disableStartPast       = updates.disableStartPast;
+    if (updates.defaultEndDateOffset   !== undefined) patch.defaultEndDateOffset   = updates.defaultEndDateOffset;
+    if (updates.defaultEndDate         !== undefined) patch.defaultEndDate         = updates.defaultEndDate;
+    if (updates.disableEndPast         !== undefined) patch.disableEndPast         = updates.disableEndPast;
     return patch;
 }
 
@@ -232,7 +286,8 @@ function ColumnEditPanel({
         colSpanMode: { type: 'input' as const, min: 1, max: 12 },
         codeGroups,
         codeGroupsLoading,
-        hideColSpan: true,  // SubList 컬럼은 colSpan 개념 없음 — ColSpan 입력란 숨김
+        hideColSpan: true,           // SubList 컬럼은 colSpan 개념 없음 — ColSpan 입력란 숨김
+        hideConditionFields: true,   // SubList 렌더러는 동적 조건 미지원 — HIDE/Disable 조건 입력란 숨김
     };
 
     return (

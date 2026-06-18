@@ -26,6 +26,9 @@ interface SizeSettingPanelProps {
     showI18nToggle?: boolean;
     onColSpanChange: (v: number) => void;
     onRowSpanChange: (v: number) => void;
+    /** 필수 여부 — 전달 시에만 표시 (sublist/multiselect 컨텐츠 전용) */
+    required?: boolean;
+    onRequiredChange?: (v: boolean) => void;
 }
 
 export function SizeSettingPanel({
@@ -36,6 +39,8 @@ export function SizeSettingPanel({
     showI18nToggle = false,
     onColSpanChange,
     onRowSpanChange,
+    required,
+    onRequiredChange,
 }: SizeSettingPanelProps) {
     const { i18nMode, toggleI18nMode } = useBuilderI18nMode();
 
@@ -69,6 +74,20 @@ export function SizeSettingPanel({
                     className="w-12 border border-slate-200 rounded px-1.5 py-1 text-xs text-center focus:outline-none focus:border-slate-900 bg-white"
                 />
             </div>
+
+            {/* 필수 여부 — onRequiredChange 전달 시에만 표시 (sublist/multiselect 컨텐츠 전용) */}
+            {onRequiredChange && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className="text-[10px] text-slate-400">필수</span>
+                    <button
+                        type="button"
+                        onClick={() => onRequiredChange(!required)}
+                        className={`relative w-9 h-5 rounded-full transition-colors ${required ? 'bg-slate-900' : 'bg-slate-300'}`}
+                    >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${required ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                </div>
+            )}
 
             {/* 다국어 모드 토글 — showI18nToggle=true일 때만 표시 (위젯 레벨 전용) */}
             {showI18nToggle && (

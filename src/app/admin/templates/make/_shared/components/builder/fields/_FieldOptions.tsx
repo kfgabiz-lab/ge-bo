@@ -64,22 +64,20 @@ export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoa
                         value={codeGroupCode || ''}
                         onChange={(code, opts) => onChange({ codeGroupCode: code, options: opts })}
                     />
-                    {/* 코드 그룹 기본값 선택 — 코드 항목 목록 + 라디오버튼 */}
+                    {/* 코드 그룹 기본값 선택 — selectbox */}
                     {onDefaultOptionChange && options && options.length > 0 && (
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                             <label className="text-[10px] font-medium text-slate-500 block">기본값</label>
-                            {stringsToOpts(options).map(opt => (
-                                <div key={opt.value} className="flex items-center justify-between px-2 py-1 bg-slate-50 rounded">
-                                    <span className="text-xs text-slate-700">{opt.text}</span>
-                                    <input
-                                        type="radio"
-                                        name="code-option-default"
-                                        checked={defaultOptionValue === opt.value}
-                                        onChange={() => onDefaultOptionChange(opt.value)}
-                                        className="w-3.5 h-3.5 accent-slate-900 cursor-pointer"
-                                    />
-                                </div>
-                            ))}
+                            <select
+                                value={defaultOptionValue ?? ''}
+                                onChange={e => onDefaultOptionChange(e.target.value)}
+                                className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900"
+                            >
+                                <option value="">없음</option>
+                                {stringsToOpts(options).map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.text}</option>
+                                ))}
+                            </select>
                         </div>
                     )}
                 </>

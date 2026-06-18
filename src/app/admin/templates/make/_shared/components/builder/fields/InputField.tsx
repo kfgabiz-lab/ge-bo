@@ -16,7 +16,7 @@ import { ValidationSection } from '../../ValidationSection';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
-export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan }: FieldEditProps) {
+export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
 
     return (
@@ -36,6 +36,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
+                hideConditionFields={hideConditionFields}
                 onChange={onChange}
             />
             {/* Placeholder */}

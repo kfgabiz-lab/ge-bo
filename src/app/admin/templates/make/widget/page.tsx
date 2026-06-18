@@ -664,6 +664,10 @@ export default function PageBuilderPage() {
                                                                                             maxColSpan={item.colSpan}
                                                                                             onColSpanChange={v => updateContentSize(item.id, content.id, v, content.rowSpan)}
                                                                                             onRowSpanChange={v => updateContentSize(item.id, content.id, content.colSpan, v)}
+                                                                                            {...(content.widget.type === 'sublist' || content.widget.type === 'multiselect' ? {
+                                                                                                required: (content.widget as SubListWidget | MultiSelectWidget).required ?? false,
+                                                                                                onRequiredChange: (v: boolean) => updateContent(item.id, content.id, { ...content.widget, required: v } as Parameters<typeof updateContent>[2]),
+                                                                                            } : {})}
                                                                                         />
                                                                                         {/* 위젯 설정 (통합 디스패처 적용) */}
                                                                                         <div className="px-3 pb-2 pt-1">
