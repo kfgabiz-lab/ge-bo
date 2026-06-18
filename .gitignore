@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 로그 파일
+*.log
+*.txt
+fe_log.txt
+lint_results.txt
+
+# 백업 파일
+*.bak
+
+# 테스트 스크립트
+check_user.js
+
+# 에디터 설정
+.vscode/
