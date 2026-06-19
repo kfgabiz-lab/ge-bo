@@ -71,37 +71,7 @@ import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
 import type { PageTableData } from './PageGridRenderer';
-import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, buildTableRow } from '../../utils';
-
-/**
- * Actions 컬럼 파라미터 문자열 → initialValues 변환
- *
- * 형식: "title,temp1=1,temp2=abc" (쉼표 구분)
- *   - title     → { title: row['title'] }  (=없음: row의 해당 key 값 사용)
- *   - temp1=1   → { temp1: '1' }           (=있음: 고정값)
- *
- * @param paramStr  ActionsField에서 입력한 파라미터 문자열
- * @param row       현재 row 데이터
- * @returns         handleInternalPopupOpen에 전달할 initialValues
- */
-function parseActionParams(
-    paramStr: string,
-    row: Record<string, unknown>
-): Record<string, string> {
-    if (!paramStr) return {};
-    const result: Record<string, string> = {};
-    paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {
-        if (part.includes('=')) {
-            const eqIdx = part.indexOf('=');
-            const key   = part.slice(0, eqIdx).trim();
-            const val   = part.slice(eqIdx + 1).trim();
-            if (key) result[key] = val;
-        } else {
-            result[part] = String(row[part] ?? '');
-        }
-    });
-    return result;
-}
+import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, buildTableRow, parseActionParams } from '../../utils';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
@@ -384,6 +354,8 @@ export function WidgetRenderer({
     const [popupSortDirMap,         setPopupSortDirMap]         = useState<Record<string, 'asc' | 'desc'>>({});
     /* 팝업 내 테이블 행 선택 — widgetId → 선택된 행 ID 배열 */
     const [popupTableSelectedRowsMap, setPopupTableSelectedRowsMap] = useState<Record<string, number[]>>({});
+    /* paramSave extras — 폼에 없는 파라미터 임시 보관 (저장 버튼 클릭 시 dataJson에 병합) */
+    const [popupParamSaveExtras, setPopupParamSaveExtras] = useState<Record<string, unknown>>({});
 
     /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 ──
      * 최신 상태를 ref로 유지하고 _hiddenLogCallbacks에 콜백 등록 */
@@ -478,6 +450,7 @@ export function WidgetRenderer({
         setPopupSubListRowsMap({});
         setPopupMultiSelectValuesMap({});
         setPopupTableSelectedRowsMap({});
+        setPopupParamSaveExtras({});
     }, []);
 
     /**
@@ -494,6 +467,7 @@ export function WidgetRenderer({
         _listSlug?: string,
         initialValues?: Record<string, string>,
         groupId?: string | null,
+        paramSave?: boolean,
     ) => {
         if (mode !== 'live') return;
 
@@ -529,6 +503,7 @@ export function WidgetRenderer({
                 if (initialValues) {
                     Object.entries(initialValues).forEach(([k, v]) => params.set(k, v));
                 }
+                if (paramSave) params.set('_paramSave', 'true');
                 const qs = params.toString() ? `?${params.toString()}` : '';
                 router.push(`/admin/widgetSub/${slug}${qs}`);
                 return;
@@ -641,6 +616,41 @@ export function WidgetRenderer({
                     }));
                     setPopupImgBlobUrls(blobMap);
                 }
+            }
+
+            /* paramSave 처리 — 폼에 없는 initialValues를 extras에 보관 (저장 버튼 클릭 시 dataJson에 병합) */
+            if (paramSave && initialValues && Object.keys(initialValues).length > 0) {
+                type FormFieldMeta = { field: FormFieldItem; contentKey: string | undefined };
+                const allFormFieldMeta: FormFieldMeta[] = formContents.flatMap(c => {
+                    const fw = c.widget as { fields?: FormFieldItem[]; contentKey?: string };
+                    return (fw.fields ?? []).map(f => ({ field: f, contentKey: fw.contentKey || undefined }));
+                });
+
+                const extras: Record<string, unknown> = {};
+
+                Object.entries(initialValues).forEach(([key, value]) => {
+                    const dotIdx = key.indexOf('.');
+                    if (dotIdx !== -1) {
+                        /* contentKey.fieldKey 형식 */
+                        const contentKey = key.slice(0, dotIdx);
+                        const fieldKey   = key.slice(dotIdx + 1);
+                        const hasForm    = formContents.some(c => (c.widget as { contentKey?: string }).contentKey === contentKey);
+                        if (!hasForm) return; /* contentKey 폼 없음 → 무시 */
+                        const hasField   = allFormFieldMeta.some(
+                            m => m.contentKey === contentKey && (m.field.fieldKey || m.field.label) === fieldKey
+                        );
+                        if (!hasField) {
+                            if (!extras[contentKey]) extras[contentKey] = {};
+                            (extras[contentKey] as Record<string, string>)[fieldKey] = value;
+                        }
+                    } else {
+                        /* 단순 fieldKey */
+                        const hasField = allFormFieldMeta.some(m => (m.field.fieldKey || m.field.label) === key);
+                        if (!hasField) extras[key] = value;
+                    }
+                });
+
+                if (Object.keys(extras).length > 0) setPopupParamSaveExtras(extras);
             }
 
             setPopupCfg(cfg);
@@ -827,6 +837,18 @@ export function WidgetRenderer({
                 {},
             );
 
+            /* paramSave extras 병합 — 저장 시 폼에 없던 파라미터를 dataJson에 추가 */
+            if (Object.keys(popupParamSaveExtras).length > 0) {
+                Object.entries(popupParamSaveExtras).forEach(([key, val]) => {
+                    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+                        /* contentKey 섹션 — 기존 섹션에 병합 */
+                        dataJson[key] = { ...(dataJson[key] as Record<string, unknown> ?? {}), ...(val as Record<string, unknown>) };
+                    } else {
+                        dataJson[key] = val;
+                    }
+                });
+            }
+
             /* 4단계: page_data 저장 (신규 POST / 수정 PUT) */
             let savedId: number | null = null;
             if (popupEditId) {
@@ -853,7 +875,7 @@ export function WidgetRenderer({
         } finally {
             setPopupSaving(false);
         }
-    }, [popupListSlug, popupEditId, popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, handlePopupClose, onRefresh]);
+    }, [popupListSlug, popupEditId, popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupParamSaveExtras, handlePopupClose, onRefresh]);
 
     /**
      * 팝업 내 datasave 버튼 핸들러 — connType='datasave' 전용
@@ -1337,8 +1359,8 @@ export function WidgetRenderer({
                     widget={widget}
                     selectedParentId={selectedParentId}
                     onSelect={onCategorySelect}
-                    onPopupOpen={(slug, editId, listSlug, initialValues) =>
-                        handleInternalPopupOpen(slug, editId ?? null, listSlug, initialValues)
+                    onPopupOpen={(slug, editId, listSlug, initialValues, paramSave) =>
+                        handleInternalPopupOpen(slug, editId ?? null, listSlug, initialValues, null, paramSave)
                     }
                     refreshTick={categoryRefreshTick}
                 />

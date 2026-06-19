@@ -109,7 +109,7 @@ export function FieldBase(props: FieldBaseProps) {
                     <input
                         type="text"
                         value={fieldKey}
-                        onChange={e => onChange({ fieldKey: e.target.value.replace(/\./g, '_') })}
+                        onChange={e => onChange({ fieldKey: e.target.value })}
                         placeholder="예: userName, status..."
                         className={`${INPUT_CLS} font-mono`}
                     />

@@ -537,3 +537,42 @@ export function applySortChange(
         sd: dir ?? 'asc',
     };
 }
+
+/**
+ * 파라미터 문자열 파싱 — 쉼표 구분 + row 동적 주입
+ *
+ * 규칙:
+ *   - "key=value"  → 고정값
+ *   - "key"        → row[key] 조회 → 없으면 skip
+ *   - dot notation "content1.field2" → dot 이후 fieldKey(field2)로 row 조회 → 없으면 skip
+ *
+ * 사용법:
+ *   parseActionParams('depth=4,name', { name: '홍길동' })
+ *   // → { depth: '4', name: '홍길동' }
+ *
+ *   parseActionParams('content1.field1=aaa,content1.field2', { field2: '테스트' })
+ *   // → { 'content1.field1': 'aaa', 'content1.field2': '테스트' }
+ */
+export function parseActionParams(
+    paramStr: string | undefined,
+    row: Record<string, unknown> = {},
+): Record<string, string> {
+    if (!paramStr) return {};
+    const result: Record<string, string> = {};
+    paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {
+        if (part.includes('=')) {
+            /* 고정값 — key=value 형태 */
+            const eqIdx = part.indexOf('=');
+            const key   = part.slice(0, eqIdx).trim();
+            const val   = part.slice(eqIdx + 1).trim();
+            if (key) result[key] = val;
+        } else {
+            /* 동적 주입 — dot notation이면 마지막 세그먼트로 row 조회 */
+            const fieldKey = part.includes('.') ? part.slice(part.lastIndexOf('.') + 1) : part;
+            if (fieldKey in row) result[part] = String(row[fieldKey] ?? '');
+            /* row에 없으면 skip */
+        }
+    });
+    return result;
+}
+

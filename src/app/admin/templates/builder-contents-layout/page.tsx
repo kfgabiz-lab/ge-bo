@@ -83,6 +83,50 @@ const SAMPLE_SEARCH: SearchWidget = {
     ],
 };
 
+/** 검색폼 카테고리 버전 — category 타입 selectbox (maxDepth 3, 대분류/중분류/소분류) */
+const SAMPLE_SEARCH_CATEGORY: SearchWidget = {
+    type: 'search',
+    widgetId: 'guide-search-category',
+    contentKey: '',
+    rows: [
+        {
+            id: 'cr1', cols: 2,
+            fields: [
+                {
+                    id: 'cf1', type: 'category', label: '분류', colSpan: 1,
+                    maxDepth: 3,
+                    depthLabels: ['대분류', '중분류', '소분류'],
+                    dbSlug: '',
+                    depthValueFields: ['id', 'id', 'id'],
+                    depthTextFields: ['name', 'name', 'name'],
+                },
+                { id: 'cf2', type: 'input', label: '검색어', colSpan: 1, placeholder: '검색어를 입력하세요' },
+            ],
+        },
+        {
+            id: 'cr2', cols: 2,
+            fields: [
+                {
+                    id: 'cf3', type: 'category', label: '유형', colSpan: 1,
+                    maxDepth: 2,
+                    depthLabels: ['대분류', '소분류'],
+                    dbSlug: '',
+                    depthValueFields: ['id', 'id'],
+                    depthTextFields: ['name', 'name'],
+                },
+                {
+                    id: 'cf4', type: 'category', label: '단일 depth', colSpan: 1,
+                    maxDepth: 1,
+                    depthLabels: ['구분'],
+                    dbSlug: '',
+                    depthValueFields: ['id'],
+                    depthTextFields: ['name'],
+                },
+            ],
+        },
+    ],
+};
+
 /** 검색폼 심플 버전 — displayStyle: 'simple' (한 줄 인라인) */
 const SAMPLE_SEARCH_SIMPLE: SearchWidget = {
     type: 'search',
@@ -312,8 +356,9 @@ const SAMPLE_TAB: TabWidget = {
 /* 탭별 위젯 배열 — 순서대로 PageLayout 그리드에 배치됨 */
 const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: number }[]> = {
     search: [
-        { widget: SAMPLE_SEARCH,        colSpan: 12, rowSpan: 5 },
-        { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
+        { widget: SAMPLE_SEARCH,          colSpan: 12, rowSpan: 5 },
+        { widget: SAMPLE_SEARCH_SIMPLE,   colSpan: 12, rowSpan: 1 },
+        { widget: SAMPLE_SEARCH_CATEGORY, colSpan: 12, rowSpan: 3 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
     form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 23 }],

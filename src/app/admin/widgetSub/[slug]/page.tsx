@@ -87,6 +87,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     /* ── MultiSelect 위젯별 선택 ID 배열 ── */
     const [multiSelectValuesMap, setMultiSelectValuesMap] = useState<Record<string, number[]>>({});
+    /* ── urlParamSaveExtras — _paramSave=true 시 폼에 없는 URL 파라미터 임시 보관 (저장 시 dataJson에 병합) ── */
+    const [urlParamSaveExtras, setUrlParamSaveExtras] = useState<Record<string, unknown>>({});
     /** SubList 파일 — widgetId → rowId → colId → 새로 선택한 파일 목록 */
     const [subListFileMap, setSubListFileMap] = useState<Record<string, Record<string, Record<string, File[]>>>>({});
 
@@ -356,31 +358,74 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         console.log('[수정모드] queryId:', queryId, 'queryGroupId:', queryGroupId);
         console.log('[수정모드] formWidgets:', formWidgets.map(fw => ({ widgetId: fw.widgetId, connectedSlug: fw.connectedSlug, contentKey: fw.contentKey })));
 
-        /** id·group_id 제외한 URL 파라미터를 fieldKey 기준으로 폼 필드에 적용
-         * - 비동기 DB 복원 완료 후 호출해야 URL 파라미터가 DB 값 위에 덮어씌워짐
+        /**
+         * URL 파라미터를 폼 필드에 적용
+         * _paramSave=true이면 폼에 없는 파라미터를 urlParamSaveExtras에 보관 (저장 버튼 클릭 시 dataJson에 병합)
+         *
+         * 규칙:
+         *   - contentKey.fieldKey → contentKey 폼에 fieldKey 있으면 세팅, 없으면 extras에 보관
+         *   - fieldKey            → 전체 폼에 fieldKey 있으면 세팅, 없으면 extras에 보관 (루트)
          */
         const applyUrlParams = () => {
-            const SKIP_KEYS = new Set(['id', 'group_id']);
+            const SKIP_KEYS = new Set(['id', 'group_id', '_paramSave']);
+            const isParamSave = searchParams.get('_paramSave') === 'true';
+
             const urlOverrides: Record<string, Record<string, string>> = {};
-            formWidgets.forEach(fw => {
-                fw.fields.forEach(f => {
-                    const key = f.fieldKey || f.label || '';
-                    if (!key || SKIP_KEYS.has(key)) return;
-                    const urlVal = searchParams.get(key);
-                    if (urlVal !== null) {
-                        if (!urlOverrides[fw.widgetId]) urlOverrides[fw.widgetId] = {};
-                        urlOverrides[fw.widgetId][f.id] = urlVal;
+            const extras: Record<string, unknown> = {};
+
+            searchParams.forEach((value, key) => {
+                if (SKIP_KEYS.has(key)) return;
+
+                const dotIdx = key.indexOf('.');
+                if (dotIdx !== -1) {
+                    /* dot notation: contentKey.fieldKey */
+                    const contentKey = key.slice(0, dotIdx);
+                    const fieldKey   = key.slice(dotIdx + 1);
+                    const targetFw   = formWidgets.find(fw => fw.contentKey === contentKey);
+                    if (!targetFw) return; /* contentKey 폼 없음 → 무시 */
+
+                    const targetField = targetFw.fields.find(f => (f.fieldKey || f.label) === fieldKey);
+                    if (targetField) {
+                        if (!urlOverrides[targetFw.widgetId]) urlOverrides[targetFw.widgetId] = {};
+                        urlOverrides[targetFw.widgetId][targetField.id] = value;
+                    } else if (isParamSave) {
+                        /* 폼에 필드 없음 + paramSave → extras에 contentKey 섹션으로 보관 */
+                        if (!extras[contentKey]) extras[contentKey] = {};
+                        (extras[contentKey] as Record<string, string>)[fieldKey] = value;
                     }
-                });
+                } else {
+                    /* plain fieldKey — 전체 폼에서 탐색 */
+                    let found = false;
+                    formWidgets.forEach(fw => {
+                        const targetField = fw.fields.find(f => (f.fieldKey || f.label) === key);
+                        if (targetField) {
+                            found = true;
+                            if (!urlOverrides[fw.widgetId]) urlOverrides[fw.widgetId] = {};
+                            urlOverrides[fw.widgetId][targetField.id] = value;
+                        }
+                    });
+                    if (!found && isParamSave) {
+                        /* 전체 폼에 없음 + paramSave → extras 루트에 보관 */
+                        extras[key] = value;
+                    }
+                }
             });
-            if (Object.keys(urlOverrides).length === 0) return;
-            setFormValuesMap(prev => {
-                const next = { ...prev };
-                Object.entries(urlOverrides).forEach(([wId, vals]) => {
-                    next[wId] = { ...(next[wId] ?? {}), ...vals };
+
+            /* 폼 값 세팅 */
+            if (Object.keys(urlOverrides).length > 0) {
+                setFormValuesMap(prev => {
+                    const next = { ...prev };
+                    Object.entries(urlOverrides).forEach(([wId, vals]) => {
+                        next[wId] = { ...(next[wId] ?? {}), ...vals };
+                    });
+                    return next;
                 });
-                return next;
-            });
+            }
+
+            /* extras 보관 (저장 버튼 클릭 시 handleContentAction에서 dataJson에 병합) */
+            if (Object.keys(extras).length > 0) {
+                setUrlParamSaveExtras(extras);
+            }
         };
 
         if (queryGroupId) {
@@ -417,7 +462,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
             }
         } else {
-            /* 신규 모드 — 기본값만 처리, URL 파라미터는 applyUrlParams()에서 별도 적용 */
+            /* 신규 모드 — 기본값만 처리, URL 파라미터는 applyUrlParamsWithAutoSave()에서 별도 적용 */
             setCurrentGroupId(null);
             setMultiSelectValuesMap({});
             const initMap: Record<string, Record<string, string>> = {};
@@ -626,7 +671,9 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 : undefined;
 
             /* slug 그룹별 반복 저장 */
-            for (const [connectedSlug, widgets] of slugGroups) {
+            for (let groupIdx = 0; groupIdx < slugGroups.length; groupIdx++) {
+            const [connectedSlug, widgets] = slugGroups[groupIdx];
+            const isFirstSlugGroup = groupIdx === 0;
                 const newFileIdsByFieldId: Record<string, number[]> = {};
 
                 /* 1. 파일 업로드 */
@@ -689,6 +736,24 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     processedSubListRowsMap,
                     multiSelectMap,
                 );
+
+                /* urlParamSaveExtras 병합 — 저장 시 폼에 없던 파라미터를 dataJson에 추가 */
+                if (Object.keys(urlParamSaveExtras).length > 0) {
+                    Object.entries(urlParamSaveExtras).forEach(([key, val]) => {
+                        if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+                            /* contentKey 섹션 — 해당 contentKey를 가진 폼이 이 slug 그룹에 있을 때만 병합 */
+                            const hasContentKey = widgets.some(
+                                w => w.type === 'form' && (w as FormWidget).contentKey === key
+                            );
+                            if (hasContentKey) {
+                                dataJson[key] = { ...(dataJson[key] as Record<string, unknown> ?? {}), ...(val as Record<string, unknown>) };
+                            }
+                        } else if (isFirstSlugGroup) {
+                            /* 루트 레벨 — 첫 번째 slug 그룹에만 병합 */
+                            dataJson[key] = val as unknown;
+                        }
+                    });
+                }
 
                 /* 3. 저장 (생성 or 수정) */
                 let savedDataId: number;
@@ -789,7 +854,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 toast.error(action === 'save' ? '저장 중 오류가 발생했습니다.' : '삭제 중 오류가 발생했습니다.');
             }
         }
-    }, [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, imgBlobUrls, multiSelectValuesMap, router, searchParams, currentGroupId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, imgBlobUrls, multiSelectValuesMap, urlParamSaveExtras, router, searchParams, currentGroupId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
      * 데이터저장 버튼 핸들러 — connType='datasave' 전용

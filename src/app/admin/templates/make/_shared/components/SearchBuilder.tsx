@@ -27,9 +27,9 @@ import { SortableRowWrapper, SortableFieldWrapper, EmptyFieldDropZone } from './
 import api from '@/lib/api';
 import {
     InputField, SelectField, DateField, DateRangeField,
-    RadioField, CheckboxField, ButtonField,
+    RadioField, CheckboxField, ButtonField, CategoryField,
 } from './builder/fields';
-import type { FieldEditValues } from './builder/fields';
+import type { FieldEditValues, SlugOption } from './builder/fields';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의 — _shared/types.ts에서 import    */
@@ -62,6 +62,7 @@ const FIELD_TYPES: { type: SearchFieldType; label: string; desc: string; default
     { type: 'radio',          label: 'Radio',            desc: '라디오 단일선택',      defaultColSpan: 1 },
     { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',    defaultColSpan: 1 },
     { type: 'button',         label: 'Button',           desc: '선택 버튼',            defaultColSpan: 1 },
+    { type: 'category',       label: 'Category',         desc: '카테고리 계층 검색',   defaultColSpan: 1 },
 ];
 
 /** 옵션이 필요한 필드 타입 여부 */
@@ -115,6 +116,19 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
         api.get('/codes').then(res => {
             setCodeGroups(res.data || []);
         }).catch(() => {}).finally(() => setCodeGroupsLoading(false));
+    }, []);
+
+    /* ── 카테고리 슬러그 목록 (PAGE_DATA 타입) ── */
+    const [slugOptions, setSlugOptions]               = useState<SlugOption[]>([]);
+    const [slugOptionsLoading, setSlugOptionsLoading] = useState(false);
+
+    /* category 슬러그 로드 */
+    useEffect(() => {
+        setSlugOptionsLoading(true);
+        api.get('/slug-registry', { params: { type: 'PAGE_DATA', size: '200', sort: 'slug,asc' } })
+            .then(res => setSlugOptions(res.data?.content || []))
+            .catch(() => {})
+            .finally(() => setSlugOptionsLoading(false));
     }, []);
 
     /* ══════════════════════════════════════════ */
@@ -186,6 +200,15 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             options: [],
             codeGroupCode: undefined,
             multiSelect: false,
+            /* category 초기값 */
+            ...(type === 'category' && {
+                maxDepth: 1,
+                depthLabels: [],
+                depthLabelMsgKeys: [],
+                depthValueFields: [],
+                depthTextFields: [],
+                dbSlug: '',
+            }),
         });
     };
 
@@ -218,6 +241,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultDateOffset, defaultDate, disablePast,
             defaultStartDateOffset, defaultStartDate, disableStartPast,
             defaultEndDateOffset, defaultEndDate, disableEndPast,
+            dbSlug, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -255,6 +279,13 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultEndDateOffset: defaultEndDateOffset ?? undefined,
             defaultEndDate: defaultEndDate || undefined,
             disableEndPast: disableEndPast || undefined,
+            /* category 전용 */
+            dbSlug:            pendingType === 'category' ? (dbSlug || undefined) : undefined,
+            maxDepth:          pendingType === 'category' ? (maxDepth ?? 1) : undefined,
+            depthLabels:       pendingType === 'category' ? (depthLabels?.length ? depthLabels : undefined) : undefined,
+            depthLabelMsgKeys: pendingType === 'category' ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
+            depthValueFields:  pendingType === 'category' ? (depthValueFields?.length ? depthValueFields : undefined) : undefined,
+            depthTextFields:   pendingType === 'category' ? (depthTextFields?.length ? depthTextFields : undefined) : undefined,
         };
 
         onChange(rows.map(r =>
@@ -309,6 +340,15 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             case 'radio':          return <RadioField {...props} />;
             case 'checkbox':       return <CheckboxField {...props} />;
             case 'button':         return <ButtonField {...props} />;
+            case 'category':
+                /* slugOptions는 SearchBuilder 클로저에서 직접 참조 */
+                return (
+                    <CategoryField
+                        {...props}
+                        slugOptions={slugOptions}
+                        slugOptionsLoading={slugOptionsLoading}
+                    />
+                );
             default:               return null;
         }
     };
@@ -424,6 +464,13 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 defaultEndDateOffset:   field.defaultEndDateOffset,
                                                                                 defaultEndDate:         field.defaultEndDate,
                                                                                 disableEndPast:         field.disableEndPast,
+                                                                                /* category 전용 */
+                                                                                dbSlug:            field.dbSlug,
+                                                                                maxDepth:          field.maxDepth,
+                                                                                depthLabels:       field.depthLabels,
+                                                                                depthLabelMsgKeys: field.depthLabelMsgKeys,
+                                                                                depthValueFields:  field.depthValueFields,
+                                                                                depthTextFields:   field.depthTextFields,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

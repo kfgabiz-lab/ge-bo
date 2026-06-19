@@ -36,7 +36,7 @@ import { RendererContainer } from './RendererContainer';
 import type { CategoryWidget } from './types';
 import type { RendererMode } from './types';
 import { useI18n } from '@/hooks/use-i18n';
-import { resolveAccessor } from '../../utils';
+import { resolveAccessor, parseActionParams } from '../../utils';
 
 /** 카테고리 항목 하나 */
 interface CategoryItem {
@@ -62,7 +62,7 @@ interface CategoryRendererProps {
      * - popup: handleInternalPopupOpen(slug, editId, listSlug) 호출
      * - path: router.push(path) 는 CategoryRenderer 내부에서 직접 처리
      */
-    onPopupOpen?: (slug: string, editId?: number | null, listSlug?: string, initialValues?: Record<string, string>) => void;
+    onPopupOpen?: (slug: string, editId?: number | null, listSlug?: string, initialValues?: Record<string, string>, paramSave?: boolean) => void;
     /** 팝업 저장 완료 시 증가 — 값이 바뀔 때마다 목록 재조회 */
     refreshTick?: number;
 }
@@ -83,20 +83,6 @@ const PREVIEW_ITEMS: CategoryItem[] = [
     { id: 12, name: '항목 L', depth: 1, parentId: null, code: 'A-012', description: '열두 번째 항목에 대한 간단한 설명입니다.' },
 ];
 
-/**
- * 파라미터 문자열 파싱 유틸
- * @param params "depth=1&parentId=5" 형태의 문자열
- * @returns { depth: '1', parentId: '5' }
- */
-function parseParams(params?: string): Record<string, string> {
-    if (!params) return {};
-    return Object.fromEntries(
-        params.split('&')
-            .map(p => p.split('='))
-            .filter(([k]) => k.trim())
-            .map(([k, v]) => [k.trim(), (v ?? '').trim()])
-    );
-}
 
 export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onPopupOpen, refreshTick }: CategoryRendererProps) {
     const isPreview = mode === 'preview';
@@ -202,7 +188,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
         e.stopPropagation();
         if (isPreview) return;
         if (widget.detailConnType === 'popup' && widget.detailPopupSlug) {
-            const staticParams = parseParams(widget.detailParams);
+            const staticParams = parseActionParams(widget.detailParams, item._dataJson ?? {});
             onPopupOpen?.(widget.detailPopupSlug, item.id, widget.dbSlug, staticParams);
             return;
         }
@@ -345,7 +331,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 {/* 등록 버튼 — preview: 항상 표시 / live 인라인: 상위 선택 후 표시 / live popup·path: 항상 표시 */}
                 {(widget.allowCreate !== false) && (isPreview || !parentNotSelected || widget.createConnType === 'popup' || widget.createConnType === 'path') && (
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             if (isPreview) return;
                             /* 상위 카테고리 미선택 시 validation (depth 2 이상) */
                             if (parentNotSelected) {
@@ -354,12 +340,15 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                             }
                             /* 연결 타입에 따라 동작 분기 */
                             if (widget.createConnType === 'popup' && widget.createPopupSlug) {
-                                /* 정적 파라미터 + 동적 상위 ID 자동 주입 (depth 2 이상) */
-                                const staticParams = parseParams(widget.createParams);
+                                /* 파라미터 파싱 후 팝업/페이지 오픈, autoSave 플래그 전달 */
+                                const staticParams = parseActionParams(widget.createParams, {});
                                 const dynamicParams: Record<string, string> = selectedParentId != null ? { parentId: String(selectedParentId) } : {};
-                                onPopupOpen?.(widget.createPopupSlug, null, widget.dbSlug, { ...staticParams, ...dynamicParams });
+                                onPopupOpen?.(widget.createPopupSlug, null, widget.dbSlug, { ...staticParams, ...dynamicParams }, widget.createParamSave);
                             } else if (widget.createConnType === 'path' && widget.createPath) {
-                                const qs = widget.createParams ? `?${widget.createParams}` : '';
+                                /* parseActionParams로 파싱 후 URLSearchParams로 올바른 쿼리스트링 생성 */
+                                const parsed = parseActionParams(widget.createParams, {});
+                                if (widget.createParamSave) parsed['_paramSave'] = 'true';
+                                const qs = Object.keys(parsed).length > 0 ? `?${new URLSearchParams(parsed).toString()}` : '';
                                 router.push(`${widget.createPath}${qs}`);
                             } else {
                                 /* 연결 없음 — inline 입력창 표시 */
@@ -510,12 +499,16 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                             >
                                                 {(widget.allowEdit !== false) && (
                                                     <button
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             if (isPreview) return;
                                                             if (widget.editConnType === 'popup' && widget.editPopupSlug) {
-                                                                onPopupOpen?.(widget.editPopupSlug, item.id, widget.dbSlug, parseParams(widget.editParams));
+                                                                /* 팝업/페이지로 이동하며 파라미터를 initialValues로 전달, autoSave 플래그 전달 */
+                                                                onPopupOpen?.(widget.editPopupSlug, item.id, widget.dbSlug, parseActionParams(widget.editParams, item._dataJson ?? {}), widget.editParamSave);
                                                             } else if (widget.editConnType === 'path' && widget.editPath) {
-                                                                const qs = widget.editParams ? `&${widget.editParams}` : '';
+                                                                /* parseActionParams로 파싱 후 URLSearchParams로 올바른 쿼리스트링 생성 */
+                                                                const parsed = parseActionParams(widget.editParams, item._dataJson ?? {});
+                                                                if (widget.editParamSave) parsed['_paramSave'] = 'true';
+                                                                const qs = Object.keys(parsed).length > 0 ? `&${new URLSearchParams(parsed).toString()}` : '';
                                                                 router.push(`${widget.editPath}?id=${item.id}${qs}`);
                                                             } else {
                                                                 setEditId(item.id);

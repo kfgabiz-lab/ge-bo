@@ -31,6 +31,7 @@ export { ActionButtonField } from './ActionButtonField';
 export type { ActionButtonFieldProps } from './ActionButtonField';
 export { SlugSelectField } from './SlugSelectField';
 export type { SlugOption } from './SlugSelectField';
+export { CategoryField } from './CategoryField';
 export type { FieldEditProps, FieldEditValues, ColSpanMode } from './types';
 
 /* ── TableColumn 계열 ── */

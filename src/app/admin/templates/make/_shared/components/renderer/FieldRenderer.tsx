@@ -20,6 +20,7 @@
 import React, { useRef, useId } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { CategorySearchField } from './CategorySearchField';
 import dynamic from 'next/dynamic';
 import { Calendar, Paperclip, Film, Plus, X } from 'lucide-react';
 import { Image as ImageIcon } from 'lucide-react';
@@ -1481,6 +1482,18 @@ export function FieldRenderer({
                     value={value}
                     onChange={v => onChange?.(v)}
                     disabled={isDisabled}
+                />
+            );
+
+        /* ── category ── 카테고리 계층 검색 (CategorySearchField 컴포넌트에 위임) */
+        case 'category':
+            return (
+                <CategorySearchField
+                    mode={mode}
+                    field={field}
+                    value={value}
+                    onChange={onChange}
+                    isDisabled={isDisabled}
                 />
             );
 

@@ -88,8 +88,10 @@ export interface CategoryWidget {
     createPopupSlug?: string;
     /** 등록 연결 경로 (createConnType='path'일 때) */
     createPath?: string;
-    /** 등록 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (예: depth=1&parentId=5) */
+    /** 등록 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (쉼표 구분, 예: depth=4,name) */
     createParams?: string;
+    /** 등록: 파라미터를 전달받은 화면 저장 버튼 클릭 시 폼에 없는 파라미터도 함께 저장 */
+    createParamSave?: boolean;
     /** 항목 수정 허용 여부 (기본 true) */
     allowEdit?: boolean;
     /** 수정 버튼 연결 타입 ('popup'=페이지, 'path'=경로) — 미설정 시 inline 입력 */
@@ -98,8 +100,10 @@ export interface CategoryWidget {
     editPopupSlug?: string;
     /** 수정 연결 경로 (editConnType='path'일 때) */
     editPath?: string;
-    /** 수정 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (예: depth=1&parentId=5) */
+    /** 수정 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (쉼표 구분, 예: depth=4,name) */
     editParams?: string;
+    /** 수정: 파라미터를 전달받은 화면 저장 버튼 클릭 시 폼에 없는 파라미터도 함께 저장 */
+    editParamSave?: boolean;
     /** 상세 버튼 표시 여부 — 토글 ON 시 카드 hover에 상세 버튼 표시 */
     allowDetail?: boolean;
     /** 상세 버튼 연결 타입 ('popup'=페이지, 'path'=경로) */

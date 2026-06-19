@@ -16,7 +16,8 @@ export type SearchFieldType =
     | 'editor'          // 위지윅 에디터
     | 'hidden'          // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
     | 'color'           // 색상 선택 (Preset 원형 버튼)
-    | 'message-key-select'; // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
+    | 'message-key-select' // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
+    | 'category';       // 카테고리 계층 검색 (1~4 depth selectbox 연동)
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -93,6 +94,13 @@ export interface SearchFieldConfig {
     defaultEndDateOffset?: number;  // dateRange: 종료일 오늘 기준 N일 전
     defaultEndDate?: string;        // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
     disableEndPast?: boolean;       // dateRange: 종료일 이전 비활성화
+    /* ── category 전용 ── */
+    dbSlug?: string;                // 연결할 카테고리 slug (slugOptions 선택)
+    maxDepth?: 1 | 2 | 3 | 4;      // 표시할 최대 depth 수
+    depthLabels?: string[];         // depth별 라벨 배열 (예: ['대분류', '중분류', '소분류'])
+    depthLabelMsgKeys?: string[];   // depth별 라벨 다국어 키 배열
+    depthValueFields?: string[];    // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
+    depthTextFields?: string[];     // depth별 selectbox 표시 텍스트 경로 (예: 'name', 'dataJson.name')
 }
 
 /** 검색폼 행 설정 */

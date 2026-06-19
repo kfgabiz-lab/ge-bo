@@ -115,13 +115,13 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
                 )}
               </div>
               <div className="w-24">
-                <label className={LABEL_CLS}>key</label>
+                <label className={LABEL_CLS}>key <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   value={tab.contentKey ?? ""}
                   onChange={(e) => handleTabChange(idx, { contentKey: e.target.value || undefined })}
                   placeholder={`tab_${idx + 1}`}
-                  className={INPUT_CLS}
+                  className={`${INPUT_CLS} ${!tab.contentKey ? 'border-red-300' : ''}`}
                 />
               </div>
             </div>

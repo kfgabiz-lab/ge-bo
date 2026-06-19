@@ -19,6 +19,7 @@ import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { SlugSelectField } from './fields';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
+import { ParamWithSaveField } from './ParamWithSaveField';
 import type { CategoryWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 
@@ -222,18 +223,14 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                         </div>
                     )}
                 </div>
-                {/* 파라미터 — 연결 타입 설정 시만 표시 */}
+                {/* 파라미터 + 저장 체크박스 — 연결 타입 설정 시만 표시 */}
                 {widget.createConnType && (
-                    <div className="mt-1.5">
-                        <label className={LABEL_CLS}>파라미터</label>
-                        <input
-                            type="text"
-                            value={widget.createParams ?? ''}
-                            onChange={e => onChange({ ...widget, createParams: e.target.value || undefined })}
-                            placeholder="param1=1&param2=2"
-                            className={INPUT_CLS}
-                        />
-                    </div>
+                    <ParamWithSaveField
+                        paramsValue={widget.createParams}
+                        paramSaveValue={widget.createParamSave}
+                        onParamsChange={val => onChange({ ...widget, createParams: val })}
+                        onParamSaveChange={val => onChange({ ...widget, createParamSave: val })}
+                    />
                 )}
             </div>
 
@@ -286,18 +283,14 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                         </div>
                     )}
                 </div>
-                {/* 파라미터 — 연결 타입 설정 시만 표시 */}
+                {/* 파라미터 + 저장 체크박스 — 연결 타입 설정 시만 표시 */}
                 {widget.editConnType && (
-                    <div className="mt-1.5">
-                        <label className={LABEL_CLS}>파라미터</label>
-                        <input
-                            type="text"
-                            value={widget.editParams ?? ''}
-                            onChange={e => onChange({ ...widget, editParams: e.target.value || undefined })}
-                            placeholder="param1=1&param2=2"
-                            className={INPUT_CLS}
-                        />
-                    </div>
+                    <ParamWithSaveField
+                        paramsValue={widget.editParams}
+                        paramSaveValue={widget.editParamSave}
+                        onParamsChange={val => onChange({ ...widget, editParams: val })}
+                        onParamSaveChange={val => onChange({ ...widget, editParamSave: val })}
+                    />
                 )}
             </div>
 

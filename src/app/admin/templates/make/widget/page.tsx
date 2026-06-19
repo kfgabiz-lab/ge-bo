@@ -453,6 +453,16 @@ export default function PageBuilderPage() {
                 errors.push(`[Form:${label}] 중복 필드 Key: ${[...new Set(dupFieldKeys)].join(', ')}`);
         });
 
+        /* 4) Tab 위젯 탭별 contentKey 필수 검사 */
+        allContents.forEach(c => {
+            if (c.widget.type !== 'tab') return;
+            const tw = c.widget as import('../_shared/components/renderer/types').TabWidget;
+            tw.tabs.forEach((tab, idx) => {
+                if (!tab.contentKey?.trim())
+                    errors.push(`[Tab] 탭 ${idx + 1}: Key를 입력해주세요`);
+            });
+        });
+
         if (errors.length > 0) {
             toast.error(`저장 오류 (${errors.length}건): ${errors[0]}${errors.length > 1 ? ` 외 ${errors.length - 1}건` : ''}`);
             return false;
