@@ -32,6 +32,7 @@ export type { ActionButtonFieldProps } from './ActionButtonField';
 export { SlugSelectField } from './SlugSelectField';
 export type { SlugOption } from './SlugSelectField';
 export { CategoryField } from './CategoryField';
+export { DateRangeStatusSearchField } from './DateRangeStatusSearchField';
 export type { FieldEditProps, FieldEditValues, ColSpanMode } from './types';
 
 /* ── TableColumn 계열 ── */
@@ -40,5 +41,6 @@ export { BadgeOptionsField } from './BadgeOptionsField';
 export { TextCodeGroupField } from './TextCodeGroupField';
 export { BooleanTextField } from './BooleanTextField';
 export { ActionsField } from './ActionsField';
+export { DateRangeStatusColumnField } from './DateRangeStatusColumnField';
 export type { ColEditProps } from './col-types';
 export { CUSTOM_ACTION_COLORS, PRESET_COLORS } from './col-types';

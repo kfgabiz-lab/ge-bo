@@ -28,6 +28,7 @@ import api from '@/lib/api';
 import {
     InputField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField, CategoryField,
+    DateRangeStatusSearchField,
 } from './builder/fields';
 import type { FieldEditValues, SlugOption } from './builder/fields';
 
@@ -53,13 +54,14 @@ interface SearchBuilderProps {
 
 /** 필드 유형 메타 (list/page.tsx FIELD_TYPES와 동일) */
 const FIELD_TYPES: { type: SearchFieldType; label: string; desc: string; defaultColSpan: 1 | 2 }[] = [
-    { type: 'input',          label: 'Input',            desc: '텍스트 입력',          defaultColSpan: 1 },
-    { type: 'select',         label: 'Select',           desc: '셀렉트 박스',          defaultColSpan: 1 },
-    { type: 'date',           label: 'Date',             desc: '날짜 단독',            defaultColSpan: 1 },
-    { type: 'dateRange',      label: 'Date Range',       desc: '날짜 범위 (from~to)',  defaultColSpan: 2 },
-    { type: 'yearMonth',      label: 'Year Month',       desc: '년월 단독',            defaultColSpan: 1 },
-    { type: 'yearMonthRange', label: 'Year Month Range', desc: '년월 범위 (from~to)',  defaultColSpan: 2 },
-    { type: 'radio',          label: 'Radio',            desc: '라디오 단일선택',      defaultColSpan: 1 },
+    { type: 'input',            label: 'Input',            desc: '텍스트 입력',               defaultColSpan: 1 },
+    { type: 'select',           label: 'Select',           desc: '셀렉트 박스',               defaultColSpan: 1 },
+    { type: 'date',             label: 'Date',             desc: '날짜 단독',                 defaultColSpan: 1 },
+    { type: 'dateRange',        label: 'Date Range',       desc: '날짜 범위 (from~to)',       defaultColSpan: 2 },
+    { type: 'yearMonth',        label: 'Year Month',       desc: '년월 단독',                 defaultColSpan: 1 },
+    { type: 'yearMonthRange',   label: 'Year Month Range', desc: '년월 범위 (from~to)',       defaultColSpan: 2 },
+    { type: 'radio',            label: 'Radio',            desc: '라디오 단일선택',            defaultColSpan: 1 },
+    { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 필터',       defaultColSpan: 1 },
     { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',    defaultColSpan: 1 },
     { type: 'button',         label: 'Button',           desc: '선택 버튼',            defaultColSpan: 1 },
     { type: 'category',       label: 'Category',         desc: '카테고리 계층 검색',   defaultColSpan: 1 },
@@ -215,9 +217,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
     /** 추가 버튼 비활성화 여부 */
     const isAddDisabled = (): boolean => {
         if (!pendingType || !pendingValues) return true;
-        const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options } = pendingValues;
+        const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options, linkedDateRangeKey } = pendingValues;
         if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
         if ((pendingType === 'dateRange' || pendingType === 'yearMonthRange') && (!label2?.trim() && !label2MsgKey?.trim())) return true;
+        if (pendingType === 'dateRangeStatus' && !linkedDateRangeKey?.trim()) return true;
         if (needsOptions(pendingType)) {
             const hasCodeGroup = !!codeGroupCode;
             const hasOptions = !!options?.some(o => o.trim());
@@ -242,6 +245,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultStartDateOffset, defaultStartDate, disableStartPast,
             defaultEndDateOffset, defaultEndDate, disableEndPast,
             dbSlug, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
+            linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -286,6 +290,15 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             depthLabelMsgKeys: pendingType === 'category' ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
             depthValueFields:  pendingType === 'category' ? (depthValueFields?.length ? depthValueFields : undefined) : undefined,
             depthTextFields:   pendingType === 'category' ? (depthTextFields?.length ? depthTextFields : undefined) : undefined,
+            /* dateRangeStatus 전용 */
+            linkedDateRangeKey: pendingType === 'dateRangeStatus' ? (linkedDateRangeKey?.trim() || undefined) : undefined,
+            beforeText:         pendingType === 'dateRangeStatus' ? (beforeText?.trim() || undefined) : undefined,
+            beforeTextMsgKey:   pendingType === 'dateRangeStatus' ? (beforeTextMsgKey?.trim() || undefined) : undefined,
+            inRangeText:        pendingType === 'dateRangeStatus' ? (inRangeText?.trim() || undefined) : undefined,
+            inRangeTextMsgKey:  pendingType === 'dateRangeStatus' ? (inRangeTextMsgKey?.trim() || undefined) : undefined,
+            afterText:          pendingType === 'dateRangeStatus' ? (afterText?.trim() || undefined) : undefined,
+            afterTextMsgKey:    pendingType === 'dateRangeStatus' ? (afterTextMsgKey?.trim() || undefined) : undefined,
+            statusDisplayStyle: pendingType === 'dateRangeStatus' ? (statusDisplayStyle ?? 'select') : undefined,
         };
 
         onChange(rows.map(r =>
@@ -337,9 +350,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             case 'dateRange':      return <DateRangeField {...props} />;
             case 'yearMonth':      return <DateField {...props} />;
             case 'yearMonthRange': return <DateRangeField {...props} />;
-            case 'radio':          return <RadioField {...props} />;
-            case 'checkbox':       return <CheckboxField {...props} />;
-            case 'button':         return <ButtonField {...props} />;
+            case 'radio':            return <RadioField {...props} />;
+            case 'checkbox':         return <CheckboxField {...props} />;
+            case 'button':           return <ButtonField {...props} />;
+            case 'dateRangeStatus':  return <DateRangeStatusSearchField {...props} />;
             case 'category':
                 /* slugOptions는 SearchBuilder 클로저에서 직접 참조 */
                 return (
@@ -471,6 +485,15 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 depthLabelMsgKeys: field.depthLabelMsgKeys,
                                                                                 depthValueFields:  field.depthValueFields,
                                                                                 depthTextFields:   field.depthTextFields,
+                                                                                /* dateRangeStatus 전용 */
+                                                                                linkedDateRangeKey:  field.linkedDateRangeKey,
+                                                                                beforeText:          field.beforeText,
+                                                                                beforeTextMsgKey:    field.beforeTextMsgKey,
+                                                                                inRangeText:         field.inRangeText,
+                                                                                inRangeTextMsgKey:   field.inRangeTextMsgKey,
+                                                                                afterText:           field.afterText,
+                                                                                afterTextMsgKey:     field.afterTextMsgKey,
+                                                                                statusDisplayStyle:  field.statusDisplayStyle,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

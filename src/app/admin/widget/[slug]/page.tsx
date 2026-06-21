@@ -158,11 +158,16 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
             /* 정렬 조건 */
             if (sk) params.sort = `${sk},${sd}`;
 
-            /* 검색 조건 — fieldKey → label 순으로 파라미터 키 결정 */
+            /* 검색 조건 — dateRangeStatus는 drs_{linkedDateRangeKey} 형식으로 변환 */
             searchFields.forEach(f => {
-                const paramKey = f.fieldKey || f.label;
                 const val = sv[f.id];
-                if (paramKey && val && val.trim()) params[paramKey] = val;
+                if (!val || !val.trim()) return;
+                if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
+                    params[`drs_${f.linkedDateRangeKey}`] = val;
+                } else {
+                    const paramKey = f.fieldKey || f.label;
+                    if (paramKey) params[paramKey] = val;
+                }
             });
 
             const res = await api.get(`/page-data/${connectedSlug}`, { params });
@@ -370,7 +375,19 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         ) as TableWidget | undefined;
         if (!tableWidget?.connectedSlug) return;
         const searchFields = tableWidget.connectedSearchIds.flatMap(sid => fieldsMap[sid] ?? []);
-        fetchPageTableData({ tableWidget, connectedSlug: tableWidget.connectedSlug, searchFields, sv, page: 0, sk, sd });
+
+        /* _pathMap 참조해 단순 fieldKey → 실제 JSONB 경로로 변환
+         * row마다 구조가 다를 수 있으므로 모든 row를 순회해 유효한 경로를 첫 번째로 사용 */
+        let resolvedSk = sk;
+        if (sk) {
+            const rows = tableDataMapRef.current[tableWidgetId]?.rows ?? [];
+            for (const row of rows) {
+                const pathMap = row._pathMap as Record<string, string> | undefined;
+                if (pathMap?.[sk]) { resolvedSk = pathMap[sk]; break; }
+            }
+        }
+
+        fetchPageTableData({ tableWidget, connectedSlug: tableWidget.connectedSlug, searchFields, sv, page: 0, sk: resolvedSk, sd });
     }, [widgetItems, fetchPageTableData]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**
@@ -465,9 +482,14 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
         const fieldsMap = buildSearchFieldsMap(widgetItems);
         const params: Record<string, string> = {};
         Object.values(fieldsMap).flat().forEach(f => {
-            const paramKey = f.fieldKey || f.label;
             const val = searchValues[f.id];
-            if (paramKey && val && val.trim()) params[paramKey] = val;
+            if (!val || !val.trim()) return;
+            if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
+                params[`drs_${f.linkedDateRangeKey}`] = val;
+            } else {
+                const paramKey = f.fieldKey || f.label;
+                if (paramKey) params[paramKey] = val;
+            }
         });
         return params;
     }, [searchValues, widgetItems]); // eslint-disable-line react-hooks/exhaustive-deps

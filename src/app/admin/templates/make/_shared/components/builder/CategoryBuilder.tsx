@@ -234,57 +234,80 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                 )}
             </div>
 
-            {/* 수정 연결 — 타입 select + 세부 select/input 한 줄 배치 */}
+            {/* 수정 연결 — 토글 ON 시 카드 hover에 수정 버튼 표시 */}
             <div>
-                <label className={LABEL_CLS}>수정 연결</label>
-                <div className="flex gap-1.5">
-                    {/* 연결 타입 */}
-                    <div className="flex-1">
-                        <select
-                            value={widget.editConnType ?? ''}
-                            onChange={e => onChange({
-                                ...widget,
-                                editConnType: (e.target.value as 'popup' | 'path') || undefined,
-                                editPopupSlug: undefined,
-                                editPath: undefined,
-                            })}
-                            className={INPUT_CLS}
-                        >
-                            <option value="">없음</option>
-                            <option value="popup">페이지 (관리자)</option>
-                            <option value="path">경로 (개발자)</option>
-                        </select>
-                    </div>
-                    {/* 페이지 선택 — 남은 너비 채움 */}
-                    {widget.editConnType === 'popup' && (
-                        <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                    <label className={LABEL_CLS + ' mb-0'}>수정 연결</label>
+                    {/* 토글 스위치 */}
+                    <button
+                        type="button"
+                        onClick={() => onChange({
+                            ...widget,
+                            allowEdit: !widget.allowEdit,
+                            editConnType: undefined,
+                            editPopupSlug: undefined,
+                            editPath: undefined,
+                        })}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                            widget.allowEdit ? 'bg-slate-700' : 'bg-slate-200'
+                        }`}
+                    >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            widget.allowEdit ? 'translate-x-4' : 'translate-x-1'
+                        }`} />
+                    </button>
+                </div>
+                {/* 토글 ON 시에만 연결 설정 표시 */}
+                {widget.allowEdit && (
+                    <div className="flex gap-1.5">
+                        {/* 연결 타입 */}
+                        <div className="flex-1">
                             <select
-                                value={widget.editPopupSlug ?? ''}
-                                onChange={e => onChange({ ...widget, editPopupSlug: e.target.value || undefined })}
+                                value={widget.editConnType ?? ''}
+                                onChange={e => onChange({
+                                    ...widget,
+                                    editConnType: (e.target.value as 'popup' | 'path') || undefined,
+                                    editPopupSlug: undefined,
+                                    editPath: undefined,
+                                })}
                                 className={INPUT_CLS}
                             >
-                                <option value="">— 페이지 선택 —</option>
-                                {pageTemplates.map(t => (
-                                    <option key={t.id} value={t.slug}>{t.name} ({t.slug})</option>
-                                ))}
+                                <option value="">없음</option>
+                                <option value="popup">페이지 (관리자)</option>
+                                <option value="path">경로 (개발자)</option>
                             </select>
                         </div>
-                    )}
-                    {/* 경로 직접 입력 — 남은 너비 채움 */}
-                    {widget.editConnType === 'path' && (
-                        <div className="flex-1 min-w-0">
-                            <input
-                                type="text"
-                                value={widget.editPath ?? ''}
-                                onChange={e => onChange({ ...widget, editPath: e.target.value || undefined })}
-                                placeholder="/admin/category/edit"
-                                className={INPUT_CLS}
-                            />
-                        </div>
-                    )}
-                </div>
-                {/* 파라미터 + 저장 체크박스 — 연결 타입 설정 시만 표시 */}
-                {widget.editConnType && (
+                        {/* 페이지 선택 — 남은 너비 채움 */}
+                        {widget.editConnType === 'popup' && (
+                            <div className="flex-1 min-w-0">
+                                <select
+                                    value={widget.editPopupSlug ?? ''}
+                                    onChange={e => onChange({ ...widget, editPopupSlug: e.target.value || undefined })}
+                                    className={INPUT_CLS}
+                                >
+                                    <option value="">— 페이지 선택 —</option>
+                                    {pageTemplates.map(t => (
+                                        <option key={t.id} value={t.slug}>{t.name} ({t.slug})</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        {/* 경로 직접 입력 — 남은 너비 채움 */}
+                        {widget.editConnType === 'path' && (
+                            <div className="flex-1 min-w-0">
+                                <input
+                                    type="text"
+                                    value={widget.editPath ?? ''}
+                                    onChange={e => onChange({ ...widget, editPath: e.target.value || undefined })}
+                                    placeholder="/admin/category/edit"
+                                    className={INPUT_CLS}
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+                {/* 파라미터 + 저장 체크박스 — 토글 ON + 연결 타입 설정 시만 표시 */}
+                {widget.allowEdit && widget.editConnType && (
                     <ParamWithSaveField
                         paramsValue={widget.editParams}
                         paramSaveValue={widget.editParamSave}

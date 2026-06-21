@@ -82,7 +82,7 @@ interface PageGridRendererProps {
     /** (widgetId, fieldId, value) 형태로 호출 */
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
-    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean) => void;
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string) => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;

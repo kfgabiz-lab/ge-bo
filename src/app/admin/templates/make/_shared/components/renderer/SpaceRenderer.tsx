@@ -44,8 +44,8 @@ interface SpaceRendererProps {
     onPopupOpen?: (slug: string, params?: string) => void;
     /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID 전달 */
     onExcelDownload?: (tableWidgetId: string) => void;
-    /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug 전달 */
-    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean) => void;
+    /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave 전달 */
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string) => void;
 }
 
 export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave }: SpaceRendererProps) {
@@ -80,7 +80,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         } else if (field.connType === 'excel' && field.excelTableWidgetId) {
             onExcelDownload?.(field.excelTableWidgetId);
         } else if (field.connType === 'datasave' && field.dataSaveSlug) {
-            onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction);
+            /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
+            onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params);
         }
     };
 

@@ -1497,6 +1497,58 @@ export function FieldRenderer({
                 />
             );
 
+        /* ── dateRangeStatus ── 날짜 범위 상태 필터 (이전/포함/이후 선택) */
+        case 'dateRangeStatus': {
+            /* 다국어 키 우선, 없으면 직접 텍스트, 없으면 기본값 */
+            const beforeLabel  = field.beforeTextMsgKey  ? t(field.beforeTextMsgKey)  : (field.beforeText  || '예정');
+            const inRangeLabel = field.inRangeTextMsgKey ? t(field.inRangeTextMsgKey) : (field.inRangeText || '진행중');
+            const afterLabel   = field.afterTextMsgKey   ? t(field.afterTextMsgKey)   : (field.afterText   || '종료');
+            /* select 방식 */
+            if (!field.statusDisplayStyle || field.statusDisplayStyle === 'select') {
+                return (
+                    <div className="relative">
+                        <select
+                            disabled={isDisabled}
+                            className={selectCls}
+                            value={isPreview ? '' : value}
+                            onChange={isPreview ? undefined : e => onChange?.(e.target.value)}
+                        >
+                            <option value="">전체</option>
+                            <option value="before">{beforeLabel}</option>
+                            <option value="in_range">{inRangeLabel}</option>
+                            <option value="after">{afterLabel}</option>
+                        </select>
+                        <SelectArrow />
+                    </div>
+                );
+            }
+            /* radio 방식 */
+            const statusOpts: { label: string; val: string }[] = [
+                { label: '전체',       val: '' },
+                { label: beforeLabel,  val: 'before' },
+                { label: inRangeLabel, val: 'in_range' },
+                { label: afterLabel,   val: 'after' },
+            ];
+            return (
+                <div className="flex items-center gap-4 py-2">
+                    {statusOpts.map(opt => (
+                        <label key={opt.val} className={`flex items-center gap-2 ${isDisabled ? 'cursor-default' : 'cursor-pointer'}`}>
+                            <input
+                                type="radio"
+                                name={`${uid}-field-${field.id}`}
+                                disabled={isDisabled}
+                                value={opt.val}
+                                checked={!isPreview && value === opt.val}
+                                onChange={isPreview ? undefined : () => onChange?.(opt.val)}
+                                className="w-4 h-4 cursor-pointer"
+                            />
+                            <span className="text-sm text-slate-700">{opt.label}</span>
+                        </label>
+                    ))}
+                </div>
+            );
+        }
+
         default:
             return null;
     }

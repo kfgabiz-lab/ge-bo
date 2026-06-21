@@ -17,7 +17,8 @@ export type SearchFieldType =
     | 'hidden'          // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
     | 'color'           // 색상 선택 (Preset 원형 버튼)
     | 'message-key-select' // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
-    | 'category';       // 카테고리 계층 검색 (1~4 depth selectbox 연동)
+    | 'category'        // 카테고리 계층 검색 (1~4 depth selectbox 연동)
+    | 'dateRangeStatus'; // 날짜 범위 상태 필터 (이전/포함/이후 선택)
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -101,6 +102,15 @@ export interface SearchFieldConfig {
     depthLabelMsgKeys?: string[];   // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];    // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];     // depth별 selectbox 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+    /* ── dateRangeStatus 전용 ── */
+    linkedDateRangeKey?: string;    // 연결할 dateRange 필드의 accessor (예: 'period')
+    beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
+    beforeTextMsgKey?: string;      // 이전 텍스트 다국어 키
+    inRangeText?: string;           // 날짜 포함 표시 텍스트 (예: '진행중')
+    inRangeTextMsgKey?: string;     // 포함 텍스트 다국어 키
+    afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
+    afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
+    statusDisplayStyle?: 'select' | 'radio'; // 검색 UI 표시 방식 (기본: select)
 }
 
 /** 검색폼 행 설정 */
@@ -147,7 +157,7 @@ export interface CodeGroupDef {
 /* ── 테이블 컬럼 관련 타입 ── */
 
 /** 셀 렌더링 타입 */
-export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date';
+export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date' | 'dateRangeStatus';
 
 /** 셀 옵션 (badge용) */
 export interface CellOption {
@@ -208,6 +218,14 @@ export interface TableColumnConfig {
     displayAs?: 'text' | 'value';
     /** date 타입 — 날짜 표시 포맷 (예: 'YYYY-MM-DD HH:mm') */
     dateFormat?: string;
+    /* ── dateRangeStatus 전용 ── */
+    linkedDateRangeKey?: string;    // 연결할 dateRange 컬럼의 accessor (예: 'period')
+    beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
+    beforeTextMsgKey?: string;      // 이전 텍스트 다국어 키
+    inRangeText?: string;           // 날짜 포함 표시 텍스트 (예: '진행중')
+    inRangeTextMsgKey?: string;     // 포함 텍스트 다국어 키
+    afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
+    afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
 }
 
 /** 불러오기 목록 아이템 */

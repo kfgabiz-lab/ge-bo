@@ -301,8 +301,10 @@ export function buildTableRow(item: {
         ([, v]) => v !== null && typeof v === 'object' && !Array.isArray(v)
     );
 
-    /* 중복 없는 fieldKey만 root에 flat 병합 */
+    /* 중복 없는 fieldKey만 root에 flat 병합 + 경로 맵 생성 */
     const flatExtra: Record<string, unknown> = {};
+    /* fieldKey → "sectionKey.fieldKey" 경로 맵 (정렬 파라미터 변환에 사용) */
+    const _pathMap: Record<string, string> = {};
     if (sectionEntries.length > 0) {
         const keyCount: Record<string, number> = {};
         sectionEntries.forEach(([, section]) =>
@@ -310,9 +312,13 @@ export function buildTableRow(item: {
                 keyCount[k] = (keyCount[k] ?? 0) + 1;
             })
         );
-        sectionEntries.forEach(([, section]) =>
+        sectionEntries.forEach(([sectionKey, section]) =>
             Object.entries(section as Record<string, unknown>).forEach(([k, v]) => {
-                if (keyCount[k] === 1) flatExtra[k] = v;
+                if (keyCount[k] === 1) {
+                    flatExtra[k] = v;
+                    /* 단순 fieldKey → 실제 JSONB 경로 기록 */
+                    _pathMap[k] = `${sectionKey}.${k}`;
+                }
             })
         );
     }
@@ -320,6 +326,7 @@ export function buildTableRow(item: {
     return {
         _id: item.id,
         _groupId: item.groupId ?? null,
+        _pathMap,           /* fieldKey → sectionKey.fieldKey 경로 맵 (정렬용) */
         ...flatExtra,       /* 중복 없는 fieldKey flat (단순 accessor용) */
         ...restDataJson,    /* 원본 중첩 구조 보존 (dot notation accessor용) */
         createdAt: item.createdAt ?? null,
@@ -410,7 +417,6 @@ export const getTemplateLabel = (t: {
  * @param formFileIdsMap      widgetId → { fieldId: number[] } 파일 ID 맵 (기존+신규 합산 완료)
  * @param subListRowsMap      widgetId → 행 배열 (_rowId 제거, 파일 컬럼 ID 배열 완성 상태)
  * @param multiSelectMap      widgetId → number[] 선택된 ID 배열
- * @param tableSelectedMap    widgetId → number[] 테이블 선택 행 ID 배열 (optional)
  * @returns { dataJson, pkKeys }
  *
  * @example
@@ -427,7 +433,6 @@ export function buildDataJson(
     formFileIdsMap: Record<string, Record<string, number[]>>,
     subListRowsMap: Record<string, Record<string, unknown>[]>,
     multiSelectMap: Record<string, number[]>,
-    tableSelectedMap?: Record<string, number[]>,
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
@@ -459,10 +464,6 @@ export function buildDataJson(
             const rows = subListRowsMap[w.widgetId ?? ''] ?? [];
             if (w.contentKey) dataJson[w.contentKey] = { rows };
             else dataJson.rows = rows;
-
-        } else if (w.type === 'table' && tableSelectedMap) {
-            /* 테이블에서 선택된 행 ID 배열을 contentKey 아래 저장 */
-            if (w.contentKey) dataJson[w.contentKey] = tableSelectedMap[w.widgetId ?? ''] ?? [];
         }
     }
 
@@ -539,6 +540,62 @@ export function applySortChange(
 }
 
 /**
+ * Form 위젯 필드 기본값 초기화 — widgetSub(신규 모드)·useWidgetPageState 공통 사용
+ * - date              : defaultDateOffset(오늘 기준) 또는 defaultDate(고정일)
+ * - dateRange         : defaultStart/EndDateOffset 또는 defaultStart/EndDate
+ * - select/radio/checkbox : defaultOptionValue
+ * - 그 외             : defaultValueMsgKey(다국어) 또는 defaultValue(고정 텍스트)
+ *
+ * @param formWidgets 기본값을 초기화할 Form 위젯 배열
+ * @param t           다국어 번역 함수 — defaultValueMsgKey 처리용 (선택)
+ * @returns widgetId → { fieldId: 초기값 } 맵
+ *
+ * 사용법:
+ *   const initMap = initFormDefaultValues(formWidgets, t);
+ *   setFormValuesMap(initMap);
+ */
+export function initFormDefaultValues(
+    formWidgets: import('./components/builder/FormBuilder').FormWidget[],
+    t?: (key: string) => string,
+): Record<string, Record<string, string>> {
+    const calcDate = (offset: number) => {
+        const d = new Date();
+        d.setDate(d.getDate() - offset);
+        return d.toISOString().slice(0, 10);
+    };
+
+    const result: Record<string, Record<string, string>> = {};
+    formWidgets.forEach(fw => {
+        const vals: Record<string, string> = {};
+        fw.fields.forEach(f => {
+            if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+                let dateVal = '';
+                if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
+                    dateVal = calcDate(f.defaultDateOffset);
+                } else if (f.defaultDate) {
+                    dateVal = f.defaultDate;
+                }
+                if (dateVal) vals[f.id] = dateVal;
+            } else if (f.type === 'dateRange') {
+                const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0)
+                    ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+                const end = (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0)
+                    ? calcDate(f.defaultEndDateOffset) : (f.defaultEndDate ?? '');
+                if (start || end) vals[f.id] = `${start}~${end}`;
+            } else if (f.defaultOptionValue && (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox')) {
+                vals[f.id] = f.defaultOptionValue;
+            } else if (f.defaultValueMsgKey && t) {
+                vals[f.id] = t(f.defaultValueMsgKey);
+            } else if (f.defaultValue) {
+                vals[f.id] = f.defaultValue;
+            }
+        });
+        result[fw.widgetId] = vals;
+    });
+    return result;
+}
+
+/**
  * 파라미터 문자열 파싱 — 쉼표 구분 + row 동적 주입
  *
  * 규칙:
@@ -561,11 +618,12 @@ export function parseActionParams(
     const result: Record<string, string> = {};
     paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {
         if (part.includes('=')) {
-            /* 고정값 — key=value 형태 */
-            const eqIdx = part.indexOf('=');
-            const key   = part.slice(0, eqIdx).trim();
-            const val   = part.slice(eqIdx + 1).trim();
-            if (key) result[key] = val;
+            /* key=value 형태 — val이 row 필드명이면 row 값으로 치환, 없으면 고정값 */
+            const eqIdx      = part.indexOf('=');
+            const key        = part.slice(0, eqIdx).trim();
+            const val        = part.slice(eqIdx + 1).trim();
+            const resolvedVal = val in row ? String(row[val] ?? '') : val;
+            if (key) result[key] = resolvedVal;
         } else {
             /* 동적 주입 — dot notation이면 마지막 세그먼트로 row 조회 */
             const fieldKey = part.includes('.') ? part.slice(part.lastIndexOf('.') + 1) : part;
@@ -576,3 +634,230 @@ export function parseActionParams(
     return result;
 }
 
+/**
+ * datasave 대상 위젯 유효성 검사 공통 함수 (Form / SubList / MultiSelect / Table)
+ * handleDataSave, handlePopupDataSave 양쪽에서 공통 사용
+ *
+ * 사용법:
+ *   if (!validateDataSaveWidgets({ targetWidgets, formValuesMap, fileValuesMap, ... })) return;
+ */
+export function validateDataSaveWidgets(opts: {
+    targetWidgets: Array<{
+        type?: string;
+        widgetId?: string;
+        fields?: import('./components/builder/FormBuilder').FormFieldItem[];
+        contentKey?: string;
+        required?: boolean;
+        title?: string;
+        enableRowSelection?: boolean;
+        columns?: import('./components/renderer/types').SubListColumn[];
+    }>;
+    formValuesMap: Record<string, Record<string, string>>;
+    fileValuesMap: Record<string, Record<string, File[]>>;
+    existingFileMetaMap: Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>;
+    subListRowsMap: Record<string, { _rowId: string; [key: string]: unknown }[]>;
+    subListFileMap: Record<string, Record<string, Record<string, File[]>>>;
+    multiSelectValuesMap: Record<string, number[]>;
+    tableSelectedRowsMap?: Record<string, number[]>;
+}): boolean {
+    const { targetWidgets, formValuesMap, fileValuesMap, existingFileMetaMap, subListRowsMap, subListFileMap, multiSelectValuesMap, tableSelectedRowsMap } = opts;
+
+    /* Form 유효성 검사 */
+    const allFormValues = Object.assign({}, ...Object.values(formValuesMap)) as Record<string, string>;
+    const allKeyToId: Record<string, string> = {};
+    for (const w of targetWidgets) {
+        if (w.type !== 'form') continue;
+        (w.fields ?? []).forEach(f => {
+            if (!f.fieldKey) return;
+            allKeyToId[f.fieldKey] = f.id;
+            if (w.contentKey) allKeyToId[`${w.contentKey}.${f.fieldKey}`] = f.id;
+        });
+    }
+    for (const w of targetWidgets) {
+        if (w.type !== 'form') continue;
+        const wid = w.widgetId ?? '';
+        if (!validateFormFields(
+            w.fields ?? [],
+            formValuesMap[wid] ?? {},
+            fileValuesMap[wid] ?? {},
+            existingFileMetaMap[wid] ?? {},
+            allFormValues,
+            allKeyToId,
+        )) return false;
+    }
+
+    /* SubList 유효성 검사 */
+    if (!validateSubListRows(
+        targetWidgets.filter(w => w.type === 'sublist') as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('./components/renderer/types').SubListColumn[] }>,
+        subListRowsMap,
+        subListFileMap,
+    )) return false;
+
+    /* MultiSelect 유효성 검사 */
+    for (const w of targetWidgets) {
+        if (w.type !== 'multiselect') continue;
+        if (!w.required) continue;
+        if ((multiSelectValuesMap[w.widgetId ?? ''] ?? []).length === 0) {
+            toast.warning(`'${w.title || '다중선택'}' 항목은 필수 선택입니다.`);
+            return false;
+        }
+    }
+
+    /* Table 유효성 검사 — enableRowSelection=true 인 경우만 */
+    if (tableSelectedRowsMap) {
+        for (const w of targetWidgets) {
+            if (w.type !== 'table') continue;
+            if (!w.enableRowSelection) continue;
+            if ((tableSelectedRowsMap[w.widgetId ?? ''] ?? []).length === 0) {
+                toast.warning('선택된 항목이 없습니다.');
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Form 파일 업로드 + SubList rows 처리 공통 함수
+ * handleDataSave, handlePopupDataSave 양쪽에서 공통 사용
+ *
+ * 사용법:
+ *   const { formFileIdsMap, processedSubListRowsMap, allNewIds } =
+ *     await processFormFilesAndSubList({ targetWidgets, fileValuesMap, ... });
+ */
+export async function processFormFilesAndSubList(opts: {
+    targetWidgets: Array<{
+        type?: string;
+        widgetId?: string;
+        fields?: import('./components/builder/FormBuilder').FormFieldItem[];
+        columns?: import('./components/renderer/types').SubListColumn[];
+    }>;
+    fileValuesMap: Record<string, Record<string, File[]>>;
+    existingFileMetaMap: Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>;
+    subListRowsMap: Record<string, { _rowId: string; [key: string]: unknown }[]>;
+    subListFileMap: Record<string, Record<string, Record<string, File[]>>>;
+    dataSaveSlug: string;
+}): Promise<{
+    formFileIdsMap: Record<string, Record<string, number[]>>;
+    processedSubListRowsMap: Record<string, Record<string, unknown>[]>;
+    allNewIds: number[];
+}> {
+    const { targetWidgets, fileValuesMap, existingFileMetaMap, subListRowsMap, subListFileMap, dataSaveSlug } = opts;
+    const allNewIds: number[] = [];
+    const newFileIdsByFieldId: Record<string, number[]> = {};
+
+    /* 1. Form 파일 업로드 */
+    for (const w of targetWidgets) {
+        if (w.type !== 'form') continue;
+        const fwId = w.widgetId ?? '';
+        for (const f of (w.fields ?? [])) {
+            if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+            const newFiles = fileValuesMap[fwId]?.[f.id] ?? [];
+            if (!newFiles.length) continue;
+            const uploadedIds = await uploadFiles(newFiles, dataSaveSlug, f.fieldKey || f.label || '');
+            allNewIds.push(...uploadedIds);
+            newFileIdsByFieldId[f.id] = uploadedIds;
+        }
+    }
+
+    /* 2. formFileIdsMap 구성 (기존 파일 ID + 신규 업로드 ID) */
+    const formFileIdsMap: Record<string, Record<string, number[]>> = {};
+    for (const w of targetWidgets) {
+        if (w.type !== 'form') continue;
+        const fwId = w.widgetId ?? '';
+        formFileIdsMap[fwId] = {};
+        for (const f of (w.fields ?? [])) {
+            if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+            const existingIds = (existingFileMetaMap[fwId]?.[f.id] ?? []).map(m => m.id);
+            formFileIdsMap[fwId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
+        }
+    }
+
+    /* 3. SubList rows 처리 — 파일 컬럼 업로드 + rowData 구성 */
+    const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
+    for (const w of targetWidgets) {
+        if (w.type !== 'sublist') continue;
+        const wid = w.widgetId ?? '';
+        const processedRows: Record<string, unknown>[] = [];
+        for (const row of (subListRowsMap[wid] ?? [])) {
+            const { _rowId, ...rest } = row;
+            const processedRow: Record<string, unknown> = { ...rest };
+            for (const col of (w.columns ?? [])) {
+                if (!['file', 'image'].includes(col.type)) continue;
+                const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
+                const newFiles = subListFileMap[wid]?.[_rowId]?.[col.id] ?? [];
+                const uploadedIds = newFiles.length ? await uploadFiles(newFiles, dataSaveSlug, col.key) : [];
+                allNewIds.push(...uploadedIds);
+                processedRow[col.key] = [...existingIds, ...uploadedIds];
+            }
+            processedRows.push(processedRow);
+        }
+        processedSubListRowsMap[wid] = processedRows;
+    }
+
+    return { formFileIdsMap, processedSubListRowsMap, allNewIds };
+}
+
+/**
+ * 데이터테이블 컨텐츠 행별 datasave 공통 실행
+ * paramSave 있으면 parseActionParams로 row별 값 추출, 없으면 column accessor 방식
+ * @returns 저장된 행 수
+ *
+ * 사용법:
+ *   const count = await saveTableRows({
+ *     contentKey: 'board-data-table',
+ *     paramSave: 'board-data-table.depth=3,board-data-table.id,board-data-table.title',
+ *     rows: rowsToSave,
+ *     extras: {},
+ *     dataSaveSlug: 'save-slug',
+ *     templateSlug: slug,
+ *   });
+ */
+export async function saveTableRows(opts: {
+    contentKey?: string;
+    columns?: { accessor?: string }[];
+    rows: Record<string, unknown>[];
+    extras: Record<string, unknown>;
+    dataSaveSlug: string;
+    templateSlug?: string;
+    paramSave?: string;
+}): Promise<number> {
+    const { contentKey, columns, rows, extras, dataSaveSlug, templateSlug, paramSave } = opts;
+    let savedCount = 0;
+    for (const row of rows) {
+        let rowData: Record<string, unknown>;
+
+        if (paramSave) {
+            /* paramSave 있으면 → parseActionParams로 per-row 값 추출 */
+            /* row._id를 id로 매핑 (board-data-table.id 같은 동적 파라미터 대응) */
+            const rowWithId = { ...row, id: row['_id'] } as Record<string, string>;
+            const parsed = parseActionParams(paramSave, rowWithId);
+            /* contentKey 접두사 제거 후 rowData 구성 */
+            rowData = {};
+            const prefix = contentKey ? `${contentKey}.` : '';
+            for (const [key, val] of Object.entries(parsed)) {
+                const fieldKey = prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+                rowData[fieldKey] = val;
+            }
+            /* popupParamSaveExtras(extras)도 함께 merge — paramSave만으로는 depth=3 같은 고정값 누락 방지 */
+            Object.assign(rowData, extras);
+        } else {
+            /* paramSave 없으면 → column accessor + extras 방식 (fallback) */
+            rowData = {};
+            for (const col of (columns ?? [])) {
+                if (col.accessor && row[col.accessor] !== undefined) {
+                    rowData[col.accessor] = row[col.accessor];
+                }
+            }
+            Object.assign(rowData, extras);
+        }
+
+        await api.post(`/page-data/${dataSaveSlug}`, {
+            dataJson: contentKey ? { [contentKey]: rowData } : rowData,
+            ...(templateSlug && { templateSlug }),
+        });
+        savedCount++;
+    }
+    return savedCount;
+}

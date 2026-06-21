@@ -94,11 +94,9 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
     const [loading, setLoading]           = useState(false);
     const [selectedId, setSelectedId]     = useState<number | null>(null);
 
-    /* 등록/수정 입력 상태 */
+    /* 등록 입력 상태 */
     const [inputName, setInputName]       = useState('');
     const [showInput, setShowInput]       = useState(false);   // 등록 입력창 표시
-    const [editId, setEditId]             = useState<number | null>(null); // 수정 중인 항목 ID
-    const [editName, setEditName]         = useState('');
 
     /* ── 드래그 상태 ── */
     const dragIndexRef  = useRef<number | null>(null); // 드래그 시작 항목 인덱스
@@ -222,27 +220,6 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
         }
     };
 
-    /* ── 수정 ── */
-    const handleEdit = async (id: number) => {
-        if (!editName.trim()) { toast.warning('이름을 입력하세요.'); return; }
-        const target = items.find(i => i.id === id);
-        if (!target) return;
-        try {
-            const dataJson: Record<string, unknown> = {
-                name: editName.trim(),
-                depth: target.depth,
-            };
-            if (target.parentId != null) dataJson.parentId = target.parentId;
-            await api.put(`/page-data/${widget.dbSlug}/${id}`, { dataJson });
-            toast.success('수정되었습니다.');
-            setEditId(null);
-            setEditName('');
-            fetchItems();
-        } catch {
-            toast.error('수정 중 오류가 발생했습니다.');
-        }
-    };
-
     /* ── 삭제 ── */
     const handleDelete = async (id: number) => {
         if (!confirm('삭제하시겠습니까?')) return;
@@ -341,12 +318,15 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                             /* 연결 타입에 따라 동작 분기 */
                             if (widget.createConnType === 'popup' && widget.createPopupSlug) {
                                 /* 파라미터 파싱 후 팝업/페이지 오픈, autoSave 플래그 전달 */
-                                const staticParams = parseActionParams(widget.createParams, {});
+                                /* selectedParentId를 id로 참조 가능하도록 row 구성 */
+                                const rowForParams = selectedParentId != null ? { id: String(selectedParentId) } : {};
+                                const staticParams = parseActionParams(widget.createParams, rowForParams);
                                 const dynamicParams: Record<string, string> = selectedParentId != null ? { parentId: String(selectedParentId) } : {};
                                 onPopupOpen?.(widget.createPopupSlug, null, widget.dbSlug, { ...staticParams, ...dynamicParams }, widget.createParamSave);
                             } else if (widget.createConnType === 'path' && widget.createPath) {
                                 /* parseActionParams로 파싱 후 URLSearchParams로 올바른 쿼리스트링 생성 */
-                                const parsed = parseActionParams(widget.createParams, {});
+                                const rowForParams = selectedParentId != null ? { id: String(selectedParentId) } : {};
+                                const parsed = parseActionParams(widget.createParams, rowForParams);
                                 if (widget.createParamSave) parsed['_paramSave'] = 'true';
                                 const qs = Object.keys(parsed).length > 0 ? `?${new URLSearchParams(parsed).toString()}` : '';
                                 router.push(`${widget.createPath}${qs}`);
@@ -440,27 +420,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                     <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-emerald-400 rounded-r" />
                                 )}
 
-                                {/* 수정 입력창 */}
-                                {editId === item.id ? (
-                                    <div className="flex items-center gap-1.5 px-3 py-2.5">
-                                        <input
-                                            type="text"
-                                            autoFocus
-                                            value={editName}
-                                            onChange={e => setEditName(e.target.value)}
-                                            onKeyDown={e => { if (e.key === 'Enter') handleEdit(item.id); if (e.key === 'Escape') setEditId(null); }}
-                                            onClick={e => e.stopPropagation()}
-                                            className="flex-1 border border-slate-300 rounded px-1.5 py-0.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400"
-                                        />
-                                        <button onClick={e => { e.stopPropagation(); handleEdit(item.id); }} className="p-0.5 text-emerald-600 hover:text-emerald-700">
-                                            <Check className="w-3 h-3" />
-                                        </button>
-                                        <button onClick={e => { e.stopPropagation(); setEditId(null); }} className="p-0.5 text-slate-400 hover:text-slate-600">
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-1 px-2 py-2.5">
+                                <div className="flex items-center gap-1 px-2 py-2.5">
 
                                         {/* 드래그 핸들 + 순번 */}
                                         <div
@@ -497,7 +457,8 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                                 className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                                                 onClick={e => e.stopPropagation()}
                                             >
-                                                {(widget.allowEdit !== false) && (
+                                                {/* 수정 버튼 — allowEdit 토글 ON 시만 표시 */}
+                                                {widget.allowEdit && (
                                                     <button
                                                         onClick={async () => {
                                                             if (isPreview) return;
@@ -510,9 +471,6 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                                                 if (widget.editParamSave) parsed['_paramSave'] = 'true';
                                                                 const qs = Object.keys(parsed).length > 0 ? `&${new URLSearchParams(parsed).toString()}` : '';
                                                                 router.push(`${widget.editPath}?id=${item.id}${qs}`);
-                                                            } else {
-                                                                setEditId(item.id);
-                                                                setEditName(item.name);
                                                             }
                                                         }}
                                                         className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
@@ -552,8 +510,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                             </p>
                                         )}
                                         </div>{/* flex-1 min-w-0 끝 */}
-                                    </div>
-                                )}
+                                </div>
                             </div>
                             </div>
                         ))}

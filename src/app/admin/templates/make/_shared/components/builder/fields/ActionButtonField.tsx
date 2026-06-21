@@ -287,6 +287,19 @@ export function ActionButtonField({
                                 label="연결 Slug"
                                 emptyLabel="— Slug 선택 —"
                             />
+                            {/* 저장 파라미터 — 행별 추출 및 고정값 지정 */}
+                            {values.dataSaveSlug && (
+                                <div className="space-y-0.5">
+                                    <input
+                                        type="text"
+                                        value={values.params ?? ''}
+                                        onChange={e => onChange({ params: e.target.value || undefined })}
+                                        placeholder="예: contentKey.depth=3,contentKey.id"
+                                        className={INPUT_CLS}
+                                    />
+                                    <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값 · 없으면 행에서 추출</p>
+                                </div>
+                            )}
                             {/* 동작 완료 후 이전 페이지 이동 여부 */}
                             <label className="flex items-center gap-1.5 cursor-pointer mt-0.5">
                                 <input

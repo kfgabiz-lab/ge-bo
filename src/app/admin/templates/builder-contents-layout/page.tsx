@@ -45,7 +45,7 @@ type TabKey = typeof TABS[number]['key'];
 /*  샘플 위젯 데이터                           */
 /* ══════════════════════════════════════════ */
 
-/** 검색폼 — input / select / date / dateRange / yearMonth / yearMonthRange / checkbox / radio / button 필드 포함 */
+/** 검색폼 — input / select / date / dateRange / yearMonth / yearMonthRange / checkbox / radio / button / dateRangeStatus 필드 포함 */
 const SAMPLE_SEARCH: SearchWidget = {
     type: 'search',
     widgetId: 'guide-search',
@@ -78,6 +78,23 @@ const SAMPLE_SEARCH: SearchWidget = {
             fields: [
                 { id: 'f8', type: 'yearMonth',      label: '년월',        colSpan: 1 },
                 { id: 'f9', type: 'yearMonthRange', label: '기간(년월)', colSpan: 2 },
+            ],
+        },
+        {
+            id: 'r5', cols: 3,
+            fields: [
+                {
+                    id: 'f10', type: 'dateRangeStatus', label: '진행상태(select)', colSpan: 1,
+                    linkedDateRangeKey: 'period',
+                    beforeText: '예정', inRangeText: '진행중', afterText: '종료',
+                    statusDisplayStyle: 'select',
+                },
+                {
+                    id: 'f11', type: 'dateRangeStatus', label: '진행상태(radio)', colSpan: 2,
+                    linkedDateRangeKey: 'period',
+                    beforeText: '예정', inRangeText: '진행중', afterText: '종료',
+                    statusDisplayStyle: 'radio',
+                },
             ],
         },
     ],
@@ -145,7 +162,7 @@ const SAMPLE_SEARCH_SIMPLE: SearchWidget = {
     ],
 };
 
-/** 데이터테이블 — text / badge / boolean / actions 컬럼 포함 */
+/** 데이터테이블 — text / badge / boolean / actions / dateRangeStatus 컬럼 포함 */
 const SAMPLE_TABLE: TableWidget = {
     type: 'table',
     widgetId: 'guide-table',
@@ -178,8 +195,14 @@ const SAMPLE_TABLE: TableWidget = {
             trueText: '공개', falseText: '비공개',
         },
         {
-            id: 'c5', header: '등록일', accessor: 'createdAt',
-            align: 'center', sortable: true,  cellType: 'text',
+            id: 'c5', header: '기간', accessor: 'period',
+            align: 'center', sortable: false, cellType: 'text',
+        },
+        {
+            id: 'c7', header: '진행상태', accessor: '_status',
+            align: 'center', sortable: false, cellType: 'dateRangeStatus',
+            linkedDateRangeKey: 'period',
+            beforeText: '예정', inRangeText: '진행중', afterText: '종료',
         },
         {
             id: 'c6', header: '관리',   accessor: '_actions',

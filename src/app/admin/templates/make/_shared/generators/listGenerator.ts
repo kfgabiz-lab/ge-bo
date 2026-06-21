@@ -109,7 +109,8 @@ export const buildListTsxFile = (
         lines.push(`${ind(3)}const eqIdx = part.indexOf('=');`);
         lines.push(`${ind(3)}const key = part.slice(0, eqIdx).trim();`);
         lines.push(`${ind(3)}const val = part.slice(eqIdx + 1).trim();`);
-        lines.push(`${ind(3)}if (key) result[key] = val;`);
+        lines.push(`${ind(3)}const resolvedVal = val in row ? String(row[val] ?? '') : val;`);
+        lines.push(`${ind(3)}if (key) result[key] = resolvedVal;`);
         lines.push(`${ind(2)}} else {`);
         lines.push(`${ind(3)}result[part] = String(row[part] ?? '');`);
         lines.push(`${ind(2)}}`);

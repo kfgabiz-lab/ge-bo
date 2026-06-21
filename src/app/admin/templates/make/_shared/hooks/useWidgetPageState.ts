@@ -18,7 +18,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange } from "../utils";
+import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues } from "../utils";
+import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
 import type { AnyWidget } from "../components/renderer/types";
 import type { TableWidget } from "../components/builder/TableBuilder";
@@ -74,6 +75,7 @@ export function useWidgetPageState(
 ) {
   /* URL 파라미터 — 폼 필드 초기값 세팅용 */
   const searchParams = useSearchParams();
+  const { t } = useI18n();
 
   /* 검색 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>({});
@@ -158,9 +160,15 @@ export function useWidgetPageState(
         const params: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) params.sort = `${sk},${sd}`;
         searchFields.forEach((f) => {
-          const paramKey = f.fieldKey || f.label;
           const val = sv[f.id];
-          if (paramKey && val && val.trim()) params[paramKey] = val;
+          if (!val || !val.trim()) return;
+          /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
+          if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
+            params[`drs_${f.linkedDateRangeKey}`] = val;
+          } else {
+            const paramKey = f.fieldKey || f.label;
+            if (paramKey) params[paramKey] = val;
+          }
         });
 
         const res = await api.get(`/page-data/${connectedSlug}`, { params });
@@ -219,37 +227,31 @@ export function useWidgetPageState(
     tableDataMapRef.current = tableDataMap;
   }, [tableDataMap]);
 
-  /* widgetItems 로드 후 URL 파라미터 → 폼 필드 초기값 세팅
-   * URL ?fieldKey=값 이 폼 필드의 fieldKey와 일치하면 formValuesMap에 주입.
-   * hidden 필드는 URL 파라미터 없을 때 defaultValue로 초기화.
-   * 우선순위: URL 파라미터 > defaultValue > ''
+  /* widgetItems 로드 후 폼 필드 기본값 + URL 파라미터 초기화
+   * 우선순위: URL 파라미터 > defaultValue/defaultDate/defaultOptionValue 등
    */
   useEffect(() => {
     if (!widgetItems.length) return;
-    const patch: Record<string, Record<string, string>> = {};
 
-    flatWidgets(widgetItems).forEach((w) => {
-      if (w.type !== 'form') return;
-      const fw = w as FormWidget;
+    const formWidgets = flatWidgets(widgetItems).filter(w => w.type === 'form') as FormWidget[];
 
+    /* 공통 함수로 모든 타입의 기본값 초기화 */
+    const patch = initFormDefaultValues(formWidgets, t);
+
+    /* URL 파라미터가 있으면 기본값 위로 오버라이드 */
+    formWidgets.forEach((fw) => {
       (fw.fields ?? []).forEach((f) => {
         const fieldKey = f.fieldKey || f.label;
         if (!fieldKey) return;
-
         const urlVal = searchParams.get(fieldKey);
         if (urlVal !== null) {
-          /* URL 파라미터가 있으면 필드 타입 무관하게 set */
           if (!patch[fw.widgetId]) patch[fw.widgetId] = {};
           patch[fw.widgetId][f.id] = urlVal;
-        } else if (f.type === 'hidden' && f.defaultValue !== undefined) {
-          /* URL 파라미터 없는 hidden 필드는 defaultValue로 초기화 */
-          if (!patch[fw.widgetId]) patch[fw.widgetId] = {};
-          patch[fw.widgetId][f.id] = f.defaultValue;
         }
       });
     });
 
-    if (Object.keys(patch).length === 0) return;
+    if (Object.values(patch).every(v => Object.keys(v).length === 0)) return;
 
     setFormValuesMap((prev) => {
       const next = { ...prev };
@@ -258,7 +260,7 @@ export function useWidgetPageState(
       }
       return next;
     });
-  }, [widgetItems, searchParams]);
+  }, [widgetItems, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* 수정 모드 초기 데이터 로드 — sharedDataId(탭 공유 row id) 있을 때
    * 흐름: GET /page-data/{connectedSlug}/{sharedDataId}
@@ -433,17 +435,29 @@ export function useWidgetPageState(
       ) as TableWidget | undefined;
       if (!tableWidget?.connectedSlug) return;
       const searchFields = tableWidget.connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
+
+      /* _pathMap 참조해 단순 fieldKey → 실제 JSONB 경로로 변환
+       * row마다 구조가 다를 수 있으므로 모든 row를 순회해 유효한 경로를 첫 번째로 사용 */
+      let resolvedSk = sk;
+      if (sk) {
+        const rows = tableDataMap[tableWidgetId]?.rows ?? [];
+        for (const row of rows) {
+          const pathMap = row._pathMap as Record<string, string> | undefined;
+          if (pathMap?.[sk]) { resolvedSk = pathMap[sk]; break; }
+        }
+      }
+
       fetchTableData({
         tableWidget,
         connectedSlug: tableWidget.connectedSlug,
         searchFields,
         sv: searchValuesRef.current,
         page: 0,
-        sk,
+        sk: resolvedSk,
         sd,
       });
     },
-    [widgetItems, fetchTableData]
+    [widgetItems, fetchTableData, tableDataMap]
   );
 
   /* 폼 값 업데이트 */
@@ -880,6 +894,7 @@ export function useWidgetPageState(
       connectedContentWidgetIds: string[],
       dataSaveSlug: string,
       goBackAfterAction?: boolean,
+      _paramSave?: string,
     ) => {
       if (!dataSaveSlug) return;
       const allFlat = flatWidgets(widgetItems);

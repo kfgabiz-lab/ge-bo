@@ -30,6 +30,7 @@ import {
     BooleanTextField,
     ActionsField,
     SlugSelectField,
+    DateRangeStatusColumnField,
 } from './fields';
 import { DateFormatField } from './fields/DateFormatField';
 import {
@@ -67,11 +68,12 @@ export interface TableWidget {
 
 /** 셀 타입 메타 (List 빌더와 동일) */
 const CELL_TYPES: { type: CellType; label: string; desc: string }[] = [
-    { type: 'text',    label: 'Text',    desc: '일반 텍스트' },
-    { type: 'badge',   label: 'Badge',   desc: '배지 (아이콘/모양 옵션)' },
-    { type: 'boolean', label: 'Boolean', desc: '공개/비공개' },
-    { type: 'actions', label: 'Actions', desc: '액션 버튼' },
-    { type: 'date',    label: 'Date',    desc: '날짜/시간 포맷 표시' },
+    { type: 'text',             label: 'Text',             desc: '일반 텍스트' },
+    { type: 'badge',            label: 'Badge',            desc: '배지 (아이콘/모양 옵션)' },
+    { type: 'boolean',          label: 'Boolean',          desc: '공개/비공개' },
+    { type: 'actions',          label: 'Actions',          desc: '액션 버튼' },
+    { type: 'date',             label: 'Date',             desc: '날짜/시간 포맷 표시' },
+    { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 (이전/포함/이후)' },
 ];
 
 /* CUSTOM_ACTION_COLORS — 하위 호환 re-export (TableCellRenderer 등에서 참조 가능) */
@@ -119,10 +121,11 @@ function SortableColumnItem({
 
     /* 셀 타입별 배지 색상 */
     const typeBadgeCls =
-        col.cellType === 'badge'   ? 'bg-blue-100 text-blue-600' :
-        col.cellType === 'boolean' ? 'bg-emerald-100 text-emerald-600' :
-        col.cellType === 'actions' ? 'bg-orange-100 text-orange-600' :
-        col.cellType === 'date'    ? 'bg-violet-100 text-violet-600' :
+        col.cellType === 'badge'            ? 'bg-blue-100 text-blue-600' :
+        col.cellType === 'boolean'          ? 'bg-emerald-100 text-emerald-600' :
+        col.cellType === 'actions'          ? 'bg-orange-100 text-orange-600' :
+        col.cellType === 'date'             ? 'bg-violet-100 text-violet-600' :
+        col.cellType === 'dateRangeStatus'  ? 'bg-teal-100 text-teal-600' :
         'bg-slate-200 text-slate-600';
 
     return (
@@ -309,11 +312,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
         return (
             <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
                 <ColumnBaseField values={col} onChange={patch} />
-                {col.cellType === 'badge'   && <BadgeOptionsField   values={col} onChange={patch} />}
-                {col.cellType === 'text'    && <TextCodeGroupField  values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
-                {col.cellType === 'boolean' && <BooleanTextField    values={col} onChange={patch} />}
-                {col.cellType === 'actions' && <ActionsField        values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
-                {col.cellType === 'date'    && <DateFormatField     values={col} onChange={patch} />}
+                {col.cellType === 'badge'            && <BadgeOptionsField          values={col} onChange={patch} />}
+                {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
+                {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
+                {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
+                {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
+                {col.cellType === 'dateRangeStatus'  && <DateRangeStatusColumnField values={col} onChange={patch} />}
             </div>
         );
     };
@@ -482,6 +486,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                 )}
                                 {pendingCol.cellType === 'date' && (
                                     <DateFormatField
+                                        values={pendingCol}
+                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
+                                    />
+                                )}
+                                {pendingCol.cellType === 'dateRangeStatus' && (
+                                    <DateRangeStatusColumnField
                                         values={pendingCol}
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                     />

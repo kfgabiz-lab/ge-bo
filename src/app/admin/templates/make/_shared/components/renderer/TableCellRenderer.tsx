@@ -213,6 +213,35 @@ export function TableCellRenderer({
             return <span className="text-sm text-slate-700 truncate block" title={formatted}>{formatted}</span>;
         }
 
+        /* ── dateRangeStatus ── */
+        case 'dateRangeStatus': {
+            /* 다국어 키 우선, 없으면 직접 텍스트, 없으면 기본값 */
+            const beforeLabel  = col.beforeTextMsgKey  ? t(col.beforeTextMsgKey)  : (col.beforeText  || '예정');
+            const inRangeLabel = col.inRangeTextMsgKey ? t(col.inRangeTextMsgKey) : (col.inRangeText || '진행중');
+            const afterLabel   = col.afterTextMsgKey   ? t(col.afterTextMsgKey)   : (col.afterText   || '종료');
+            /* preview: 고정 샘플 텍스트 순환 표시 */
+            if (isPreview) {
+                const previewTexts = [beforeLabel, inRangeLabel, afterLabel];
+                return <span className="text-sm text-slate-600">{previewTexts[rowIndex % 3]}</span>;
+            }
+            /* live: 연결된 dateRange 컬럼 값으로 오늘 날짜 비교 → 상태 텍스트 반환 */
+            const rangeRaw = col.linkedDateRangeKey
+                ? String(resolveAccessor(row, col.linkedDateRangeKey) ?? '')
+                : '';
+            if (!rangeRaw) return <span className="text-sm text-slate-400">-</span>;
+            const [fromStr, toStr] = rangeRaw.split('~');
+            const today = new Date().toISOString().slice(0, 10);
+            let statusText = '-';
+            if (fromStr && today < fromStr) {
+                statusText = beforeLabel;
+            } else if (fromStr && toStr && today >= fromStr && today <= toStr) {
+                statusText = inRangeLabel;
+            } else if (toStr && today > toStr) {
+                statusText = afterLabel;
+            }
+            return <span className="text-sm text-slate-600">{statusText}</span>;
+        }
+
         /* ── text (default) ── */
         default: {
             if (isPreview) {

@@ -94,6 +94,15 @@ export interface FieldEditValues {
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];     // depth별 value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];      // depth별 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+    /* ── dateRangeStatus 전용 ── */
+    linkedDateRangeKey?: string;     // 연결할 dateRange 필드의 accessor (예: 'period')
+    beforeText?: string;             // 날짜 이전 표시 텍스트 (예: '예정')
+    beforeTextMsgKey?: string;       // 이전 텍스트 다국어 키
+    inRangeText?: string;            // 날짜 포함 표시 텍스트 (예: '진행중')
+    inRangeTextMsgKey?: string;      // 포함 텍스트 다국어 키
+    afterText?: string;              // 날짜 이후 표시 텍스트 (예: '종료')
+    afterTextMsgKey?: string;        // 이후 텍스트 다국어 키
+    statusDisplayStyle?: 'select' | 'radio'; // 검색 UI 표시 방식 (기본: select)
 }
 
 /**
