@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { Pencil, Trash2, Paperclip } from 'lucide-react';
+import { Pencil, Trash2, Paperclip, CopyPlus } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
@@ -46,14 +46,6 @@ const BADGE_DOT: Record<string, string> = {
     pink:    'bg-pink-500',    sky:    'bg-sky-500',
 };
 
-/** 커스텀 액션 버튼 색상 */
-const CA_CLS: Record<string, string> = {
-    slate:  'bg-slate-500 hover:bg-slate-600 text-white',
-    blue:   'bg-blue-500 hover:bg-blue-600 text-white',
-    green:  'bg-emerald-500 hover:bg-emerald-600 text-white',
-    red:    'bg-red-500 hover:bg-red-600 text-white',
-    orange: 'bg-orange-500 hover:bg-orange-600 text-white',
-};
 
 /* ────────────────────────────────────────────────────────── */
 
@@ -151,15 +143,16 @@ export function TableCellRenderer({
                             <Trash2 className="w-3.5 h-3.5" />
                         </button>
                     )}
-                    {/* 커스텀 액션 버튼 */}
-                    {(col.customActions || []).filter(ca => ca.label).map(ca => (
+                    {/* 복사 버튼 — DataTable에서는 disabled (SubList 전용 기능) */}
+                    {(col.actions || []).includes('copy') && (
                         <button
-                            key={ca.id}
-                            className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${CA_CLS[ca.color] || CA_CLS.slate}`}
+                            disabled
+                            className="p-1.5 rounded text-slate-300 cursor-not-allowed"
+                            title="복사 (SubList 전용)"
                         >
-                            {ca.label}
+                            <CopyPlus className="w-3.5 h-3.5" />
                         </button>
-                    ))}
+                    )}
                 </div>
             );
         }

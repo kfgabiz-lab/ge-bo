@@ -108,16 +108,6 @@ const FIELD_TYPES: { type: FieldType; label: string; desc: string; defaultColSpa
 
 /* ── ID 생성 ── */
 const uid = createIdGenerator('f');
-const caUid = createIdGenerator('ca'); // 커스텀 액션 버튼 ID 생성
-
-/* ── 커스텀 액션 버튼 색상 맵 (Tailwind 동적 클래스 purge 방지) ── */
-const CUSTOM_ACTION_COLORS: { value: string; label: string; cls: string }[] = [
-    { value: 'slate',   label: '기본',   cls: 'bg-slate-500 hover:bg-slate-600 text-white' },
-    { value: 'blue',    label: '파랑',   cls: 'bg-blue-500 hover:bg-blue-600 text-white' },
-    { value: 'green',   label: '초록',   cls: 'bg-emerald-500 hover:bg-emerald-600 text-white' },
-    { value: 'red',     label: '빨강',   cls: 'bg-red-500 hover:bg-red-600 text-white' },
-    { value: 'orange',  label: '주황',   cls: 'bg-orange-500 hover:bg-orange-600 text-white' },
-];
 
 /* ── 버튼 타입별 Tailwind 클래스 맵 (Tailwind 동적 클래스 purge 방지) ── */
 const BTN_TYPE_CLS: Record<string, string> = {
@@ -633,14 +623,6 @@ const buildTsxFile = (
         red: 'bg-red-500', purple: 'bg-purple-500', slate: 'bg-slate-500',
         pink: 'bg-pink-500', sky: 'bg-sky-500',
     };
-    /* 커스텀 액션 버튼 색상 정적 클래스 */
-    const CA_COLOR: Record<string, string> = {
-        slate:  'bg-slate-500 hover:bg-slate-600 text-white',
-        blue:   'bg-blue-500 hover:bg-blue-600 text-white',
-        green:  'bg-emerald-500 hover:bg-emerald-600 text-white',
-        red:    'bg-red-500 hover:bg-red-600 text-white',
-        orange: 'bg-orange-500 hover:bg-orange-600 text-white',
-    };
 
     /* ── 파일 시작 ── */
     lines.push("'use client';");
@@ -1075,11 +1057,6 @@ const buildTsxFile = (
                             lines.push(`${ind(11)}<button onClick={async () => { if (!menuSlug) { toast.error('메뉴에 slug를 설정해주세요.'); return; } if (window.confirm('삭제하시겠습니까?')) { await api.delete('/page-data/' + menuSlug + '/' + (row.id as number)); fetchData(0); } }} className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button>`);
                         }
                     });
-                    /* 커스텀 버튼 */
-                    (col.customActions || []).filter(ca => ca.label).forEach(ca => {
-                        const cls = CA_COLOR[ca.color] || CA_COLOR['slate'];
-                        lines.push(`${ind(11)}<button onClick={() => { /* TODO: ${ca.label} 처리 */ }} className="px-2 py-0.5 text-[11px] font-medium rounded transition-all ${cls}">${ca.label}</button>`);
-                    });
                     lines.push(`${ind(10)}</div>`);
                     break;
                 }
@@ -1244,7 +1221,6 @@ export default function MakeGridLayoutPage() {
     const [pendingColTrueText, setPendingColTrueText] = useState('공개');
     const [pendingColFalseText, setPendingColFalseText] = useState('비공개');
     const [pendingColActions, setPendingColActions] = useState<('edit'|'detail'|'delete')[]>(['edit', 'detail', 'delete']);
-    const [pendingColCustomActions, setPendingColCustomActions] = useState<{ id: string; label: string; color: string }[]>([]);
     const [pendingEditPopupSlug, setPendingEditPopupSlug] = useState('');
     const [pendingDetailPopupSlug, setPendingDetailPopupSlug] = useState('');
     const [pendingColWidth, setPendingColWidth] = useState<number | undefined>(150);
@@ -1501,7 +1477,6 @@ export default function MakeGridLayoutPage() {
         setPendingColTrueText('공개');
         setPendingColFalseText('비공개');
         setPendingColActions(['edit', 'detail', 'delete']);
-        setPendingColCustomActions([]);
         setPendingEditPopupSlug('');
         setPendingDetailPopupSlug('');
         if (type === 'actions') loadLayerTemplates();
@@ -1532,7 +1507,6 @@ export default function MakeGridLayoutPage() {
             trueText: pendingCellType === 'boolean' ? pendingColTrueText : undefined,
             falseText: pendingCellType === 'boolean' ? pendingColFalseText : undefined,
             actions: pendingCellType === 'actions' ? pendingColActions : undefined,
-            customActions: pendingCellType === 'actions' ? pendingColCustomActions : undefined,
             editPopupSlug: pendingCellType === 'actions' ? (pendingEditPopupSlug || undefined) : undefined,
             detailPopupSlug: pendingCellType === 'actions' ? (pendingDetailPopupSlug || undefined) : undefined,
         }]);
@@ -2638,20 +2612,6 @@ export default function MakeGridLayoutPage() {
                                                                 )}
                                                             </div>
                                                         ))}
-                                                        {/* 커스텀 버튼 목록 */}
-                                                        {(col.customActions || []).map(ca => (
-                                                            <div key={ca.id} className="flex items-center gap-1.5 pl-0.5">
-                                                                <select value={ca.color} onChange={e => updateTableColumn(col.id, { customActions: (col.customActions || []).map(c => c.id === ca.id ? { ...c, color: e.target.value } : c) })} className="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white">
-                                                                    {CUSTOM_ACTION_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                                                </select>
-                                                                <input type="text" value={ca.label} onChange={e => updateTableColumn(col.id, { customActions: (col.customActions || []).map(c => c.id === ca.id ? { ...c, label: e.target.value } : c) })} placeholder="버튼명" className="flex-1 text-[11px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900" />
-                                                                <button onClick={() => updateTableColumn(col.id, { customActions: (col.customActions || []).filter(c => c.id !== ca.id) })} className="text-slate-300 hover:text-red-400 transition-all"><X className="w-3 h-3" /></button>
-                                                            </div>
-                                                        ))}
-                                                        {/* 커스텀 버튼 추가 */}
-                                                        <button onClick={() => updateTableColumn(col.id, { customActions: [...(col.customActions || []), { id: caUid(), label: '', color: 'slate' }] })} className="w-full flex items-center justify-center gap-1 py-0.5 border border-dashed border-slate-200 rounded text-[10px] text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all">
-                                                            <Plus className="w-3 h-3" />버튼 추가
-                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
@@ -2792,20 +2752,6 @@ export default function MakeGridLayoutPage() {
                                                                 )}
                                                             </div>
                                                         ))}
-                                                        {/* 커스텀 버튼 목록 */}
-                                                        {pendingColCustomActions.map(ca => (
-                                                            <div key={ca.id} className="flex items-center gap-1.5 pl-0.5">
-                                                                <select value={ca.color} onChange={e => setPendingColCustomActions(prev => prev.map(c => c.id === ca.id ? { ...c, color: e.target.value } : c))} className="text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white">
-                                                                    {CUSTOM_ACTION_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                                                                </select>
-                                                                <input type="text" value={ca.label} onChange={e => setPendingColCustomActions(prev => prev.map(c => c.id === ca.id ? { ...c, label: e.target.value } : c))} placeholder="버튼명" className="flex-1 text-[11px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900" />
-                                                                <button onClick={() => setPendingColCustomActions(prev => prev.filter(c => c.id !== ca.id))} className="text-slate-300 hover:text-red-400 transition-all"><X className="w-3 h-3" /></button>
-                                                            </div>
-                                                        ))}
-                                                        {/* 커스텀 버튼 추가 */}
-                                                        <button onClick={() => setPendingColCustomActions(prev => [...prev, { id: caUid(), label: '', color: 'slate' }])} className="w-full flex items-center justify-center gap-1 py-0.5 border border-dashed border-slate-200 rounded text-[10px] text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all">
-                                                            <Plus className="w-3 h-3" />버튼 추가
-                                                        </button>
                                                     </div>
                                                 )}
                                                 <div className="flex gap-1.5 pt-1">
@@ -3212,9 +3158,6 @@ export default function MakeGridLayoutPage() {
                                                                             <button onClick={() => { if (col.detailPopupSlug) { setPreviewPopupTrigger({ slug: col.detailPopupSlug, ts: Date.now() }); } }} className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><Eye className="w-3.5 h-3.5" /></button>
                                                                         )}
                                                                         {(col.actions || []).includes('delete') && <button className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>}
-                                                                        {(col.customActions || []).filter(ca => ca.label).map(ca => (
-                                                                            <button key={ca.id} className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${CUSTOM_ACTION_COLORS.find(c => c.value === ca.color)?.cls || CUSTOM_ACTION_COLORS[0].cls}`}>{ca.label}</button>
-                                                                        ))}
                                                                     </div>
                                                                 )}
                                                             </td>

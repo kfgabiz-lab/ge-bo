@@ -136,6 +136,10 @@ interface PageGridRendererProps {
     multiSelectValuesMap?: Record<string, number[]>;
     /** 선택 변경 콜백 — (widgetId, ids) */
     onMultiSelectChange?: (widgetId: string, ids: number[]) => void;
+    /** widgetId → itemId → fieldKey → value */
+    multiSelectExtraFieldValuesMap?: Record<string, Record<number, Record<string, string>>>;
+    /** extraField 값 변경 콜백 — (widgetId, itemId, fieldKey, value) */
+    onMultiSelectExtraFieldChange?: (widgetId: string, itemId: number, fieldKey: string, value: string) => void;
 
     /* live 모드 전용 — 엑셀 다운로드 */
     /**
@@ -188,6 +192,8 @@ export function PageGridRenderer({
     onSubListRowsChange,
     multiSelectValuesMap,
     onMultiSelectChange,
+    multiSelectExtraFieldValuesMap,
+    onMultiSelectExtraFieldChange,
     currentSearchParams,
     urlParams,
 }: PageGridRendererProps) {
@@ -338,6 +344,8 @@ export function PageGridRenderer({
                                         /* multiselect */
                                         multiSelectValuesMap={multiSelectValuesMap}
                                         onMultiSelectChange={onMultiSelectChange}
+                                        multiSelectExtraFieldValuesMap={multiSelectExtraFieldValuesMap}
+                                        onMultiSelectExtraFieldChange={onMultiSelectExtraFieldChange}
                                         /* 팝업 */
                                         dataSlug={dataSlug}
                                         onRefresh={onRefresh}

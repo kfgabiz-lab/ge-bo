@@ -82,16 +82,6 @@ const FIELD_TYPES: { type: FieldType; label: string; desc: string; defaultColSpa
 
 /* ── ID 생성 ── */
 const uid = createIdGenerator('f');
-const caUid = createIdGenerator('ca'); // 커스텀 액션 버튼 ID 생성
-
-/* ── 커스텀 액션 버튼 색상 맵 (Tailwind 동적 클래스 purge 방지) ── */
-const CUSTOM_ACTION_COLORS: { value: string; label: string; cls: string }[] = [
-    { value: 'slate', label: '기본', cls: 'bg-slate-500 hover:bg-slate-600 text-white' },
-    { value: 'blue', label: '파랑', cls: 'bg-blue-500 hover:bg-blue-600 text-white' },
-    { value: 'green', label: '초록', cls: 'bg-emerald-500 hover:bg-emerald-600 text-white' },
-    { value: 'red', label: '빨강', cls: 'bg-red-500 hover:bg-red-600 text-white' },
-    { value: 'orange', label: '주황', cls: 'bg-orange-500 hover:bg-orange-600 text-white' },
-];
 
 /* ── 버튼 타입별 Tailwind 클래스 맵 (Tailwind 동적 클래스 purge 방지) ── */
 const BTN_TYPE_CLS: Record<string, string> = {
@@ -1645,10 +1635,6 @@ export default function MakeListPage() {
                                                                         ><Eye className="w-3.5 h-3.5" /></button>
                                                                     )}
                                                                     {(col.actions || []).includes('delete') && <button className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>}
-                                                                    {/* 커스텀 버튼 렌더링 */}
-                                                                    {(col.customActions || []).filter(ca => ca.label).map(ca => (
-                                                                        <button key={ca.id} className={`px-2 py-0.5 text-[11px] font-medium rounded transition-all ${CUSTOM_ACTION_COLORS.find(c => c.value === ca.color)?.cls || CUSTOM_ACTION_COLORS[0].cls}`}>{ca.label}</button>
-                                                                    ))}
                                                                 </div>
                                                             )}
                                                         </td>

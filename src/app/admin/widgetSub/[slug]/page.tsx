@@ -87,6 +87,8 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
 
     /* ── MultiSelect 위젯별 선택 ID 배열 ── */
     const [multiSelectValuesMap, setMultiSelectValuesMap] = useState<Record<string, number[]>>({});
+    /* ── MultiSelect 항목별 추가 입력 필드 값 — widgetId → itemId → fieldKey → value ── */
+    const [multiSelectExtraFieldValuesMap, setMultiSelectExtraFieldValuesMap] = useState<Record<string, Record<number, Record<string, string>>>>({});
     /* ── urlParamSaveExtras — _paramSave=true 시 폼에 없는 URL 파라미터 임시 보관 (저장 시 dataJson에 병합) ── */
     const [urlParamSaveExtras, setUrlParamSaveExtras] = useState<Record<string, unknown>>({});
     /** SubList 파일 — widgetId → rowId → colId → 새로 선택한 파일 목록 */
@@ -137,11 +139,31 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
             }));
         });
 
-        /* MultiSelect 복원 — contentKey 배열 값을 number[] 로 복원 */
+        /* MultiSelect 복원 — number[] 또는 { id, ...extraFields }[] 두 형태 모두 처리 */
         targetMultiSelects.forEach(mw => {
             if (!mw.contentKey) return;
             const raw = dataJson[mw.contentKey];
-            if (Array.isArray(raw)) {
+            if (!Array.isArray(raw)) return;
+
+            /* extraFields 있는 경우: [{ id: 1, role: "팀장" }, ...] 형태 */
+            if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
+                const items = raw as { id: number; [key: string]: unknown }[];
+                /* 선택 ID 배열 복원 */
+                setMultiSelectValuesMap(prev => ({
+                    ...prev,
+                    [mw.widgetId]: items.map(item => item.id),
+                }));
+                /* extraField 값 복원 */
+                const extraVals: Record<number, Record<string, string>> = {};
+                items.forEach(item => {
+                    const { id, ...fields } = item;
+                    extraVals[id] = Object.fromEntries(
+                        Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])
+                    );
+                });
+                setMultiSelectExtraFieldValuesMap(prev => ({ ...prev, [mw.widgetId]: extraVals }));
+            } else {
+                /* extraFields 없는 경우: [1, 3, ...] 형태 */
                 setMultiSelectValuesMap(prev => ({
                     ...prev,
                     [mw.widgetId]: (raw as unknown[]).filter(x => typeof x === 'number') as number[],
@@ -450,8 +472,10 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     .catch(() => {});
             });
         } else if (queryId) {
-            const formWidget    = formWidgets[0];
-            const connectedSlug = formWidget?.connectedSlug;
+            /* form 없으면 multiselect → sublist 순으로 connectedSlug fallback */
+            const connectedSlug = formWidgets[0]?.connectedSlug
+                ?? multiSelectWidgets[0]?.connectedSlug
+                ?? sublistWidgets[0]?.connectedSlug;
             if (connectedSlug) {
                 api.get(`/page-data/${connectedSlug}/${Number(queryId)}`)
                     .then(async dataRes => {
@@ -706,6 +730,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     formFileIdsMap,
                     processedSubListRowsMap,
                     multiSelectMap,
+                    multiSelectExtraFieldValuesMap,
                 );
 
                 /* urlParamSaveExtras 병합 — 저장 시 폼에 없던 파라미터를 dataJson에 추가 */
@@ -896,6 +921,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                     formFileIdsMap,
                     processedSubListRowsMap,
                     multiSelectMap,
+                    multiSelectExtraFieldValuesMap,
                 );
 
                 const res = await api.post(`/page-data/${dataSaveSlug}`, {
@@ -1064,6 +1090,16 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 onSubListRowsChange={(wId, rows) => setSubListRowsMap(prev => ({ ...prev, [wId]: rows }))}
                 multiSelectValuesMap={multiSelectValuesMap}
                 onMultiSelectChange={(wId, ids) => setMultiSelectValuesMap(prev => ({ ...prev, [wId]: ids }))}
+                multiSelectExtraFieldValuesMap={multiSelectExtraFieldValuesMap}
+                onMultiSelectExtraFieldChange={(wId, itemId, fieldKey, value) =>
+                    setMultiSelectExtraFieldValuesMap(prev => ({
+                        ...prev,
+                        [wId]: {
+                            ...(prev[wId] ?? {}),
+                            [itemId]: { ...(prev[wId]?.[itemId] ?? {}), [fieldKey]: value },
+                        },
+                    }))
+                }
                 fileValuesMap={fileValuesMap}
                 existingFileMetaMap={existingFileMetaMap}
                 imgBlobUrls={imgBlobUrls}

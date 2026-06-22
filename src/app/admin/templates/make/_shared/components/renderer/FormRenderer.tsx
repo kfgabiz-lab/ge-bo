@@ -23,13 +23,14 @@
  *   />
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import type { FormFieldItem } from '../builder/FormBuilder';
 import type { RendererMode } from './types';
 import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { CodeGroupDef, SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
+import { applyDataGeneration } from '../../utils';
 
 interface FormRendererProps {
     mode: RendererMode;
@@ -143,6 +144,35 @@ export function FormRenderer({
     const shouldDisable = (f: FormFieldItem): boolean =>
         !isPreview && !!f.disableCondition && evalCondition(f.disableCondition);
 
+    /**
+     * 필드값 변경 핸들러 — generationKey 설정 시 대상 필드에 변환값 자동 입력
+     * - generationKey 마지막 '.' 이후 세그먼트 = 대상 fieldKey
+     * - 대상 fieldKey가 같은 Form 내에 있으면 실시간 자동 입력
+     */
+    const handleFieldChange = useCallback((fieldId: string, value: string) => {
+        onChangeValues?.(fieldId, value);
+
+        /* generationKey 자동입력 처리 */
+        const sourceField = fields.find(f => f.id === fieldId);
+        if (!sourceField?.generationKey) return;
+
+        /* dot notation 마지막 세그먼트를 타겟 fieldKey로 사용 */
+        const parts = sourceField.generationKey.split('.');
+        const targetFieldKey = parts[parts.length - 1];
+        const targetFieldId  = keyToId[targetFieldKey];
+        if (!targetFieldId || targetFieldId === fieldId) return;
+
+        /* 4가지 변환 옵션 적용 */
+        const transformed = applyDataGeneration(
+            value,
+            sourceField.dataReplacement,
+            sourceField.caseChange,
+            sourceField.appendText,
+            sourceField.truncateLength,
+        );
+        onChangeValues?.(targetFieldId, transformed);
+    }, [fields, keyToId, onChangeValues]);
+
 
     if (!fields.length) {
         return (
@@ -202,7 +232,7 @@ export function FormRenderer({
                             field={f as unknown as SearchFieldConfig}
                             codeGroups={codeGroups}
                             value={values[f.id] ?? ''}
-                            onChange={isPreview ? () => {} : v => onChangeValues?.(f.id, v)}
+                            onChange={isPreview ? () => {} : v => handleFieldChange(f.id, v)}
                             fileList={fileValues?.[f.id]}
                             existingFileMeta={existingFileMeta?.[f.id]}
                             imgBlobUrls={imgBlobUrls}

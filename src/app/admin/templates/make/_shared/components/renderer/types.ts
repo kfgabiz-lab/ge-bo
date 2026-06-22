@@ -128,7 +128,8 @@ export type SubListColumnType =
     | 'dateRange'  // 날짜 범위 from~to (DateRangeField)
     | 'textarea'   // 여러 줄 텍스트 (FormTextareaField)
     | 'file'       // 파일 첨부 (FileField)
-    | 'image';     // 이미지 업로드 (ImageField)
+    | 'image'      // 이미지 업로드 (ImageField)
+    | 'action';    // 액션 버튼 (복사 전용)
 
 /**
  * 서브 목록 컬럼 설정
@@ -176,6 +177,8 @@ export interface SubListColumn {
     defaultEndDateOffset?: number;
     defaultEndDate?: string;
     disableEndPast?: boolean;
+    /* ── action 타입 전용 ── */
+    actions?: ('copy' | 'delete')[];    // SubList action 컬럼: copy, delete 가능
 }
 
 /**
@@ -198,12 +201,36 @@ export interface SubListWidget {
     columns: SubListColumn[];     // 컬럼 설정 목록
 }
 
+/** 다중선택 항목별 추가 입력 필드 타입 (FieldRenderer 재사용 대상 타입만) */
+export type MultiSelectExtraFieldType = 'input' | 'select' | 'radio' | 'checkbox' | 'date';
+
+/**
+ * 다중선택 항목별 추가 입력 필드 정의
+ * - 선택된 각 항목 행에 인라인으로 렌더링
+ * - FieldRenderer를 재사용하므로 SearchFieldConfig 호환 구조
+ * - id: DnD 내부 식별자 (uid 자동생성), key: 저장 키 (사용자 입력)
+ */
+export interface MultiSelectExtraField {
+    id: string;                       // DnD 내부 식별자 (uid 자동생성)
+    key: string;                      // 저장 키 (dataJson 내 필드명, 사용자 입력)
+    type: MultiSelectExtraFieldType;
+    label: string;
+    labelMsgKey?: string;             // 라벨 다국어 키
+    options?: string[];               // select / radio / checkbox 전용 ("텍스트:값" 형식)
+    codeGroupCode?: string;           // 공통코드 그룹 코드
+    required?: boolean;
+    placeholder?: string;
+    placeholderMsgKey?: string;       // placeholder 다국어 키
+}
+
 /**
  * 다중선택 위젯
  * 호출 slug에서 옵션 목록을 가져와 체크박스 드롭다운으로 다중 선택하고,
  * 선택된 항목의 ID 배열을 contentKey로 저장한다.
  * - sourceSlug  : 드롭다운 옵션을 가져올 slug (호출 slug)
  * - connectedSlug: 저장 시 연결되는 slug (연결 slug)
+ * - extraFields  : 선택된 항목마다 인라인으로 표시할 추가 입력 필드 목록
+ *                  있으면 저장 구조가 number[] → { id, ...필드값 }[] 로 변경
  */
 export interface MultiSelectWidget {
     type: 'multiselect';
@@ -225,6 +252,8 @@ export interface MultiSelectWidget {
     required?: boolean;           // 필수 여부 (true: 최소 1개 이상 선택해야 저장 가능)
     showBorder?: boolean;
     bgColor?: string;
+    /** 선택된 항목마다 인라인으로 표시할 추가 입력 필드 목록 */
+    extraFields?: MultiSelectExtraField[];
 }
 
 /* ── Tab 위젯 타입 ── */

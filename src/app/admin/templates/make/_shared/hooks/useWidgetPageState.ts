@@ -113,6 +113,8 @@ export function useWidgetPageState(
 
   /* 멀티셀렉트 */
   const [multiSelectValuesMap, setMultiSelectValuesMap] = useState<Record<string, number[]>>({});
+  /** widgetId → itemId → fieldKey → value */
+  const [multiSelectExtraFieldValuesMap, setMultiSelectExtraFieldValuesMap] = useState<Record<string, Record<number, Record<string, string>>>>({});
 
   /* 수정 모드 group_id (신규 저장 후 다음 저장 시 수정 모드로 처리) */
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
@@ -283,10 +285,8 @@ export function useWidgetPageState(
       .then((dataRes) => {
         const rawDataJson = (dataRes.data.dataJson ?? {}) as Record<string, unknown>;
 
-        /* 탭 contentKey 레벨 추출 (tab1) */
-        const tabSection: Record<string, unknown> = options?.contentKey
-          ? ((rawDataJson[options.contentKey] as Record<string, unknown>) ?? rawDataJson)
-          : rawDataJson;
+        /* 폼 contentKey 레벨에서 바로 접근 (탭키 감싸기 제거) */
+        const tabSection: Record<string, unknown> = rawDataJson;
 
         /* 파일 ID 수집 (메타 로드용) */
         const allFileIds: number[] = [];
@@ -715,7 +715,8 @@ export function useWidgetPageState(
             formValuesMap,
             formFileIdsMap,
             processedSubListRowsMap,
-            multiSelectMap
+            multiSelectMap,
+            multiSelectExtraFieldValuesMap,
           );
 
           /* 6. 저장 (생성 or 수정) */
@@ -742,8 +743,8 @@ export function useWidgetPageState(
                 /* 기존 데이터 없으면 빈 객체로 시작 */
               }
             }
-            /* 현재 탭 섹션만 교체, 나머지 탭 섹션 보존 */
-            finalDataJson = { ...baseDataJson, [options.contentKey]: dataJson };
+            /* 탭키 없이 폼 섹션 직접 merge (다른 탭 섹션 보존) */
+            finalDataJson = { ...baseDataJson, ...dataJson };
           }
 
           let savedDataId: number;
@@ -995,6 +996,7 @@ export function useWidgetPageState(
           formFileIdsMap,
           processedSubListRowsMap,
           multiSelectMap,
+          multiSelectExtraFieldValuesMap,
         );
 
         /* 6. dataSaveSlug에 신규 저장 */
@@ -1099,6 +1101,15 @@ export function useWidgetPageState(
     multiSelectValuesMap,
     onMultiSelectChange: (wId: string, ids: number[]) =>
       setMultiSelectValuesMap((prev) => ({ ...prev, [wId]: ids })),
+    multiSelectExtraFieldValuesMap,
+    onMultiSelectExtraFieldChange: (wId: string, itemId: number, fieldKey: string, value: string) =>
+      setMultiSelectExtraFieldValuesMap((prev) => ({
+        ...prev,
+        [wId]: {
+          ...(prev[wId] ?? {}),
+          [itemId]: { ...(prev[wId]?.[itemId] ?? {}), [fieldKey]: value },
+        },
+      })),
   };
 
   return { gridProps, setSubListRowsMap };

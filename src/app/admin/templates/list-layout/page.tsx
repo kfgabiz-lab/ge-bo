@@ -67,7 +67,6 @@ const COLUMNS: TableColumnConfig[] = [
         id: 'c-actions', header: '관리', accessor: '_id',
         align: 'center', sortable: false, cellType: 'actions',
         actions: ['edit', 'detail', 'delete'],
-        customActions: [{ id: 'ca-approve', label: '승인', color: 'green' }],
     },
 ];
 

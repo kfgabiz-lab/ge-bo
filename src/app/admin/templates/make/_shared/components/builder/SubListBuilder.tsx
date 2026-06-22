@@ -39,6 +39,7 @@ import {
     FormTextareaField, FileField, ImageField,
     SlugSelectField,
 } from './fields';
+import { ActionsField } from './fields/ActionsField';
 import type { FieldEditValues } from './fields/types';
 import { createIdGenerator } from '../../utils';
 import type { SubListWidget, SubListColumn, SubListColumnType } from '../renderer/types';
@@ -54,6 +55,7 @@ const SUBLIST_COLUMN_TYPES: FieldTypeItem[] = [
     { type: 'textarea',  label: 'Textarea',   desc: '여러 줄 텍스트' },
     { type: 'file',      label: 'File',       desc: '파일 첨부' },
     { type: 'image',     label: 'Image',      desc: '이미지 업로드' },
+    { type: 'action',    label: 'Action',     desc: '액션 버튼 (복사)' },
 ];
 
 interface SubListBuilderProps {
@@ -115,6 +117,8 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         defaultEndDateOffset:   col.defaultEndDateOffset,
         defaultEndDate:         col.defaultEndDate,
         disableEndPast:         col.disableEndPast,
+        /* action */
+        actions: col.actions as FieldEditValues['actions'],
     };
 }
 
@@ -165,6 +169,8 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.defaultEndDateOffset   !== undefined) patch.defaultEndDateOffset   = updates.defaultEndDateOffset;
     if (updates.defaultEndDate         !== undefined) patch.defaultEndDate         = updates.defaultEndDate;
     if (updates.disableEndPast         !== undefined) patch.disableEndPast         = updates.disableEndPast;
+    /* action */
+    if (updates.actions                !== undefined) patch.actions                = updates.actions as ('copy')[];
     return patch;
 }
 
@@ -203,6 +209,7 @@ function SortableColumnItem({
         textarea:  'bg-amber-50 text-amber-600',
         file:      'bg-orange-50 text-orange-600',
         image:     'bg-pink-50 text-pink-600',
+        action:    'bg-slate-100 text-slate-600',
     };
 
     return (
@@ -300,6 +307,16 @@ function ColumnEditPanel({
             {col.type === 'textarea'  && <FormTextareaField {...commonProps} />}
             {col.type === 'file'      && <FileField         {...commonProps} />}
             {col.type === 'image'     && <ImageField        {...commonProps} />}
+            {/* action 타입 — SubList는 수정만 비활성, 삭제/복사 체크 가능 */}
+            {col.type === 'action'    && (
+                <ActionsField
+                    values={{ actions: col.actions }}
+                    onChange={patch => onChange(fromFieldValues(patch))}
+                    layerTemplates={[]}
+                    onRequestLayerTemplates={() => {}}
+                    disabledActions={['edit']}
+                />
+            )}
 
         </div>
     );
@@ -333,7 +350,10 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
     /* ── 타입 선택 후 컬럼 추가 ── */
     const addColumn = (type: SubListColumnType) => {
         const newCol: SubListColumn = {
-            id: uid(), key: '', label: '', type,
+            id: uid(),
+            key:   type === 'action' ? 'action' : '',
+            label: type === 'action' ? '관리'   : '',
+            type,
             required: false,
         };
         onChange({ ...widget, columns: [...widget.columns, newCol] });

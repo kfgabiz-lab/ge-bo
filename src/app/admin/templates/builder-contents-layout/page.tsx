@@ -289,7 +289,7 @@ const SAMPLE_CATEGORY_4: CategoryWidget = {
     allowCreate: true, allowEdit: true, allowDelete: true,
 };
 
-/** 다중선택 — 담당자 선택 샘플 (name,dept 필드 표시) */
+/** 다중선택 — 담당자 선택 샘플 (name,dept + 추가 입력 필드 5종 전체 포함) */
 const SAMPLE_MULTISELECT: MultiSelectWidget = {
     type: 'multiselect',
     widgetId: 'guide-multiselect',
@@ -300,6 +300,13 @@ const SAMPLE_MULTISELECT: MultiSelectWidget = {
     placeholder: '담당자를 선택하세요',
     title: '담당자 선택',
     showBorder: true,
+    extraFields: [
+        { id: 'ef-1', key: 'role',      type: 'select',   label: '역할',   options: ['개발자:개발자', '디자이너:디자이너', '기획자:기획자', 'QA:QA'] },
+        { id: 'ef-2', key: 'startDate', type: 'date',     label: '시작일' },
+        { id: 'ef-3', key: 'note',      type: 'input',    label: '메모',   placeholder: '비고 입력' },
+        { id: 'ef-4', key: 'level',     type: 'radio',    label: '중요도', options: ['높음:높음', '보통:보통', '낮음:낮음'] },
+        { id: 'ef-5', key: 'notify',    type: 'checkbox', label: '알림',   options: ['이메일:email', 'SMS:sms'] },
+    ],
 };
 
 /** 기본정보 탭용 간단 폼 — 핵심 필드만 추출 */

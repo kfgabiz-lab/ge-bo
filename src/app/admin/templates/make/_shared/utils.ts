@@ -416,11 +416,12 @@ export const getTemplateLabel = (t: {
  * @param formValuesMap       widgetId → { fieldId: 값 } 폼 필드 값 맵
  * @param formFileIdsMap      widgetId → { fieldId: number[] } 파일 ID 맵 (기존+신규 합산 완료)
  * @param subListRowsMap      widgetId → 행 배열 (_rowId 제거, 파일 컬럼 ID 배열 완성 상태)
- * @param multiSelectMap      widgetId → number[] 선택된 ID 배열
+ * @param multiSelectMap             widgetId → number[] 선택된 ID 배열
+ * @param multiSelectExtraFieldMap   widgetId → itemId → fieldKey → value (extraFields 있을 때만)
  * @returns { dataJson, pkKeys }
  *
  * @example
- * const { dataJson, pkKeys } = buildDataJson(widgets, formValuesMap, formFileIdsMap, subListRowsMap, multiSelectMap);
+ * const { dataJson, pkKeys } = buildDataJson(widgets, formValuesMap, formFileIdsMap, subListRowsMap, multiSelectMap, multiSelectExtraFieldMap);
  */
 export function buildDataJson(
     widgets: Array<{
@@ -428,11 +429,13 @@ export function buildDataJson(
         widgetId?: string;
         fields?: import('./components/builder/FormBuilder').FormFieldItem[];
         contentKey?: string;
+        extraFields?: import('./components/renderer/types').MultiSelectExtraField[];
     }>,
     formValuesMap: Record<string, Record<string, string>>,
     formFileIdsMap: Record<string, Record<string, number[]>>,
     subListRowsMap: Record<string, Record<string, unknown>[]>,
     multiSelectMap: Record<string, number[]>,
+    multiSelectExtraFieldMap?: Record<string, Record<number, Record<string, string>>>,
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
@@ -455,9 +458,58 @@ export function buildDataJson(
             if (w.contentKey) dataJson[w.contentKey] = section;
             else Object.assign(dataJson, section);
 
+            /* 데이터생성 — generationKey가 있는 필드의 변환값을 지정 경로에 저장
+             * 1단계: "fieldKey"         → dataJson.fieldKey
+             * 2단계: "ck.fieldKey"      → dataJson.ck.fieldKey
+             * 3단계: "tk.ck.fieldKey"   → dataJson.tk.ck.fieldKey */
+            (w.fields ?? []).forEach(f => {
+                if (!f.generationKey) return;
+                if (f.type === 'file' || f.type === 'image' || f.type === 'media') return;
+                const sourceValue = rawValues[f.id] ?? '';
+                const transformed = applyDataGeneration(
+                    sourceValue,
+                    f.dataReplacement,
+                    f.caseChange,
+                    f.appendText,
+                    f.truncateLength,
+                );
+                const parts = f.generationKey.split('.');
+                if (parts.length === 1) {
+                    dataJson[parts[0]] = transformed;
+                } else if (parts.length === 2) {
+                    const [ck, fk] = parts;
+                    if (!dataJson[ck] || typeof dataJson[ck] !== 'object' || Array.isArray(dataJson[ck])) {
+                        dataJson[ck] = {};
+                    }
+                    (dataJson[ck] as Record<string, unknown>)[fk] = transformed;
+                } else if (parts.length === 3) {
+                    const [tk, ck, fk] = parts;
+                    if (!dataJson[tk] || typeof dataJson[tk] !== 'object' || Array.isArray(dataJson[tk])) {
+                        dataJson[tk] = {};
+                    }
+                    const tabSection = dataJson[tk] as Record<string, unknown>;
+                    if (!tabSection[ck] || typeof tabSection[ck] !== 'object' || Array.isArray(tabSection[ck])) {
+                        tabSection[ck] = {};
+                    }
+                    (tabSection[ck] as Record<string, unknown>)[fk] = transformed;
+                }
+            });
+
         } else if (w.type === 'multiselect') {
             if (w.contentKey) {
-                dataJson[w.contentKey] = multiSelectMap[w.widgetId ?? ''] ?? [];
+                const selectedIds = multiSelectMap[w.widgetId ?? ''] ?? [];
+                const extraFields = w.extraFields ?? [];
+                if (extraFields.length > 0) {
+                    /* extraFields 있으면 객체 배열로 저장: [{ id, fieldKey: value, ... }] */
+                    const extraVals = multiSelectExtraFieldMap?.[w.widgetId ?? ''] ?? {};
+                    dataJson[w.contentKey] = selectedIds.map(id => ({
+                        id,
+                        ...Object.fromEntries(extraFields.map(ef => [ef.key, extraVals[id]?.[ef.key] ?? ''])),
+                    }));
+                } else {
+                    /* extraFields 없으면 기존 number[] 방식 유지 */
+                    dataJson[w.contentKey] = selectedIds;
+                }
             }
 
         } else if (w.type === 'sublist') {
@@ -468,6 +520,54 @@ export function buildDataJson(
     }
 
     return { dataJson, pkKeys };
+}
+
+/**
+ * 데이터생성 자동변환 — Input/FormTextarea 필드의 generationKey 기능에 사용
+ *
+ * 적용 순서: 데이터변경 → 문자변경 → 텍스트추가(끝) → 글자자르기
+ *
+ * @param value           원본 값 (소스 필드 입력값)
+ * @param dataReplacement 데이터변경: 'hyphen' 이면 공백·특수문자 → '-' 치환, 마지막 '-' 제거
+ * @param caseChange      문자변경: 'upper'=대문자 / 'lower'=소문자
+ * @param appendText      텍스트추가(끝): 변환 후 끝에 붙이는 고정 문자열
+ * @param truncateLength  글자자르기: N자 미만으로 자름 (length >= N 이면 slice(0, N-1))
+ * @returns 변환된 문자열
+ *
+ * @example
+ * applyDataGeneration('Hello World!', 'hyphen', 'lower', '-doc', 20)
+ * // → 'hello-world-doc'
+ */
+export function applyDataGeneration(
+    value: string,
+    dataReplacement?: 'none' | 'hyphen',
+    caseChange?: 'none' | 'upper' | 'lower',
+    appendText?: string,
+    truncateLength?: number,
+): string {
+    let result = value;
+
+    /* 1단계: 데이터변경 — 공백·특수문자 → '-', 연속 '-' 정리, 마지막 '-' 제거 */
+    if (dataReplacement === 'hyphen') {
+        result = result
+            .replace(/[\s\W]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/-$/g, '');
+    }
+
+    /* 2단계: 문자변경 */
+    if (caseChange === 'upper') result = result.toUpperCase();
+    else if (caseChange === 'lower') result = result.toLowerCase();
+
+    /* 3단계: 텍스트추가(끝) */
+    if (appendText) result = result + appendText;
+
+    /* 4단계: 글자자르기 — truncateLength 미만으로 자름 */
+    if (truncateLength && result.length >= truncateLength) {
+        result = result.slice(0, truncateLength - 1);
+    }
+
+    return result;
 }
 
 /**

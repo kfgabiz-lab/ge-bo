@@ -289,7 +289,6 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 falseText: p.cellType === 'boolean' ? p.falseText : undefined,
                 /* actions 전용 */
                 actions:            p.cellType === 'actions' ? p.actions            : undefined,
-                customActions:      p.cellType === 'actions' ? p.customActions      : undefined,
                 editPopupSlug:      p.cellType === 'actions' ? p.editPopupSlug      : undefined,
                 detailPopupSlug:    p.cellType === 'actions' ? p.detailPopupSlug    : undefined,
                 editFileLayerSlug:  p.cellType === 'actions' ? p.editFileLayerSlug  : undefined,
@@ -315,7 +314,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 {col.cellType === 'badge'            && <BadgeOptionsField          values={col} onChange={patch} />}
                 {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
                 {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
-                {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
+                {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} disabledActions={['copy']} />}
                 {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
                 {col.cellType === 'dateRangeStatus'  && <DateRangeStatusColumnField values={col} onChange={patch} />}
             </div>
@@ -482,6 +481,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                         layerTemplates={layerTemplates}
                                         onRequestLayerTemplates={loadLayerTemplates}
+                                        disabledActions={['copy']}
                                     />
                                 )}
                                 {pendingCol.cellType === 'date' && (

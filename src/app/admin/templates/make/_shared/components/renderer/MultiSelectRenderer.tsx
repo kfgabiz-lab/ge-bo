@@ -25,7 +25,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, X, Search } from 'lucide-react';
 import api from '@/lib/api';
 import { RendererContainer } from './RendererContainer';
-import type { MultiSelectWidget, RendererMode } from './types';
+import { FieldRenderer } from './FieldRenderer';
+import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from './types';
+import type { SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
@@ -52,6 +54,29 @@ export interface MultiSelectRendererProps {
     selectedIds?: number[];
     /** live 모드 — 선택 변경 콜백 */
     onChange?: (ids: number[]) => void;
+    /**
+     * live 모드 — 항목별 추가 입력 필드 값
+     * { [itemId]: { [fieldId]: value } }
+     */
+    extraFieldValues?: Record<number, Record<string, string>>;
+    /** live 모드 — 추가 필드 값 변경 콜백 */
+    onExtraFieldChange?: (itemId: number, fieldId: string, value: string) => void;
+}
+
+/**
+ * MultiSelectExtraField → SearchFieldConfig 변환
+ * FieldRenderer 재사용을 위해 최소 필드만 매핑
+ */
+function toFieldConfig(f: MultiSelectExtraField): SearchFieldConfig {
+    return {
+        id: f.key,                    // 저장 키는 key 사용 (id는 DnD 내부 식별자)
+        type: f.type,
+        label: f.label,
+        colSpan: 1,
+        options: f.options,
+        required: f.required,
+        placeholder: f.placeholder,
+    };
 }
 
 /* ── 유틸: dot notation 경로로 중첩 객체 값 접근 (예: "form.title" → item['form']['title']) ── */
@@ -73,7 +98,7 @@ function buildLabel(item: OptionItem, labelFields: string): string {
         .join(' > ');
 }
 
-export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }: MultiSelectRendererProps) {
+export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, extraFieldValues = {}, onExtraFieldChange }: MultiSelectRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
     const labelFields = widget.labelFields || 'name';
@@ -181,9 +206,9 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
                         <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* 드롭다운 패널 — preview: 인라인 표시 / live: 절대 위치 */}
-                    {(isOpen || isPreview) && (
-                        <div className={`${isPreview ? 'relative' : 'absolute z-50'} w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg`}>
+                    {/* 드롭다운 패널 — live: 클릭 시 절대 위치로 표시, preview: 닫힌 상태 유지 */}
+                    {isOpen && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
 
                             {/* 검색 입력 */}
                             <div className="p-2 border-b border-slate-100">
@@ -232,25 +257,68 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange }
                     )}
                 </div>
 
-                {/* 선택된 항목 태그 — 한 줄씩 세로 나열 */}
+                {/* 선택된 항목 목록 — 항목명 + 추가 필드 1줄 배치 */}
                 {selectedOptions.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                        {selectedOptions.map(opt => (
-                            <div
-                                key={opt.id}
-                                className="flex items-center justify-between px-3 py-1.5 bg-slate-100 rounded text-xs text-slate-700"
-                            >
-                                <span>{buildLabel(opt, labelFields)}</span>
-                                <button
-                                    type="button"
-                                    disabled={isPreview}
-                                    onClick={() => removeItem(opt.id)}
-                                    className="text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default ml-2 shrink-0"
+                    <div className="flex flex-col gap-1.5">
+                        {selectedOptions.map(opt => {
+                            const hasExtra = (widget.extraFields?.length ?? 0) > 0;
+                            const itemVals = extraFieldValues[opt.id] ?? {};
+
+                            return (
+                                <div
+                                    key={opt.id}
+                                    className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
                                 >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
-                        ))}
+                                    {/* 항목명 — 고정 너비로 잘림 방지 */}
+                                    <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
+                                        {buildLabel(opt, labelFields)}
+                                    </span>
+
+                                    {/* 구분선 */}
+                                    {hasExtra && (
+                                        <div className="w-px h-4 bg-slate-300 shrink-0" />
+                                    )}
+
+                                    {/* 추가 입력 필드 — 1줄 인라인 배치 */}
+                                    {hasExtra && widget.extraFields!.map((ef, idx) => (
+                                        <React.Fragment key={ef.id}>
+                                            {/* 필드 사이 구분선 */}
+                                            {idx > 0 && (
+                                                <div className="w-px h-4 bg-slate-200 shrink-0" />
+                                            )}
+                                            <div className={`shrink-0 ${
+                                                /* radio/checkbox는 auto, input/select/date는 고정 폭 */
+                                                ef.type === 'radio' || ef.type === 'checkbox'
+                                                    ? 'min-w-fit'
+                                                    : 'w-[120px]'
+                                            }`}>
+                                                {/* FieldRenderer — placeholder에 label 대체 */}
+                                                <FieldRenderer
+                                                    mode={isPreview ? 'preview' : 'live'}
+                                                    field={{
+                                                        ...toFieldConfig(ef),
+                                                        /* input/select/date는 placeholder로 label 표시 */
+                                                        placeholder: ef.placeholder ?? ef.label,
+                                                    }}
+                                                    value={isPreview ? '' : (itemVals[ef.key] ?? '')}
+                                                    onChange={v => onExtraFieldChange?.(opt.id, ef.key, v)}
+                                                />
+                                            </div>
+                                        </React.Fragment>
+                                    ))}
+
+                                    {/* X버튼 — 오른쪽 끝 고정 */}
+                                    <button
+                                        type="button"
+                                        disabled={isPreview}
+                                        onClick={() => removeItem(opt.id)}
+                                        className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 

@@ -36,6 +36,8 @@ export type {
     SubListColumn,
     SubListColumnType,
     MultiSelectWidget,
+    MultiSelectExtraField,
+    MultiSelectExtraFieldType,
     TabItem,
     TabWidget,
     AnyWidget,

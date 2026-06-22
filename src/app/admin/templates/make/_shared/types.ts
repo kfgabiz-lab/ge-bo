@@ -111,6 +111,17 @@ export interface SearchFieldConfig {
     afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
     afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
     statusDisplayStyle?: 'select' | 'radio'; // 검색 UI 표시 방식 (기본: select)
+    /* ── 데이터생성 전용 (Input/FormTextarea) ── */
+    /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+    generationKey?: string;
+    /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
+    dataReplacement?: 'none' | 'hyphen';
+    /** 문자변경: 없음(none) / 대문자(upper) / 소문자(lower) */
+    caseChange?: 'none' | 'upper' | 'lower';
+    /** 텍스트추가(끝) — 변환 후 끝에 붙이는 문자열 */
+    appendText?: string;
+    /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
+    truncateLength?: number;
 }
 
 /** 검색폼 행 설정 */
@@ -202,8 +213,7 @@ export interface TableColumnConfig {
     trueTextMsgKey?: string;           // boolean true 텍스트 다국어 키
     falseText?: string;                 // boolean 타입 false 텍스트
     falseTextMsgKey?: string;          // boolean false 텍스트 다국어 키
-    actions?: ('edit' | 'detail' | 'delete')[]; // 프리셋 액션 버튼
-    customActions?: { id: string; label: string; color: string }[]; // 커스텀 버튼
+    actions?: ('edit' | 'detail' | 'delete' | 'copy')[]; // 프리셋 액션 버튼
     editPageRules?: EditPageRule[];      // 수정 버튼 페이지 이동 규칙 목록
     editPopupSlug?: string;             // 수정 버튼 연결 LAYER slug (관리자방식)
     detailPopupSlug?: string;           // 상세 버튼 연결 LAYER slug (관리자방식)

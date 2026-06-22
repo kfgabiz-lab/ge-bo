@@ -44,3 +44,9 @@ export { ActionsField } from './ActionsField';
 export { DateRangeStatusColumnField } from './DateRangeStatusColumnField';
 export type { ColEditProps } from './col-types';
 export { CUSTOM_ACTION_COLORS, PRESET_COLORS } from './col-types';
+
+/* ── MultiSelect 추가 필드 계열 (simple 버전 — colSpan/validation 제거) ── */
+export { ExtraSimpleInputField }  from './ExtraSimpleInputField';
+export { ExtraSimpleSelectField } from './ExtraSimpleSelectField';
+export type { ExtraSimpleInputFieldValues }  from './ExtraSimpleInputField';
+export type { ExtraSimpleSelectFieldValues } from './ExtraSimpleSelectField';

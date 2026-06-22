@@ -297,6 +297,12 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 defaultEndDateOffset:   f.defaultEndDateOffset,
                 defaultEndDate:         f.defaultEndDate,
                 disableEndPast:         f.disableEndPast,
+                /* ── 데이터생성 ── */
+                generationKey:      f.generationKey,
+                dataReplacement:    f.dataReplacement,
+                caseChange:         f.caseChange,
+                appendText:         f.appendText,
+                truncateLength:     f.truncateLength,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),

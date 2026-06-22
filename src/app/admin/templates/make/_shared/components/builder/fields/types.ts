@@ -103,6 +103,19 @@ export interface FieldEditValues {
     afterText?: string;              // 날짜 이후 표시 텍스트 (예: '종료')
     afterTextMsgKey?: string;        // 이후 텍스트 다국어 키
     statusDisplayStyle?: 'select' | 'radio'; // 검색 UI 표시 방식 (기본: select)
+    /* ── 데이터생성 전용 (Input/FormTextarea) ── */
+    /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+    generationKey?: string;
+    /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
+    dataReplacement?: 'none' | 'hyphen';
+    /** 문자변경: 없음(none) / 대문자(upper) / 소문자(lower) */
+    caseChange?: 'none' | 'upper' | 'lower';
+    /** 텍스트추가(끝) — 변환 후 끝에 붙이는 문자열 */
+    appendText?: string;
+    /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
+    truncateLength?: number;
+    /* ── action 컬럼 전용 (SubList action 타입 컬럼에서 사용) ── */
+    actions?: ('edit' | 'detail' | 'delete' | 'copy')[];
 }
 
 /**

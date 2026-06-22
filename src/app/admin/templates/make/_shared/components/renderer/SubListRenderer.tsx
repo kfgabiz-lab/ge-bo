@@ -21,7 +21,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, CopyPlus } from 'lucide-react';
 import api from '@/lib/api';
 import { RendererContainer } from './RendererContainer';
 import { FieldRenderer } from './FieldRenderer';
@@ -116,6 +116,11 @@ export function SubListRenderer({
 }: SubListRendererProps) {
     const visibleColumns = widget.columns;
     const { t } = useI18n();
+
+    /* action 컬럼 존재 여부 및 삭제 포함 여부 */
+    const actionCol = visibleColumns.find(col => col.type === 'action');
+    /* action 컬럼에 삭제가 포함된 경우 → 고정 삭제 열 숨기고 action 컬럼에서 통합 처리 */
+    const hasActionDelete = !!(actionCol?.actions || []).includes('delete');
 
     /* 공통코드 목록 */
     const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
@@ -227,6 +232,16 @@ export function SubListRenderer({
         onChange?.(updated);
     }, [rows, onChange]);
 
+    /** 행 복사 — 해당 row를 바로 아래에 삽입 (_rowId만 새로 생성) */
+    const handleCopy = useCallback((rowId: string) => {
+        const idx = rows.findIndex(r => r._rowId === rowId);
+        if (idx === -1) return;
+        const copied: SubListRow = { ...rows[idx], _rowId: `row-${Date.now()}` };
+        const updated = [...rows.slice(0, idx + 1), copied, ...rows.slice(idx + 1)];
+        setRows(updated);
+        onChange?.(updated);
+    }, [rows, onChange]);
+
     /** 기존 파일 제거 — existingMetaMap + row 데이터의 ID 배열 동시 갱신 */
     const handleRemoveExisting = useCallback((rowId: string, colId: string, fileId: number) => {
         setExistingMetaMap(prev => ({
@@ -300,15 +315,22 @@ export function SubListRenderer({
                                         className="px-3 py-2 text-left font-semibold text-slate-600 whitespace-nowrap"
                                         style={{ minWidth: 80 }}
                                     >
-                                        {col.labelMsgKey ? t(col.labelMsgKey) : col.label}
+                                        {/* action 컬럼 헤더 — label 없으면 "관리"로 표시 */}
+                                        {col.type === 'action'
+                                            ? (col.labelMsgKey ? t(col.labelMsgKey) : (col.label || '관리'))
+                                            : (col.labelMsgKey ? t(col.labelMsgKey) : col.label)
+                                        }
                                         {col.required && (
                                             <span className="ml-0.5 text-red-500">*</span>
                                         )}
                                     </th>
                                 ))}
-                                <th className="px-3 py-2 text-center font-semibold text-slate-600 w-16 whitespace-nowrap">
-                                    삭제
-                                </th>
+                                {/* 고정 삭제 열 — action 컬럼에 삭제가 없을 때만 표시 */}
+                                {!hasActionDelete && (
+                                    <th className="px-3 py-2 text-center font-semibold text-slate-600 w-16 whitespace-nowrap">
+                                        삭제
+                                    </th>
+                                )}
                             </tr>
                         </thead>
 
@@ -332,6 +354,39 @@ export function SubListRenderer({
                                         {/* 각 셀 — 항상 입력 필드, 파일 타입은 Form과 동일하게 props 전달 */}
                                         {visibleColumns.map(col => {
                                             const isFileType = (FILE_COL_TYPES as readonly string[]).includes(col.type);
+
+                                            /* action 타입 컬럼 — 삭제/복사 버튼 통합 렌더링 */
+                                            if (col.type === 'action') {
+                                                return (
+                                                    <td key={col.id} className="px-2 py-1.5 align-middle">
+                                                        <div className="flex items-center gap-1 justify-center">
+                                                            {(col.actions || []).includes('delete') && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={mode === 'preview'}
+                                                                    onClick={() => handleDelete(row._rowId)}
+                                                                    className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                                                    title="삭제"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                            {(col.actions || []).includes('copy') && (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={mode === 'preview'}
+                                                                    onClick={() => handleCopy(row._rowId)}
+                                                                    className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                                                    title="복사"
+                                                                >
+                                                                    <CopyPlus className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                );
+                                            }
+
                                             return (
                                                 <td key={col.id} className="px-2 py-1.5 align-middle">
                                                     <FieldRenderer
@@ -349,18 +404,20 @@ export function SubListRenderer({
                                             );
                                         })}
 
-                                        {/* 삭제 버튼 */}
-                                        <td className="px-2 py-1.5 text-center align-middle w-16">
-                                            <button
-                                                type="button"
-                                                disabled={mode === 'preview'}
-                                                title="삭제"
-                                                onClick={() => handleDelete(row._rowId)}
-                                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </td>
+                                        {/* 고정 삭제 열 — action 컬럼에 삭제 없을 때만 표시 */}
+                                        {!hasActionDelete && (
+                                            <td className="px-2 py-1.5 text-center align-middle w-16">
+                                                <button
+                                                    type="button"
+                                                    disabled={mode === 'preview'}
+                                                    title="삭제"
+                                                    onClick={() => handleDelete(row._rowId)}
+                                                    className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))
                             )}

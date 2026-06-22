@@ -217,6 +217,10 @@ interface WidgetRendererProps {
     multiSelectValuesMap?: Record<string, number[]>;
     /** 선택 변경 콜백 — (widgetId, ids) */
     onMultiSelectChange?: (widgetId: string, ids: number[]) => void;
+    /** widgetId → itemId → fieldKey → value */
+    multiSelectExtraFieldValuesMap?: Record<string, Record<number, Record<string, string>>>;
+    /** extraField 값 변경 콜백 — (widgetId, itemId, fieldKey, value) */
+    onMultiSelectExtraFieldChange?: (widgetId: string, itemId: number, fieldKey: string, value: string) => void;
 
     /* ── live 모드 전용 — category ── */
     /** 카테고리 위젯별 선택된 항목 ID (widgetId → selectedId) */
@@ -309,6 +313,8 @@ export function WidgetRenderer({
     /* multiselect */
     multiSelectValuesMap,
     onMultiSelectChange,
+    multiSelectExtraFieldValuesMap,
+    onMultiSelectExtraFieldChange,
     /* category */
     categorySelections,
     onCategorySelect,
@@ -1388,6 +1394,8 @@ export function WidgetRenderer({
                 widget={widget}
                 selectedIds={multiSelectValuesMap?.[msWid] ?? []}
                 onChange={ids => onMultiSelectChange?.(msWid, ids)}
+                extraFieldValues={multiSelectExtraFieldValuesMap?.[msWid]}
+                onExtraFieldChange={(itemId, fieldKey, value) => onMultiSelectExtraFieldChange?.(msWid, itemId, fieldKey, value)}
             />
         );
     }

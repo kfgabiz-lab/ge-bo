@@ -60,14 +60,6 @@ export const buildListTsxFile = (
         red: 'bg-red-500', purple: 'bg-purple-500', slate: 'bg-slate-500',
         pink: 'bg-pink-500', sky: 'bg-sky-500',
     };
-    /* 커스텀 액션 버튼 색상 정적 클래스 */
-    const CA_COLOR: Record<string, string> = {
-        slate: 'bg-slate-500 hover:bg-slate-600 text-white',
-        blue: 'bg-blue-500 hover:bg-blue-600 text-white',
-        green: 'bg-emerald-500 hover:bg-emerald-600 text-white',
-        red: 'bg-red-500 hover:bg-red-600 text-white',
-        orange: 'bg-orange-500 hover:bg-orange-600 text-white',
-    };
 
     /* ── 코드 생성 시작 ── */
     lines.push("'use client';");
@@ -491,10 +483,6 @@ export const buildListTsxFile = (
                         } else if (action === 'delete') {
                             lines.push(`${ind(11)}<button onClick={async () => { if (!menuSlug) { toast.error('메뉴에 slug를 설정해주세요.'); return; } if (window.confirm('삭제하시겠습니까?')) { await api.delete('/page-data/' + menuSlug + '/' + (row.id as number)); fetchData(0); } }} className="p-1.5 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button>`);
                         }
-                    });
-                    (col.customActions || []).filter(ca => ca.label).forEach(ca => {
-                        const cls = CA_COLOR[ca.color] || CA_COLOR['slate'];
-                        lines.push(`${ind(11)}<button onClick={() => { /* TODO: ${ca.label} 처리 */ }} className="px-2 py-0.5 text-[11px] font-medium rounded transition-all ${cls}">${ca.label}</button>`);
                     });
                     lines.push(`${ind(10)}</div>`);
                     break;

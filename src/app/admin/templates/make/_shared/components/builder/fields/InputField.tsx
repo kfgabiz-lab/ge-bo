@@ -13,6 +13,7 @@ import React from 'react';
 import { FieldEditProps } from './types';
 import { FieldBase, INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { ValidationSection } from '../../ValidationSection';
+import { DataGenerationSection } from './DataGenerationSection';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
@@ -83,6 +84,8 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 }}
                 onChange={updates => onChange(updates)}
             />
+            {/* 데이터생성 — 이 필드 값을 변환하여 생성KEY 대상 필드에 자동 입력 */}
+            <DataGenerationSection values={values} onChange={onChange} />
         </div>
     );
 }
