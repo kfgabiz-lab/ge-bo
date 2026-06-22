@@ -773,7 +773,10 @@ export function FieldRenderer({
             /* 빈 상태: preview/live 동일한 label 구조 — canAdd 여부로 기능만 분기 */
             if (currentCount === 0) {
                 return (
-                    <div style={{ height: fileHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
+                    <div style={{ height: fileHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}
+                        onDragOver={canAdd ? e => e.preventDefault() : undefined}
+                        onDrop={canAdd ? e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleFileSelect(files); } : undefined}
+                    >
                         {canAdd ? (
                             /* FileInput: display:none input + renderTrigger → Edge overflow-y-auto 내부 onChange 버그 우회 */
                             <FileInput
@@ -803,7 +806,10 @@ export function FieldRenderer({
 
             /* 파일 있을 때: 파일 목록 + 하단 validation 정보 + 추가 버튼 */
             return (
-                <div style={{ height: fileHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
+                <div style={{ height: fileHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}
+                    onDragOver={canAdd ? e => e.preventDefault() : undefined}
+                    onDrop={canAdd ? e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleFileSelect(files); } : undefined}
+                >
                     {/* 파일 목록 */}
                     <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
                         {existingFileMeta?.map(meta => (
@@ -903,7 +909,10 @@ export function FieldRenderer({
             };
 
             return (
-                <div style={{ height: imgHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
+                <div style={{ height: imgHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}
+                    onDragOver={canAdd ? e => e.preventDefault() : undefined}
+                    onDrop={canAdd ? e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleImgSelect(files); } : undefined}
+                >
                     {currentCount === 0 ? (
                         /* 빈 상태: canAdd일 때 FileInput(programmatic click), 아닐 때 정적 UI */
                         canAdd ? (
@@ -1074,7 +1083,10 @@ export function FieldRenderer({
             /* 빈 상태: canAdd일 때 FileInput(programmatic click), 아닐 때 정적 UI */
             if (currentCount === 0) {
                 return (
-                    <div style={{ height: vidHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}>
+                    <div style={{ height: vidHeight }} className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}
+                        onDragOver={canAdd ? e => e.preventDefault() : undefined}
+                        onDrop={canAdd ? e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleVidSelect(files); } : undefined}
+                    >
                         {canAdd ? (
                             <FileInput
                                 accept={vidAcceptStr}
@@ -1126,7 +1138,10 @@ export function FieldRenderer({
                 return (
                     /* isolation:isolate — 독립 stacking context 생성으로 부모(GridCell/RendererContainer)의
                        overflow:hidden이 Edge video GPU compositing 레이어를 clip하는 것을 차단 */
-                    <div className="p-1" style={{ height: vidHeight, isolation: 'isolate' }}>
+                    <div className="p-1" style={{ height: vidHeight, isolation: 'isolate' }}
+                        onDragOver={canAdd ? e => e.preventDefault() : undefined}
+                        onDrop={canAdd ? e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleVidSelect(files); } : undefined}
+                    >
                         <div
                             className="grid gap-1"
                             style={{
@@ -1136,19 +1151,24 @@ export function FieldRenderer({
                         >
                             {displayItems.map((item, i) => {
                                 if (item.kind === 'existing') {
-                                    /* 기존 파일: 파일명 + 크기 표시 (서버 스트리밍 미지원) */
+                                    const blobUrl = imgBlobUrls?.[item.meta.id];
                                     return (
-                                        <div key={item.meta.id} className="relative flex flex-col items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 group overflow-hidden">
-                                            <Film className="w-6 h-6 text-slate-300" />
-                                            <button
-                                                type="button"
-                                                title="클릭하여 다운로드"
-                                                onClick={() => downloadFile(item.meta.id, item.meta.origName)}
-                                                className="text-[10px] text-slate-500 px-1 truncate w-full text-center hover:text-blue-600 hover:underline transition-colors"
-                                            >
-                                                {item.meta.origName}
-                                            </button>
-                                            <span className="text-[10px] text-slate-400">{fmtSize(item.meta.fileSize)}</span>
+                                        /* blob URL 있으면 video 플레이어, 없으면 로딩 중 아이콘 표시 */
+                                        <div key={item.meta.id} className="relative border border-slate-200 group" style={{ borderRadius: '6px' }}>
+                                            {blobUrl ? (
+                                                <video
+                                                    src={blobUrl}
+                                                    controls
+                                                    playsInline
+                                                    preload="auto"
+                                                    style={{ width: '100%', height: `${cellH}px`, display: 'block' }}
+                                                />
+                                            ) : (
+                                                <div className="w-full flex flex-col items-center justify-center gap-1 bg-slate-50" style={{ height: `${cellH}px` }}>
+                                                    <Film className="w-6 h-6 text-slate-300" />
+                                                    <span className="text-[10px] text-slate-400">로딩 중...</span>
+                                                </div>
+                                            )}
                                             {!isReadOnly && (
                                                 <button type="button" onClick={() => onRemoveExisting?.(item.meta.id)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <X className="w-2.5 h-2.5 text-white" />
@@ -1337,6 +1357,8 @@ export function FieldRenderer({
                     <div
                         style={{ height: mediaHeight }}
                         className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? ' opacity-75' : ''}`}
+                        onDragOver={canAdd ? e => e.preventDefault() : undefined}
+                        onDrop={canAdd ? e => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleMediaSelect(files); } : undefined}
                     >
                         {canAdd ? (
                             <FileInput

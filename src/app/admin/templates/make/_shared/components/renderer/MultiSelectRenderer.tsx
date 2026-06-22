@@ -145,21 +145,17 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
 
     /* ── 체크 토글 ── */
     const toggleItem = useCallback((id: number) => {
-        setSelected(prev => {
-            const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-            onChange?.(next);
-            return next;
-        });
-    }, [onChange]);
+        const next = selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id];
+        setSelected(next);
+        onChange?.(next);
+    }, [selected, onChange]);
 
     /* ── 태그 제거 ── */
     const removeItem = useCallback((id: number) => {
-        setSelected(prev => {
-            const next = prev.filter(x => x !== id);
-            onChange?.(next);
-            return next;
-        });
-    }, [onChange]);
+        const next = selected.filter(x => x !== id);
+        setSelected(next);
+        onChange?.(next);
+    }, [selected, onChange]);
 
     /* ── 필터링된 옵션 ── */
     const filteredOptions = options.filter(opt => {

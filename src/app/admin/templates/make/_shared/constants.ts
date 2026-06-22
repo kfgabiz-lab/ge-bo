@@ -24,6 +24,17 @@ export const FILE_TYPE_PRESETS = {
  * @example
  * FILE_TYPE_LABELS.image // 'jpg, jpeg, png, gif, webp, svg, bmp'
  */
+/**
+ * 파일 업로드를 사용하는 필드 타입 목록 (단일 출처)
+ *
+ * 새 파일 타입 추가 시 이 배열만 수정하면 utils.ts, page.tsx 전체 반영.
+ *
+ * @example
+ * FILE_FIELD_TYPES.includes(f.type) // true면 파일 업로드 필드
+ */
+export const FILE_FIELD_TYPES = ['file', 'image', 'video', 'media'] as const;
+export type FileFieldType = typeof FILE_FIELD_TYPES[number];
+
 export const FILE_TYPE_LABELS: Record<keyof typeof FILE_TYPE_PRESETS, string> = {
     doc:   FILE_TYPE_PRESETS.doc.replace(/\./g, '').replace(/,/g, ', '),
     image: FILE_TYPE_PRESETS.image.replace(/\./g, '').replace(/,/g, ', '),

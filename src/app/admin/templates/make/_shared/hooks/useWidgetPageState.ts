@@ -19,6 +19,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues } from "../utils";
+import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
 import type { AnyWidget } from "../components/renderer/types";
@@ -325,15 +326,15 @@ export function useWidgetPageState(
                   : tabSection;
                 const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
                 fw.fields.forEach((f) => {
-                  if (!f.fieldKey || (f.type !== 'file' && f.type !== 'image' && f.type !== 'media')) return;
+                  if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
                   const ids = section[f.fieldKey];
                   if (!Array.isArray(ids)) return;
                   metaByFieldId[f.id] = (ids as number[]).map((id) => {
                     const m = metaList.find((m) => m.id === id);
                     return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
                   });
-                  /* 이미지/미디어 타입 blob URL 생성 */
-                  if (f.type === 'image' || f.type === 'media') {
+                  /* 이미지/동영상/미디어 타입: blob URL 생성 → 미리보기·플레이어용 */
+                  if (f.type === 'image' || f.type === 'video' || f.type === 'media') {
                     (ids as number[]).forEach((id) => {
                       api.get(`/page-files/${id}`, { responseType: 'blob' })
                         .then((blobRes) => setImgBlobUrls((prev) => ({ ...prev, [id]: URL.createObjectURL(blobRes.data) })))
@@ -695,7 +696,7 @@ export function useWidgetPageState(
             const fw = w as FormWidget;
             formFileIdsMap[fw.widgetId] = {};
             for (const f of fw.fields) {
-              if (f.type !== "file" && f.type !== "image" && f.type !== "media") continue;
+              if (!FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) continue;
               const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map((m) => m.id);
               formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
             }
@@ -822,7 +823,7 @@ export function useWidgetPageState(
                   { id: number; origName: string; fileSize: number }[]
                 > = {};
                 fw.fields.forEach((f) => {
-                  if (!f.fieldKey || (f.type !== "file" && f.type !== "image" && f.type !== "media"))
+                  if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]))
                     return;
                   const ids = section[f.fieldKey];
                   if (!Array.isArray(ids)) return;
@@ -832,8 +833,8 @@ export function useWidgetPageState(
                       ? { id: m.id, origName: m.origName, fileSize: m.fileSize }
                       : { id, origName: "", fileSize: 0 };
                   });
-                  /* 이미지/미디어 타입은 blob URL 생성 */
-                  if (imageFieldIds.has(f.id) || f.type === "media") {
+                  /* 이미지/동영상/미디어 타입은 blob URL 생성 */
+                  if (imageFieldIds.has(f.id) || f.type === "video" || f.type === "media") {
                     (ids as number[]).forEach((id) => {
                       if (imgBlobUrls[id]) return;
                       api
@@ -975,7 +976,7 @@ export function useWidgetPageState(
           const fw = w as FormWidget;
           formFileIdsMap[fw.widgetId] = {};
           for (const f of fw.fields) {
-            if (f.type !== "file" && f.type !== "image" && f.type !== "media") continue;
+            if (!FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) continue;
             const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map((m) => m.id);
             formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
           }

@@ -5,6 +5,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { FILE_FIELD_TYPES } from './constants';
 
 /**
  * "텍스트:값" 형식의 옵션 문자열 파싱
@@ -139,10 +140,10 @@ export const validateFormFields = (
         const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
 
         if (f.required) {
-            const empty = (f.type === 'file' || f.type === 'image' || f.type === 'media') ? fileCount === 0 : !val;
+            const empty = FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) ? fileCount === 0 : !val;
             if (empty) { toast.warning(`'${label}' 항목은 필수 입력입니다.`); return false; }
         }
-        if (val && f.type !== 'file' && f.type !== 'image' && f.type !== 'video' && f.type !== 'media') {
+        if (val && !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
             if (f.minLength && val.length < f.minLength) {
                 toast.warning(`'${label}' 항목은 최소 ${f.minLength}자 이상 입력해야 합니다.`); return false;
             }
@@ -158,14 +159,14 @@ export const validateFormFields = (
                 }
             } catch { /* 잘못된 패턴 무시 */ }
         }
-        if ((f.type === 'file' || f.type === 'image' || f.type === 'media') && f.maxFileCount && fileCount > f.maxFileCount) {
+        if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) && f.maxFileCount && fileCount > f.maxFileCount) {
             toast.warning(`'${label}' 항목은 최대 ${f.maxFileCount}개까지 첨부 가능합니다.`); return false;
         }
-        if ((f.type === 'file' || f.type === 'image' || f.type === 'media') && f.maxFileSizeMB) {
+        if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) && f.maxFileSizeMB) {
             const over = (fileValues[f.id] || []).find(file => file.size > f.maxFileSizeMB! * 1024 * 1024);
             if (over) { toast.warning(`'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`); return false; }
         }
-        if ((f.type === 'file' || f.type === 'image' || f.type === 'media') && f.maxTotalSizeMB) {
+        if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) && f.maxTotalSizeMB) {
             const total = (fileValues[f.id] || []).reduce((s, file) => s + file.size, 0);
             if (total > f.maxTotalSizeMB * 1024 * 1024) {
                 toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
@@ -448,7 +449,7 @@ export function buildDataJson(
             (w.fields ?? []).forEach(f => {
                 const key = f.fieldKey || f.label;
                 if (!key) return;
-                if (f.type === 'file' || f.type === 'image' || f.type === 'media') {
+                if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
                     section[key] = fileIds[f.id] ?? [];
                 } else {
                     section[key] = rawValues[f.id] ?? '';
@@ -464,7 +465,7 @@ export function buildDataJson(
              * 3단계: "tk.ck.fieldKey"   → dataJson.tk.ck.fieldKey */
             (w.fields ?? []).forEach(f => {
                 if (!f.generationKey) return;
-                if (f.type === 'file' || f.type === 'image' || f.type === 'media') return;
+                if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
                 const sourceValue = rawValues[f.id] ?? '';
                 const transformed = applyDataGeneration(
                     sourceValue,
@@ -852,7 +853,7 @@ export async function processFormFilesAndSubList(opts: {
         if (w.type !== 'form') continue;
         const fwId = w.widgetId ?? '';
         for (const f of (w.fields ?? [])) {
-            if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+            if (!FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) continue;
             const newFiles = fileValuesMap[fwId]?.[f.id] ?? [];
             if (!newFiles.length) continue;
             const uploadedIds = await uploadFiles(newFiles, dataSaveSlug, f.fieldKey || f.label || '');
@@ -868,7 +869,7 @@ export async function processFormFilesAndSubList(opts: {
         const fwId = w.widgetId ?? '';
         formFileIdsMap[fwId] = {};
         for (const f of (w.fields ?? [])) {
-            if (f.type !== 'file' && f.type !== 'image' && f.type !== 'media') continue;
+            if (!FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) continue;
             const existingIds = (existingFileMetaMap[fwId]?.[f.id] ?? []).map(m => m.id);
             formFileIdsMap[fwId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
         }
