@@ -26,6 +26,7 @@ export { FileField } from './FileField';
 export { ImageField } from './ImageField';
 export { VideoField } from './VideoField';
 export { MediaField } from './MediaField';
+export { TimeField } from './TimeField';
 export { ColorField } from './ColorField';
 export { ActionButtonField } from './ActionButtonField';
 export type { ActionButtonFieldProps } from './ActionButtonField';

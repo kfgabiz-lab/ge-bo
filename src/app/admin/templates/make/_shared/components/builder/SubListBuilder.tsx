@@ -392,22 +392,22 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
             <section className="space-y-3">
                 <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">기본 설정</h4>
 
-                {/* connectedSlug */}
-                <SlugSelectField
-                    value={widget.connectedSlug ?? ''}
-                    onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
-                    slugOptions={slugOptions}
-                />
-
-                {/* contentKey */}
-                <div>
-                    <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                    <input
-                        type="text"
-                        value={widget.contentKey}
-                        onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                        placeholder="예: subList1 (페이지 내 고유)"
-                        className={INPUT_CLS}
+                {/* Key * | 연결 slug — 2열 그리드 */}
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                        <input
+                            type="text"
+                            value={widget.contentKey}
+                            onChange={e => onChange({ ...widget, contentKey: e.target.value })}
+                            placeholder="예: subList1 (페이지 내 고유)"
+                            className={INPUT_CLS}
+                        />
+                    </div>
+                    <SlugSelectField
+                        value={widget.connectedSlug ?? ''}
+                        onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
+                        slugOptions={slugOptions}
                     />
                 </div>
 

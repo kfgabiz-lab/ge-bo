@@ -27,9 +27,11 @@
  *   />
  */
 
+import { useMemo } from 'react';
 import { Search, RotateCcw } from 'lucide-react';
 import { SearchForm, SearchRow, SearchField } from '@/components/search';
 import { SearchRowConfig, CodeGroupDef } from '../../types';
+import { evalFieldCondition } from '../../utils';
 import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { RendererMode } from './types';
@@ -63,6 +65,23 @@ export function SearchRenderer({
     const isPreview = mode === 'preview';
     const { t } = useI18n();
 
+    /* fieldKey → fieldId 역매핑 — hideCondition/disableCondition 평가용 */
+    const keyToId = useMemo(() => {
+        const map: Record<string, string> = {};
+        rows.forEach(row =>
+            row.fields.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; })
+        );
+        return map;
+    }, [rows]);
+
+    /* live 모드에서 hideCondition 충족 시 해당 필드 숨김 */
+    const shouldHide = (fieldKey: string | undefined, hideCondition: string | undefined): boolean =>
+        !isPreview && !!hideCondition && !!fieldKey && evalFieldCondition(hideCondition, keyToId, values);
+
+    /* live 모드에서 disableCondition 충족 시 해당 필드 비활성화 */
+    const shouldDisable = (disableCondition: string | undefined): boolean =>
+        !isPreview && !!disableCondition && evalFieldCondition(disableCondition, keyToId, values);
+
     /* 행이 없을 때 — preview는 안내 텍스트, live는 null */
     if (!rows.length) {
         return isPreview ? (
@@ -82,7 +101,9 @@ export function SearchRenderer({
             <RendererContainer className="flex items-center gap-3 bg-white px-4">
                 {/* 필드 영역 — SearchRow와 동일한 grid gap-4 방식 */}
                 <div className={`flex-1 grid ${GRID_COLS[cols] ?? 'grid-cols-5'} gap-4`}>
-                    {row.fields.map(field => (
+                    {row.fields.map(field => {
+                        if (shouldHide(field.fieldKey, field.hideCondition)) return null;
+                        return (
                         <div key={field.id} className={COL_SPAN[Math.min(field.colSpan ?? 1, cols)] ?? 'col-span-1'}>
                             <FieldRenderer
                                 mode={mode}
@@ -90,9 +111,11 @@ export function SearchRenderer({
                                 value={values[field.id] || ''}
                                 onChange={v => onChangeValues?.(field.id, v)}
                                 codeGroups={codeGroups}
+                                forceDisabled={shouldDisable(field.disableCondition)}
                             />
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
                 {/* 검색/초기화 버튼 — SearchForm과 동일한 버튼 스타일, 항상 표시 */}
                 <button
@@ -122,7 +145,9 @@ export function SearchRenderer({
             >
                 {rows.map(row => (
                     <SearchRow key={row.id} cols={row.cols}>
-                        {row.fields.map(field => (
+                        {row.fields.map(field => {
+                            if (shouldHide(field.fieldKey, field.hideCondition)) return null;
+                            return (
                             <SearchField
                                 key={field.id}
                                 /* dateRange: label ~ label2 형식으로 표시 / msgKey 우선 처리 */
@@ -141,9 +166,11 @@ export function SearchRenderer({
                                     value={values[field.id] || ''}
                                     onChange={v => onChangeValues?.(field.id, v)}
                                     codeGroups={codeGroups}
+                                    forceDisabled={shouldDisable(field.disableCondition)}
                                 />
                             </SearchField>
-                        ))}
+                            );
+                        })}
                     </SearchRow>
                 ))}
             </SearchForm>

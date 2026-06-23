@@ -238,6 +238,7 @@ const SAMPLE_FORM: FormWidget = {
         { id: 'ff13', type: 'video', label: '동영상 URL',    colSpan: 12, rowSpan: 2, videoMode: 'url' },
         { id: 'ff14', type: 'media',  label: '컨텐츠 업로드', colSpan: 12, rowSpan: 2, required: true },
         { id: 'ff16', type: 'editor', label: '내용',          colSpan: 12, rowSpan: 5 },
+        { id: 'ff20', type: 'time',   label: '시간',           colSpan: 6,  rowSpan: 1 },
         {
             id: 'ff15', type: 'color', label: '색상',         colSpan: 12, rowSpan: 1,
             options: ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6b7280'],

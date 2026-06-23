@@ -1,8 +1,8 @@
 ﻿'use client';
 
-import { LogOut, ChevronRight, Home, Globe, ChevronDown } from 'lucide-react';
+import { LogOut, ChevronRight, Home, Globe } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth-store';
@@ -41,16 +41,14 @@ function findMenuBreadcrumb(
     return null;
 }
 
-/** 홈페이지 선택 드롭다운 컴포넌트 */
+/** 홈페이지 선택 셀렉트박스 컴포넌트 */
 function SiteSelector() {
     const { activeSiteId, setActiveSiteId, loadActiveSiteFromStorage } = useSiteStore();
     const adminInfo = useAuthStore((state) => state.adminInfo);
     const logout = useAuthStore((state) => state.logout);
     const router = useRouter();
     const { t } = useI18n();
-    const [open, setOpen] = useState(false);
     const [mySites, setMySites] = useState<{ id: number; name: string; nameMsgKey?: string }[]>([]);
-    const ref = useRef<HTMLDivElement>(null);
 
     /* 마운트 시 localStorage 복원 */
     useEffect(() => {
@@ -90,53 +88,30 @@ function SiteSelector() {
         fetchSites();
     }, [adminInfo?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    /* 외부 클릭 시 닫기 */
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    const activeSite = mySites.find(s => s.id === activeSiteId);
+    /* 사이트 변경 — activeSiteId 업데이트 후 페이지 전체 새로고침 */
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setActiveSiteId(Number(e.target.value));
+        window.location.reload();
+    };
 
     return (
-        <div ref={ref} className="relative">
-            <button
-                onClick={() => setOpen(prev => !prev)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-all"
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
+            <Globe className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+            <select
+                value={activeSiteId ?? ''}
+                onChange={handleChange}
+                className="text-xs font-semibold text-slate-700 bg-transparent outline-none cursor-pointer max-w-[120px]"
             >
-                <Globe className="w-3.5 h-3.5 text-slate-400" />
-                <span className="max-w-[120px] truncate">
-                    {activeSite
-                        ? (activeSite.nameMsgKey ? t(activeSite.nameMsgKey) : activeSite.name)
-                        : t('site.selector.empty')}
-                </span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
-
-            {open && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden">
-                    {mySites.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-slate-400 text-center">{t('site.selector.no_sites')}</div>
-                    ) : (
-                        mySites.map(site => (
-                            <button
-                                key={site.id}
-                                onClick={() => { setActiveSiteId(site.id); setOpen(false); }}
-                                className={`w-full text-left px-3 py-2 text-xs font-medium transition-all hover:bg-slate-50 ${
-                                    activeSiteId === site.id ? 'text-slate-900 bg-slate-50 font-semibold' : 'text-slate-600'
-                                }`}
-                            >
-                                {site.nameMsgKey ? t(site.nameMsgKey) : site.name}
-                            </button>
-                        ))
-                    )}
-                </div>
-            )}
+                {mySites.length === 0 ? (
+                    <option value="">{t('site.selector.empty')}</option>
+                ) : (
+                    mySites.map(site => (
+                        <option key={site.id} value={site.id}>
+                            {site.nameMsgKey ? t(site.nameMsgKey) : site.name}
+                        </option>
+                    ))
+                )}
+            </select>
         </div>
     );
 }

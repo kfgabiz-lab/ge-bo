@@ -430,6 +430,7 @@ export function buildDataJson(
         widgetId?: string;
         fields?: import('./components/builder/FormBuilder').FormFieldItem[];
         contentKey?: string;
+        connectedSlug?: string;
         extraFields?: import('./components/renderer/types').MultiSelectExtraField[];
     }>,
     formValuesMap: Record<string, Record<string, string>>,
@@ -437,6 +438,7 @@ export function buildDataJson(
     subListRowsMap: Record<string, Record<string, unknown>[]>,
     multiSelectMap: Record<string, number[]>,
     multiSelectExtraFieldMap?: Record<string, Record<number, Record<string, string>>>,
+    mainConnectedSlug?: string,
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
@@ -456,8 +458,14 @@ export function buildDataJson(
                 }
                 if (f.isPk) pkKeys.push(key);
             });
-            if (w.contentKey) dataJson[w.contentKey] = section;
-            else Object.assign(dataJson, section);
+            /* mainConnectedSlug와 다른 connectedSlug → _rel에 저장 */
+            if (mainConnectedSlug && w.connectedSlug && w.connectedSlug !== mainConnectedSlug) {
+                if (!dataJson['_rel']) dataJson['_rel'] = {};
+                (dataJson['_rel'] as Record<string, unknown>)[w.connectedSlug] = section;
+            } else {
+                if (w.contentKey) dataJson[w.contentKey] = section;
+                else Object.assign(dataJson, section);
+            }
 
             /* 데이터생성 — generationKey가 있는 필드의 변환값을 지정 경로에 저장
              * 1단계: "fieldKey"         → dataJson.fieldKey
@@ -476,7 +484,7 @@ export function buildDataJson(
                 /* 다중 dataGenerations 배열 처리 */
                 (f.dataGenerations ?? []).forEach(dg => {
                     if (!dg.generationKey) return;
-                    const transformed = applyDataGeneration(sourceValue, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength);
+                    const transformed = applyDataGeneration(sourceValue, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength, dg.stripHtml);
                     writeToGenerationPath(dataJson, dg.generationKey, transformed);
                 });
             });
@@ -485,7 +493,19 @@ export function buildDataJson(
             if (w.contentKey) {
                 const selectedIds = multiSelectMap[w.widgetId ?? ''] ?? [];
                 const extraFields = w.extraFields ?? [];
-                if (extraFields.length > 0) {
+                /* mainConnectedSlug와 다른 connectedSlug → _rel.{connectedSlug}에 저장 */
+                const isRel = mainConnectedSlug && w.connectedSlug && w.connectedSlug !== mainConnectedSlug;
+                if (isRel) {
+                    if (!dataJson['_rel']) dataJson['_rel'] = {};
+                    const rel = dataJson['_rel'] as Record<string, unknown>;
+                    const extraVals = multiSelectExtraFieldMap?.[w.widgetId ?? ''] ?? {};
+                    rel[w.connectedSlug!] = extraFields.length > 0
+                        ? selectedIds.map(id => ({
+                            id,
+                            ...Object.fromEntries(extraFields.map(ef => [ef.key, extraVals[id]?.[ef.key] ?? ''])),
+                        }))
+                        : selectedIds.map(id => ({ id }));
+                } else if (extraFields.length > 0) {
                     /* extraFields 있으면 객체 배열로 저장: [{ id, fieldKey: value, ... }] */
                     const extraVals = multiSelectExtraFieldMap?.[w.widgetId ?? ''] ?? {};
                     dataJson[w.contentKey] = selectedIds.map(id => ({
@@ -500,7 +520,7 @@ export function buildDataJson(
 
         } else if (w.type === 'sublist') {
             const rows = subListRowsMap[w.widgetId ?? ''] ?? [];
-            if (w.contentKey) dataJson[w.contentKey] = { rows };
+            if (w.contentKey) dataJson[w.contentKey] = rows;
             else dataJson.rows = rows;
         }
     }
@@ -553,8 +573,18 @@ export function applyDataGeneration(
     caseChange?: 'none' | 'upper' | 'lower',
     appendText?: string,
     truncateLength?: number,
+    stripHtml?: boolean,
 ): string {
     let result = value;
+
+    /* 0단계: HTML제거 — 에디터 값의 HTML 태그 및 엔티티 제거 */
+    if (stripHtml) {
+        if (typeof window !== 'undefined') {
+            result = new DOMParser().parseFromString(result, 'text/html').body.textContent || '';
+        } else {
+            result = result.replace(/<[^>]*>/g, '');
+        }
+    }
 
     /* 1단계: 데이터변경 — 공백·특수문자 → '-', 연속 '-' 정리, 마지막 '-' 제거 */
     if (dataReplacement === 'hyphen') {

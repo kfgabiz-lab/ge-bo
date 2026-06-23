@@ -181,7 +181,7 @@ export function FormRenderer({
         /* 단일 generationKey 처리 (기존 호환) */
         if (sourceField.generationKey) {
             const targetFieldId = resolveTargetFieldId(sourceField.generationKey);
-            const transformed = applyDataGeneration(value, sourceField.dataReplacement, sourceField.caseChange, sourceField.appendText, sourceField.truncateLength);
+            const transformed = applyDataGeneration(value, sourceField.dataReplacement, sourceField.caseChange, sourceField.appendText, sourceField.truncateLength, undefined);
             if (targetFieldId && targetFieldId !== fieldId) {
                 dispatchValue(targetFieldId, transformed);
             } else if (!targetFieldId) {
@@ -194,7 +194,7 @@ export function FormRenderer({
         (sourceField.dataGenerations ?? []).forEach(dg => {
             if (!dg.generationKey) return;
             const targetFieldId = resolveTargetFieldId(dg.generationKey);
-            const transformed = applyDataGeneration(value, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength);
+            const transformed = applyDataGeneration(value, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength, dg.stripHtml);
             if (targetFieldId && targetFieldId !== fieldId) {
                 dispatchValue(targetFieldId, transformed);
             } else if (!targetFieldId) {

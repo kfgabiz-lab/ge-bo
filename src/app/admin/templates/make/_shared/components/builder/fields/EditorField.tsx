@@ -2,6 +2,7 @@ import { FieldEditProps } from './types';
 import { FieldBase } from './_FieldBase';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import { DataGenerationSection } from './DataGenerationSection';
 
 /**
  * EditorField: 위지윅 에디터 설정용 L3 컴포넌트
@@ -83,6 +84,9 @@ export const EditorField = (props: FieldEditProps) => {
                         />
                     </div>
                 </div>
+
+                {/* 데이터생성 — 에디터 값을 변환하여 생성KEY 대상 필드에 자동 입력 */}
+                <DataGenerationSection values={values} onChange={onChange} fieldType="editor" />
             </div>
         </FieldBase>
     );

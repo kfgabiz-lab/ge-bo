@@ -192,9 +192,10 @@ export function SubListRenderer({
 
     /* ── 이벤트 핸들러 ── */
 
-    /** 추가 — 빈 행을 rows에 즉시 추가 */
+    /** 추가 — 빈 행을 rows에 즉시 추가 (UUID id 영속 저장) */
     const handleAdd = useCallback(() => {
-        const newRow: SubListRow = { _rowId: `row-${Date.now()}` };
+        const newId = crypto.randomUUID();
+        const newRow: SubListRow = { _rowId: newId, id: newId };
         const updated = [...rows, newRow];
         setRows(updated);
         onChange?.(updated);
@@ -211,19 +212,21 @@ export function SubListRenderer({
         externalOnFileChange?.(colId, files, rowId);
     }, [externalOnFileChange]);
 
-    /** 삭제 — 행 데이터와 함께 해당 행의 파일 상태도 정리 */
+    /** 삭제 — 기존 파일 API 삭제 후 행 제거 */
     const handleDelete = useCallback((rowId: string) => {
         if (!confirm('삭제하시겠습니까?')) return;
+        /* 해당 row의 기존 파일 즉시 삭제 */
+        const fileMeta = existingMetaMap[rowId] ?? {};
+        Object.values(fileMeta).flatMap(metas => metas.map(m => m.id)).forEach(fileId => {
+            api.delete(`/page-files/${fileId}`).catch(() => {});
+        });
         const updated = rows.filter(r => r._rowId !== rowId);
         setRows(updated);
         onChange?.(updated);
         /* 내부 파일 state 정리 */
-        setInternalFileMap(prev => {
-            const next = { ...prev };
-            delete next[rowId];
-            return next;
-        });
-    }, [rows, onChange]);
+        setInternalFileMap(prev => { const next = { ...prev }; delete next[rowId]; return next; });
+        setExistingMetaMap(prev => { const next = { ...prev }; delete next[rowId]; return next; });
+    }, [rows, onChange, existingMetaMap]);
 
     /** 행 값 변경 */
     const handleRowChange = useCallback((rowId: string, key: string, value: string) => {
@@ -232,11 +235,12 @@ export function SubListRenderer({
         onChange?.(updated);
     }, [rows, onChange]);
 
-    /** 행 복사 — 해당 row를 바로 아래에 삽입 (_rowId만 새로 생성) */
+    /** 행 복사 — 해당 row를 바로 아래에 삽입 (새 UUID 생성) */
     const handleCopy = useCallback((rowId: string) => {
         const idx = rows.findIndex(r => r._rowId === rowId);
         if (idx === -1) return;
-        const copied: SubListRow = { ...rows[idx], _rowId: `row-${Date.now()}` };
+        const newId = crypto.randomUUID();
+        const copied: SubListRow = { ...rows[idx], _rowId: newId, id: newId };
         const updated = [...rows.slice(0, idx + 1), copied, ...rows.slice(idx + 1)];
         setRows(updated);
         onChange?.(updated);

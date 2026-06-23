@@ -18,7 +18,8 @@ export type SearchFieldType =
     | 'color'           // 색상 선택 (Preset 원형 버튼)
     | 'message-key-select' // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
     | 'category'        // 카테고리 계층 검색 (1~4 depth selectbox 연동)
-    | 'dateRangeStatus'; // 날짜 범위 상태 필터 (이전/포함/이후 선택)
+    | 'dateRangeStatus'  // 날짜 범위 상태 필터 (이전/포함/이후 선택)
+    | 'time';            // 시간 선택 (HH:MM, input[type="time"])
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -102,6 +103,16 @@ export interface SearchFieldConfig {
     depthLabelMsgKeys?: string[];   // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];    // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];     // depth별 selectbox 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+    /* ── time 전용 ── */
+    defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
+    timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
+    /* ── 동적 조건 (Search 전용) ── */
+    /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 숨김
+     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
+    hideCondition?: string;
+    /** 동적 Disable 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 비활성화
+     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
+    disableCondition?: string;
     /* ── dateRangeStatus 전용 ── */
     linkedDateRangeKey?: string;    // 연결할 dateRange 필드의 accessor (예: 'period')
     beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
@@ -123,7 +134,7 @@ export interface SearchFieldConfig {
     /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
     truncateLength?: number;
     /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
-    dataGenerations?: { generationKey: string; dataReplacement?: 'none' | 'hyphen'; caseChange?: 'none' | 'upper' | 'lower'; appendText?: string; truncateLength?: number; }[];
+    dataGenerations?: { generationKey: string; stripHtml?: boolean; dataReplacement?: 'none' | 'hyphen'; caseChange?: 'none' | 'upper' | 'lower'; appendText?: string; truncateLength?: number; }[];
 }
 
 /** 검색폼 행 설정 */

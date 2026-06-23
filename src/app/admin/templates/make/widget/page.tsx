@@ -385,6 +385,20 @@ export default function PageBuilderPage() {
         ));
     };
 
+    /* ── 메인 연결 slug 변경 — form/sublist connectedSlug 자동 동기화 ── */
+    const handleMainConnectedSlugChange = (slug: string) => {
+        om.setMainConnectedSlug(slug);
+        setWidgetItems(prev => prev.map(item => ({
+            ...item,
+            contents: item.contents.map(c => {
+                if (c.widget.type === 'form' || c.widget.type === 'sublist') {
+                    return { ...c, widget: { ...c.widget, connectedSlug: slug || undefined } };
+                }
+                return c;
+            }),
+        })));
+    };
+
     /**
      * 저장 전 공통 validation — 저장 버튼(상단)과 모달 확인 버튼 양쪽에서 동일하게 사용
      * @returns 오류가 없으면 true
@@ -483,13 +497,14 @@ export default function PageBuilderPage() {
         await tm.handleSaveConfirm(
             widgetItems as unknown as import('../_shared/templateApi').PageWidgetItem[],
             {
-                outputMode:         om.outputMode,
-                pageTitle:          om.pageTitle,
-                pageTitleMsgKey:    om.pageTitleMsgKey || undefined,
-                layerType:          om.layerType,
-                layerTitle:         om.layerTitle,
-                layerTitleMsgKey:   om.layerTitleMsgKey || undefined,
-                layerWidth:         om.layerWidth,
+                outputMode:          om.outputMode,
+                pageTitle:           om.pageTitle,
+                pageTitleMsgKey:     om.pageTitleMsgKey || undefined,
+                layerType:           om.layerType,
+                layerTitle:          om.layerTitle,
+                layerTitleMsgKey:    om.layerTitleMsgKey || undefined,
+                layerWidth:          om.layerWidth,
+                mainConnectedSlug:   om.mainConnectedSlug || undefined,
             },
         );
     };
@@ -545,6 +560,9 @@ export default function PageBuilderPage() {
                         layerTitle={om.layerTitle}
                         layerTitleMsgKey={om.layerTitleMsgKey}
                         layerWidth={om.layerWidth}
+                        mainConnectedSlug={om.mainConnectedSlug}
+                        onMainConnectedSlugChange={handleMainConnectedSlugChange}
+                        slugOptions={slugOptions}
                         onOutputModeChange={om.setOutputMode}
                         onPageTitleChange={om.setPageTitle}
                         onPageTitleMsgKeyChange={om.setPageTitleMsgKey}

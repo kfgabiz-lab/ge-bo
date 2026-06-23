@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 /**
  * useWidgetPageState — 위젯 페이지 공통 상태 관리 훅
@@ -14,11 +14,11 @@
  * options.onGoBack: 저장/삭제 후 이동 처리. 운영 페이지는 router.back(), 탭은 undefined(이동 없음).
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList } from "../utils";
+import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition } from "../utils";
 import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
@@ -72,6 +72,8 @@ interface UseWidgetPageStateOptions {
   onDataIdCreated?: (connectedSlug: string, id: number) => void;
   /** 저장 성공(POST/PUT 모두) 시 상위(TabRenderer)로 알림 — savedTabSet 갱신용 */
   onSaved?: () => void;
+  /** 페이지 레벨 메인 연결 slug — buildDataJson _rel 분기 기준 */
+  mainConnectedSlug?: string;
 }
 
 /**
@@ -191,9 +193,15 @@ export function useWidgetPageState(
         const pageSize = tableWidget.pageSize || DEFAULT_PAGE_SIZE;
         const params: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) params.sort = `${sk},${sd}`;
+        /* fieldKey → fieldId 역매핑 — hideCondition 평가용 */
+        const keyToId: Record<string, string> = {};
+        searchFields.forEach((f) => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
         searchFields.forEach((f) => {
           const val = sv[f.id];
           if (!val || !val.trim()) return;
+          /* hideCondition 충족 시 API 파라미터 제외 — 화면에서 숨겨진 필드는 검색에서도 제외 */
+          const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, sv) : false;
+          if (f.hideCondition && hideResult) return;
           /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
           if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
             params[`drs_${f.linkedDateRangeKey}`] = val;
@@ -401,19 +409,23 @@ export function useWidgetPageState(
       });
 
       sublists.forEach(sw => {
-        const section = (sw.contentKey && dataJson[sw.contentKey])
-          ? dataJson[sw.contentKey] as Record<string, unknown>
-          : {};
-        const rawRows = (section.rows ?? []) as Record<string, unknown>[];
+        const raw = sw.contentKey ? dataJson[sw.contentKey] : null;
+        /* { rows } 래핑 제거 후 배열 직접 저장 방식 */
+        const rawRows = Array.isArray(raw) ? raw as Record<string, unknown>[] : [];
         setSubListRowsMap(prev => ({
           ...prev,
-          [sw.widgetId]: rawRows.map((r, i) => ({ _rowId: `row-${i}`, ...r })),
+          [sw.widgetId]: rawRows.map((r, i) => ({
+            _rowId: (r.id as string) ?? `row-${i}`,
+            ...r,
+          })),
         }));
       });
 
       multiSels.forEach(mw => {
         if (!mw.contentKey) return;
-        const raw = dataJson[mw.contentKey];
+        /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
+        const rel = dataJson['_rel'] as Record<string, unknown> | undefined;
+        const raw = (mw.connectedSlug && rel?.[mw.connectedSlug]) ?? dataJson[mw.contentKey];
         if (!Array.isArray(raw)) return;
         if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
           const items = raw as { id: number; [key: string]: unknown }[];
@@ -866,12 +878,10 @@ export function useWidgetPageState(
             return;
         }
 
-        /* 다중 slug 저장 시 confirm */
-        const slugGroups = Array.from(slugGroupsMap.entries());
-        if (slugGroups.length > 1 && !isUpdate) {
-          const slugNames = slugGroups.map(([s]) => s).join(", ");
-          if (!confirm(`다음 ${slugGroups.length}개 항목에 저장됩니다:\n${slugNames}\n\n계속하시겠습니까?`)) return;
-        }
+        /* mainConnectedSlug가 있으면 전체 위젯을 하나의 slug로 통합 저장 */
+        const slugGroups = options?.mainConnectedSlug
+            ? [[options.mainConnectedSlug, targetWidgets] as [string, (FormWidget | SubListWidget | MultiSelectWidget)[]]]
+            : Array.from(slugGroupsMap.entries());
 
         /* group_id 결정 */
         const groupId =
@@ -969,6 +979,7 @@ export function useWidgetPageState(
             processedSubListRowsMap,
             multiSelectMap,
             multiSelectExtraFieldValuesMap,
+            options?.mainConnectedSlug,
           );
 
           /* 5-1. urlParamSaveExtras 병합 — enableUrlEditMode 시 폼에 없던 URL 파라미터를 dataJson에 추가 */
@@ -1222,6 +1233,7 @@ export function useWidgetPageState(
             processedSubListRowsMap,
             multiSelectMap,
             multiSelectExtraFieldValuesMap,
+            options?.mainConnectedSlug,
           );
 
           const res = await api.post(`/page-data/${dataSaveSlug}`, {
@@ -1316,6 +1328,27 @@ export function useWidgetPageState(
     setCategorySelections((prev) => ({ ...prev, [widgetId]: selectedId }));
   }, []);
 
+  /* 엑셀 다운로드용 현재 검색 파라미터 — hideCondition 충족 필드 제외 */
+  const currentSearchParams = useMemo(() => {
+    const fieldsMap = buildSearchFieldsMap(widgetItems);
+    const keyToId: Record<string, string> = {};
+    Object.values(fieldsMap).flat().forEach(f => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
+    const params: Record<string, string> = {};
+    Object.values(fieldsMap).flat().forEach(f => {
+      const val = searchValues[f.id];
+      if (!val || !val.trim()) return;
+      const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
+      if (f.hideCondition && hideResult) return;
+      if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
+        params[`drs_${f.linkedDateRangeKey}`] = val;
+      } else {
+        const paramKey = f.fieldKey || f.label;
+        if (paramKey) params[paramKey] = val;
+      }
+    });
+    return params;
+  }, [searchValues, widgetItems]);
+
   /* PageGridRenderer에 바로 spread할 수 있도록 묶어서 반환 */
   const gridProps = {
     searchValues,
@@ -1342,6 +1375,7 @@ export function useWidgetPageState(
     onCategorySelect: handleCategorySelect,
     onRefresh: handleRefresh,
     pageSlug,
+    currentSearchParams,
     /* 파일 업로드 */
     fileValuesMap,
     existingFileMetaMap,

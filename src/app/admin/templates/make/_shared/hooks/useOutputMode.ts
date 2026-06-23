@@ -25,6 +25,8 @@ export interface OutputModeValue {
     layerTitle: string;
     layerTitleMsgKey: string;      // 팝업 제목 다국어 키
     layerWidth: LayerWidth;
+    /** 저장 시 메인 data_slug (선택) */
+    mainConnectedSlug: string;
     /** 우측 드로어 여부 — layerpopup + right 조합일 때 true */
     isRightDrawer: boolean;
     setOutputMode: (v: OutputMode) => void;
@@ -34,6 +36,7 @@ export interface OutputModeValue {
     setLayerTitle: (v: string) => void;
     setLayerTitleMsgKey: (v: string) => void;
     setLayerWidth: (v: LayerWidth) => void;
+    setMainConnectedSlug: (v: string) => void;
     /**
      * 저장된 configJson에서 outputMode 관련 값 일괄 복원
      * @param cfg JSON.parse(tpl.configJson) 결과 객체
@@ -49,22 +52,26 @@ export function useOutputMode(): OutputModeValue {
     const [layerTitle, setLayerTitle]             = useState('');
     const [layerTitleMsgKey, setLayerTitleMsgKey] = useState('');
     const [layerWidth, setLayerWidth]             = useState<LayerWidth>('md');
+    const [mainConnectedSlug, setMainConnectedSlug] = useState('');
 
     const isRightDrawer = outputMode === 'layerpopup' && layerType === 'right';
 
     const restore = (cfg: Record<string, unknown>) => {
-        setOutputMode     ((cfg.outputMode      as OutputMode)  || 'page');
-        setPageTitle      ((cfg.pageTitle       as string)      || '');
-        setPageTitleMsgKey((cfg.pageTitleMsgKey as string)      || '');
-        setLayerType      ((cfg.layerType       as LayerType)   || 'center');
-        setLayerTitle     ((cfg.layerTitle      as string)      || '');
-        setLayerTitleMsgKey((cfg.layerTitleMsgKey as string)    || '');
-        setLayerWidth     ((cfg.layerWidth      as LayerWidth)  || 'md');
+        setOutputMode        ((cfg.outputMode         as OutputMode)  || 'page');
+        setPageTitle         ((cfg.pageTitle          as string)      || '');
+        setPageTitleMsgKey   ((cfg.pageTitleMsgKey    as string)      || '');
+        setLayerType         ((cfg.layerType          as LayerType)   || 'center');
+        setLayerTitle        ((cfg.layerTitle         as string)      || '');
+        setLayerTitleMsgKey  ((cfg.layerTitleMsgKey   as string)      || '');
+        setLayerWidth        ((cfg.layerWidth         as LayerWidth)  || 'md');
+        setMainConnectedSlug ((cfg.mainConnectedSlug  as string)      || '');
     };
 
     return {
-        outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth, isRightDrawer,
+        outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
+        mainConnectedSlug, isRightDrawer,
         setOutputMode, setPageTitle, setPageTitleMsgKey, setLayerType, setLayerTitle, setLayerTitleMsgKey, setLayerWidth,
+        setMainConnectedSlug,
         restore,
     };
 }

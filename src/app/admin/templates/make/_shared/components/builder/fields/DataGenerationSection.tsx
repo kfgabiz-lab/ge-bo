@@ -31,6 +31,8 @@ interface DataGenerationSectionProps {
     values: Pick<FieldEditValues, 'generationKey' | 'dataReplacement' | 'caseChange' | 'appendText' | 'truncateLength' | 'dataGenerations'>;
     /** 변경 핸들러 */
     onChange: (updates: Partial<FieldEditValues>) => void;
+    /** 필드 타입 — 'editor'일 때 HTML제거|글자자르기 UI 표시 (기본: 'input') */
+    fieldType?: 'input' | 'editor';
 }
 
 /** select 공통 스타일 */
@@ -39,17 +41,19 @@ const SELECT_CLS = 'w-full border border-slate-200 rounded px-2 py-1.5 text-xs f
 /** 빈 세트 초기값 */
 const EMPTY_ENTRY: DataGenerationEntry = { generationKey: '' };
 
-/** 세트 1개 UI — 생성KEY + 2열 그리드(데이터변경|문자변경) + 2열 그리드(텍스트추가|글자자르기) */
+/** 세트 1개 UI — fieldType에 따라 변환옵션 그리드 분기 */
 function GenerationEntryRow({
     entry,
     index,
     onChange,
     onRemove,
+    fieldType = 'input',
 }: {
     entry: DataGenerationEntry;
     index: number;
     onChange: (updated: DataGenerationEntry) => void;
     onRemove: () => void;
+    fieldType?: 'input' | 'editor';
 }) {
     return (
         <div className="pl-2 border-l-2 border-slate-100 space-y-1.5">
@@ -77,71 +81,95 @@ function GenerationEntryRow({
                 />
             </div>
 
-            {/* 2열 그리드: 데이터변경 | 문자변경 */}
-            <div className="grid grid-cols-2 gap-1.5">
-                {/* 데이터변경 */}
-                <div>
-                    <label className={LABEL_CLS}>데이터변경</label>
-                    <select
-                        value={entry.dataReplacement ?? 'none'}
-                        onChange={e => onChange({ ...entry, dataReplacement: e.target.value as 'none' | 'hyphen' })}
-                        className={SELECT_CLS}
-                    >
-                        <option value="none">없음</option>
-                        <option value="hyphen">데이터치환(-)</option>
-                    </select>
-                    {entry.dataReplacement === 'hyphen' && (
-                        <p className="text-[9px] text-slate-400 mt-0.5">공백·특수문자 → '-' 치환</p>
-                    )}
+            {/* editor: HTML제거 | 글자자르기 */}
+            {fieldType === 'editor' && (
+                <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                        <label className={LABEL_CLS}>HTML제거</label>
+                        <select
+                            value={entry.stripHtml ? 'strip' : 'none'}
+                            onChange={e => onChange({ ...entry, stripHtml: e.target.value === 'strip' })}
+                            className={SELECT_CLS}
+                        >
+                            <option value="none">없음</option>
+                            <option value="strip">HTML 태그 제거</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className={LABEL_CLS}>글자자르기(자 미만)</label>
+                        <input
+                            type="number"
+                            min={1}
+                            value={entry.truncateLength ?? ''}
+                            placeholder="0"
+                            onChange={e => onChange({ ...entry, truncateLength: e.target.value ? Number(e.target.value) : undefined })}
+                            className={INPUT_CLS}
+                        />
+                    </div>
                 </div>
+            )}
 
-                {/* 문자변경 */}
-                <div>
-                    <label className={LABEL_CLS}>문자변경</label>
-                    <select
-                        value={entry.caseChange ?? 'none'}
-                        onChange={e => onChange({ ...entry, caseChange: e.target.value as 'none' | 'upper' | 'lower' })}
-                        className={SELECT_CLS}
-                    >
-                        <option value="none">없음</option>
-                        <option value="upper">대문자로</option>
-                        <option value="lower">소문자로</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* 2열 그리드: 텍스트추가(끝) | 글자자르기 */}
-            <div className="grid grid-cols-2 gap-1.5">
-                {/* 텍스트추가(끝) */}
-                <div>
-                    <label className={LABEL_CLS}>텍스트추가(끝)</label>
-                    <input
-                        type="text"
-                        value={entry.appendText ?? ''}
-                        placeholder="끝에 추가할 텍스트"
-                        onChange={e => onChange({ ...entry, appendText: e.target.value || undefined })}
-                        className={INPUT_CLS}
-                    />
-                </div>
-
-                {/* 글자자르기 */}
-                <div>
-                    <label className={LABEL_CLS}>글자자르기(자 미만)</label>
-                    <input
-                        type="number"
-                        min={1}
-                        value={entry.truncateLength ?? ''}
-                        placeholder="0"
-                        onChange={e => onChange({ ...entry, truncateLength: e.target.value ? Number(e.target.value) : undefined })}
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
-                    />
-                </div>
-            </div>
+            {/* input/textarea: 데이터변경|문자변경 + 텍스트추가|글자자르기 */}
+            {fieldType !== 'editor' && (
+                <>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <label className={LABEL_CLS}>데이터변경</label>
+                            <select
+                                value={entry.dataReplacement ?? 'none'}
+                                onChange={e => onChange({ ...entry, dataReplacement: e.target.value as 'none' | 'hyphen' })}
+                                className={SELECT_CLS}
+                            >
+                                <option value="none">없음</option>
+                                <option value="hyphen">데이터치환(-)</option>
+                            </select>
+                            {entry.dataReplacement === 'hyphen' && (
+                                <p className="text-[9px] text-slate-400 mt-0.5">공백·특수문자 → '-' 치환</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className={LABEL_CLS}>문자변경</label>
+                            <select
+                                value={entry.caseChange ?? 'none'}
+                                onChange={e => onChange({ ...entry, caseChange: e.target.value as 'none' | 'upper' | 'lower' })}
+                                className={SELECT_CLS}
+                            >
+                                <option value="none">없음</option>
+                                <option value="upper">대문자로</option>
+                                <option value="lower">소문자로</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                            <label className={LABEL_CLS}>텍스트추가(끝)</label>
+                            <input
+                                type="text"
+                                value={entry.appendText ?? ''}
+                                placeholder="끝에 추가할 텍스트"
+                                onChange={e => onChange({ ...entry, appendText: e.target.value || undefined })}
+                                className={INPUT_CLS}
+                            />
+                        </div>
+                        <div>
+                            <label className={LABEL_CLS}>글자자르기(자 미만)</label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={entry.truncateLength ?? ''}
+                                placeholder="0"
+                                onChange={e => onChange({ ...entry, truncateLength: e.target.value ? Number(e.target.value) : undefined })}
+                                className={INPUT_CLS}
+                            />
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
 
-export function DataGenerationSection({ values, onChange }: DataGenerationSectionProps) {
+export function DataGenerationSection({ values, onChange, fieldType = 'input' }: DataGenerationSectionProps) {
     /* dataGenerations 배열 — 없으면 기존 단일값(generationKey)을 1번 세트로 마이그레이션 */
     const entries: DataGenerationEntry[] = values.dataGenerations?.length
         ? values.dataGenerations
@@ -186,6 +214,7 @@ export function DataGenerationSection({ values, onChange }: DataGenerationSectio
                     key={index}
                     entry={entry}
                     index={index}
+                    fieldType={fieldType}
                     onChange={updated => handleChange(index, updated)}
                     onRemove={() => handleRemove(index)}
                 />

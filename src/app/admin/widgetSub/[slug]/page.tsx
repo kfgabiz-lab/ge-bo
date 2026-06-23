@@ -28,14 +28,16 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const { t }         = useI18n();
 
     /* 템플릿 로딩 상태 */
-    const [loading,     setLoading]     = useState(true);
-    const [error,       setError]       = useState<string | null>(null);
-    const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
+    const [loading,            setLoading]            = useState(true);
+    const [error,              setError]              = useState<string | null>(null);
+    const [widgetItems,        setWidgetItems]        = useState<PageWidgetItem[]>([]);
+    const [mainConnectedSlug,  setMainConnectedSlug]  = useState<string | undefined>(undefined);
 
     /* 공통 훅 — 검색·테이블·폼·파일·SubList·MultiSelect 상태 및 핸들러 전체 */
     const { gridProps } = useWidgetPageState(widgetItems, slug, {
         enableUrlEditMode: true,
         onGoBack: () => router.back(),
+        mainConnectedSlug,
     });
 
     /* 템플릿 로딩 */
@@ -46,6 +48,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 const raw = JSON.parse(res.data.configJson) as Record<string, unknown>;
                 const items: PageWidgetItem[] = raw.widgetItems ? raw.widgetItems as PageWidgetItem[] : [];
                 setWidgetItems(items);
+                setMainConnectedSlug((raw.mainConnectedSlug as string) || undefined);
                 /* pageTitleMsgKey 우선 → 없으면 pageTitle 직접 텍스트 사용 */
                 const msgKey = (raw.pageTitleMsgKey as string) || '';
                 setPageTitle(msgKey ? t(msgKey) : ((raw.pageTitle as string) || ''));

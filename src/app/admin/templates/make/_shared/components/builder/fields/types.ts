@@ -12,10 +12,12 @@ export type ColSpanMode =
     | { type: 'button'; options: number[]; minSpan?: number }  // 버튼 선택 방식 (Search: 1~5)
     | { type: 'input'; min: number; max: number };             // 숫자 입력 방식 (Form: 1~12)
 
-/** 데이터생성 세트 1개 — 생성KEY + 4가지 변환옵션 */
+/** 데이터생성 세트 1개 — 생성KEY + 변환옵션 */
 export interface DataGenerationEntry {
     /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
     generationKey: string;
+    /** HTML제거 — true 이면 HTML 태그 제거 후 변환 (에디터 전용) */
+    stripHtml?: boolean;
     /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
     dataReplacement?: 'none' | 'hyphen';
     /** 문자변경: 없음(none) / 대문자(upper) / 소문자(lower) */
@@ -108,6 +110,9 @@ export interface FieldEditValues {
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];     // depth별 value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];      // depth별 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+    /* ── time 전용 ── */
+    defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
+    timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
     /* ── dateRangeStatus 전용 ── */
     linkedDateRangeKey?: string;     // 연결할 dateRange 필드의 accessor (예: 'period')
     beforeText?: string;             // 날짜 이전 표시 텍스트 (예: '예정')

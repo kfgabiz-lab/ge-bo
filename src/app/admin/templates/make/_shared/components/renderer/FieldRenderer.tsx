@@ -1493,6 +1493,20 @@ export function FieldRenderer({
             );
         }
 
+        /* ── time ── */
+        case 'time':
+            return (
+                <input
+                    type="time"
+                    disabled={isDisabled}
+                    readOnly={isReadOnly}
+                    className={`${inputCls}${readonlyCls}`}
+                    value={value}
+                    step={field.timeStep ? field.timeStep * 60 : undefined}
+                    onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
+                />
+            );
+
         /* ── hidden ── 화면에 렌더링하지 않음 — 저장 시 defaultValue로 자동 포함 */
         case 'hidden':
             return null;

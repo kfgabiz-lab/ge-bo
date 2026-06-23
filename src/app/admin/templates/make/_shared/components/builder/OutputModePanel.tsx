@@ -44,6 +44,12 @@ interface OutputModePanelProps {
     layerTitle: string;
     layerTitleMsgKey: string;
     layerWidth: LayerWidth;
+    /** 페이지 레벨 메인 연결 slug (선택) */
+    mainConnectedSlug?: string;
+    /** 메인 연결 slug 변경 핸들러 */
+    onMainConnectedSlugChange?: (v: string) => void;
+    /** slug 목록 — 드롭다운 옵션 */
+    slugOptions?: { id: number; slug: string; name: string }[];
     onOutputModeChange: (v: OutputMode) => void;
     onPageTitleChange: (v: string) => void;
     onPageTitleMsgKeyChange: (v: string) => void;
@@ -59,6 +65,7 @@ interface OutputModePanelProps {
  */
 export function OutputModePanel({
     outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
+    mainConnectedSlug = '', onMainConnectedSlugChange, slugOptions = [],
     onOutputModeChange, onPageTitleChange, onPageTitleMsgKeyChange,
     onLayerTypeChange, onLayerTitleChange, onLayerTitleMsgKeyChange, onLayerWidthChange,
 }: OutputModePanelProps) {
@@ -120,6 +127,30 @@ export function OutputModePanel({
                             className={inputCls}
                         />
                     )}
+                </div>
+            )}
+
+            {/* 메인 연결 slug — outputMode 관계없이 항상 표시 (선택) */}
+            {onMainConnectedSlugChange && (
+                <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
+                    <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block">
+                        메인 연결 Slug <span className="font-normal text-slate-400">(선택)</span>
+                    </label>
+                    <div className="relative">
+                        <select
+                            value={mainConnectedSlug}
+                            onChange={e => onMainConnectedSlugChange(e.target.value)}
+                            className={selectCls}
+                        >
+                            <option value="">— 없음 —</option>
+                            {slugOptions.map(opt => (
+                                <option key={opt.id} value={opt.slug}>
+                                    {opt.name} ({opt.slug})
+                                </option>
+                            ))}
+                        </select>
+                        <SelectArrow />
+                    </div>
                 </div>
             )}
 

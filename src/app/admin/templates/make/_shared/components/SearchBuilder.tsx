@@ -246,6 +246,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultEndDateOffset, defaultEndDate, disableEndPast,
             dbSlug, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
+            hideCondition, disableCondition,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -299,6 +300,9 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             afterText:          pendingType === 'dateRangeStatus' ? (afterText?.trim() || undefined) : undefined,
             afterTextMsgKey:    pendingType === 'dateRangeStatus' ? (afterTextMsgKey?.trim() || undefined) : undefined,
             statusDisplayStyle: pendingType === 'dateRangeStatus' ? (statusDisplayStyle ?? 'select') : undefined,
+            /* 동적 조건 */
+            hideCondition:     hideCondition?.trim()    || undefined,
+            disableCondition:  disableCondition?.trim() || undefined,
         };
 
         onChange(rows.map(r =>
@@ -494,6 +498,9 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 afterText:           field.afterText,
                                                                                 afterTextMsgKey:     field.afterTextMsgKey,
                                                                                 statusDisplayStyle:  field.statusDisplayStyle,
+                                                                                /* 동적 조건 */
+                                                                                hideCondition:       field.hideCondition,
+                                                                                disableCondition:    field.disableCondition,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

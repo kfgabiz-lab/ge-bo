@@ -234,8 +234,8 @@ export function FieldBase(props: FieldBaseProps) {
                 )}
             </div>
 
-            {/* 동적 HIDE 조건 | 동적 Disable 조건 — Form 모드에서만, SubList 등 미지원 컨텍스트 제외 */}
-            {isFormMode && !hideConditionFields && (
+            {/* 동적 HIDE 조건 | 동적 Disable 조건 — SubList 등 미지원 컨텍스트 제외 */}
+            {!hideConditionFields && (
                 <div className="grid grid-cols-2 gap-2">
                     <div>
                         <label className={LABEL_CLS}>동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span></label>

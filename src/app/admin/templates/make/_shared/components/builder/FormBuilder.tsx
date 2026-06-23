@@ -34,7 +34,7 @@ import {
     InputField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
     EditorField, FileField, ImageField, VideoField, MediaField,
-    FormTextareaField,
+    FormTextareaField, TimeField,
     SlugSelectField,
 } from './fields';
 import type { FieldEditValues } from './fields';
@@ -90,6 +90,7 @@ const FORM_FIELD_TYPES: FieldTypeItem[] = [
     { type: 'video',          label: 'Video',            desc: 'URL · 파일 업로드',        defaultColSpan: 2 },
     { type: 'media',          label: '미디어',           desc: '이미지·동영상 통합',        defaultColSpan: 2 },
     { type: 'textarea',       label: 'Textarea',         desc: '여러 줄 텍스트 입력',      defaultColSpan: 2 },
+    { type: 'time',           label: 'Time',             desc: '시간 선택 (HH:MM)',        defaultColSpan: 1 },
     { type: 'hidden',         label: 'Hidden',           desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
 ];
 
@@ -297,6 +298,8 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 defaultEndDateOffset:   f.defaultEndDateOffset,
                 defaultEndDate:         f.defaultEndDate,
                 disableEndPast:         f.disableEndPast,
+                defaultTime:            f.defaultTime,
+                timeStep:               f.timeStep,
                 /* ── 데이터생성 ── */
                 generationKey:      f.generationKey,
                 dataReplacement:    f.dataReplacement,
@@ -330,6 +333,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             case 'image':     return <ImageField {...props} />;
             case 'video':     return <VideoField {...props} />;
             case 'media':     return <MediaField {...props} />;
+            case 'time':      return <TimeField {...props} />;
             case 'textarea':  return <FormTextareaField {...props} />;
             /* hidden: KEY(fieldKey) + VALUE(defaultValue) 한 줄 배치 */
             case 'hidden':
@@ -364,7 +368,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
     /* ── 렌더 ── */
     return (
         <div className="space-y-2 pt-1">
-            {/* Key * | 연결 slug — 2열 그리드 */}
+            {/* Key * | 연결 slug */}
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key <span className="text-red-400">*</span></label>
