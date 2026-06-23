@@ -99,6 +99,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 codeGroups={codeGroups}
                 dataSlug={resolvedDataSlug}
                 urlParams={urlParams}
+                mainConnectedSlug={mainConnectedSlug}
                 {...gridProps}
             />
         </PageLayout>

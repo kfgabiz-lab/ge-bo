@@ -37,9 +37,11 @@ interface TabRendererProps {
   widget: TabWidget;
   /** 탭을 포함하는 상위 페이지 slug — 저장 시 templateSlug로 사용 */
   pageSlug?: string;
+  /** 진입 페이지(탭 페이지)의 메인 연결 slug — 탭 서브페이지 mainConnectedSlug보다 우선 적용 */
+  parentMainConnectedSlug?: string;
 }
 
-export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
+export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug }: TabRendererProps) {
   const { tabs } = widget;
   const [activeIdx, setActiveIdx] = useState(0);
   /* 한 번이라도 활성화된 탭 인덱스 집합 — lazy mount용 */
@@ -132,6 +134,7 @@ export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
                   tab={tab}
                   tabIdx={idx}
                   pageSlug={pageSlug}
+                  parentMainConnectedSlug={parentMainConnectedSlug}
                   sharedDataIdMap={sharedDataIdMap}
                   urlId={urlId}
                   onDataIdCreated={handleDataIdCreated}
@@ -196,6 +199,8 @@ interface LiveTabPanelProps {
   tabIdx: number;
   /** 탭을 포함하는 상위 페이지 slug — 저장 시 templateSlug로 사용 */
   pageSlug?: string;
+  /** 진입 페이지(탭 페이지) mainConnectedSlug — 서브페이지 mainConnectedSlug보다 우선 적용 */
+  parentMainConnectedSlug?: string;
   /** connectedSlug → row id 매핑 (TabRenderer 레벨에서 관리) */
   sharedDataIdMap: Record<string, number>;
   /** URL ?id — 수정 진입 시 초기 row id */
@@ -215,11 +220,15 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
+  const [subPageMainConnectedSlug, setSubPageMainConnectedSlug] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  /* 탭 페이지 mainConnectedSlug 우선, 없으면 서브페이지 mainConnectedSlug 사용 */
+  const resolvedMainConnectedSlug = parentMainConnectedSlug || subPageMainConnectedSlug;
 
   /**
    * 이 탭의 connectedSlug 목록(저장 위젯 기준)을 추출하여
@@ -248,6 +257,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdC
     sharedDataId,
     onDataIdCreated,
     onSaved: () => onSaved(tabIdx),
+    mainConnectedSlug: resolvedMainConnectedSlug,
   });
 
   /* 팝업 저장에 사용할 dataSlug — widgetItems의 첫 번째 table 위젯 connectedSlug */
@@ -263,6 +273,8 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdC
     fetchTemplateConfig(tab.pageSlug)
       .then((cfg) => {
         setWidgetItems(cfg.widgetItems as unknown as PageWidgetItem[]);
+        /* 서브페이지 mainConnectedSlug 저장 — parentMainConnectedSlug 없을 때 폴백으로 사용 */
+        setSubPageMainConnectedSlug(cfg.mainConnectedSlug || undefined);
       })
       .catch(() => setFailed(true))
       .finally(() => setLoading(false));

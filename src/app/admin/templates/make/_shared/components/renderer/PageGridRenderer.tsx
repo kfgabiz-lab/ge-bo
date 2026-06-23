@@ -153,6 +153,8 @@ interface PageGridRendererProps {
     crossTabFormValues?: Record<string, string>;
     /** cross-tab 데이터생성 자동입력 콜백 — 현재 탭에서 못 찾은 fieldId를 TabRenderer로 에스컬레이션 */
     onCrossTabFormChange?: (fieldId: string, value: string) => void;
+    /** 진입 페이지의 메인 연결 slug — TabRenderer에 전달하여 탭 내부 저장 시 우선 적용 */
+    mainConnectedSlug?: string;
 }
 
 /**
@@ -202,6 +204,7 @@ export function PageGridRenderer({
     urlParams,
     crossTabFormValues,
     onCrossTabFormChange,
+    mainConnectedSlug,
 }: PageGridRendererProps) {
     /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
      * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
@@ -401,6 +404,7 @@ export function PageGridRenderer({
                                         dataSlug={dataSlug}
                                         onRefresh={onRefresh}
                                         pageSlug={pageSlug}
+                                        mainConnectedSlug={mainConnectedSlug}
                                         /* 엑셀 다운로드 */
                                         tableWidgetsMap={tableWidgetsMap}
                                         currentSearchParams={currentSearchParams}

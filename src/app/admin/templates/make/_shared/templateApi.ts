@@ -29,6 +29,8 @@ export interface TemplatePopupConfig {
     layerTitle?:      string;
     layerTitleMsgKey?: string;
     layerWidth?:      'sm' | 'md' | 'lg' | 'xl';
+    /** 페이지 레벨 메인 연결 slug — 탭 서브페이지 저장 시 우선순위 판단에 사용 */
+    mainConnectedSlug?: string;
     /** 위젯 목록 — PageWidgetItem[] 구조 (PageGridRenderer에 바로 사용) */
     widgetItems: PageWidgetItem[];
 }
@@ -80,11 +82,12 @@ export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupCo
     }
 
     return {
-        outputMode:       raw.outputMode       || 'page',
-        layerType:        raw.layerType        || 'center',
-        layerTitle:       raw.layerTitle       || '',
-        layerTitleMsgKey: raw.layerTitleMsgKey || '',
-        layerWidth:       raw.layerWidth       || 'md',
+        outputMode:        raw.outputMode        || 'page',
+        layerType:         raw.layerType         || 'center',
+        layerTitle:        raw.layerTitle        || '',
+        layerTitleMsgKey:  raw.layerTitleMsgKey  || '',
+        layerWidth:        raw.layerWidth        || 'md',
+        mainConnectedSlug: (raw.mainConnectedSlug as string) || undefined,
         widgetItems,
     };
 }

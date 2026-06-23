@@ -252,6 +252,8 @@ interface WidgetRendererProps {
     onRefresh?: () => void;
     /** 현재 페이지 slug — 팝업 저장 시 templateSlug로 전달 */
     pageSlug?: string;
+    /** 진입 페이지의 메인 연결 slug — TabRenderer에 전달하여 탭 내부 저장 시 우선 적용 */
+    mainConnectedSlug?: string;
     /**
      * 외부에서 팝업을 직접 트리거할 때 사용 (LIST 버튼바, test 페이지 등).
      * ts가 변경될 때마다 팝업을 오픈한다.
@@ -328,6 +330,7 @@ export function WidgetRenderer({
     dataSlug,
     onRefresh,
     pageSlug,
+    mainConnectedSlug,
     externalPopupTrigger,
 }: WidgetRendererProps) {
     const router  = useRouter();
@@ -1405,7 +1408,7 @@ export function WidgetRenderer({
     }
 
     if (widget.type === 'tab') {
-        return <TabRenderer mode={mode} widget={widget} pageSlug={pageSlug} />;
+        return <TabRenderer mode={mode} widget={widget} pageSlug={pageSlug} parentMainConnectedSlug={mainConnectedSlug} />;
     }
 
     return <div className={BASE_CLS} />;

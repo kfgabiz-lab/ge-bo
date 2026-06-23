@@ -243,7 +243,7 @@ export function FieldBase(props: FieldBaseProps) {
                             type="text"
                             value={hideCondition ?? ''}
                             onChange={e => onChange({ hideCondition: e.target.value || undefined })}
-                            placeholder="예: status=1 / personal.status!=0"
+                            placeholder="예: status=1,type=Y / status= (빈값)"
                             className={INPUT_CLS}
                         />
                     </div>
@@ -253,7 +253,7 @@ export function FieldBase(props: FieldBaseProps) {
                             type="text"
                             value={disableCondition ?? ''}
                             onChange={e => onChange({ disableCondition: e.target.value || undefined })}
-                            placeholder="예: status=1 / personal.status!=0"
+                            placeholder="예: status=1,type=Y / status= (빈값)"
                             className={INPUT_CLS}
                         />
                     </div>
