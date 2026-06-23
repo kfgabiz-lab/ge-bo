@@ -19,7 +19,7 @@
  *   <TabRenderer mode="live" widget={tabWidget} />
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from 'sonner';
@@ -65,6 +65,14 @@ export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
   const [savedTabSet, setSavedTabSet] = useState<Set<number>>(
     () => new Set(urlId ? [0] : [])
   );
+
+  /* 탭 간 공유 데이터생성 자동입력 상태 — fieldId → value (모든 탭 공유) */
+  const [crossTabFormValues, setCrossTabFormValues] = useState<Record<string, string>>({});
+
+  /* 어느 탭 PageGridRenderer에서도 escalate 될 수 있는 cross-tab 값 업데이트 콜백 */
+  const handleCrossTabFormChange = useCallback((fieldId: string, value: string) => {
+    setCrossTabFormValues(prev => ({ ...prev, [fieldId]: value }));
+  }, []);
 
   /**
    * 탭 클릭 이동 가드 (live 모드 한정)
@@ -128,6 +136,8 @@ export function TabRenderer({ mode, widget, pageSlug }: TabRendererProps) {
                   urlId={urlId}
                   onDataIdCreated={handleDataIdCreated}
                   onSaved={handleTabSaved}
+                  crossTabFormValues={crossTabFormValues}
+                  onCrossTabFormChange={handleCrossTabFormChange}
                 />
               ) : (
                 <PreviewTabPanel tab={tab} activeIdx={idx} />
@@ -194,6 +204,10 @@ interface LiveTabPanelProps {
   onDataIdCreated: (connectedSlug: string, id: number) => void;
   /** POST/PUT 저장 성공 시 탭 인덱스를 TabRenderer로 전달 — savedTabSet 갱신 */
   onSaved: (tabIdx: number) => void;
+  /** TabRenderer 레벨에서 관리하는 cross-tab 공유 폼 값 (fieldId → value) */
+  crossTabFormValues: Record<string, string>;
+  /** 어떤 탭에서도 대상 fieldId를 못 찾으면 TabRenderer로 에스컬레이션 */
+  onCrossTabFormChange: (fieldId: string, value: string) => void;
 }
 
 /**
@@ -201,7 +215,7 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -277,5 +291,15 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, sharedDataIdMap, urlId, onDataIdC
 
   if (!widgetItems.length) return null;
 
-  return <PageGridRenderer mode="live" widgetItems={widgetItems} codeGroups={codeGroups} dataSlug={dataSlug} {...gridProps} />;
+  return (
+    <PageGridRenderer
+      mode="live"
+      widgetItems={widgetItems}
+      codeGroups={codeGroups}
+      dataSlug={dataSlug}
+      crossTabFormValues={crossTabFormValues}
+      onCrossTabFormChange={onCrossTabFormChange}
+      {...gridProps}
+    />
+  );
 }

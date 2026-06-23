@@ -35,7 +35,8 @@ import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { ToggleRow } from './fields/_ToggleRow';
 import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
 import {
-    InputField, SelectField, DateField, DateRangeField,
+    InputField, SelectField, RadioField, CheckboxField,
+    DateField, DateRangeField,
     FormTextareaField, FileField, ImageField,
     SlugSelectField,
 } from './fields';
@@ -50,6 +51,8 @@ const uid = createIdGenerator('slc');
 const SUBLIST_COLUMN_TYPES: FieldTypeItem[] = [
     { type: 'input',     label: 'Input',      desc: '텍스트 입력' },
     { type: 'select',    label: 'Select',     desc: '셀렉트 박스' },
+    { type: 'radio',     label: 'Radio',      desc: '라디오 단일선택' },
+    { type: 'checkbox',  label: 'Checkbox',   desc: '체크박스 복수선택' },
     { type: 'date',      label: 'Date',       desc: '날짜 단독' },
     { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)' },
     { type: 'textarea',  label: 'Textarea',   desc: '여러 줄 텍스트' },
@@ -204,6 +207,8 @@ function SortableColumnItem({
     const typeBadgeCls: Record<SubListColumnType, string> = {
         input:     'bg-blue-50 text-blue-600',
         select:    'bg-purple-50 text-purple-600',
+        radio:     'bg-indigo-50 text-indigo-600',
+        checkbox:  'bg-cyan-50 text-cyan-600',
         date:      'bg-green-50 text-green-600',
         dateRange: 'bg-teal-50 text-teal-600',
         textarea:  'bg-amber-50 text-amber-600',
@@ -302,6 +307,8 @@ function ColumnEditPanel({
             {/* 타입별 공통 필드 컴포넌트 */}
             {col.type === 'input'     && <InputField        {...commonProps} />}
             {col.type === 'select'    && <SelectField       {...commonProps} />}
+            {col.type === 'radio'     && <RadioField        {...commonProps} />}
+            {col.type === 'checkbox'  && <CheckboxField     {...commonProps} />}
             {col.type === 'date'      && <DateField         {...commonProps} />}
             {col.type === 'dateRange' && <DateRangeField    {...commonProps} />}
             {col.type === 'textarea'  && <FormTextareaField {...commonProps} />}

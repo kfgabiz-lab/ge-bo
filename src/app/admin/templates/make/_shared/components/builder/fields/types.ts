@@ -12,6 +12,20 @@ export type ColSpanMode =
     | { type: 'button'; options: number[]; minSpan?: number }  // 버튼 선택 방식 (Search: 1~5)
     | { type: 'input'; min: number; max: number };             // 숫자 입력 방식 (Form: 1~12)
 
+/** 데이터생성 세트 1개 — 생성KEY + 4가지 변환옵션 */
+export interface DataGenerationEntry {
+    /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+    generationKey: string;
+    /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
+    dataReplacement?: 'none' | 'hyphen';
+    /** 문자변경: 없음(none) / 대문자(upper) / 소문자(lower) */
+    caseChange?: 'none' | 'upper' | 'lower';
+    /** 텍스트추가(끝) — 변환 후 끝에 붙이는 문자열 */
+    appendText?: string;
+    /** 글자자르기 — N자 미만으로 자름 */
+    truncateLength?: number;
+}
+
 /** 공통 필드 편집 값 */
 export interface FieldEditValues {
     label: string;
@@ -114,6 +128,8 @@ export interface FieldEditValues {
     appendText?: string;
     /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
     truncateLength?: number;
+    /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
+    dataGenerations?: DataGenerationEntry[];
     /* ── action 컬럼 전용 (SubList action 타입 컬럼에서 사용) ── */
     actions?: ('edit' | 'detail' | 'delete' | 'copy')[];
 }

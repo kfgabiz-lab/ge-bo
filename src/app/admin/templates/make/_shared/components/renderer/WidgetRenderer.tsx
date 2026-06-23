@@ -156,6 +156,8 @@ interface WidgetRendererProps {
     formValues?: Record<string, string>;
     /** Form 필드값 변경 핸들러 */
     onFormValuesChange?: (fieldId: string, value: string) => void;
+    /** cross-form 데이터생성 실시간 자동입력 콜백 — 어느 폼이든 fieldId로 값 업데이트 */
+    onChangeAllFormValues?: (fieldId: string, value: string) => void;
     /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 */
     allFormValues?: Record<string, string>;
     /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
@@ -278,6 +280,7 @@ export function WidgetRenderer({
     /* form */
     formValues = {},
     onFormValuesChange,
+    onChangeAllFormValues,
     allFormValues,
     allFieldKeyToId,
     urlParams,
@@ -1313,6 +1316,7 @@ export function WidgetRenderer({
                 codeGroups={codeGroups}
                 values={formValues}
                 onChangeValues={onFormValuesChange}
+                onChangeAllFormValues={onChangeAllFormValues}
                 allFormValues={allFormValues}
                 allFieldKeyToId={allFieldKeyToId}
                 urlParams={urlParams}

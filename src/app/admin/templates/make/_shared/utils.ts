@@ -464,36 +464,21 @@ export function buildDataJson(
              * 2단계: "ck.fieldKey"      → dataJson.ck.fieldKey
              * 3단계: "tk.ck.fieldKey"   → dataJson.tk.ck.fieldKey */
             (w.fields ?? []).forEach(f => {
-                if (!f.generationKey) return;
                 if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
                 const sourceValue = rawValues[f.id] ?? '';
-                const transformed = applyDataGeneration(
-                    sourceValue,
-                    f.dataReplacement,
-                    f.caseChange,
-                    f.appendText,
-                    f.truncateLength,
-                );
-                const parts = f.generationKey.split('.');
-                if (parts.length === 1) {
-                    dataJson[parts[0]] = transformed;
-                } else if (parts.length === 2) {
-                    const [ck, fk] = parts;
-                    if (!dataJson[ck] || typeof dataJson[ck] !== 'object' || Array.isArray(dataJson[ck])) {
-                        dataJson[ck] = {};
-                    }
-                    (dataJson[ck] as Record<string, unknown>)[fk] = transformed;
-                } else if (parts.length === 3) {
-                    const [tk, ck, fk] = parts;
-                    if (!dataJson[tk] || typeof dataJson[tk] !== 'object' || Array.isArray(dataJson[tk])) {
-                        dataJson[tk] = {};
-                    }
-                    const tabSection = dataJson[tk] as Record<string, unknown>;
-                    if (!tabSection[ck] || typeof tabSection[ck] !== 'object' || Array.isArray(tabSection[ck])) {
-                        tabSection[ck] = {};
-                    }
-                    (tabSection[ck] as Record<string, unknown>)[fk] = transformed;
+
+                /* 단일 generationKey 처리 (기존 호환) */
+                if (f.generationKey) {
+                    const transformed = applyDataGeneration(sourceValue, f.dataReplacement, f.caseChange, f.appendText, f.truncateLength);
+                    writeToGenerationPath(dataJson, f.generationKey, transformed);
                 }
+
+                /* 다중 dataGenerations 배열 처리 */
+                (f.dataGenerations ?? []).forEach(dg => {
+                    if (!dg.generationKey) return;
+                    const transformed = applyDataGeneration(sourceValue, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength);
+                    writeToGenerationPath(dataJson, dg.generationKey, transformed);
+                });
             });
 
         } else if (w.type === 'multiselect') {
@@ -521,6 +506,29 @@ export function buildDataJson(
     }
 
     return { dataJson, pkKeys };
+}
+
+/**
+ * 생성KEY dot notation 경로에 값을 기록 — buildDataJson / FormRenderer 공용
+ * 1단계: "fieldKey"       → dataJson.fieldKey
+ * 2단계: "ck.fieldKey"    → dataJson.ck.fieldKey
+ * 3단계: "tk.ck.fieldKey" → dataJson.tk.ck.fieldKey
+ */
+function writeToGenerationPath(dataJson: Record<string, unknown>, generationKey: string, value: string) {
+    const parts = generationKey.split('.');
+    if (parts.length === 1) {
+        dataJson[parts[0]] = value;
+    } else if (parts.length === 2) {
+        const [ck, fk] = parts;
+        if (!dataJson[ck] || typeof dataJson[ck] !== 'object' || Array.isArray(dataJson[ck])) dataJson[ck] = {};
+        (dataJson[ck] as Record<string, unknown>)[fk] = value;
+    } else if (parts.length === 3) {
+        const [tk, ck, fk] = parts;
+        if (!dataJson[tk] || typeof dataJson[tk] !== 'object' || Array.isArray(dataJson[tk])) dataJson[tk] = {};
+        const tabSection = dataJson[tk] as Record<string, unknown>;
+        if (!tabSection[ck] || typeof tabSection[ck] !== 'object' || Array.isArray(tabSection[ck])) tabSection[ck] = {};
+        (tabSection[ck] as Record<string, unknown>)[fk] = value;
+    }
 }
 
 /**

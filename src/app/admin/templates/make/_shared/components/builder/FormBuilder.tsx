@@ -303,6 +303,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 caseChange:         f.caseChange,
                 appendText:         f.appendText,
                 truncateLength:     f.truncateLength,
+                dataGenerations:    f.dataGenerations,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),

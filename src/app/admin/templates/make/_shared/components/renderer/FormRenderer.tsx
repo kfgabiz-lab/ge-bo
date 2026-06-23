@@ -55,6 +55,8 @@ interface FormRendererProps {
     values?: Record<string, string>;
     /** 필드값 변경 핸들러 — live 모드에서 외부로 값 전달 */
     onChangeValues?: (fieldId: string, value: string) => void;
+    /** cross-form 데이터생성 실시간 자동입력 콜백 — 어느 폼이든 fieldId로 값 업데이트 */
+    onChangeAllFormValues?: (fieldId: string, value: string) => void;
     /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 (fieldId → value) */
     allFormValues?: Record<string, string>;
     /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
@@ -87,6 +89,7 @@ export function FormRenderer({
     codeGroups = [],
     values = {},
     onChangeValues,
+    onChangeAllFormValues,
     allFormValues,
     allFieldKeyToId,
     urlParams,
@@ -154,24 +157,52 @@ export function FormRenderer({
 
         /* generationKey 자동입력 처리 */
         const sourceField = fields.find(f => f.id === fieldId);
-        if (!sourceField?.generationKey) return;
+        if (!sourceField) return;
 
-        /* dot notation 마지막 세그먼트를 타겟 fieldKey로 사용 */
-        const parts = sourceField.generationKey.split('.');
-        const targetFieldKey = parts[parts.length - 1];
-        const targetFieldId  = keyToId[targetFieldKey];
-        if (!targetFieldId || targetFieldId === fieldId) return;
+        /* generationKey로 대상 fieldId 탐색
+         * - 도트 포함(예: form3.title): allFieldKeyToId에서 cross-form 탐색
+         * - 단순 key(예: title): keyToId에서 현재 폼 탐색 */
+        const resolveTargetFieldId = (generationKey: string): string | undefined => {
+            if (generationKey.includes('.')) return allFieldKeyToId?.[generationKey];
+            return keyToId[generationKey];
+        };
 
-        /* 4가지 변환 옵션 적용 */
-        const transformed = applyDataGeneration(
-            value,
-            sourceField.dataReplacement,
-            sourceField.caseChange,
-            sourceField.appendText,
-            sourceField.truncateLength,
-        );
-        onChangeValues?.(targetFieldId, transformed);
-    }, [fields, keyToId, onChangeValues]);
+        /* 대상 fieldId에 변환값 전달
+         * - 현재 폼 소속: onChangeValues
+         * - 다른 폼 소속: onChangeAllFormValues */
+        const dispatchValue = (targetFieldId: string, transformed: string) => {
+            if (keyToId[Object.keys(keyToId).find(k => keyToId[k] === targetFieldId) ?? ''] !== undefined || Object.values(keyToId).includes(targetFieldId)) {
+                onChangeValues?.(targetFieldId, transformed);
+            } else {
+                onChangeAllFormValues?.(targetFieldId, transformed);
+            }
+        };
+
+        /* 단일 generationKey 처리 (기존 호환) */
+        if (sourceField.generationKey) {
+            const targetFieldId = resolveTargetFieldId(sourceField.generationKey);
+            const transformed = applyDataGeneration(value, sourceField.dataReplacement, sourceField.caseChange, sourceField.appendText, sourceField.truncateLength);
+            if (targetFieldId && targetFieldId !== fieldId) {
+                dispatchValue(targetFieldId, transformed);
+            } else if (!targetFieldId) {
+                /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
+                onChangeAllFormValues?.(sourceField.generationKey, transformed);
+            }
+        }
+
+        /* 다중 dataGenerations 배열 처리 */
+        (sourceField.dataGenerations ?? []).forEach(dg => {
+            if (!dg.generationKey) return;
+            const targetFieldId = resolveTargetFieldId(dg.generationKey);
+            const transformed = applyDataGeneration(value, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength);
+            if (targetFieldId && targetFieldId !== fieldId) {
+                dispatchValue(targetFieldId, transformed);
+            } else if (!targetFieldId) {
+                /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
+                onChangeAllFormValues?.(dg.generationKey, transformed);
+            }
+        });
+    }, [fields, keyToId, allFieldKeyToId, onChangeValues, onChangeAllFormValues]);
 
 
     if (!fields.length) {

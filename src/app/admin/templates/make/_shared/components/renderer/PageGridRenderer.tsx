@@ -18,7 +18,7 @@
  *   </PageLayout>
  */
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { getSpaceGridColumn } from '../../utils';
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -149,6 +149,10 @@ interface PageGridRendererProps {
     currentSearchParams?: Record<string, string>;
     /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 URL 파라미터 참조용 (key → value) */
     urlParams?: Record<string, string>;
+    /** cross-tab 데이터생성 공유값 — TabRenderer가 관리, 다른 탭 폼 필드 실시간 반영용 (fieldId → value) */
+    crossTabFormValues?: Record<string, string>;
+    /** cross-tab 데이터생성 자동입력 콜백 — 현재 탭에서 못 찾은 fieldId를 TabRenderer로 에스컬레이션 */
+    onCrossTabFormChange?: (fieldId: string, value: string) => void;
 }
 
 /**
@@ -196,6 +200,8 @@ export function PageGridRenderer({
     onMultiSelectExtraFieldChange,
     currentSearchParams,
     urlParams,
+    crossTabFormValues,
+    onCrossTabFormChange,
 }: PageGridRendererProps) {
     /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
      * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
@@ -222,9 +228,53 @@ export function PageGridRenderer({
         return map;
     }, [widgetItems]);
 
+    /* fieldId → widgetId 역매핑 — cross-form 데이터생성 실시간 자동입력용 */
+    const fieldIdToWidgetId = useMemo(() => {
+        const map: Record<string, string> = {};
+        widgetItems.flatMap(item => item.contents.map(c => c.widget))
+            .filter((w): w is FormWidget => w.type === 'form')
+            .forEach(w => w.fields?.forEach(f => {
+                if (w.widgetId) map[f.id] = w.widgetId;
+            }));
+        return map;
+    }, [widgetItems]);
+
+    /* crossTabFormValues를 formValuesMap에 병합 — 다른 탭에서 생성된 값을 현재 탭 폼에 주입
+     * crossTabFormValues 키는 fieldKey("form3.title" 등) 형태
+     * → allFieldKeyToId로 fieldId로 변환 후 fieldIdToWidgetId로 widgetId 매핑 */
+    const mergedFormValuesMap = useMemo(() => {
+        if (!crossTabFormValues || Object.keys(crossTabFormValues).length === 0) return formValuesMap;
+        const merged: Record<string, Record<string, string>> = {};
+        Object.entries(formValuesMap ?? {}).forEach(([wid, vals]) => {
+            const extra: Record<string, string> = {};
+            Object.entries(crossTabFormValues).forEach(([fieldKey, val]) => {
+                /* fieldKey → fieldId 변환 (현재 탭의 allFieldKeyToId 기준) */
+                const targetFieldId = allFieldKeyToId[fieldKey];
+                if (targetFieldId && fieldIdToWidgetId[targetFieldId] === wid) {
+                    extra[targetFieldId] = val;
+                }
+            });
+            merged[wid] = { ...vals, ...extra };
+        });
+        return merged;
+    }, [formValuesMap, crossTabFormValues, allFieldKeyToId, fieldIdToWidgetId]);
+
+    /* mergedFormValuesMap 기반 통합 allFormValues — cross-tab 값 포함 */
     const allFormValues = useMemo(() => {
-        return Object.assign({}, ...Object.values(formValuesMap ?? {})) as Record<string, string>;
-    }, [formValuesMap]);
+        return Object.assign({}, ...Object.values(mergedFormValuesMap ?? {})) as Record<string, string>;
+    }, [mergedFormValuesMap]);
+
+    /* cross-form/cross-tab 데이터생성 자동입력 콜백
+     * - 현재 탭 내 폼 소속이면 → onFormValuesChange로 업데이트
+     * - 못 찾으면 → onCrossTabFormChange로 TabRenderer에 에스컬레이션 */
+    const handleChangeAllFormValues = useCallback((fieldId: string, value: string) => {
+        const widgetId = fieldIdToWidgetId[fieldId];
+        if (widgetId) {
+            onFormValuesChange?.(widgetId, fieldId, value);
+        } else {
+            onCrossTabFormChange?.(fieldId, value);
+        }
+    }, [fieldIdToWidgetId, onFormValuesChange, onCrossTabFormChange]);
 
     /* ── 카테고리 dbSlug 상속 맵 ──
      * depth 2+ 위젯은 dbSlug가 없으므로 parentWidgetId 체인을 타고 올라가 상위 dbSlug 상속.
@@ -306,8 +356,9 @@ export function PageGridRenderer({
                                         onReset={wid ? () => onReset?.(wid) : undefined}
                                         codeGroups={codeGroups}
                                         /* 폼 */
-                                        formValues={formValuesMap?.[wid] ?? {}}
+                                        formValues={mergedFormValuesMap?.[wid] ?? {}}
                                         onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
+                                        onChangeAllFormValues={handleChangeAllFormValues}
                                         allFormValues={allFormValues}
                                         allFieldKeyToId={allFieldKeyToId}
                                         urlParams={urlParams}

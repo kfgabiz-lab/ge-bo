@@ -124,6 +124,8 @@ export interface CategoryWidget {
 export type SubListColumnType =
     | 'input'      // 텍스트 입력 (InputField)
     | 'select'     // 셀렉트 박스 (SelectField)
+    | 'radio'      // 라디오 단일선택 (RadioField)
+    | 'checkbox'   // 체크박스 복수선택 (CheckboxField)
     | 'date'       // 날짜 단독 (DateField)
     | 'dateRange'  // 날짜 범위 from~to (DateRangeField)
     | 'textarea'   // 여러 줄 텍스트 (FormTextareaField)

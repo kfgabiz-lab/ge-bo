@@ -122,6 +122,8 @@ export interface SearchFieldConfig {
     appendText?: string;
     /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
     truncateLength?: number;
+    /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
+    dataGenerations?: { generationKey: string; dataReplacement?: 'none' | 'hyphen'; caseChange?: 'none' | 'upper' | 'lower'; appendText?: string; truncateLength?: number; }[];
 }
 
 /** 검색폼 행 설정 */
