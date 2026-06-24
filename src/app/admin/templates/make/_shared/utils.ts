@@ -295,7 +295,8 @@ export function buildTableRow(item: {
     updatedAt?: string | null;
     updatedBy?: string | null;
 }): Record<string, unknown> {
-    const { id: _omit, ...restDataJson } = item.dataJson ?? {};
+    /* dataJson.id를 제거하지 않고 유지 — params에서 id로 접근 가능하도록 */
+    const restDataJson = item.dataJson ?? {};
 
     /* 최상위 object 값(contentKey 섹션) 감지 */
     const sectionEntries = Object.entries(restDataJson).filter(
@@ -439,6 +440,8 @@ export function buildDataJson(
     multiSelectMap: Record<string, number[]>,
     multiSelectExtraFieldMap?: Record<string, Record<number, Record<string, string>>>,
     mainConnectedSlug?: string,
+    /** hideCondition 평가용 전체 폼 값 — 미전달 시 위젯 자체 rawValues로 평가 */
+    allFormValues?: Record<string, string>,
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
@@ -448,9 +451,16 @@ export function buildDataJson(
             const rawValues = formValuesMap[w.widgetId ?? ''] ?? {};
             const fileIds   = formFileIdsMap[w.widgetId ?? ''] ?? {};
             const section: Record<string, unknown> = {};
+            /* hideCondition 평가용 fieldKey → fieldId 역매핑 */
+            const keyToId: Record<string, string> = {};
+            (w.fields ?? []).forEach(f => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
+            /* 전체 폼 값 우선, 없으면 위젯 자체 값으로 평가 */
+            const evalValues = allFormValues ?? rawValues;
             (w.fields ?? []).forEach(f => {
                 const key = f.fieldKey || f.label;
                 if (!key) return;
+                /* hideCondition 충족 필드는 저장에서 제외 */
+                if (f.hideCondition && evalFieldCondition(f.hideCondition, keyToId, evalValues)) return;
                 if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
                     section[key] = fileIds[f.id] ?? [];
                 } else {

@@ -39,6 +39,7 @@ export function DateRangeStatusSearchField({
                 descriptionMsgKey={values.descriptionMsgKey}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
+                excludeFromSearch={values.excludeFromSearch}
                 onChange={onChange}
             />
             {/* 연결 dateRange 필드 Key */}

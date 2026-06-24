@@ -854,12 +854,16 @@ export function WidgetRenderer({
                 ...saveFormContents.map(c => c.widget),
                 ...saveSublistContents.map(c => c.widget),
             ] as Parameters<typeof buildDataJson>[0];
+            const popupAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
             const { dataJson } = buildDataJson(
                 allSaveWidgets,
                 popupFormValuesMap,
                 formFileIdsMap,
                 processedSubListRowsMap,
                 {},
+                undefined,
+                undefined,
+                popupAllFormValues,
             );
 
             /* paramSave extras 병합 — 저장 시 폼에 없던 파라미터를 dataJson에 추가 */
@@ -981,12 +985,16 @@ export function WidgetRenderer({
 
             /* form/sublist/multiselect → dataJson 구성 및 POST */
             if (nonTableWidgets.length > 0) {
+                const datasaveAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
                 const { dataJson, pkKeys } = buildDataJson(
                     nonTableWidgets as Parameters<typeof buildDataJson>[0],
                     popupFormValuesMap,
                     formFileIdsMap,
                     processedSubListRowsMap,
                     multiSelectMap,
+                    undefined,
+                    undefined,
+                    datasaveAllFormValues,
                 );
 
                 const saveRes = await api.post(`/page-data/${dataSaveSlug}`, {

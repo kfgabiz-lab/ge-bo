@@ -32,6 +32,7 @@ export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, co
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
+                excludeFromSearch={values.excludeFromSearch}
                 onChange={onChange}
             />
             {/* 옵션 */}

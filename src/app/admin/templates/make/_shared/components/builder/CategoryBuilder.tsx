@@ -95,7 +95,11 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                     <select
                         className={INPUT_CLS}
                         value={widget.depth}
-                        onChange={e => onChange({ ...widget, depth: Number(e.target.value) })}
+                        onChange={e => {
+                            const newDepth = Number(e.target.value);
+                            /* depth 2+ 변경 시 dbSlug 초기화 — depth 1 위젯에서 상속받도록 */
+                            onChange({ ...widget, depth: newDepth, dbSlug: newDepth > 1 ? '' : widget.dbSlug });
+                        }}
                     >
                         <option value={1}>1 — 대분류</option>
                         <option value={2}>2 — 중분류</option>

@@ -8,6 +8,9 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
 
 const BASE_URL = '/api/v1';
 
+/* 동시 401 race condition 방지 — refresh는 한 번만 실행, 나머지는 대기 */
+let refreshPromise: Promise<string> | null = null;
+
 /**
  * Axios 기본 인스턴스
  * - Access Token: Zustand 메모리에서 읽어 자동 첨부 (localStorage 미사용)
@@ -46,13 +49,22 @@ api.interceptors.response.use(
         if (error.response?.status === 401 && !original._retry && original.url !== '/auth/refresh' && original.url !== '/auth/logout') {
             original._retry = true;
             try {
-                const resp = await api.post('/auth/refresh', {}, { withCredentials: true });
-                const { accessToken, adminInfo } = resp.data;
-                useAuthStore.getState().setAccessToken(accessToken, adminInfo);
+                /* 이미 refresh 진행 중이면 동일한 Promise 대기, 아니면 새로 시작 */
+                if (!refreshPromise) {
+                    refreshPromise = api.post('/auth/refresh', {}, { withCredentials: true })
+                        .then(resp => {
+                            const { accessToken, adminInfo } = resp.data;
+                            useAuthStore.getState().setAccessToken(accessToken, adminInfo);
+                            return accessToken as string;
+                        })
+                        .finally(() => { refreshPromise = null; });
+                }
+                const accessToken = await refreshPromise;
                 original.headers.Authorization = `Bearer ${accessToken}`;
                 return api(original);
             } catch {
                 // Refresh 실패 시 로그아웃 처리
+                refreshPromise = null;
                 await api.post('/auth/logout', {}, { withCredentials: true }).catch(() => {});
                 useAuthStore.getState().logout();
                 if (typeof window !== 'undefined' && window.location.pathname !== '/bo/admin/login') {

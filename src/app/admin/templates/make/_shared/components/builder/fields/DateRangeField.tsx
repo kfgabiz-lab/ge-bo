@@ -88,6 +88,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
+                excludeFromSearch={values.excludeFromSearch}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
                 onChange={onChange}

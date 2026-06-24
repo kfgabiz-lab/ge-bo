@@ -224,7 +224,7 @@ export function SpaceBuilder({
         onChange({ ...widget, items: widget.items.map(i => i.id === id ? { ...i, ...patch } : i) });
 
     const colSpanMode = { type: 'input' as const, min: 1, max: maxColSpan };
-    const rowSpanConfig = { min: 1, max: 20 };
+    const rowSpanConfig = { min: 1, max: 30 };
 
     return (
         <div className="space-y-4 pt-1">

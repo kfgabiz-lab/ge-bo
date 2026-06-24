@@ -34,6 +34,7 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
+                excludeFromSearch={values.excludeFromSearch}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
                 onChange={onChange}

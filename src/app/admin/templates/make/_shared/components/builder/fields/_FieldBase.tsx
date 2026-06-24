@@ -54,7 +54,9 @@ interface FieldBaseProps {
     hideCondition?: string;
     /** 동적 Disable 조건 — Form 빌더(input 모드)일 때만 표시 */
     disableCondition?: string;
-    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; hideCondition: string | undefined; disableCondition: string | undefined; description: string; descriptionMsgKey: string | undefined }>) => void;
+    /** 검색제외 — true 시 검색 API 파라미터에 포함하지 않음 (검색 모드에서만 표시) */
+    excludeFromSearch?: boolean;
+    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
 }
@@ -65,7 +67,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, hideCondition, disableCondition, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, hideCondition, disableCondition, excludeFromSearch, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -218,18 +220,24 @@ export function FieldBase(props: FieldBaseProps) {
                 )}
             </div>}
 
-            {/* 필수항목 | 읽기전용 — ColSpan/RowSpan 바로 아래 한 줄 */}
-            <div className={`grid gap-1 mt-1 ${isFormMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {/* 필수항목 | 읽기전용(Form) or 검색제외(Search) — ColSpan/RowSpan 바로 아래 한 줄 */}
+            <div className="grid grid-cols-2 gap-1 mt-1">
                 <ToggleRow
                     label="필수 항목"
                     value={!!required}
                     onChange={v => onChange({ required: v })}
                 />
-                {isFormMode && (
+                {isFormMode ? (
                     <ToggleRow
                         label="읽기 전용"
                         value={!!readonly}
                         onChange={v => onChange({ readonly: v })}
+                    />
+                ) : (
+                    <ToggleRow
+                        label="검색 제외"
+                        value={!!excludeFromSearch}
+                        onChange={v => onChange({ excludeFromSearch: v })}
                     />
                 )}
             </div>

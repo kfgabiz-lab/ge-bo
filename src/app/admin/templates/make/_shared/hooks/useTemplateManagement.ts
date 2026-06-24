@@ -112,13 +112,30 @@ export function useTemplateManagement(templateType: string) {
     ) => {
         setIsSaving(true);
         try {
+            /* 카테고리 위젯 depth 2+ dbSlug를 depth 1 값으로 전파 */
+            const allWidgets = widgetItems.flatMap(item => item.contents.map(c => c.widget)) as { type?: string; depth?: number; dbSlug?: string; widgetId?: string; parentWidgetId?: string }[];
+            const catDepth1 = allWidgets.find(w => w.type === 'category' && w.depth === 1);
+            const depth1Slug = catDepth1?.dbSlug ?? '';
+            const processedItems = depth1Slug
+                ? widgetItems.map(item => ({
+                    ...item,
+                    contents: item.contents.map(c => {
+                        const w = c.widget as { type?: string; depth?: number; dbSlug?: string };
+                        if (w.type === 'category' && (w.depth ?? 1) > 1) {
+                            return { ...c, widget: { ...c.widget, dbSlug: depth1Slug } };
+                        }
+                        return c;
+                    }),
+                }))
+                : widgetItems;
+
             const result = await saveTemplate({
                 id: currentTemplateId,
                 name: saveModalName,
                 slug: saveModalSlug,
                 description: saveModalDesc,
                 templateType,
-                widgetItems,
+                widgetItems: processedItems,
                 extra,
             });
             setCurrentTemplateId(result.id);

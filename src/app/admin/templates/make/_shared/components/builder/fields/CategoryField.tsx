@@ -70,6 +70,7 @@ export function CategoryField({
                 required={values.required}
                 description={values.description}
                 descriptionMsgKey={values.descriptionMsgKey}
+                excludeFromSearch={values.excludeFromSearch}
                 onChange={onChange}
             />
 

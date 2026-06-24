@@ -50,7 +50,7 @@ import { BG_COLOR_OPTIONS } from './SpaceBuilder';
 /** 폼 위젯의 개별 필드 — SearchFieldConfig에 rowSpan 추가 */
 export interface FormFieldItem extends Omit<SearchFieldConfig, 'colSpan'> {
     colSpan: number;        // 1~12 (12칸 그리드)
-    rowSpan: number;        // 1~20 (행 높이 배수)
+    rowSpan: number;        // 1~30 (행 높이 배수)
     hideCondition?: string;    // 동적 HIDE 조건 (예: "status=1,type=Y")
     disableCondition?: string; // 동적 Disable 조건 (예: "status=1,type=Y")
 }
@@ -312,8 +312,8 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 updateField(f.id, updates as Partial<FormFieldItem>),
             /* Form: 숫자 입력형 ColSpan (max는 prop으로 제어, 기본 12) */
             colSpanMode: { type: 'input' as const, min: 1, max: maxColSpan },
-            /* RowSpan: 1~20 배수 */
-            rowSpanConfig: { min: 1, max: 20 },
+            /* RowSpan: 1~30 배수 */
+            rowSpanConfig: { min: 1, max: 30 },
             codeGroups,
             codeGroupsLoading,
         };

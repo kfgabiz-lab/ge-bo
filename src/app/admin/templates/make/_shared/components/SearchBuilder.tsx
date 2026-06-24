@@ -199,6 +199,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             placeholder: '',
             colSpan: defaultColSpan,
             required: false,
+            excludeFromSearch: false,
             options: [],
             codeGroupCode: undefined,
             multiSelect: false,
@@ -238,7 +239,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             label, labelMsgKey, label2, label2MsgKey,
             fieldKey, placeholder, placeholderMsgKey,
             description, descriptionMsgKey,
-            colSpan, required, options, codeGroupCode, multiSelect,
+            colSpan, required, excludeFromSearch, options, codeGroupCode, multiSelect,
             minLength, maxLength, pattern, patternDesc, minSelect, maxSelect,
             defaultValue, defaultValueMsgKey, defaultOptionValue,
             defaultDateOffset, defaultDate, disablePast,
@@ -263,6 +264,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             descriptionMsgKey: descriptionMsgKey?.trim() || undefined,
             colSpan: colSpan as 1|2|3|4|5,
             required: required || undefined,
+            excludeFromSearch: excludeFromSearch || undefined,
             options: options?.length ? options : undefined,
             codeGroupCode: codeGroupCode || undefined,
             multiSelect: pendingType === 'button' && multiSelect ? true : undefined,
@@ -435,6 +437,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                         }
                                                                     </span>
                                                                     {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
+                                                                    {field.excludeFromSearch && <span className="text-[9px] px-1 py-0.5 bg-slate-200 text-slate-500 rounded font-medium">검색제외</span>}
                                                                     {field.colSpan > 1 && <span className="text-[10px] text-slate-400">×{field.colSpan}</span>}
                                                                     <div className="flex items-center gap-0.5">
                                                                         <button onClick={() => moveFieldInRow(row.id, fi, 'up')} disabled={fi === 0} className="p-1 rounded text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ChevronUp className="w-3 h-3" /></button>
@@ -461,6 +464,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 description:        field.description,
                                                                                 descriptionMsgKey:  field.descriptionMsgKey,
                                                                                 required:           field.required,
+                                                                                excludeFromSearch:  field.excludeFromSearch,
                                                                                 options:            field.options,
                                                                                 codeGroupCode:      field.codeGroupCode,
                                                                                 multiSelect:        field.multiSelect,

@@ -113,6 +113,8 @@ export interface SearchFieldConfig {
     /** 동적 Disable 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 비활성화
      *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
     disableCondition?: string;
+    /** 검색제외 — true 시 검색 버튼 클릭 시 API 파라미터에 포함하지 않음 */
+    excludeFromSearch?: boolean;
     /* ── dateRangeStatus 전용 ── */
     linkedDateRangeKey?: string;    // 연결할 dateRange 필드의 accessor (예: 'period')
     beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')

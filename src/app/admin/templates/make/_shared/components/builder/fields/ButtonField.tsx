@@ -32,6 +32,7 @@ export function ButtonField({ values, onChange, colSpanMode, rowSpanConfig, code
                 readonly={values.readonly}
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
+                excludeFromSearch={values.excludeFromSearch}
                 onChange={onChange}
             />
             {/* 옵션 */}

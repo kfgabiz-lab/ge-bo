@@ -199,6 +199,8 @@ export function useWidgetPageState(
         searchFields.forEach((f) => {
           const val = sv[f.id];
           if (!val || !val.trim()) return;
+          /* 검색제외 필드는 값이 있어도 API 파라미터에서 제외 */
+          if (f.excludeFromSearch) return;
           /* hideCondition 충족 시 API 파라미터 제외 — 화면에서 숨겨진 필드는 검색에서도 제외 */
           const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, sv) : false;
           if (f.hideCondition && hideResult) return;
@@ -980,6 +982,7 @@ export function useWidgetPageState(
             multiSelectMap,
             multiSelectExtraFieldValuesMap,
             options?.mainConnectedSlug,
+            allFormValues,
           );
 
           /* 5-1. urlParamSaveExtras 병합 — enableUrlEditMode 시 폼에 없던 URL 파라미터를 dataJson에 추가 */
@@ -1226,6 +1229,7 @@ export function useWidgetPageState(
             multiSelectMap[mw.widgetId] = multiSelectValuesMap[mw.widgetId] ?? [];
           }
 
+          const dataSaveAllFormValues = Object.assign({}, ...Object.values(formValuesMap)) as Record<string, string>;
           const { dataJson, pkKeys } = buildDataJson(
             nonTableWidgets as Parameters<typeof buildDataJson>[0],
             formValuesMap,
@@ -1234,6 +1238,7 @@ export function useWidgetPageState(
             multiSelectMap,
             multiSelectExtraFieldValuesMap,
             options?.mainConnectedSlug,
+            dataSaveAllFormValues,
           );
 
           const res = await api.post(`/page-data/${dataSaveSlug}`, {

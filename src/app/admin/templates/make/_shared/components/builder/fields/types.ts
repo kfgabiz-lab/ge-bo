@@ -79,6 +79,8 @@ export interface FieldEditValues {
     /** 동적 Disable 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 비활성화
      *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
     disableCondition?: string;
+    /** 검색제외 — true 시 검색 API 파라미터에 포함하지 않음 */
+    excludeFromSearch?: boolean;
     /* ── 파일 업로드 & 비디오 설정 (Layer 전용) ── */
     maxFileCount?: number;       // 최대 파일 수
     maxFileSizeMB?: number;      // 개당 최대 용량

@@ -9,7 +9,7 @@
  * 사용법:
  *   <FormTextareaField values={field} onChange={onChange}
  *     colSpanMode={{ type: 'input', min: 1, max: 12 }}
- *     rowSpanConfig={{ min: 1, max: 20 }}
+ *     rowSpanConfig={{ min: 1, max: 30 }}
  *     codeGroups={[]} codeGroupsLoading={false} />
  */
 
