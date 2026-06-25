@@ -108,8 +108,12 @@ export function SearchRenderer({
                             <FieldRenderer
                                 mode={mode}
                                 field={field}
-                                value={values[field.id] || ''}
-                                onChange={v => onChangeValues?.(field.id, v)}
+                                value={field.type === 'dateRange' ? undefined : (values[field.id] || '')}
+                                onChange={field.type === 'dateRange' ? undefined : v => onChangeValues?.(field.id, v)}
+                                valueFrom={field.type === 'dateRange' ? (values[field.id + '_from'] || '') : undefined}
+                                valueTo={field.type === 'dateRange' ? (values[field.id + '_to'] || '') : undefined}
+                                onFromChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_from', v) : undefined}
+                                onToChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_to', v) : undefined}
                                 codeGroups={codeGroups}
                                 forceDisabled={shouldDisable(field.disableCondition)}
                             />
@@ -163,8 +167,12 @@ export function SearchRenderer({
                                 <FieldRenderer
                                     mode={mode}
                                     field={field}
-                                    value={values[field.id] || ''}
-                                    onChange={v => onChangeValues?.(field.id, v)}
+                                    value={field.type === 'dateRange' ? undefined : (values[field.id] || '')}
+                                    onChange={field.type === 'dateRange' ? undefined : v => onChangeValues?.(field.id, v)}
+                                    valueFrom={field.type === 'dateRange' ? (values[field.id + '_from'] || '') : undefined}
+                                    valueTo={field.type === 'dateRange' ? (values[field.id + '_to'] || '') : undefined}
+                                    onFromChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_from', v) : undefined}
+                                    onToChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_to', v) : undefined}
                                     codeGroups={codeGroups}
                                     forceDisabled={shouldDisable(field.disableCondition)}
                                 />

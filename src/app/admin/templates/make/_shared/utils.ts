@@ -136,7 +136,10 @@ export const validateFormFields = (
         if (f.hideCondition && evalFieldCondition(f.hideCondition, resolvedKeyToId, resolvedValues)) continue;
 
         const label     = f.label || f.fieldKey || f.id;
-        const val       = (values[f.id] || '').trim();
+        /* dateRange: _from/_to 분리 키 사용 — required 체크 시 시작일 기준 */
+        const val       = f.type === 'dateRange'
+            ? (values[f.id + '_from'] || '').trim()
+            : (values[f.id] || '').trim();
         const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
 
         if (f.required) {
@@ -172,8 +175,17 @@ export const validateFormFields = (
                 toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
             }
         }
-        /* dateRange / yearMonthRange: 종료가 시작보다 이전이면 오류 */
-        if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+        /* dateRange: _from/_to 분리 키로 검증 */
+        if (f.type === 'dateRange') {
+            const from = values[f.id + '_from'] || '';
+            const to = values[f.id + '_to'] || '';
+            if (from && to && from > to) {
+                toast.warning(`'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
+                return false;
+            }
+        }
+        /* yearMonthRange: 기존 '~' 단일 방식 유지 */
+        if (f.type === 'yearMonthRange') {
             const [from, to] = (values[f.id] || '~').split('~');
             if (from && to && from > to) {
                 toast.warning(`'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
@@ -463,6 +475,10 @@ export function buildDataJson(
                 if (f.hideCondition && evalFieldCondition(f.hideCondition, keyToId, evalValues)) return;
                 if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
                     section[key] = fileIds[f.id] ?? [];
+                } else if (f.type === 'dateRange') {
+                    /* dateRange: _from/_to 분리 키로 저장 */
+                    section[key + '_from'] = rawValues[f.id + '_from'] ?? '';
+                    section[key + '_to'] = rawValues[f.id + '_to'] ?? '';
                 } else {
                     section[key] = rawValues[f.id] ?? '';
                 }
@@ -730,7 +746,9 @@ export function initFormDefaultValues(
                     ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
                 const end = (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0)
                     ? calcDate(f.defaultEndDateOffset) : (f.defaultEndDate ?? '');
-                if (start || end) vals[f.id] = `${start}~${end}`;
+                /* dateRange: _from/_to 분리 키로 초기값 저장 */
+                if (start) vals[f.id + '_from'] = start;
+                if (end) vals[f.id + '_to'] = end;
             } else if (f.defaultOptionValue && (f.type === 'select' || f.type === 'radio' || f.type === 'checkbox')) {
                 vals[f.id] = f.defaultOptionValue;
             } else if (f.defaultValueMsgKey && t) {

@@ -20,7 +20,7 @@ interface SizeSettingPanelProps {
     rowSpan: number;
     /** Col 최대값 (기본 12) */
     maxColSpan?: number;
-    /** Row 최대값 (기본 20) */
+    /** Row 최대값 (기본 30) */
     maxRowSpan?: number;
     /** 다국어 모드 토글 버튼 표시 여부 — 위젯 레벨에서만 true */
     showI18nToggle?: boolean;
@@ -35,7 +35,7 @@ export function SizeSettingPanel({
     colSpan,
     rowSpan,
     maxColSpan = 12,
-    maxRowSpan = 20,
+    maxRowSpan = 30,
     showI18nToggle = false,
     onColSpanChange,
     onRowSpanChange,

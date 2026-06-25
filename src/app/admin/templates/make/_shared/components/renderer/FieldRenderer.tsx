@@ -127,6 +127,14 @@ interface FieldRendererProps {
     field: SearchFieldConfig;
     value?: string;
     onChange?: (v: string) => void;
+    /** dateRange 전용: 시작일 (valueFrom/valueTo 사용 시 value 무시) */
+    valueFrom?: string;
+    /** dateRange 전용: 종료일 */
+    valueTo?: string;
+    /** dateRange 전용: 시작일 변경 핸들러 */
+    onFromChange?: (v: string) => void;
+    /** dateRange 전용: 종료일 변경 핸들러 */
+    onToChange?: (v: string) => void;
     codeGroups?: CodeGroupDef[];
     /** action-button 클릭 시 호출 (SpaceRenderer 등에서 주입) */
     onButtonClick?: () => void;
@@ -315,6 +323,10 @@ export function FieldRenderer({
     field,
     value = '',
     onChange,
+    valueFrom,
+    valueTo,
+    onFromChange,
+    onToChange,
     codeGroups = [],
     onButtonClick,
     fileList,
@@ -471,9 +483,9 @@ export function FieldRenderer({
 
         /* ── dateRange ── */
         case 'dateRange': {
-            const parts = (value || '~').split('~');
-            const from = parts[0] || '';
-            const to = parts[1] || '';
+            /* valueFrom/valueTo 분리 props 사용 — value '~' 단일 방식 제거 */
+            const from = valueFrom ?? '';
+            const to = valueTo ?? '';
             const today = new Date().toISOString().slice(0, 10);
             /* 기본값 날짜 계산 — offset 기반 또는 직접 지정 날짜 */
             const calcRangeDefault = (offset?: number, date?: string): string => {
@@ -501,7 +513,7 @@ export function FieldRenderer({
                             className={`${inputCls} pl-9${readonlyCls}`}
                             value={from}
                             min={startMin}
-                            onChange={isReadOnly ? undefined : e => onChange?.(`${e.target.value}~${to}`)}
+                            onChange={isReadOnly ? undefined : e => onFromChange?.(e.target.value)}
                         />
                     </div>
                     <span className="text-sm text-slate-400 flex-shrink-0">~</span>
@@ -514,7 +526,7 @@ export function FieldRenderer({
                             className={`${inputCls} pl-9${readonlyCls}`}
                             value={to}
                             min={endMin}
-                            onChange={isReadOnly ? undefined : e => onChange?.(`${from}~${e.target.value}`)}
+                            onChange={isReadOnly ? undefined : e => onToChange?.(e.target.value)}
                         />
                     </div>
                 </div>

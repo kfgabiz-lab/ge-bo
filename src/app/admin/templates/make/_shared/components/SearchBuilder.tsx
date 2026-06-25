@@ -32,6 +32,14 @@ import {
 } from './builder/fields';
 import type { FieldEditValues, SlugOption } from './builder/fields';
 
+/** slug-relation 목록 아이템 타입 */
+export interface SlugRelationOption {
+    id: number;
+    masterSlug: string;
+    slaveSlug: string;
+    description?: string;
+}
+
 /* ══════════════════════════════════════════ */
 /*  타입 정의 — _shared/types.ts에서 import    */
 /*  하위 호환을 위해 re-export                  */
@@ -131,6 +139,15 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             .then(res => setSlugOptions(res.data?.content || []))
             .catch(() => {})
             .finally(() => setSlugOptionsLoading(false));
+    }, []);
+
+    /* ── slug-relation 목록 ── */
+    const [slugRelationOptions, setSlugRelationOptions] = useState<SlugRelationOption[]>([]);
+
+    useEffect(() => {
+        api.get('/slug-relations', { params: { size: 200 } })
+            .then(res => setSlugRelationOptions(res.data?.content || []))
+            .catch(() => {});
     }, []);
 
     /* ══════════════════════════════════════════ */
@@ -245,7 +262,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultDateOffset, defaultDate, disablePast,
             defaultStartDateOffset, defaultStartDate, disableStartPast,
             defaultEndDateOffset, defaultEndDate, disableEndPast,
-            dbSlug, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
+            dbSlug, relationSlugId, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
         } = pendingValues;
@@ -288,6 +305,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             disableEndPast: disableEndPast || undefined,
             /* category 전용 */
             dbSlug:            pendingType === 'category' ? (dbSlug || undefined) : undefined,
+            relationSlugId:    pendingType === 'category' ? (relationSlugId || undefined) : undefined,
             maxDepth:          pendingType === 'category' ? (maxDepth ?? 1) : undefined,
             depthLabels:       pendingType === 'category' ? (depthLabels?.length ? depthLabels : undefined) : undefined,
             depthLabelMsgKeys: pendingType === 'category' ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
@@ -361,12 +379,13 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             case 'button':           return <ButtonField {...props} />;
             case 'dateRangeStatus':  return <DateRangeStatusSearchField {...props} />;
             case 'category':
-                /* slugOptions는 SearchBuilder 클로저에서 직접 참조 */
+                /* slugOptions, slugRelationOptions는 SearchBuilder 클로저에서 직접 참조 */
                 return (
                     <CategoryField
                         {...props}
                         slugOptions={slugOptions}
                         slugOptionsLoading={slugOptionsLoading}
+                        slugRelationOptions={slugRelationOptions}
                     />
                 );
             default:               return null;
@@ -488,6 +507,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 disableEndPast:         field.disableEndPast,
                                                                                 /* category 전용 */
                                                                                 dbSlug:            field.dbSlug,
+                                                                                relationSlugId:    field.relationSlugId,
                                                                                 maxDepth:          field.maxDepth,
                                                                                 depthLabels:       field.depthLabels,
                                                                                 depthLabelMsgKeys: field.depthLabelMsgKeys,

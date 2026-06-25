@@ -107,6 +107,7 @@ export interface FieldEditValues {
     disableEndPast?: boolean;        // dateRange: 종료일 이전 비활성화
     /* ── category 전용 ── */
     dbSlug?: string;                 // 카테고리 연결 slug (PAGE_DATA 타입)
+    relationSlugId?: number;         // 연동 slug-relation ID
     maxDepth?: 1 | 2 | 3 | 4;       // 표시할 최대 depth 수
     depthLabels?: string[];          // depth별 라벨 배열
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열

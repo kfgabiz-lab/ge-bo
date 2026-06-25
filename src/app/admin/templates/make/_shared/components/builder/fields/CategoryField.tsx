@@ -17,12 +17,15 @@ import { SlugSelectField } from './SlugSelectField';
 import type { SlugOption } from './SlugSelectField';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import type { SlugRelationOption } from '../../SearchBuilder';
 
 interface CategoryFieldProps extends FieldEditProps {
     /** 카테고리 데이터 slug 목록 (PAGE_DATA 타입) */
     slugOptions: SlugOption[];
     /** 슬러그 로딩 여부 */
     slugOptionsLoading?: boolean;
+    /** slug-relation 전체 목록 */
+    slugRelationOptions?: SlugRelationOption[];
 }
 
 /** depth별 배열 특정 인덱스 값 업데이트 헬퍼 */
@@ -36,6 +39,7 @@ export function CategoryField({
     values, onChange, colSpanMode,
     autoFocus, onLabelKeyDown,
     slugOptions, slugOptionsLoading,
+    slugRelationOptions = [],
 }: CategoryFieldProps) {
     const { i18nMode } = useBuilderI18nMode();
 
@@ -86,6 +90,25 @@ export function CategoryField({
                     emptyLabel="Slug를 선택하세요 (선택)"
                 />
             )}
+
+            {/* 연동 Slug 선택 (slug-relation 목록) */}
+            <div>
+                <label className={LABEL_CLS}>연동 Slug</label>
+                <select
+                    value={values.relationSlugId ?? ''}
+                    onChange={e => onChange({ relationSlugId: e.target.value ? Number(e.target.value) : undefined })}
+                    className={INPUT_CLS}
+                >
+                    <option value="">연동 없음</option>
+                    {slugRelationOptions.map(opt => (
+                        <option key={opt.id} value={opt.id}>
+                            {opt.description
+                                ? `${opt.description} (${opt.masterSlug} → ${opt.slaveSlug})`
+                                : `${opt.masterSlug} → ${opt.slaveSlug}`}
+                        </option>
+                    ))}
+                </select>
+            </div>
 
             {/* 최대 Depth 선택 (1~4 버튼형) */}
             <div className="flex items-center justify-between">

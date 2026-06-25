@@ -197,13 +197,24 @@ export function useWidgetPageState(
         const keyToId: Record<string, string> = {};
         searchFields.forEach((f) => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
         searchFields.forEach((f) => {
-          const val = sv[f.id];
-          if (!val || !val.trim()) return;
-          /* 검색제외 필드는 값이 있어도 API 파라미터에서 제외 */
+          /* 검색제외 필드는 API 파라미터에서 제외 */
           if (f.excludeFromSearch) return;
-          /* hideCondition 충족 시 API 파라미터 제외 — 화면에서 숨겨진 필드는 검색에서도 제외 */
+          /* hideCondition 충족 시 API 파라미터 제외 */
           const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, sv) : false;
           if (f.hideCondition && hideResult) return;
+          /* dateRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
+          if (f.type === 'dateRange') {
+            const paramKey = f.fieldKey || f.label;
+            const from = sv[f.id + '_from'];
+            const to   = sv[f.id + '_to'];
+            if (paramKey) {
+              if (from?.trim()) params[`${paramKey}_from`] = from;
+              if (to?.trim())   params[`${paramKey}_to`]   = to;
+            }
+            return;
+          }
+          const val = sv[f.id];
+          if (!val || !val.trim()) return;
           /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
           if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
             params[`drs_${f.linkedDateRangeKey}`] = val;
@@ -318,7 +329,9 @@ export function useWidgetPageState(
         } else if (f.type === 'dateRange') {
           const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
           const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
-          if (start || end) initVals[f.id] = `${start}~${end}`;
+          /* dateRange: from/to 분리 저장 */
+          if (start) initVals[f.id + '_from'] = start;
+          if (end)   initVals[f.id + '_to']   = end;
         } else if ((f.type === 'select' || f.type === 'radio' || f.type === 'checkbox') && f.defaultOptionValue) {
           initVals[f.id] = f.defaultOptionValue;
         } else if (f.defaultValue) {
@@ -402,7 +415,14 @@ export function useWidgetPageState(
         const section = findSection(dataJson, fw.contentKey);
         const vals: Record<string, string> = {};
         fw.fields.forEach(f => {
-          if (f.fieldKey && section[f.fieldKey] !== undefined) {
+          if (!f.fieldKey) return;
+          if (f.type === 'dateRange') {
+            /* dateRange: dataJson에서 _from/_to 분리 키로 복원 */
+            const fromVal = section[f.fieldKey + '_from'];
+            const toVal = section[f.fieldKey + '_to'];
+            if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
+            if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
+          } else if (section[f.fieldKey] !== undefined) {
             const raw = section[f.fieldKey];
             if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
           }
@@ -1340,10 +1360,21 @@ export function useWidgetPageState(
     Object.values(fieldsMap).flat().forEach(f => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
     const params: Record<string, string> = {};
     Object.values(fieldsMap).flat().forEach(f => {
-      const val = searchValues[f.id];
-      if (!val || !val.trim()) return;
       const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
       if (f.hideCondition && hideResult) return;
+      /* dateRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
+      if (f.type === 'dateRange') {
+        const paramKey = f.fieldKey || f.label;
+        const from = searchValues[f.id + '_from'];
+        const to   = searchValues[f.id + '_to'];
+        if (paramKey) {
+          if (from?.trim()) params[`${paramKey}_from`] = from;
+          if (to?.trim())   params[`${paramKey}_to`]   = to;
+        }
+        return;
+      }
+      const val = searchValues[f.id];
+      if (!val || !val.trim()) return;
       if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
         params[`drs_${f.linkedDateRangeKey}`] = val;
       } else {

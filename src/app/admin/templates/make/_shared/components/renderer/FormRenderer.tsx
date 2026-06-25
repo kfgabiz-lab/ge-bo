@@ -262,8 +262,12 @@ export function FormRenderer({
                             mode={mode}
                             field={f as unknown as SearchFieldConfig}
                             codeGroups={codeGroups}
-                            value={values[f.id] ?? ''}
-                            onChange={isPreview ? () => {} : v => handleFieldChange(f.id, v)}
+                            value={f.type === 'dateRange' ? undefined : (values?.[f.id] ?? '')}
+                            onChange={f.type === 'dateRange' ? undefined : (isPreview ? () => {} : v => handleFieldChange(f.id, v))}
+                            valueFrom={f.type === 'dateRange' ? (values?.[f.id + '_from'] ?? '') : undefined}
+                            valueTo={f.type === 'dateRange' ? (values?.[f.id + '_to'] ?? '') : undefined}
+                            onFromChange={f.type === 'dateRange' ? (isPreview ? undefined : v => handleFieldChange(f.id + '_from', v)) : undefined}
+                            onToChange={f.type === 'dateRange' ? (isPreview ? undefined : v => handleFieldChange(f.id + '_to', v)) : undefined}
                             fileList={fileValues?.[f.id]}
                             existingFileMeta={existingFileMeta?.[f.id]}
                             imgBlobUrls={imgBlobUrls}
