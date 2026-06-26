@@ -161,10 +161,10 @@ export function FormRenderer({
 
         /* generationKey로 대상 fieldId 탐색
          * - 도트 포함(예: form3.title): allFieldKeyToId에서 cross-form 탐색
-         * - 단순 key(예: title): keyToId에서 현재 폼 탐색 */
+         * - 단순 key(예: title): keyToId(현재 폼) 우선, 없으면 allFieldKeyToId(같은 탭 내 다른 폼) 탐색 */
         const resolveTargetFieldId = (generationKey: string): string | undefined => {
             if (generationKey.includes('.')) return allFieldKeyToId?.[generationKey];
-            return keyToId[generationKey];
+            return keyToId[generationKey] ?? allFieldKeyToId?.[generationKey];
         };
 
         /* 대상 fieldId에 변환값 전달
@@ -196,13 +196,24 @@ export function FormRenderer({
             const targetFieldId = resolveTargetFieldId(dg.generationKey);
             const transformed = applyDataGeneration(value, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength, dg.stripHtml);
             if (targetFieldId && targetFieldId !== fieldId) {
+                /* onlyIfEmpty=true면 대상 필드가 빈값일 때만 반영 */
+                if (dg.onlyIfEmpty) {
+                    const currentVal = values[targetFieldId] ?? allFormValues?.[targetFieldId] ?? '';
+                    if (currentVal !== '') return;
+                }
                 dispatchValue(targetFieldId, transformed);
             } else if (!targetFieldId) {
                 /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
+                if (dg.onlyIfEmpty) {
+                    /* generationKey는 fieldKey — allFieldKeyToId로 fieldId 변환 후 allFormValues 조회 */
+                    const crossFieldId = allFieldKeyToId?.[dg.generationKey];
+                    const currentVal = (crossFieldId ? allFormValues?.[crossFieldId] : undefined) ?? '';
+                    if (currentVal !== '') return;
+                }
                 onChangeAllFormValues?.(dg.generationKey, transformed);
             }
         });
-    }, [fields, keyToId, allFieldKeyToId, onChangeValues, onChangeAllFormValues]);
+    }, [fields, keyToId, allFieldKeyToId, values, allFormValues, onChangeValues, onChangeAllFormValues]);
 
 
     if (!fields.length) {

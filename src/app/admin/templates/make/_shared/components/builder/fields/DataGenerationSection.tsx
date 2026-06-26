@@ -69,16 +69,27 @@ function GenerationEntryRow({
                 </button>
             </div>
 
-            {/* 생성 KEY */}
-            <div>
-                <label className={LABEL_CLS}>생성 KEY</label>
-                <input
-                    type="text"
-                    value={entry.generationKey}
-                    placeholder="fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey"
-                    onChange={e => onChange({ ...entry, generationKey: e.target.value })}
-                    className={INPUT_CLS}
-                />
+            {/* 생성 KEY | 빈값 체크박스 */}
+            <div className="grid grid-cols-[1fr_auto] gap-1.5 items-end">
+                <div>
+                    <label className={LABEL_CLS}>생성 KEY</label>
+                    <input
+                        type="text"
+                        value={entry.generationKey}
+                        placeholder="fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey"
+                        onChange={e => onChange({ ...entry, generationKey: e.target.value })}
+                        className={INPUT_CLS}
+                    />
+                </div>
+                <div className="flex flex-col items-center gap-0.5 pb-0.5">
+                    <label className={LABEL_CLS}>빈값</label>
+                    <input
+                        type="checkbox"
+                        checked={entry.onlyIfEmpty ?? false}
+                        onChange={e => onChange({ ...entry, onlyIfEmpty: e.target.checked || undefined })}
+                        className="w-4 h-4 rounded border-slate-300 accent-slate-800"
+                    />
+                </div>
             </div>
 
             {/* editor: HTML제거 | 글자자르기 */}

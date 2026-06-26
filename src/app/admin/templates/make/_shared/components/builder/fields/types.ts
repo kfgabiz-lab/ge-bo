@@ -16,6 +16,8 @@ export type ColSpanMode =
 export interface DataGenerationEntry {
     /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
     generationKey: string;
+    /** 빈값일 때만 반영 — true 시 대상 필드가 빈값인 경우에만 생성값 적용 */
+    onlyIfEmpty?: boolean;
     /** HTML제거 — true 이면 HTML 태그 제거 후 변환 (에디터 전용) */
     stripHtml?: boolean;
     /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
