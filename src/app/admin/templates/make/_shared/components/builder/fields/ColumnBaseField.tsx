@@ -18,40 +18,79 @@ import { ColEditProps } from './col-types';
 import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import type { SlugRelationOption } from '../../SearchBuilder';
 
 interface ColumnBaseFieldProps extends ColEditProps {
     /** 추가 모드: 헤더명 input 자동 포커스 */
     autoFocus?: boolean;
+    /** 연결 가능한 FETCH 슬러그 목록 (TableBuilder에서 connectedSlug 기준으로 필터링하여 전달) */
+    fetchRelations?: SlugRelationOption[];
 }
 
-export function ColumnBaseField({ values, onChange, autoFocus }: ColumnBaseFieldProps) {
+/** relationId → FETCH 결과 키 변환: 2 → "_fetchedRel2" */
+function buildFetchKey(relationId: number): string {
+    return `_fetchedRel${relationId}`;
+}
+
+export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = [] }: ColumnBaseFieldProps) {
     const isActions = values.cellType === 'actions';
     const { i18nMode } = useBuilderI18nMode();
 
     return (
         <div className="space-y-2">
-            {/* 헤더명 / Key — 2열 그리드 (actions 타입 제외) */}
+            {/* 헤더명 | 연결Slug — 2열 그리드 (actions 타입 제외) */}
             {!isActions && (
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className={LABEL_CLS}>헤더명 <span className="text-red-400">*</span></label>
-                        {i18nMode ? (
-                            <MessageKeySelector
-                                value={values.headerMsgKey ?? ''}
-                                onChange={key => onChange({ headerMsgKey: key })}
-                                resourceType="WORD"
-                                size="sm"
-                            />
-                        ) : (
-                            <input
-                                type="text"
-                                value={values.header ?? ''}
-                                autoFocus={autoFocus}
-                                onChange={e => onChange({ header: e.target.value })}
+                <>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className={LABEL_CLS}>헤더명 <span className="text-red-400">*</span></label>
+                            {i18nMode ? (
+                                <MessageKeySelector
+                                    value={values.headerMsgKey ?? ''}
+                                    onChange={key => onChange({ headerMsgKey: key })}
+                                    resourceType="WORD"
+                                    size="sm"
+                                />
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={values.header ?? ''}
+                                    autoFocus={autoFocus}
+                                    onChange={e => onChange({ header: e.target.value })}
+                                    className={INPUT_CLS}
+                                />
+                            )}
+                        </div>
+                        <div>
+                            <label className={LABEL_CLS}>연결 Slug</label>
+                            <select
+                                value={values.relationSlugId ?? ''}
+                                onChange={e => {
+                                    if (e.target.value) {
+                                        const selected = fetchRelations.find(r => r.id === Number(e.target.value));
+                                        onChange({
+                                            relationSlugId: Number(e.target.value),
+                                            accessor: selected ? buildFetchKey(selected.id) : values.accessor,
+                                        });
+                                    } else {
+                                        onChange({ relationSlugId: undefined });
+                                    }
+                                }}
                                 className={INPUT_CLS}
-                            />
-                        )}
+                            >
+                                <option value="">연동 없음</option>
+                                {fetchRelations.map(r => (
+                                    <option key={r.id} value={r.id}>
+                                        {r.description
+                                            ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                                            : `${r.masterSlug} → ${r.slaveSlug}`}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
+
+                    {/* KEY — 단독 행 */}
                     <div>
                         <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
                         <input
@@ -61,7 +100,7 @@ export function ColumnBaseField({ values, onChange, autoFocus }: ColumnBaseField
                             className={`${INPUT_CLS} font-mono`}
                         />
                     </div>
-                </div>
+                </>
             )}
 
             {/* 너비(+단위) / 정렬 — 2열 그리드 */}

@@ -108,12 +108,12 @@ export function SearchRenderer({
                             <FieldRenderer
                                 mode={mode}
                                 field={field}
-                                value={field.type === 'dateRange' ? undefined : (values[field.id] || '')}
-                                onChange={field.type === 'dateRange' ? undefined : v => onChangeValues?.(field.id, v)}
-                                valueFrom={field.type === 'dateRange' ? (values[field.id + '_from'] || '') : undefined}
-                                valueTo={field.type === 'dateRange' ? (values[field.id + '_to'] || '') : undefined}
-                                onFromChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_from', v) : undefined}
-                                onToChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_to', v) : undefined}
+                                value={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? undefined : (values[field.id] || '')}
+                                onChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? undefined : v => onChangeValues?.(field.id, v)}
+                                valueFrom={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? (values[field.id + '_from'] || '') : undefined}
+                                valueTo={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? (values[field.id + '_to'] || '') : undefined}
+                                onFromChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? v => onChangeValues?.(field.id + '_from', v) : undefined}
+                                onToChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? v => onChangeValues?.(field.id + '_to', v) : undefined}
                                 codeGroups={codeGroups}
                                 forceDisabled={shouldDisable(field.disableCondition)}
                             />
@@ -156,7 +156,7 @@ export function SearchRenderer({
                                 key={field.id}
                                 /* dateRange: label ~ label2 형식으로 표시 / msgKey 우선 처리 */
                                 label={
-                                    field.type === 'dateRange'
+                                    (field.type === 'dateRange' || field.type === 'yearMonthRange')
                                         ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
                                         : (field.labelMsgKey ? t(field.labelMsgKey) : (field.label || undefined))
                                 }
@@ -167,12 +167,12 @@ export function SearchRenderer({
                                 <FieldRenderer
                                     mode={mode}
                                     field={field}
-                                    value={field.type === 'dateRange' ? undefined : (values[field.id] || '')}
-                                    onChange={field.type === 'dateRange' ? undefined : v => onChangeValues?.(field.id, v)}
-                                    valueFrom={field.type === 'dateRange' ? (values[field.id + '_from'] || '') : undefined}
-                                    valueTo={field.type === 'dateRange' ? (values[field.id + '_to'] || '') : undefined}
-                                    onFromChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_from', v) : undefined}
-                                    onToChange={field.type === 'dateRange' ? v => onChangeValues?.(field.id + '_to', v) : undefined}
+                                    value={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? undefined : (values[field.id] || '')}
+                                    onChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? undefined : v => onChangeValues?.(field.id, v)}
+                                    valueFrom={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? (values[field.id + '_from'] || '') : undefined}
+                                    valueTo={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? (values[field.id + '_to'] || '') : undefined}
+                                    onFromChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? v => onChangeValues?.(field.id + '_from', v) : undefined}
+                                    onToChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? v => onChangeValues?.(field.id + '_to', v) : undefined}
                                     codeGroups={codeGroups}
                                     forceDisabled={shouldDisable(field.disableCondition)}
                                 />

@@ -505,6 +505,7 @@ export default function PageBuilderPage() {
                 layerTitleMsgKey:    om.layerTitleMsgKey || undefined,
                 layerWidth:          om.layerWidth,
                 mainConnectedSlug:   om.mainConnectedSlug || undefined,
+                leaveCheck:          om.leaveCheck || undefined,
             },
         );
     };
@@ -563,6 +564,8 @@ export default function PageBuilderPage() {
                         mainConnectedSlug={om.mainConnectedSlug}
                         onMainConnectedSlugChange={handleMainConnectedSlugChange}
                         slugOptions={slugOptions}
+                        leaveCheck={om.leaveCheck}
+                        onLeaveCheckChange={om.setLeaveCheck}
                         onOutputModeChange={om.setOutputMode}
                         onPageTitleChange={om.setPageTitle}
                         onPageTitleMsgKeyChange={om.setPageTitleMsgKey}

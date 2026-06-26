@@ -105,6 +105,12 @@ export interface FieldEditValues {
     defaultEndDateOffset?: number;   // dateRange: 종료일 오늘 기준 N일 전
     defaultEndDate?: string;         // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
     disableEndPast?: boolean;        // dateRange: 종료일 이전 비활성화
+    /** dateRange 통합 서브타입 — 날짜/년월/일시분초/시분초 (기본: 'date') */
+    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time';
+    /** date 통합 서브타입 — 날짜/년월/일시분초 (기본: 'date') */
+    dateSubType?: 'date' | 'yearMonth' | 'datetime';
+    /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
+    singleDateRange?: boolean;
     /* ── category 전용 ── */
     dbSlug?: string;                 // 카테고리 연결 slug (PAGE_DATA 타입)
     relationSlugId?: number;         // 연동 slug-relation ID

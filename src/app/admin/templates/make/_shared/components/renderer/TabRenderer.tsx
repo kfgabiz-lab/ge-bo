@@ -19,7 +19,7 @@
  *   <TabRenderer mode="live" widget={tabWidget} />
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from 'sonner';
@@ -39,9 +39,11 @@ interface TabRendererProps {
   pageSlug?: string;
   /** 진입 페이지(탭 페이지)의 메인 연결 slug — 탭 서브페이지 mainConnectedSlug보다 우선 적용 */
   parentMainConnectedSlug?: string;
+  /** 이탈체크 활성 여부 — 탭 내부 폼 변경 시 이탈 감지 */
+  leaveCheck?: boolean;
 }
 
-export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug }: TabRendererProps) {
+export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, leaveCheck }: TabRendererProps) {
   const { tabs } = widget;
   const [activeIdx, setActiveIdx] = useState(0);
   /* 한 번이라도 활성화된 탭 인덱스 집합 — lazy mount용 */
@@ -71,6 +73,9 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug }:
   /* 탭 간 공유 데이터생성 자동입력 상태 — fieldId → value (모든 탭 공유) */
   const [crossTabFormValues, setCrossTabFormValues] = useState<Record<string, string>>({});
 
+  /* 탭별 이탈 확인 함수 — LiveTabPanel이 마운트 시 등록, 탭 전환 전 호출 */
+  const confirmLeaveMap = useRef<Record<number, () => boolean>>({});
+
   /* 어느 탭 PageGridRenderer에서도 escalate 될 수 있는 cross-tab 값 업데이트 콜백 */
   const handleCrossTabFormChange = useCallback((fieldId: string, value: string) => {
     setCrossTabFormValues(prev => ({ ...prev, [fieldId]: value }));
@@ -79,10 +84,17 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug }:
   /**
    * 탭 클릭 이동 가드 (live 모드 한정)
    * - 이동 대상 탭보다 앞에 required=true인 미저장 탭이 있으면 이동 차단
+   * - leaveCheck 활성 시 현재 탭에 미저장 변경사항이 있으면 컨펌 후 이동
    */
   function handleTabClick(idx: number) {
-    if (mode === 'live' && idx > 0) {
-      /* 0번 탭만 required 대상 — idx 0의 required가 true이고 미저장이면 차단 */
+    if (mode !== 'live') {
+      setActiveIdx(idx);
+      setMountedTabs((prev) => new Set([...prev, idx]));
+      return;
+    }
+
+    /* required 저장 가드 */
+    if (idx > 0) {
       const firstTab = tabs[0];
       if (firstTab?.required && !savedTabSet.has(0)) {
         const tabLabel = firstTab.labelMsgKey ? t(firstTab.labelMsgKey) : (firstTab.label || '탭 1');
@@ -90,6 +102,13 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug }:
         return;
       }
     }
+
+    /* 이탈체크 가드 — 현재 탭에 미저장 변경이 있으면 컨펌 */
+    if (leaveCheck && idx !== activeIdx) {
+      const confirmFn = confirmLeaveMap.current[activeIdx];
+      if (confirmFn && !confirmFn()) return;
+    }
+
     setActiveIdx(idx);
     setMountedTabs((prev) => new Set([...prev, idx]));
   }
@@ -141,6 +160,8 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug }:
                   onSaved={handleTabSaved}
                   crossTabFormValues={crossTabFormValues}
                   onCrossTabFormChange={handleCrossTabFormChange}
+                  leaveCheck={leaveCheck}
+                  onRegisterConfirmLeave={(tabIdx, fn) => { confirmLeaveMap.current[tabIdx] = fn; }}
                 />
               ) : (
                 <PreviewTabPanel tab={tab} activeIdx={idx} />
@@ -213,6 +234,10 @@ interface LiveTabPanelProps {
   crossTabFormValues: Record<string, string>;
   /** 어떤 탭에서도 대상 fieldId를 못 찾으면 TabRenderer로 에스컬레이션 */
   onCrossTabFormChange: (fieldId: string, value: string) => void;
+  /** 이탈체크 활성 여부 — 상위 페이지에서 전달 */
+  leaveCheck?: boolean;
+  /** 탭 전환 가드용 confirmLeave 함수 등록 콜백 */
+  onRegisterConfirmLeave?: (tabIdx: number, fn: () => boolean) => void;
 }
 
 /**
@@ -220,7 +245,7 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange, leaveCheck, onRegisterConfirmLeave }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [subPageMainConnectedSlug, setSubPageMainConnectedSlug] = useState<string | undefined>(undefined);
@@ -252,13 +277,21 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
     return urlId ?? null;
   }, [widgetItems, sharedDataIdMap, urlId]);
 
-  const { gridProps } = useWidgetPageState(widgetItems, pageSlug ?? tab.pageSlug, {
+  const { gridProps, confirmLeave } = useWidgetPageState(widgetItems, pageSlug ?? tab.pageSlug, {
     contentKey: tab.contentKey,
     sharedDataId,
     onDataIdCreated,
     onSaved: () => onSaved(tabIdx),
     mainConnectedSlug: resolvedMainConnectedSlug,
+    leaveCheck,
   });
+
+  /* 탭 전환 가드용 confirmLeave 등록 — leaveCheck 활성 시 */
+  useEffect(() => {
+    if (leaveCheck && onRegisterConfirmLeave) {
+      onRegisterConfirmLeave(tabIdx, confirmLeave);
+    }
+  }, [leaveCheck, tabIdx, confirmLeave, onRegisterConfirmLeave]);
 
   /* 팝업 저장에 사용할 dataSlug — widgetItems의 첫 번째 table 위젯 connectedSlug */
   const dataSlug = useMemo(() => {

@@ -136,8 +136,8 @@ export const validateFormFields = (
         if (f.hideCondition && evalFieldCondition(f.hideCondition, resolvedKeyToId, resolvedValues)) continue;
 
         const label     = f.label || f.fieldKey || f.id;
-        /* dateRange: _from/_to 분리 키 사용 — required 체크 시 시작일 기준 */
-        const val       = f.type === 'dateRange'
+        /* dateRange/yearMonthRange: _from/_to 분리 키 사용 — required 체크 시 시작일 기준 */
+        const val       = (f.type === 'dateRange' || f.type === 'yearMonthRange')
             ? (values[f.id + '_from'] || '').trim()
             : (values[f.id] || '').trim();
         const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
@@ -184,9 +184,10 @@ export const validateFormFields = (
                 return false;
             }
         }
-        /* yearMonthRange: 기존 '~' 단일 방식 유지 */
+        /* yearMonthRange: _from/_to 분리 키로 검증 */
         if (f.type === 'yearMonthRange') {
-            const [from, to] = (values[f.id] || '~').split('~');
+            const from = values[f.id + '_from'] || '';
+            const to   = values[f.id + '_to'] || '';
             if (from && to && from > to) {
                 toast.warning(`'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
                 return false;
@@ -475,8 +476,8 @@ export function buildDataJson(
                 if (f.hideCondition && evalFieldCondition(f.hideCondition, keyToId, evalValues)) return;
                 if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
                     section[key] = fileIds[f.id] ?? [];
-                } else if (f.type === 'dateRange') {
-                    /* dateRange: _from/_to 분리 키로 저장 */
+                } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+                    /* dateRange/yearMonthRange: _from/_to 분리 키로 저장 */
                     section[key + '_from'] = rawValues[f.id + '_from'] ?? '';
                     section[key + '_to'] = rawValues[f.id + '_to'] ?? '';
                 } else {

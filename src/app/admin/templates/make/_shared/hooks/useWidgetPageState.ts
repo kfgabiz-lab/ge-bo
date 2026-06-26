@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -74,6 +75,8 @@ interface UseWidgetPageStateOptions {
   onSaved?: () => void;
   /** 페이지 레벨 메인 연결 slug — buildDataJson _rel 분기 기준 */
   mainConnectedSlug?: string;
+  /** true: 폼 변경 후 이탈 시 confirm 다이얼로그 표시 */
+  leaveCheck?: boolean;
 }
 
 /**
@@ -105,6 +108,9 @@ export function useWidgetPageState(
   /* URL 파라미터 — 폼 필드 초기값 세팅용 */
   const searchParams = useSearchParams();
   const { t } = useI18n();
+
+  /* 이탈 감지 — leaveCheck 옵션이 true일 때만 활성화 */
+  const { markDirty, markClean, confirmLeave } = useLeaveCheck(options?.leaveCheck ?? false);
 
   /* 검색 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>({});
@@ -202,14 +208,20 @@ export function useWidgetPageState(
           /* hideCondition 충족 시 API 파라미터 제외 */
           const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, sv) : false;
           if (f.hideCondition && hideResult) return;
-          /* dateRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
-          if (f.type === 'dateRange') {
+          /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
+          if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
             const paramKey = f.fieldKey || f.label;
             const from = sv[f.id + '_from'];
             const to   = sv[f.id + '_to'];
             if (paramKey) {
-              if (from?.trim()) params[`${paramKey}_from`] = from;
-              if (to?.trim())   params[`${paramKey}_to`]   = to;
+              /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
+              if (f.singleDateRange) {
+                if (from?.trim()) params[`${paramKey}_gte`] = from;
+                if (to?.trim())   params[`${paramKey}_lte`] = to;
+              } else {
+                if (from?.trim()) params[`${paramKey}_from`] = from;
+                if (to?.trim())   params[`${paramKey}_to`]   = to;
+              }
             }
             return;
           }
@@ -318,18 +330,35 @@ export function useWidgetPageState(
   /* Search 위젯 날짜·옵션 기본값 초기화 — widgetSub 페이지 패턴 지원 */
   useEffect(() => {
     if (!widgetItems.length) return;
-    const calcDate = (offset: number) => { const d = new Date(); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
     const initVals: Record<string, string> = {};
     flatWidgets(widgetItems).forEach(w => {
       if (w.type !== 'search') return;
       (w.rows as { fields: SearchFieldConfig[] }[]).flatMap(r => r.fields).forEach((f: SearchFieldConfig) => {
-        if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
-          const val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) ? calcDate(f.defaultDateOffset) : (f.defaultDate ?? '');
+        if ((f.type === 'date' || f.type === 'yearMonth') && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+          /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
+          const subType = f.type === 'yearMonth' ? 'yearMonth' : (f.dateSubType ?? 'date');
+          const calcDateBySubType = (offset: number): string => {
+            const d = new Date(); d.setDate(d.getDate() - offset);
+            const iso = d.toISOString();
+            if (subType === 'yearMonth') return iso.slice(0, 7);
+            if (subType === 'datetime') return iso.slice(0, 16);
+            return iso.slice(0, 10);
+          };
+          const val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) ? calcDateBySubType(f.defaultDateOffset) : (f.defaultDate ?? '');
           if (val) initVals[f.id] = val;
-        } else if (f.type === 'dateRange') {
-          const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
-          const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
-          /* dateRange: from/to 분리 저장 */
+        } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+          /* rangeSubType에 따라 날짜 포맷 분기 */
+          const subType = f.rangeSubType ?? (f.type === 'yearMonthRange' ? 'yearMonth' : 'date');
+          const calcRangeDate = (offset: number): string => {
+            const d = new Date(); d.setDate(d.getDate() - offset);
+            const iso = d.toISOString();
+            if (subType === 'yearMonth') return iso.slice(0, 7);
+            if (subType === 'datetime') return iso.slice(0, 16);
+            return iso.slice(0, 10);
+          };
+          const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcRangeDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+          const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcRangeDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
+          /* dateRange/yearMonthRange: from/to 분리 저장 */
           if (start) initVals[f.id + '_from'] = start;
           if (end)   initVals[f.id + '_to']   = end;
         } else if ((f.type === 'select' || f.type === 'radio' || f.type === 'checkbox') && f.defaultOptionValue) {
@@ -416,8 +445,8 @@ export function useWidgetPageState(
         const vals: Record<string, string> = {};
         fw.fields.forEach(f => {
           if (!f.fieldKey) return;
-          if (f.type === 'dateRange') {
-            /* dateRange: dataJson에서 _from/_to 분리 키로 복원 */
+          if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+            /* dateRange/yearMonthRange: dataJson에서 _from/_to 분리 키로 복원 */
             const fromVal = section[f.fieldKey + '_from'];
             const toVal = section[f.fieldKey + '_to'];
             if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
@@ -747,7 +776,8 @@ export function useWidgetPageState(
   /* 폼 값 업데이트 */
   const updateFormValue = useCallback((widgetId: string, fieldId: string, value: string) => {
     setFormValuesMap((prev) => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: value } }));
-  }, []);
+    markDirty();
+  }, [markDirty]);
 
   /**
    * 파일 선택 핸들러
@@ -773,8 +803,9 @@ export function useWidgetPageState(
         ...prev,
         [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: files },
       }));
+      markDirty();
     },
-    []
+    [markDirty]
   );
 
   /** 기존 파일 삭제 — API 호출 후 existingFileMetaMap 및 imgBlobUrls 갱신 */
@@ -863,6 +894,7 @@ export function useWidgetPageState(
             await api.delete(`/page-data/${firstSlug}/${storedId}`);
           }
           toast.success("삭제되었습니다.");
+          markClean();
           if (goBackAfterAction) options?.onGoBack?.();
           return;
         }
@@ -1157,6 +1189,7 @@ export function useWidgetPageState(
         } /* slug 그룹 반복 끝 */
 
         toast.success(isUpdate ? "수정되었습니다." : "저장되었습니다.");
+        markClean();
         if (goBackAfterAction) options?.onGoBack?.();
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response?.status;
@@ -1183,6 +1216,7 @@ export function useWidgetPageState(
       currentGroupId,
       pageSlug,
       options,
+      markClean,
     ]
   );
 
@@ -1300,6 +1334,7 @@ export function useWidgetPageState(
 
         if (anySaved) {
           toast.success("저장되었습니다.");
+          markClean();
           if (goBackAfterAction) options?.onGoBack?.();
         }
       } catch {
@@ -1307,7 +1342,7 @@ export function useWidgetPageState(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, multiSelectValuesMap, tableSelectedRowsMap, urlParamSaveExtras, pageSlug, options]
+    [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, multiSelectValuesMap, tableSelectedRowsMap, urlParamSaveExtras, pageSlug, options, markClean]
   );
 
   /* 테이블 전체 새로고침 */
@@ -1362,14 +1397,20 @@ export function useWidgetPageState(
     Object.values(fieldsMap).flat().forEach(f => {
       const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
       if (f.hideCondition && hideResult) return;
-      /* dateRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
-      if (f.type === 'dateRange') {
+      /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
+      if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
         const paramKey = f.fieldKey || f.label;
         const from = searchValues[f.id + '_from'];
         const to   = searchValues[f.id + '_to'];
         if (paramKey) {
-          if (from?.trim()) params[`${paramKey}_from`] = from;
-          if (to?.trim())   params[`${paramKey}_to`]   = to;
+          /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
+          if (f.singleDateRange) {
+            if (from?.trim()) params[`${paramKey}_gte`] = from;
+            if (to?.trim())   params[`${paramKey}_lte`] = to;
+          } else {
+            if (from?.trim()) params[`${paramKey}_from`] = from;
+            if (to?.trim())   params[`${paramKey}_to`]   = to;
+          }
         }
         return;
       }
@@ -1396,8 +1437,10 @@ export function useWidgetPageState(
     onContentAction: handleContentAction,
     onDataSave: handleDataSave,
     subListRowsMap,
-    onSubListRowsChange: (wId: string, rows: SubListRow[]) =>
-      setSubListRowsMap((prev) => ({ ...prev, [wId]: rows })),
+    onSubListRowsChange: (wId: string, rows: SubListRow[]) => {
+      setSubListRowsMap((prev) => ({ ...prev, [wId]: rows }));
+      markDirty();
+    },
     tableDataMap,
     sortKeyMap,
     sortDirMap,
@@ -1412,6 +1455,7 @@ export function useWidgetPageState(
     onRefresh: handleRefresh,
     pageSlug,
     currentSearchParams,
+    leaveCheck: options?.leaveCheck ?? false,
     /* 파일 업로드 */
     fileValuesMap,
     existingFileMetaMap,
@@ -1420,8 +1464,10 @@ export function useWidgetPageState(
     onRemoveExisting: handleRemoveExisting,
     /* 멀티셀렉트 */
     multiSelectValuesMap,
-    onMultiSelectChange: (wId: string, ids: number[]) =>
-      setMultiSelectValuesMap((prev) => ({ ...prev, [wId]: ids })),
+    onMultiSelectChange: (wId: string, ids: number[]) => {
+      setMultiSelectValuesMap((prev) => ({ ...prev, [wId]: ids }));
+      markDirty();
+    },
     multiSelectExtraFieldValuesMap,
     onMultiSelectExtraFieldChange: (wId: string, itemId: number, fieldKey: string, value: string) =>
       setMultiSelectExtraFieldValuesMap((prev) => ({
@@ -1433,5 +1479,5 @@ export function useWidgetPageState(
       })),
   };
 
-  return { gridProps, setSubListRowsMap };
+  return { gridProps, setSubListRowsMap, confirmLeave };
 }

@@ -27,6 +27,8 @@ export interface OutputModeValue {
     layerWidth: LayerWidth;
     /** 저장 시 메인 data_slug (선택) */
     mainConnectedSlug: string;
+    /** 운영페이지 이탈 시 변경사항 확인 여부 */
+    leaveCheck: boolean;
     /** 우측 드로어 여부 — layerpopup + right 조합일 때 true */
     isRightDrawer: boolean;
     setOutputMode: (v: OutputMode) => void;
@@ -37,6 +39,7 @@ export interface OutputModeValue {
     setLayerTitleMsgKey: (v: string) => void;
     setLayerWidth: (v: LayerWidth) => void;
     setMainConnectedSlug: (v: string) => void;
+    setLeaveCheck: (v: boolean) => void;
     /**
      * 저장된 configJson에서 outputMode 관련 값 일괄 복원
      * @param cfg JSON.parse(tpl.configJson) 결과 객체
@@ -53,6 +56,7 @@ export function useOutputMode(): OutputModeValue {
     const [layerTitleMsgKey, setLayerTitleMsgKey] = useState('');
     const [layerWidth, setLayerWidth]             = useState<LayerWidth>('md');
     const [mainConnectedSlug, setMainConnectedSlug] = useState('');
+    const [leaveCheck, setLeaveCheck]               = useState(false);
 
     const isRightDrawer = outputMode === 'layerpopup' && layerType === 'right';
 
@@ -65,13 +69,14 @@ export function useOutputMode(): OutputModeValue {
         setLayerTitleMsgKey  ((cfg.layerTitleMsgKey   as string)      || '');
         setLayerWidth        ((cfg.layerWidth         as LayerWidth)  || 'md');
         setMainConnectedSlug ((cfg.mainConnectedSlug  as string)      || '');
+        setLeaveCheck        ((cfg.leaveCheck         as boolean)     ?? false);
     };
 
     return {
         outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
-        mainConnectedSlug, isRightDrawer,
+        mainConnectedSlug, leaveCheck, isRightDrawer,
         setOutputMode, setPageTitle, setPageTitleMsgKey, setLayerType, setLayerTitle, setLayerTitleMsgKey, setLayerWidth,
-        setMainConnectedSlug,
+        setMainConnectedSlug, setLeaveCheck,
         restore,
     };
 }

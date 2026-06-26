@@ -31,6 +31,8 @@ export interface TemplatePopupConfig {
     layerWidth?:      'sm' | 'md' | 'lg' | 'xl';
     /** 페이지 레벨 메인 연결 slug — 탭 서브페이지 저장 시 우선순위 판단에 사용 */
     mainConnectedSlug?: string;
+    /** 운영페이지 이탈 시 변경사항 확인 여부 */
+    leaveCheck?: boolean;
     /** 위젯 목록 — PageWidgetItem[] 구조 (PageGridRenderer에 바로 사용) */
     widgetItems: PageWidgetItem[];
 }
@@ -88,6 +90,7 @@ export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupCo
         layerTitleMsgKey:  raw.layerTitleMsgKey  || '',
         layerWidth:        raw.layerWidth        || 'md',
         mainConnectedSlug: (raw.mainConnectedSlug as string) || undefined,
+        leaveCheck:        (raw.leaveCheck as boolean)       ?? false,
         widgetItems,
     };
 }

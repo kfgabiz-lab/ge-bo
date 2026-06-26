@@ -254,6 +254,8 @@ interface WidgetRendererProps {
     pageSlug?: string;
     /** 진입 페이지의 메인 연결 slug — TabRenderer에 전달하여 탭 내부 저장 시 우선 적용 */
     mainConnectedSlug?: string;
+    /** 이탈체크 활성 여부 — TabRenderer에 전달하여 탭 내부 폼 변경 감지 */
+    leaveCheck?: boolean;
     /**
      * 외부에서 팝업을 직접 트리거할 때 사용 (LIST 버튼바, test 페이지 등).
      * ts가 변경될 때마다 팝업을 오픈한다.
@@ -331,6 +333,7 @@ export function WidgetRenderer({
     onRefresh,
     pageSlug,
     mainConnectedSlug,
+    leaveCheck,
     externalPopupTrigger,
 }: WidgetRendererProps) {
     const router  = useRouter();
@@ -1416,7 +1419,7 @@ export function WidgetRenderer({
     }
 
     if (widget.type === 'tab') {
-        return <TabRenderer mode={mode} widget={widget} pageSlug={pageSlug} parentMainConnectedSlug={mainConnectedSlug} />;
+        return <TabRenderer mode={mode} widget={widget} pageSlug={pageSlug} parentMainConnectedSlug={mainConnectedSlug} leaveCheck={leaveCheck} />;
     }
 
     return <div className={BASE_CLS} />;

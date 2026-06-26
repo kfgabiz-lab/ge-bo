@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 // import { Layers } from 'lucide-react'; /* 기존 로고 — 원복 시 주석 해제 */
 import * as LucideIcons from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useMenuStore, MenuItem as DbMenu } from '@/store/use-menu-store';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLeaveCheckStore } from '@/store/use-leave-check-store';
 
 /* ── 아이콘 동적 렌더러 ── */
 const renderIcon = (name: string, className = 'w-4 h-4') => {
@@ -22,7 +23,9 @@ const renderIcon = (name: string, className = 'w-4 h-4') => {
 /* ── 메뉴 아이템 ── */
 const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; depth?: number; isCollapsed?: boolean }) => {
     const pathname = usePathname();
+    const router = useRouter();
     const { t } = useI18n();
+    const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
     /* nameMsgKey 있으면 locale-aware 텍스트, 없으면 name 컬럼 fallback */
     const displayName = item.nameMsgKey ? t(item.nameMsgKey) : item.name;
 
@@ -47,6 +50,14 @@ const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; dep
 
     const handleToggle = (e: React.MouseEvent) => {
         if (hasChildren) { e.preventDefault(); setIsOpen(!isOpen); }
+    };
+
+    /* 이탈체크 가드 — isDirty 상태에서 다른 메뉴 클릭 시 confirm */
+    const handleLinkClick = (e: React.MouseEvent, url: string) => {
+        if (!confirmLeave) return;
+        e.preventDefault();
+        if (!confirmLeave()) return;
+        router.push(url);
     };
 
     const base = `relative flex items-center justify-between gap-2.5 py-2 pr-3 rounded-lg transition-all duration-150 text-[13px] group ${depth > 0 && !isCollapsed ? 'pl-9' : 'pl-3'} ${isCollapsed ? 'justify-center pr-0' : ''}`;
@@ -80,7 +91,13 @@ const MenuItemComponent = ({ item, depth = 0, isCollapsed }: { item: DbMenu; dep
             {hasChildren || !hasUrl ? (
                 <button onClick={handleToggle} className={`${base} ${style} w-full`}>{inner}</button>
             ) : (
-                <Link href={item.url || '#'} className={`${base} ${style}`}>{inner}</Link>
+                <Link
+                    href={item.url || '#'}
+                    className={`${base} ${style}`}
+                    onClick={confirmLeave ? (e) => handleLinkClick(e, item.url || '#') : undefined}
+                >
+                    {inner}
+                </Link>
             )}
             {hasChildren && isOpen && !isCollapsed && (
                 <div className="mt-0.5 relative">

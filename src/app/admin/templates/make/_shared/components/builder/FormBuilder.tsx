@@ -77,10 +77,8 @@ export interface FormWidget {    type: 'form';
 const FORM_FIELD_TYPES: FieldTypeItem[] = [
     { type: 'input',          label: 'Input',            desc: '텍스트 입력',              defaultColSpan: 1 },
     { type: 'select',         label: 'Select',           desc: '셀렉트 박스',              defaultColSpan: 1 },
-    { type: 'date',           label: 'Date',             desc: '날짜 단독',                defaultColSpan: 1 },
-    { type: 'dateRange',      label: 'Date Range',       desc: '날짜 범위 (from~to)',      defaultColSpan: 2 },
-    { type: 'yearMonth',      label: 'Year Month',       desc: '년월 단독',                defaultColSpan: 1 },
-    { type: 'yearMonthRange', label: 'Year Month Range', desc: '년월 범위 (from~to)',      defaultColSpan: 2 },
+    { type: 'date',           label: 'Date',             desc: '날짜/년월/일시 단독',      defaultColSpan: 1 },
+    { type: 'dateRange',      label: 'Date Range',       desc: '날짜/년월/일시/시간 범위', defaultColSpan: 2 },
     { type: 'radio',          label: 'Radio',            desc: '라디오 단일선택',          defaultColSpan: 1 },
     { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',        defaultColSpan: 1 },
     { type: 'button',         label: 'Button',           desc: '선택 버튼',                defaultColSpan: 1 },
@@ -139,7 +137,7 @@ function SortableFormField({
                 <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono flex-shrink-0">{field.type}</span>
                 {/* 라벨 (hidden은 fieldKey 표시) */}
                 <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
-                    {field.type === 'dateRange'
+                    {(field.type === 'dateRange' || field.type === 'yearMonthRange')
                         ? `${field.labelMsgKey ? t(field.labelMsgKey) : (field.label || '')} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
                         : field.type === 'hidden'
                             ? (field.fieldKey || <span className="italic text-slate-300">Key 없음</span>)
@@ -230,6 +228,10 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             fieldKey: '',
             colSpan: meta?.defaultColSpan ?? 1,
             rowSpan: 1,
+            /* date: 기본 서브타입 날짜로 초기화 */
+            ...(type === 'date' && { dateSubType: 'date' as const }),
+            /* dateRange: 기본 서브타입 날짜로 초기화 */
+            ...(type === 'dateRange' && { rangeSubType: 'date' as const }),
         };
         onChange({ ...widget, fields: [...widget.fields, newField] });
         setEditingId(newField.id);
@@ -298,6 +300,10 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
                 defaultEndDateOffset:   f.defaultEndDateOffset,
                 defaultEndDate:         f.defaultEndDate,
                 disableEndPast:         f.disableEndPast,
+                /* date 서브타입 (yearMonth 기존 데이터 → yearMonth fallback) */
+                dateSubType:            f.dateSubType ?? (f.type === 'yearMonth' ? 'yearMonth' : undefined),
+                /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */
+                rangeSubType:           f.rangeSubType ?? (f.type === 'yearMonthRange' ? 'yearMonth' : undefined),
                 defaultTime:            f.defaultTime,
                 timeStep:               f.timeStep,
                 /* ── 데이터생성 ── */

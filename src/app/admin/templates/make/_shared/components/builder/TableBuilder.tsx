@@ -32,6 +32,7 @@ import {
     SlugSelectField,
     DateRangeStatusColumnField,
 } from './fields';
+import type { SlugRelationOption } from '../SearchBuilder';
 import { DateFormatField } from './fields/DateFormatField';
 import {
     DndContext, closestCenter, KeyboardSensor, PointerSensor,
@@ -56,6 +57,7 @@ export interface TableWidget {
     columns: TableColumnConfig[];           /* List 빌더와 동일한 컬럼 타입 */
     connectedSearchIds: string[];           /* 연결된 Search 위젯 widgetId 목록 */
     connectedSlug?: string;                 /* DB Slug — 데이터 API 호출 대상 */
+    fetchRelationId?: number;               /* FETCH 연동 slug-relation ID */
     pageSize: number;
     displayMode: DisplayMode;              /* 표시 방식 (pagination | scroll) */
     /** 행 다중선택 체크박스 표시 여부 (기본 false) */
@@ -196,6 +198,9 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     const [layerTemplates, setLayerTemplates] = useState<TemplateItem[]>([]);
     const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
 
+    /* 전체 slug-relation 목록 — SearchBuilder와 동일한 패턴 */
+    const [allSlugRelations, setAllSlugRelations] = useState<SlugRelationOption[]>([]);
+
     /* 드래그 센서 — 3px 이상 이동 시 드래그 시작 (클릭 오인 방지) */
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
@@ -205,6 +210,13 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     /* 공통코드 로딩 */
     useEffect(() => {
         api.get('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
+    }, []);
+
+    /* slug-relation 전체 목록 1회 로드 — SearchBuilder와 동일한 방식 */
+    useEffect(() => {
+        api.get('/slug-relations', { params: { size: 200 } })
+            .then(res => setAllSlugRelations(res.data?.content || []))
+            .catch(() => {});
     }, []);
 
     /* 전체 템플릿 목록 lazy 로딩 (QUICK_DETAIL · PAGE 등 모든 타입 포함) */
@@ -310,7 +322,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
         const patch = (p: Partial<TableColumnConfig>) => updateColumn(col.id, p);
         return (
             <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
-                <ColumnBaseField values={col} onChange={patch} />
+                <ColumnBaseField values={col} onChange={patch} fetchRelations={allSlugRelations} />
                 {col.cellType === 'badge'            && <BadgeOptionsField          values={col} onChange={patch} />}
                 {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
                 {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
@@ -352,7 +364,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 />
             </div>
 
-            {/* 페이지당 건수 | 체크박스 — 2열 그리드 */}
+            {/* 페이지당 건수 | 연동 Slug — 2열 그리드 */}
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
@@ -365,13 +377,32 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                     )}
                 </div>
                 <div>
-                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">체크박스</label>
-                    <ToggleRow
-                        label={widget.enableRowSelection ? '사용' : '미사용'}
-                        value={widget.enableRowSelection ?? false}
-                        onChange={v => onChange({ ...widget, enableRowSelection: v })}
-                    />
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">연동 Slug</label>
+                    <select
+                        value={widget.fetchRelationId ?? ''}
+                        onChange={e => onChange({ ...widget, fetchRelationId: e.target.value ? Number(e.target.value) : undefined })}
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+                    >
+                        <option value="">연동 없음</option>
+                        {allSlugRelations.map(r => (
+                            <option key={r.id} value={r.id}>
+                                {r.description
+                                    ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                                    : `${r.masterSlug} → ${r.slaveSlug}`}
+                            </option>
+                        ))}
+                    </select>
                 </div>
+            </div>
+
+            {/* 체크박스 */}
+            <div>
+                <label className="text-[10px] font-medium text-slate-500 mb-1 block">체크박스</label>
+                <ToggleRow
+                    label={widget.enableRowSelection ? '사용' : '미사용'}
+                    value={widget.enableRowSelection ?? false}
+                    onChange={v => onChange({ ...widget, enableRowSelection: v })}
+                />
             </div>
 
             {/* 연결된 Search 위젯 */}
@@ -454,6 +485,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                     values={pendingCol}
                                     onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                     autoFocus
+                                    fetchRelations={allSlugRelations}
                                 />
                                 {pendingCol.cellType === 'badge' && (
                                     <BadgeOptionsField

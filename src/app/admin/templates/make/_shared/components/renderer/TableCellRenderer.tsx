@@ -217,12 +217,14 @@ export function TableCellRenderer({
                 const previewTexts = [beforeLabel, inRangeLabel, afterLabel];
                 return <span className="text-sm text-slate-600">{previewTexts[rowIndex % 3]}</span>;
             }
-            /* live: 연결된 dateRange 컬럼 값으로 오늘 날짜 비교 → 상태 텍스트 반환 */
-            const rangeRaw = col.linkedDateRangeKey
-                ? String(resolveAccessor(row, col.linkedDateRangeKey) ?? '')
+            /* live: 연결된 dateRange 컬럼의 _from/_to 분리 값으로 오늘 날짜 비교 → 상태 텍스트 반환 */
+            const fromStr = col.linkedDateRangeKey
+                ? String(resolveAccessor(row, col.linkedDateRangeKey + '_from') ?? '')
                 : '';
-            if (!rangeRaw) return <span className="text-sm text-slate-400">-</span>;
-            const [fromStr, toStr] = rangeRaw.split('~');
+            const toStr = col.linkedDateRangeKey
+                ? String(resolveAccessor(row, col.linkedDateRangeKey + '_to') ?? '')
+                : '';
+            if (!fromStr && !toStr) return <span className="text-sm text-slate-400">-</span>;
             const today = new Date().toISOString().slice(0, 10);
             let statusText = '-';
             if (fromStr && today < fromStr) {
@@ -240,7 +242,8 @@ export function TableCellRenderer({
             if (isPreview) {
                 return <span className="text-slate-400 text-sm">샘플 텍스트</span>;
             }
-            const strVal = String(value ?? '');
+            /* Object인 경우 빈값 처리 — fetch_fields 없이 Map 전체가 들어온 경우 방어 */
+            const strVal = (value == null || typeof value === 'object') ? '' : String(value);
             /* 공통코드 연동 — 코드값을 이름으로 변환 (쉼표 구분 복수값 포함) */
             if (col.codeGroupCode && col.displayAs !== 'value') {
                 const details = codeGroups.find(g => g.groupCode === col.codeGroupCode)?.details ?? [];

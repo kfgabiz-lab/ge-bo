@@ -34,6 +34,12 @@ export interface SearchFieldConfig {
     label2?: string;        // dateRange 두 번째 라벨
     label2MsgKey?: string;  // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
+    /** dateRange 통합 서브타입 — 범위 입력 방식 (기본: 'date') */
+    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time';
+    /** date 통합 서브타입 — 단독 날짜 입력 방식 (기본: 'date') */
+    dateSubType?: 'date' | 'yearMonth' | 'datetime';
+    /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
+    singleDateRange?: boolean;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
     placeholder?: string;
     placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
@@ -252,6 +258,7 @@ export interface TableColumnConfig {
     inRangeTextMsgKey?: string;     // 포함 텍스트 다국어 키
     afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
     afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
+    relationSlugId?: number;        // 연동 slug-relation ID (FETCH 카테고리 연동)
 }
 
 /** 불러오기 목록 아이템 */

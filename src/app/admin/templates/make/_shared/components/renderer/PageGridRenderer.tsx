@@ -155,6 +155,8 @@ interface PageGridRendererProps {
     onCrossTabFormChange?: (fieldId: string, value: string) => void;
     /** 진입 페이지의 메인 연결 slug — TabRenderer에 전달하여 탭 내부 저장 시 우선 적용 */
     mainConnectedSlug?: string;
+    /** 이탈체크 활성 여부 — TabRenderer에 전달하여 탭 내부 폼 변경 감지 */
+    leaveCheck?: boolean;
 }
 
 /**
@@ -205,6 +207,7 @@ export function PageGridRenderer({
     crossTabFormValues,
     onCrossTabFormChange,
     mainConnectedSlug,
+    leaveCheck,
 }: PageGridRendererProps) {
     /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
      * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
@@ -405,6 +408,7 @@ export function PageGridRenderer({
                                         onRefresh={onRefresh}
                                         pageSlug={pageSlug}
                                         mainConnectedSlug={mainConnectedSlug}
+                                        leaveCheck={leaveCheck}
                                         /* 엑셀 다운로드 */
                                         tableWidgetsMap={tableWidgetsMap}
                                         currentSearchParams={currentSearchParams}

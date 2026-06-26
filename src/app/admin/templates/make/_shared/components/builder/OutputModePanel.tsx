@@ -50,6 +50,10 @@ interface OutputModePanelProps {
     onMainConnectedSlugChange?: (v: string) => void;
     /** slug 목록 — 드롭다운 옵션 */
     slugOptions?: { id: number; slug: string; name: string }[];
+    /** 운영페이지 이탈 시 변경사항 확인 여부 */
+    leaveCheck?: boolean;
+    /** 이탈체크 변경 핸들러 */
+    onLeaveCheckChange?: (v: boolean) => void;
     onOutputModeChange: (v: OutputMode) => void;
     onPageTitleChange: (v: string) => void;
     onPageTitleMsgKeyChange: (v: string) => void;
@@ -66,6 +70,7 @@ interface OutputModePanelProps {
 export function OutputModePanel({
     outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
     mainConnectedSlug = '', onMainConnectedSlugChange, slugOptions = [],
+    leaveCheck = false, onLeaveCheckChange,
     onOutputModeChange, onPageTitleChange, onPageTitleMsgKeyChange,
     onLayerTypeChange, onLayerTitleChange, onLayerTitleMsgKeyChange, onLayerWidthChange,
 }: OutputModePanelProps) {
@@ -130,27 +135,46 @@ export function OutputModePanel({
                 </div>
             )}
 
-            {/* 메인 연결 slug — outputMode 관계없이 항상 표시 (선택) */}
-            {onMainConnectedSlugChange && (
+            {/* 메인 연결 slug / 이탈체크 — outputMode 관계없이 항상 표시 */}
+            {(onMainConnectedSlugChange || onLeaveCheckChange) && (
                 <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
-                    <label className="text-[10px] font-semibold text-slate-500 mb-1.5 block">
-                        메인 연결 Slug <span className="font-normal text-slate-400">(선택)</span>
-                    </label>
-                    <div className="relative">
-                        <select
-                            value={mainConnectedSlug}
-                            onChange={e => onMainConnectedSlugChange(e.target.value)}
-                            className={selectCls}
-                        >
-                            <option value="">— 없음 —</option>
-                            {slugOptions.map(opt => (
-                                <option key={opt.id} value={opt.slug}>
-                                    {opt.name} ({opt.slug})
-                                </option>
-                            ))}
-                        </select>
-                        <SelectArrow />
+                    {/* 헤더 행: slug 라벨(좌) + 이탈체크 체크박스(우) */}
+                    <div className="flex items-center justify-between mb-1.5">
+                        {onMainConnectedSlugChange ? (
+                            <label className="text-[10px] font-semibold text-slate-500">
+                                메인 연결 Slug <span className="font-normal text-slate-400">(선택)</span>
+                            </label>
+                        ) : <span />}
+                        {onLeaveCheckChange && (
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={leaveCheck}
+                                    onChange={e => onLeaveCheckChange(e.target.checked)}
+                                    className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                                />
+                                <span className="text-[10px] font-semibold text-slate-500">이탈체크</span>
+                            </label>
+                        )}
                     </div>
+                    {/* 메인 연결 Slug 드롭다운 */}
+                    {onMainConnectedSlugChange && (
+                        <div className="relative">
+                            <select
+                                value={mainConnectedSlug}
+                                onChange={e => onMainConnectedSlugChange(e.target.value)}
+                                className={selectCls}
+                            >
+                                <option value="">— 없음 —</option>
+                                {slugOptions.map(opt => (
+                                    <option key={opt.id} value={opt.slug}>
+                                        {opt.name} ({opt.slug})
+                                    </option>
+                                ))}
+                            </select>
+                            <SelectArrow />
+                        </div>
+                    )}
                 </div>
             )}
 

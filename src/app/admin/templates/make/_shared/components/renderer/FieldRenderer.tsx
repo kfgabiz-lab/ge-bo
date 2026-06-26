@@ -406,24 +406,40 @@ export function FieldRenderer({
                 </div>
             );
 
-        /* ── date ── */
+        /* ── yearMonth — date 통합 케이스로 fall-through (하위 호환) ── */
+        case 'yearMonth':
+        /* ── date — dateSubType으로 날짜/년월/일시분초 3가지 타입 통합 ── */
         case 'date': {
-            /* 기본값 날짜 계산 — offset 기반 또는 직접 지정 날짜, 둘 다 없으면 오늘 */
-            const dateToday = new Date().toISOString().slice(0, 10);
+            /* yearMonth 기존 데이터는 yearMonth subType으로 처리 */
+            const dateSubType = field.type === 'yearMonth' ? 'yearMonth' : (field.dateSubType ?? 'date');
+            const inputType = dateSubType === 'yearMonth' ? 'month'
+                : dateSubType === 'datetime' ? 'datetime-local'
+                : 'date';
+            /* 오늘 값 (min 제약에 사용) — 서브타입별 포맷 */
+            const getTodayVal = (): string => {
+                const iso = new Date().toISOString();
+                if (dateSubType === 'yearMonth') return iso.slice(0, 7);
+                if (dateSubType === 'datetime') return iso.slice(0, 16);
+                return iso.slice(0, 10);
+            };
+            /* offset 기반 기본값 계산 — 서브타입별 포맷 */
             const calcDateDefault = (offset?: number, date?: string): string => {
                 if (offset !== undefined && offset !== 0) {
                     const d = new Date();
                     d.setDate(d.getDate() - offset);
-                    return d.toISOString().slice(0, 10);
+                    const iso = d.toISOString();
+                    if (dateSubType === 'yearMonth') return iso.slice(0, 7);
+                    if (dateSubType === 'datetime') return iso.slice(0, 16);
+                    return iso.slice(0, 10);
                 }
                 return date ?? '';
             };
             const dateDefault = calcDateDefault(field.defaultDateOffset, field.defaultDate);
-            /* 토글 ON: 기본값 날짜(또는 오늘)를 고정 min으로 — 사용자가 날짜 변경해도 min은 유지 */
-            const dateMin = field.disablePast ? (dateDefault || dateToday) : undefined;
+            /* 토글 ON: 기본값(또는 오늘)을 고정 min으로 */
+            const dateMin = field.disablePast ? (dateDefault || getTodayVal()) : undefined;
             return (
                 <input
-                    type="date"
+                    type={inputType}
                     disabled={isDisabled}
                     readOnly={isReadOnly}
                     className={`${inputCls}${readonlyCls}`}
@@ -434,80 +450,57 @@ export function FieldRenderer({
             );
         }
 
-        /* ── yearMonth — 년월 단독 선택 (저장값: YYYY-MM) ── */
-        case 'yearMonth':
-            return (
-                <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    <input
-                        type="month"
-                        readOnly={isReadOnly}
-                        className={`${inputCls} pl-9${readonlyCls}`}
-                        value={value}
-                        onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
-                    />
-                </div>
-            );
-
-        /* ── yearMonthRange — 년월 범위 선택 (저장값: YYYY-MM~YYYY-MM) ── */
-        case 'yearMonthRange': {
-            const parts = (value || '~').split('~');
-            const from  = parts[0] || '';
-            const to    = parts[1] || '';
-            return (
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                            type="month"
-                            readOnly={isReadOnly}
-                            className={`${inputCls} pl-9${readonlyCls}`}
-                            value={from}
-                            onChange={isReadOnly ? undefined : e => onChange?.(`${e.target.value}~${to}`)}
-                        />
-                    </div>
-                    <span className="text-sm text-slate-400 flex-shrink-0">~</span>
-                    <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                            type="month"
-                            readOnly={isReadOnly}
-                            className={`${inputCls} pl-9${readonlyCls}`}
-                            value={to}
-                            onChange={isReadOnly ? undefined : e => onChange?.(`${from}~${e.target.value}`)}
-                        />
-                    </div>
-                </div>
-            );
-        }
-
-        /* ── dateRange ── */
+        /* ── yearMonthRange — dateRange 통합 케이스로 fall-through (하위 호환) ── */
+        case 'yearMonthRange':
+        /* ── dateRange — rangeSubType으로 날짜/년월/일시분초/시분초 4가지 타입 통합 ── */
         case 'dateRange': {
-            /* valueFrom/valueTo 분리 props 사용 — value '~' 단일 방식 제거 */
+            /* yearMonthRange 기존 데이터는 yearMonth subType으로 처리 */
+            const subType = (field.type === 'yearMonthRange')
+                ? 'yearMonth'
+                : (field.rangeSubType ?? 'date');
+
             const from = valueFrom ?? '';
-            const to = valueTo ?? '';
-            const today = new Date().toISOString().slice(0, 10);
-            /* 기본값 날짜 계산 — offset 기반 또는 직접 지정 날짜 */
+            const to   = valueTo ?? '';
+
+            const inputType = subType === 'yearMonth' ? 'month'
+                : subType === 'datetime' ? 'datetime-local'
+                : subType === 'time' ? 'time'
+                : 'date';
+
+            /* 서브타입별 오늘 값 계산 (min 제약에 사용) */
+            const getToday = (): string => {
+                const iso = new Date().toISOString();
+                if (subType === 'yearMonth') return iso.slice(0, 7);
+                if (subType === 'datetime') return iso.slice(0, 16);
+                if (subType === 'time') return new Date().toTimeString().slice(0, 5);
+                return iso.slice(0, 10);
+            };
+
+            /* offset 기반 기본값 계산 — 서브타입에 따라 포맷 분기 */
             const calcRangeDefault = (offset?: number, date?: string): string => {
                 if (offset !== undefined && offset !== 0) {
                     const d = new Date();
                     d.setDate(d.getDate() - offset);
-                    return d.toISOString().slice(0, 10);
+                    const iso = d.toISOString();
+                    if (subType === 'yearMonth') return iso.slice(0, 7);
+                    if (subType === 'datetime') return iso.slice(0, 16);
+                    return iso.slice(0, 10);
                 }
                 return date ?? '';
             };
+
             const startDefault = calcRangeDefault(field.defaultStartDateOffset, field.defaultStartDate);
             const endDefault   = calcRangeDefault(field.defaultEndDateOffset,   field.defaultEndDate);
-            /* 토글 ON: 기본값 날짜(또는 오늘)를 고정 min으로 — 토글 OFF면 무조건 undefined */
-            const startMin = field.disableStartPast ? (startDefault || today) : undefined;
-            const endMin   = field.disableEndPast   ? (endDefault   || today) : undefined;
+            const todayVal     = getToday();
+            const startMin = field.disableStartPast ? (startDefault || todayVal) : undefined;
+            const endMin   = field.disableEndPast   ? (endDefault   || todayVal) : undefined;
+
             return (
-                /* preview/live 동일 UI — 달력 아이콘 + date input, preview는 disabled만 적용 */
                 <div className="flex items-center gap-2">
                     <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
-                            type="date"
+                            type={inputType}
                             disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}
@@ -518,9 +511,9 @@ export function FieldRenderer({
                     </div>
                     <span className="text-sm text-slate-400 flex-shrink-0">~</span>
                     <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
-                            type="date"
+                            type={inputType}
                             disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}

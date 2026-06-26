@@ -32,12 +32,14 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const [error,              setError]              = useState<string | null>(null);
     const [widgetItems,        setWidgetItems]        = useState<PageWidgetItem[]>([]);
     const [mainConnectedSlug,  setMainConnectedSlug]  = useState<string | undefined>(undefined);
+    const [leaveCheck,         setLeaveCheck]         = useState(false);
 
     /* 공통 훅 — 검색·테이블·폼·파일·SubList·MultiSelect 상태 및 핸들러 전체 */
     const { gridProps } = useWidgetPageState(widgetItems, slug, {
         enableUrlEditMode: true,
         onGoBack: () => router.back(),
         mainConnectedSlug,
+        leaveCheck,
     });
 
     /* 템플릿 로딩 */
@@ -49,6 +51,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 const items: PageWidgetItem[] = raw.widgetItems ? raw.widgetItems as PageWidgetItem[] : [];
                 setWidgetItems(items);
                 setMainConnectedSlug((raw.mainConnectedSlug as string) || undefined);
+                setLeaveCheck((raw.leaveCheck as boolean) ?? false);
                 /* pageTitleMsgKey 우선 → 없으면 pageTitle 직접 텍스트 사용 */
                 const msgKey = (raw.pageTitleMsgKey as string) || '';
                 setPageTitle(msgKey ? t(msgKey) : ((raw.pageTitle as string) || ''));

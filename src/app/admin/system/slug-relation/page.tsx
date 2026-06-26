@@ -26,6 +26,8 @@ interface SlugRelation {
     relationDir: string;
     fetchFields: string | null;
     fetchSeparator: string;
+    slaveType: string;
+    categoryDepth: number;
     description: string | null;
     createdBy: string;
     createdAt: string;
@@ -52,6 +54,8 @@ const EMPTY_FORM = {
     relationDir: 'FILTER',
     fetchFields: '',
     fetchSeparator: ',',
+    slaveType: 'TABLE',
+    categoryDepth: '1',
     description: '',
 };
 
@@ -59,8 +63,9 @@ const EMPTY_FORM = {
 /*  상수                                       */
 /* ══════════════════════════════════════════ */
 
-const JOIN_TYPES  = ['EQ', 'ARRAY_CONTAINS'];
+const JOIN_TYPES   = ['EQ', 'ARRAY_CONTAINS'];
 const RELATION_DIRS = ['FILTER', 'FETCH'];
+const SLAVE_TYPES  = ['TABLE', 'CATEGORY'];
 
 /* 공통 input/select 스타일 */
 const inputCls  = 'w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white';
@@ -163,6 +168,8 @@ export default function SlugRelationPage() {
             relationDir:   item.relationDir,
             fetchFields:   item.fetchFields   ?? '',
             fetchSeparator: item.fetchSeparator,
+            slaveType:     item.slaveType     ?? 'TABLE',
+            categoryDepth: String(item.categoryDepth ?? 1),
             description:   item.description   ?? '',
         });
         setModalOpen(true);
@@ -186,6 +193,8 @@ export default function SlugRelationPage() {
                 relationDir:   form.relationDir,
                 fetchFields:   form.fetchFields.trim()    || null,
                 fetchSeparator: form.fetchSeparator || ',',
+                slaveType:     form.relationDir === 'FETCH' ? (form.slaveType || 'TABLE') : 'TABLE',
+                categoryDepth: form.slaveType === 'CATEGORY' ? (Number(form.categoryDepth) || 1) : 1,
                 description:   form.description.trim()   || null,
             };
             if (editTarget) {
@@ -312,19 +321,20 @@ export default function SlugRelationPage() {
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[120px]">Join Type</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap w-[130px]">Slave Filter</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[90px]">방향</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[100px]">Slave Type</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[80px]">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={9} className="py-16 text-center">
+                                    <td colSpan={10} className="py-16 text-center">
                                         <Loader2 className="w-5 h-5 animate-spin text-slate-300 mx-auto" />
                                     </td>
                                 </tr>
                             ) : items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
+                                    <td colSpan={10} className="py-16 text-center text-sm text-slate-400">
                                         등록된 SLUG 연동이 없습니다.
                                     </td>
                                 </tr>
@@ -345,6 +355,13 @@ export default function SlugRelationPage() {
                                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${DIR_CLS[item.relationDir] ?? 'bg-slate-100 text-slate-600'}`}>
                                             {item.relationDir}
                                         </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {item.relationDir === 'FETCH' && (
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.slaveType === 'CATEGORY' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                {item.slaveType ?? 'TABLE'}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center gap-1.5">
@@ -514,6 +531,34 @@ export default function SlugRelationPage() {
                                 <p className="mt-1 text-xs text-slate-400">slave 조회 시 고정 조건 (없으면 빈 값)</p>
                             </div>
 
+                            {/* Slave Type — 항상 표시 */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Slave Type</label>
+                                <div className="relative">
+                                    <select value={form.slaveType} onChange={e => setField('slaveType', e.target.value)} className={selectCls}>
+                                        {SLAVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                    <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                                </div>
+                                <p className="mt-1 text-xs text-slate-400">TABLE: slave에서 직접 추출 / CATEGORY: 상위 계층 거슬러 추출</p>
+                            </div>
+
+                            {/* Category Depth — CATEGORY 타입일 때만 표시 */}
+                            {form.slaveType === 'CATEGORY' && (
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Category Depth</label>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={5}
+                                        value={form.categoryDepth}
+                                        onChange={e => setField('categoryDepth', e.target.value)}
+                                        className={inputCls}
+                                    />
+                                    <p className="mt-1 text-xs text-slate-400">표시할 계층 수 (1=상위명, 2=대분류 &gt; 중분류, 최대 5)</p>
+                                </div>
+                            )}
+
                             {/* Fetch Fields / Fetch Separator — FETCH 방향일 때만 표시 */}
                             {form.relationDir === 'FETCH' && (
                                 <div className="grid grid-cols-2 gap-4">
@@ -522,10 +567,10 @@ export default function SlugRelationPage() {
                                         <input
                                             value={form.fetchFields}
                                             onChange={e => setField('fetchFields', e.target.value)}
-                                            placeholder="예: product.title"
+                                            placeholder="예: form1.title"
                                             className={inputCls}
                                         />
-                                        <p className="mt-1 text-xs text-slate-400">표시할 slave 필드 경로</p>
+                                        <p className="mt-1 text-xs text-slate-400">표시할 slave 필드 경로 (dot notation)</p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-700 mb-1.5">Fetch Separator</label>

@@ -13,6 +13,7 @@ import { useSiteStore } from '@/store/use-site-store';
 import { usePageTitleStore } from '@/store/use-page-title-store';
 import { LanguageSelector } from '@/components/layout/language-selector';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLeaveCheckStore } from '@/store/use-leave-check-store';
 
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
@@ -126,6 +127,7 @@ export function Header() {
     const pageTitle = usePageTitleStore(s => s.pageTitle);
     const previousPath = usePageTitleStore(s => s.previousPath);
     const { t } = useI18n();
+    const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
 
     /* React Query 기반 네비게이션 메뉴 캐싱 연동 */
     const { data: serverNavMenus } = useNavMenusQuery();
@@ -189,7 +191,10 @@ export function Header() {
                         ) : (
                             <span
                                 className="text-gray-500 hover:text-slate-900 cursor-pointer transition-colors font-medium"
-                                onClick={() => router.push(crumb.href)}
+                                onClick={() => {
+                                    if (confirmLeave && !confirmLeave()) return;
+                                    router.push(crumb.href);
+                                }}
                             >
                                 {crumb.label}
                             </span>

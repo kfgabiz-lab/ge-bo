@@ -37,6 +37,8 @@ export interface SlugRelationOption {
     id: number;
     masterSlug: string;
     slaveSlug: string;
+    relationDir?: string;
+    slaveType?: string;
     description?: string;
 }
 
@@ -64,10 +66,8 @@ interface SearchBuilderProps {
 const FIELD_TYPES: { type: SearchFieldType; label: string; desc: string; defaultColSpan: 1 | 2 }[] = [
     { type: 'input',            label: 'Input',            desc: '텍스트 입력',               defaultColSpan: 1 },
     { type: 'select',           label: 'Select',           desc: '셀렉트 박스',               defaultColSpan: 1 },
-    { type: 'date',             label: 'Date',             desc: '날짜 단독',                 defaultColSpan: 1 },
-    { type: 'dateRange',        label: 'Date Range',       desc: '날짜 범위 (from~to)',       defaultColSpan: 2 },
-    { type: 'yearMonth',        label: 'Year Month',       desc: '년월 단독',                 defaultColSpan: 1 },
-    { type: 'yearMonthRange',   label: 'Year Month Range', desc: '년월 범위 (from~to)',       defaultColSpan: 2 },
+    { type: 'date',             label: 'Date',             desc: '날짜/년월/일시 단독',        defaultColSpan: 1 },
+    { type: 'dateRange',        label: 'Date Range',       desc: '날짜/년월/일시/시간 범위',   defaultColSpan: 2 },
     { type: 'radio',            label: 'Radio',            desc: '라디오 단일선택',            defaultColSpan: 1 },
     { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 필터',       defaultColSpan: 1 },
     { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',    defaultColSpan: 1 },
@@ -220,6 +220,14 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             options: [],
             codeGroupCode: undefined,
             multiSelect: false,
+            /* date 초기값 */
+            ...(type === 'date' && {
+                dateSubType: 'date' as const,
+            }),
+            /* dateRange 초기값 */
+            ...(type === 'dateRange' && {
+                rangeSubType: 'date' as const,
+            }),
             /* category 초기값 */
             ...(type === 'category' && {
                 maxDepth: 1,
@@ -265,6 +273,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             dbSlug, relationSlugId, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
+            rangeSubType, dateSubType, singleDateRange,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -303,6 +312,12 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultEndDateOffset: defaultEndDateOffset ?? undefined,
             defaultEndDate: defaultEndDate || undefined,
             disableEndPast: disableEndPast || undefined,
+            /* date 서브타입 */
+            dateSubType: pendingType === 'date' ? (dateSubType ?? 'date') : undefined,
+            /* dateRange 서브타입 */
+            rangeSubType: pendingType === 'dateRange' ? (rangeSubType ?? 'date') : undefined,
+            /* singleDateRange — dateRange 단일 date 컬럼 범위 검색 옵션 */
+            singleDateRange: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (singleDateRange || undefined) : undefined,
             /* category 전용 */
             dbSlug:            pendingType === 'category' ? (dbSlug || undefined) : undefined,
             relationSlugId:    pendingType === 'category' ? (relationSlugId || undefined) : undefined,
@@ -505,6 +520,11 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 defaultEndDateOffset:   field.defaultEndDateOffset,
                                                                                 defaultEndDate:         field.defaultEndDate,
                                                                                 disableEndPast:         field.disableEndPast,
+                                                                                /* date 서브타입 (yearMonth 기존 데이터 → yearMonth fallback) */
+                                                                                dateSubType:            field.dateSubType ?? (field.type === 'yearMonth' ? 'yearMonth' : undefined),
+                                                                                /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */
+                                                                                rangeSubType:           field.rangeSubType ?? (field.type === 'yearMonthRange' ? 'yearMonth' : undefined),
+                                                                                singleDateRange:        field.singleDateRange,
                                                                                 /* category 전용 */
                                                                                 dbSlug:            field.dbSlug,
                                                                                 relationSlugId:    field.relationSlugId,

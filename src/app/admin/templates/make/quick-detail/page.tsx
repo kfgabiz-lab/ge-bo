@@ -241,6 +241,8 @@ export default function QuickDetailBuilderPage() {
                         onLayerTitleChange={om.setLayerTitle}
                         onLayerTitleMsgKeyChange={om.setLayerTitleMsgKey}
                         onLayerWidthChange={om.setLayerWidth}
+                        leaveCheck={om.leaveCheck}
+                        onLeaveCheckChange={om.setLeaveCheck}
                     />
 
                     {/* 위젯 셀 영역 — Widget 빌더와 동일한 구조 */}
@@ -425,6 +427,7 @@ export default function QuickDetailBuilderPage() {
                     layerType:  om.layerType,
                     layerTitle: om.layerTitle,
                     layerWidth: om.layerWidth,
+                    leaveCheck: om.leaveCheck || undefined,
                 })}
                 toSlug={toSlug}
             />
