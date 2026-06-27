@@ -382,6 +382,7 @@ export function PageGridRenderer({
                                         allFormValues={allFormValues}
                                         allFieldKeyToId={allFieldKeyToId}
                                         urlParams={urlParams}
+                                        crossTabFormValues={crossTabFormValues}
                                         onContentAction={(widgetIds, action, goBack) => onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap)}
                                         onDataSave={onDataSave}
                                         onClose={onClose}

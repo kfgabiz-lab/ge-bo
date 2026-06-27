@@ -164,6 +164,8 @@ interface WidgetRendererProps {
     allFieldKeyToId?: Record<string, string>;
     /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 URL 파라미터 참조용 (key → value) */
     urlParams?: Record<string, string>;
+    /** cross-tab 공유 폼 값 — TabRenderer가 관리, 다른 탭 필드 hide/disable 조건 평가용 (fieldKey → value) */
+    crossTabFormValues?: Record<string, string>;
     /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 버튼 클릭 시 데이터저장 동작 — connType='datasave' 전용 */
@@ -297,6 +299,7 @@ export function WidgetRenderer({
     allFormValues,
     allFieldKeyToId,
     urlParams,
+    crossTabFormValues,
     onContentAction,
     onDataSave,
     onClose,
@@ -1368,6 +1371,8 @@ export function WidgetRenderer({
                 allFormValues={allFormValues}
                 allFieldKeyToId={allFieldKeyToId}
                 urlParams={urlParams}
+                crossTabFormValues={crossTabFormValues}
+                contentKey={widget.contentKey}
                 fileValues={fileValues}
                 existingFileMeta={existingFileMeta}
                 imgBlobUrls={imgBlobUrls}

@@ -63,6 +63,10 @@ interface FormRendererProps {
     allFieldKeyToId?: Record<string, string>;
     /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 폼 필드 외 URL 파라미터도 참조 가능 (key → value) */
     urlParams?: Record<string, string>;
+    /** cross-tab 공유 폼 값 — TabRenderer가 관리, 다른 탭 필드 hide/disable 조건 평가용 (fieldKey → value) */
+    crossTabFormValues?: Record<string, string>;
+    /** 이 폼 위젯의 contentKey — cross-tab 에스컬레이션 시 contentKey.fieldKey 형식으로도 저장하여 탭 간 명시 참조 지원 */
+    contentKey?: string;
     /* ── 파일/이미지/비디오 전용 (live 모드) ── */
     /** 새로 선택한 파일 목록 (fieldId → File[]) */
     fileValues?: Record<string, File[]>;
@@ -93,6 +97,8 @@ export function FormRenderer({
     allFormValues,
     allFieldKeyToId,
     urlParams,
+    crossTabFormValues,
+    contentKey,
     fileValues,
     existingFileMeta,
     imgBlobUrls,
@@ -125,6 +131,8 @@ export function FormRenderer({
                 /* 폼 필드에 없으면 URL 파라미터에서 조회 */
                 if (fieldId) return (resolvedValues[fieldId] ?? '') !== val;
                 if (urlParams && key in urlParams) return (urlParams[key] ?? '') !== val;
+                /* cross-tab: fieldKey로 직접 참조 — 다른 탭 필드 값 조회 */
+                if (crossTabFormValues && key in crossTabFormValues) return (crossTabFormValues[key] ?? '') !== val;
                 return false;
             }
             const eqIdx = cond.indexOf('=');
@@ -135,6 +143,8 @@ export function FormRenderer({
             /* 폼 필드에 없으면 URL 파라미터에서 조회 */
             if (fieldId) return (resolvedValues[fieldId] ?? '') === val;
             if (urlParams && key in urlParams) return (urlParams[key] ?? '') === val;
+            /* cross-tab: fieldKey로 직접 참조 — 다른 탭 필드 값 조회 */
+            if (crossTabFormValues && key in crossTabFormValues) return (crossTabFormValues[key] ?? '') === val;
             return false;
         });
     };
@@ -161,9 +171,19 @@ export function FormRenderer({
     const handleFieldChange = useCallback((fieldId: string, value: string) => {
         onChangeValues?.(fieldId, value);
 
-        /* generationKey 자동입력 처리 */
         const sourceField = fields.find(f => f.id === fieldId);
         if (!sourceField) return;
+
+        /* fieldKey 있는 모든 필드 변경 시 — cross-tab hide/disable 조건 평가용 값 공유
+         * 단순 fieldKey("title")와 contentKey.fieldKey("form1.title") 두 형식 모두 저장 */
+        if (sourceField.fieldKey) {
+            onChangeAllFormValues?.(sourceField.fieldKey, value);
+            if (contentKey) {
+                onChangeAllFormValues?.(`${contentKey}.${sourceField.fieldKey}`, value);
+            }
+        }
+
+        /* generationKey 자동입력 처리 */
 
         /* generationKey로 대상 fieldId 탐색
          * - 도트 포함(예: form3.title): allFieldKeyToId에서 cross-form 탐색
