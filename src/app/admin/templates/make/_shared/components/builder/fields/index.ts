@@ -43,6 +43,7 @@ export { TextCodeGroupField } from './TextCodeGroupField';
 export { BooleanTextField } from './BooleanTextField';
 export { ActionsField } from './ActionsField';
 export { DateRangeStatusColumnField } from './DateRangeStatusColumnField';
+export { InlineEditField } from './InlineEditField';
 export type { ColEditProps } from './col-types';
 export { CUSTOM_ACTION_COLORS, PRESET_COLORS } from './col-types';
 

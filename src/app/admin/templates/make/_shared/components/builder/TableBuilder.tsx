@@ -31,6 +31,7 @@ import {
     ActionsField,
     SlugSelectField,
     DateRangeStatusColumnField,
+    InlineEditField,
 } from './fields';
 import type { SlugRelationOption } from '../SearchBuilder';
 import { DateFormatField } from './fields/DateFormatField';
@@ -76,6 +77,7 @@ const CELL_TYPES: { type: CellType; label: string; desc: string }[] = [
     { type: 'actions',          label: 'Actions',          desc: '액션 버튼' },
     { type: 'date',             label: 'Date',             desc: '날짜/시간 포맷 표시' },
     { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 (이전/포함/이후)' },
+    { type: 'inlineEdit',       label: 'InlineEdit',       desc: '즉시 수정 (토글/체크박스/라디오)' },
 ];
 
 /* CUSTOM_ACTION_COLORS — 하위 호환 re-export (TableCellRenderer 등에서 참조 가능) */
@@ -128,6 +130,7 @@ function SortableColumnItem({
         col.cellType === 'actions'          ? 'bg-orange-100 text-orange-600' :
         col.cellType === 'date'             ? 'bg-violet-100 text-violet-600' :
         col.cellType === 'dateRangeStatus'  ? 'bg-teal-100 text-teal-600' :
+        col.cellType === 'inlineEdit'       ? 'bg-indigo-100 text-indigo-600' :
         'bg-slate-200 text-slate-600';
 
     return (
@@ -256,29 +259,44 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     /** 셀 타입 선택 → pendingCol에 타입별 기본값 세팅 (Phase 2 진입) */
     const selectCellType = (type: CellType) => {
         setPendingCol({
-            cellType:    type,
-            header:      '',
-            accessor:    type === 'actions' ? 'actions' : '',
-            trueText:    '공개',
-            falseText:   '비공개',
-            width:       type === 'actions' ? 120 : 150,
-            widthUnit:   'px',
-            align:       type === 'actions' ? 'center' : 'left',
-            sortable:    type !== 'actions',
-            badgeShape:  'round',
-            showIcon:    false,
-            displayAs:   'text',
-            actions:     type === 'actions' ? ['edit', 'detail', 'delete'] : undefined,
-            cellOptions: type === 'badge'   ? [{ text: '', value: '', color: 'slate' }] : undefined,
+            cellType:       type,
+            header:         '',
+            accessor:       type === 'actions' ? 'actions' : '',
+            trueText:       '공개',
+            falseText:      '비공개',
+            width:          type === 'actions' ? 120 : 150,
+            widthUnit:      'px',
+            align:          type === 'actions' ? 'center' : 'left',
+            sortable:       type !== 'actions',
+            badgeShape:     'round',
+            showIcon:       false,
+            displayAs:      'text',
+            actions:        type === 'actions'    ? ['edit', 'detail', 'delete'] : undefined,
+            cellOptions:    type === 'badge'      ? [{ text: '', value: '', color: 'slate' }] : undefined,
+            inlineEditType: type === 'inlineEdit' ? 'toggle' : undefined,
         });
         if (type === 'actions') loadLayerTemplates();
+    };
+
+    /**
+     * 컬럼 설정 유효성 검사 공통 함수
+     * — confirmAddColumn 및 추가 버튼 disabled 양쪽에서 재사용
+     */
+    const isColumnValid = (p: Partial<TableColumnConfig> | null): boolean => {
+        if (!p?.cellType) return false;
+        if (p.cellType === 'actions') return true;
+        if (!p.header?.trim() && !p.headerMsgKey?.trim()) return false;
+        if (!p.accessor?.trim()) return false;
+        /* inlineEdit: 저장 경로 필수 */
+        if (p.cellType === 'inlineEdit' && !p.inlineEditFieldKey?.trim()) return false;
+        return true;
     };
 
     /** pendingCol → 실제 컬럼 추가 확정 */
     const confirmAddColumn = () => {
         const p = pendingCol;
-        if (!p?.cellType) return;
-        if (p.cellType !== 'actions' && ((!p.header?.trim() && !p.headerMsgKey?.trim()) || !p.accessor?.trim())) return;
+        /* null 체크 먼저 — isColumnValid 통과 후에는 p가 non-null 보장 */
+        if (!p?.cellType || !isColumnValid(p)) return;
 
         onChange({
             ...widget,
@@ -305,9 +323,13 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 detailPopupSlug:    p.cellType === 'actions' ? p.detailPopupSlug    : undefined,
                 editFileLayerSlug:  p.cellType === 'actions' ? p.editFileLayerSlug  : undefined,
                 detailFileLayerSlug:p.cellType === 'actions' ? p.detailFileLayerSlug: undefined,
-                /* text 전용 */
-                codeGroupCode: p.cellType === 'text' && p.codeGroupCode ? p.codeGroupCode : undefined,
-                displayAs:     p.cellType === 'text' && p.codeGroupCode ? p.displayAs     : undefined,
+                /* text / inlineEdit 공통 — 공통코드 연동 */
+                codeGroupCode: (p.cellType === 'text' || p.cellType === 'inlineEdit') && p.codeGroupCode ? p.codeGroupCode : undefined,
+                displayAs:     p.cellType === 'text' && p.codeGroupCode ? p.displayAs : undefined,
+                /* inlineEdit 전용 */
+                inlineEditType:     p.cellType === 'inlineEdit' ? (p.inlineEditType ?? 'toggle') : undefined,
+                options:            p.cellType === 'inlineEdit' ? p.options : undefined,
+                inlineEditFieldKey: p.cellType === 'inlineEdit' ? p.inlineEditFieldKey?.trim() : undefined,
             }],
         });
         setPendingCol(null);
@@ -329,6 +351,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} disabledActions={['copy']} />}
                 {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
                 {col.cellType === 'dateRangeStatus'  && <DateRangeStatusColumnField values={col} onChange={patch} />}
+                {col.cellType === 'inlineEdit'       && <InlineEditField            values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
             </div>
         );
     };
@@ -528,13 +551,18 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                     />
                                 )}
+                                {pendingCol.cellType === 'inlineEdit' && (
+                                    <InlineEditField
+                                        values={pendingCol}
+                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
+                                        codeGroups={codeGroups}
+                                        codeGroupsLoading={false}
+                                    />
+                                )}
 
-                                {/* 추가 확정 버튼 — i18nMode 시 headerMsgKey도 유효 입력으로 인정 */}
+                                {/* 추가 확정 버튼 — isColumnValid 공통 함수로 검증 */}
                                 <button onClick={confirmAddColumn}
-                                    disabled={pendingCol.cellType !== 'actions' && (
-                                        (!pendingCol.header?.trim() && !pendingCol.headerMsgKey?.trim()) ||
-                                        !pendingCol.accessor?.trim()
-                                    )}
+                                    disabled={!isColumnValid(pendingCol)}
                                     className="w-full py-1.5 text-[11px] font-semibold bg-slate-900 text-white rounded hover:bg-slate-700 disabled:opacity-40 transition-all">
                                     추가
                                 </button>

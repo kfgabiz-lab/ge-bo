@@ -72,6 +72,7 @@ export interface FieldEditValues {
     excelTableWidgetId?: string;          // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
     params?: string;                      // popup·path 연결 시 전달 파라미터 (예: depth=1,type=create)
     dataSaveSlug?: string;                // 데이터저장 연결 slug (connType='datasave' 전용)
+    saveConfirm?: boolean;                // 저장 컨펌 — true 시 live 모드 버튼 클릭 시 확인창 표시 (action-button 전용)
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부
@@ -107,6 +108,8 @@ export interface FieldEditValues {
     defaultEndDateOffset?: number;   // dateRange: 종료일 오늘 기준 N일 전
     defaultEndDate?: string;         // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
     disableEndPast?: boolean;        // dateRange: 종료일 이전 비활성화
+    maxRangeValue?: number;          // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
+    maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
     /** dateRange 통합 서브타입 — 날짜/년월/일시분초/시분초 (기본: 'date') */
     rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time';
     /** date 통합 서브타입 — 날짜/년월/일시분초 (기본: 'date') */

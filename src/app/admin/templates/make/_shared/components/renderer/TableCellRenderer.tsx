@@ -237,6 +237,119 @@ export function TableCellRenderer({
             return <span className="text-sm text-slate-600">{statusText}</span>;
         }
 
+        /* ── inlineEdit ── */
+        case 'inlineEdit': {
+            const editType = col.inlineEditType ?? 'toggle';
+            /* inlineEdit는 저장 경로(inlineEditFieldKey)가 표시값 경로와 동일해야 함
+             * accessor가 다르게 설정된 경우에도 inlineEditFieldKey로 현재 값을 읽음 */
+            const inlineValue = col.inlineEditFieldKey
+                ? resolveAccessor(row, col.inlineEditFieldKey)
+                : value;
+
+            /* 옵션 파싱: "텍스트|값" 형식 → { text, value } 배열 */
+            const opts = (col.options ?? []).map(o => {
+                const [text, val] = o.split('|');
+                return { text: text?.trim() ?? o, value: val?.trim() ?? o };
+            });
+
+            /* 공통코드 연동 옵션 */
+            const codeDetails = col.codeGroupCode
+                ? (codeGroups?.find(g => g.groupCode === col.codeGroupCode)?.details ?? [])
+                : [];
+            const resolvedOpts = codeDetails.length > 0
+                ? codeDetails.map(d => ({ text: d.name, value: d.code }))
+                : opts;
+
+            /* ── 토글 ── */
+            if (editType === 'toggle') {
+                const boolVal = isPreview ? (rowIndex % 2 === 0) : Boolean(value);
+                return (
+                    <button
+                        type="button"
+                        onClick={!isPreview && col.inlineEditFieldKey
+                            ? () => handlers?.onInlineEdit?.(row._id as number, col.inlineEditFieldKey!, !boolVal)
+                            : undefined}
+                        className={`relative w-9 h-5 rounded-full transition-colors ${boolVal ? 'bg-slate-900' : 'bg-slate-300'} ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}
+                    >
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${boolVal ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
+                );
+            }
+
+            /* ── 라디오 ── */
+            if (editType === 'radio') {
+                const currentVal = isPreview ? (resolvedOpts[rowIndex % Math.max(resolvedOpts.length, 1)]?.value ?? '') : String(value ?? '');
+                if (!resolvedOpts.length) return <span className="text-slate-400 text-xs">옵션 없음</span>;
+                return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {resolvedOpts.map(opt => (
+                            <label key={opt.value} className={`flex items-center gap-1 ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}>
+                                <input
+                                    type="radio"
+                                    checked={currentVal === opt.value}
+                                    onChange={!isPreview && col.inlineEditFieldKey
+                                        ? () => handlers?.onInlineEdit?.(row._id as number, col.inlineEditFieldKey!, opt.value)
+                                        : undefined}
+                                    disabled={isPreview}
+                                    className="w-3 h-3 accent-slate-900"
+                                />
+                                <span className="text-xs text-slate-700">{opt.text}</span>
+                            </label>
+                        ))}
+                    </div>
+                );
+            }
+
+            /* ── 체크박스 ── */
+            if (editType === 'checkbox') {
+                /* 체크박스: 단일 boolean처럼 동작 (옵션 없으면) 또는 다중 배열 */
+                if (!resolvedOpts.length) {
+                    const boolVal = isPreview ? (rowIndex % 2 === 0) : Boolean(value);
+                    return (
+                        <input
+                            type="checkbox"
+                            checked={boolVal}
+                            onChange={!isPreview && col.inlineEditFieldKey
+                                ? () => handlers?.onInlineEdit?.(row._id as number, col.inlineEditFieldKey!, !boolVal)
+                                : undefined}
+                            disabled={isPreview}
+                            className="w-4 h-4 accent-slate-900"
+                        />
+                    );
+                }
+                /* 다중 선택: 저장값은 배열 */
+                const selectedVals: string[] = isPreview
+                    ? [resolvedOpts[rowIndex % resolvedOpts.length]?.value ?? '']
+                    : (Array.isArray(value) ? (value as string[]) : []);
+                return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {resolvedOpts.map(opt => {
+                            const checked = selectedVals.includes(opt.value);
+                            return (
+                                <label key={opt.value} className={`flex items-center gap-1 ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={!isPreview && col.inlineEditFieldKey ? () => {
+                                            const next = checked
+                                                ? selectedVals.filter(v => v !== opt.value)
+                                                : [...selectedVals, opt.value];
+                                            handlers?.onInlineEdit?.(row._id as number, col.inlineEditFieldKey!, next);
+                                        } : undefined}
+                                        disabled={isPreview}
+                                        className="w-3 h-3 accent-slate-900"
+                                    />
+                                    <span className="text-xs text-slate-700">{opt.text}</span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                );
+            }
+
+            return null;
+        }
+
         /* ── text (default) ── */
         default: {
             if (isPreview) {

@@ -205,6 +205,17 @@ const SAMPLE_TABLE: TableWidget = {
             beforeText: '예정', inRangeText: '진행중', afterText: '종료',
         },
         {
+            id: 'c8', header: '사용여부', accessor: 'active',
+            align: 'center', sortable: false, cellType: 'inlineEdit',
+            inlineEditType: 'toggle', inlineEditFieldKey: 'active',
+        },
+        {
+            id: 'c9', header: '상태', accessor: 'status',
+            align: 'center', sortable: false, cellType: 'inlineEdit',
+            inlineEditType: 'radio', inlineEditFieldKey: 'status',
+            options: ['진행중|ing', '완료|done', '취소|cancel'],
+        },
+        {
             id: 'c6', header: '관리',   accessor: '_actions',
             align: 'center', sortable: false, cellType: 'actions',
             actions: ['edit', 'delete'],

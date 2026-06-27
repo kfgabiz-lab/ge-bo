@@ -77,6 +77,7 @@ export interface SearchFieldConfig {
     contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
     goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
     dataSaveSlug?: string;                   // 데이터저장 연결 slug (connType='datasave' 전용)
+    saveConfirm?: boolean;                   // 저장 컨펌 여부 — true 시 버튼 클릭 시 확인창 표시 (action-button 전용)
     isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
     readonly?: boolean;             // 읽기 전용 여부 (Form 전용)
     // ── 파일/이미지/비디오 전용 ──
@@ -102,6 +103,8 @@ export interface SearchFieldConfig {
     defaultEndDateOffset?: number;  // dateRange: 종료일 오늘 기준 N일 전
     defaultEndDate?: string;        // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
     disableEndPast?: boolean;       // dateRange: 종료일 이전 비활성화
+    maxRangeValue?: number;         // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
+    maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
     /* ── category 전용 ── */
     dbSlug?: string;                // 연결할 카테고리 slug (slugOptions 선택)
     relationSlugId?: number;        // 연동 slug-relation ID
@@ -190,7 +193,7 @@ export interface CodeGroupDef {
 /* ── 테이블 컬럼 관련 타입 ── */
 
 /** 셀 렌더링 타입 */
-export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date' | 'dateRangeStatus';
+export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date' | 'dateRangeStatus' | 'inlineEdit';
 
 /** 셀 옵션 (badge용) */
 export interface CellOption {
@@ -259,6 +262,10 @@ export interface TableColumnConfig {
     afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
     afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
     relationSlugId?: number;        // 연동 slug-relation ID (FETCH 카테고리 연동)
+    /* ── inlineEdit 전용 ── */
+    inlineEditType?: 'toggle' | 'checkbox' | 'radio'; // 즉시 수정 UI 타입
+    options?: string[];             // 수동 입력 옵션 목록 ("텍스트|값" 형식, radio/checkbox 전용)
+    inlineEditFieldKey?: string;    // 저장 경로 (dot notation, 예: form1.active) — 필수 입력
 }
 
 /** 불러오기 목록 아이템 */

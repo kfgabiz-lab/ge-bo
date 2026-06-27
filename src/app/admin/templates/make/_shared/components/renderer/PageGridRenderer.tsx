@@ -81,7 +81,7 @@ interface PageGridRendererProps {
     formValuesMap?: Record<string, Record<string, string>>;
     /** (widgetId, fieldId, value) 형태로 호출 */
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, resolvedFormValuesMap?: Record<string, Record<string, string>>) => void;
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string) => void;
 
     /* live 모드 전용 — 테이블 */
@@ -247,21 +247,35 @@ export function PageGridRenderer({
 
     /* crossTabFormValues를 formValuesMap에 병합 — 다른 탭에서 생성된 값을 현재 탭 폼에 주입
      * crossTabFormValues 키는 fieldKey("form3.title" 등) 형태
-     * → allFieldKeyToId로 fieldId로 변환 후 fieldIdToWidgetId로 widgetId 매핑 */
+     * → allFieldKeyToId로 fieldId로 변환 후 fieldIdToWidgetId로 widgetId 매핑
+     *
+     * 병합 규칙:
+     * 1. formValuesMap에 없는 widgetId라도 crossTab 값이 있으면 merged에 포함
+     * 2. formValuesMap 값이 비어있으면("") crossTab 자동생성 값 우선 사용
+     * 3. formValuesMap 값이 실제로 입력된 경우(비어있지 않음)만 vals 우선
+     */
     const mergedFormValuesMap = useMemo(() => {
         if (!crossTabFormValues || Object.keys(crossTabFormValues).length === 0) return formValuesMap;
-        const merged: Record<string, Record<string, string>> = {};
-        Object.entries(formValuesMap ?? {}).forEach(([wid, vals]) => {
-            const extra: Record<string, string> = {};
-            Object.entries(crossTabFormValues).forEach(([fieldKey, val]) => {
-                /* fieldKey → fieldId 변환 (현재 탭의 allFieldKeyToId 기준) */
-                const targetFieldId = allFieldKeyToId[fieldKey];
-                if (targetFieldId && fieldIdToWidgetId[targetFieldId] === wid) {
-                    extra[targetFieldId] = val;
-                }
-            });
-            merged[wid] = { ...vals, ...extra };
+
+        /* formValuesMap 기반으로 시작 (기존 widgetId 모두 포함) */
+        const merged: Record<string, Record<string, string>> = { ...(formValuesMap ?? {}) };
+
+        /* crossTabFormValues 전체 순회 — widgetId가 merged에 없어도 추가 */
+        Object.entries(crossTabFormValues).forEach(([fieldKey, crossVal]) => {
+            const targetFieldId = allFieldKeyToId[fieldKey];
+            if (!targetFieldId) return;
+            const widgetId = fieldIdToWidgetId[targetFieldId];
+            if (!widgetId) return;
+
+            const currentVals = merged[widgetId] ?? {};
+            const existingVal = currentVals[targetFieldId];
+
+            /* formValuesMap에 실제 입력 값이 있으면 보호, 없거나 빈값이면 crossTab 값 사용 */
+            if (!existingVal || existingVal === '') {
+                merged[widgetId] = { ...currentVals, [targetFieldId]: crossVal };
+            }
         });
+
         return merged;
     }, [formValuesMap, crossTabFormValues, allFieldKeyToId, fieldIdToWidgetId]);
 
@@ -368,7 +382,7 @@ export function PageGridRenderer({
                                         allFormValues={allFormValues}
                                         allFieldKeyToId={allFieldKeyToId}
                                         urlParams={urlParams}
-                                        onContentAction={onContentAction}
+                                        onContentAction={(widgetIds, action, goBack) => onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap)}
                                         onDataSave={onDataSave}
                                         onClose={onClose}
                                         /* SubList */

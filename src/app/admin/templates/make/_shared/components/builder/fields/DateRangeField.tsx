@@ -227,6 +227,43 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                     <ToggleRow label="" value={values.disableEndPast ?? false} onChange={v => onChange({ disableEndPast: v || undefined })} />
                 </div>
             </div>
+
+            {/* 최대 조회 기간 — 검색 시 범위 초과 방지 (0 또는 미설정 시 제한 없음) */}
+            <div className="space-y-1.5 pt-1.5 border-t border-slate-100">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">최대 조회 기간</p>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className={LABEL_CLS}>
+                            기간 <span className="text-slate-300 font-normal">(선택)</span>
+                        </label>
+                        {/* INPUT_CLS 재사용 — 셀 전체 너비를 채워야 하므로 좁은 INPUT_NUM_CLS 대신 사용 */}
+                        <input
+                            type="number"
+                            min={0}
+                            value={values.maxRangeValue ?? ''}
+                            onChange={e => {
+                                const n = Number(e.target.value) || 0;
+                                onChange({ maxRangeValue: n > 0 ? n : undefined });
+                            }}
+                            className={INPUT_CLS}
+                        />
+                    </div>
+                    <div>
+                        <label className={LABEL_CLS}>단위</label>
+                        {/* INPUT_CLS 기존 상수 재사용 */}
+                        <select
+                            value={values.maxRangeUnit ?? 'day'}
+                            onChange={e => onChange({ maxRangeUnit: e.target.value as 'day' | 'week' | 'month' | 'year' })}
+                            className={INPUT_CLS}
+                        >
+                            <option value="day">일</option>
+                            <option value="week">주</option>
+                            <option value="month">월</option>
+                            <option value="year">년</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

@@ -270,6 +270,15 @@ interface WidgetRendererProps {
     } | null;
 }
 
+/** dot notation으로 중첩 필드 값 업데이트 (inlineEdit 낙관적 업데이트용) */
+function applyDotField(obj: Record<string, unknown>, key: string, value: unknown): Record<string, unknown> {
+    const idx = key.indexOf('.');
+    if (idx === -1) return { ...obj, [key]: value };
+    const head = key.slice(0, idx);
+    const tail = key.slice(idx + 1);
+    return { ...obj, [head]: applyDotField((obj[head] as Record<string, unknown>) ?? {}, tail, value) };
+}
+
 export function WidgetRenderer({
     mode,
     widget,
@@ -350,6 +359,10 @@ export function WidgetRenderer({
     const [popupListSlug,        setPopupListSlug]        = useState('');
     /* 카테고리 팝업 저장 후 목록 재조회용 — 증가할 때마다 CategoryRenderer가 fetchItems 호출 */
     const [categoryRefreshTick,  setCategoryRefreshTick]  = useState(0);
+
+    /* inlineEdit 낙관적 업데이트 — tableData prop 동기화 + 즉시 반영 */
+    const [localTableData, setLocalTableData] = useState<Record<string, unknown>[] | undefined>(tableData);
+    useEffect(() => { setLocalTableData(tableData); }, [tableData]);
 
     /* 팝업 폼 필드값 — widgetId → { fieldId: 값 } (page 모드 formValuesMap과 동일 구조) */
     const [popupFormValuesMap,   setPopupFormValuesMap]   = useState<Record<string, Record<string, string>>>({});
@@ -1281,6 +1294,27 @@ export function WidgetRenderer({
                 }
                 handlers?.onFileClick?.(col, row);
             },
+            /* inlineEdit 셀 즉시 수정 — PATCH /{id}/field API 호출 */
+            onInlineEdit: handlers?.onInlineEdit ?? (mode === 'live' && connectedSlug
+                ? async (id: number, fieldKey: string, value: unknown) => {
+                    try {
+                        await api.patch(`/page-data/${connectedSlug}/${id}/field`, { fieldKey, value });
+                        /* 낙관적 업데이트 — 서버 재조회 전 즉시 UI 반영
+                         * buildTableRow가 root에 flat 병합한 값도 함께 업데이트 (accessor 읽기 일치) */
+                        const lastKey = fieldKey.includes('.') ? fieldKey.split('.').pop()! : fieldKey;
+                        setLocalTableData(prev => prev?.map(row => {
+                            if ((row as { _id?: number })._id !== id) return row;
+                            const updated = applyDotField(row as Record<string, unknown>, fieldKey, value);
+                            return { ...updated, [lastKey]: value };
+                        }));
+                        onRefresh?.();
+                    } catch (e) {
+                        console.error('[inlineEdit] 오류:', e);
+                        toast.error('수정 중 오류가 발생했습니다.');
+                    }
+                }
+                : undefined
+            ),
         };
 
         return (
@@ -1295,7 +1329,7 @@ export function WidgetRenderer({
                     onRowsSelect={onRowsSelect}
                     pageSize={widget.pageSize}
                     displayMode={widget.displayMode}
-                    data={tableData}
+                    data={localTableData}
                     isLoading={tableLoading}
                     sortKey={sortKey}
                     sortDir={sortDir}

@@ -525,6 +525,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */
                                                                                 rangeSubType:           field.rangeSubType ?? (field.type === 'yearMonthRange' ? 'yearMonth' : undefined),
                                                                                 singleDateRange:        field.singleDateRange,
+                                                                                maxRangeValue:          field.maxRangeValue,
+                                                                                maxRangeUnit:           field.maxRangeUnit,
                                                                                 /* category 전용 */
                                                                                 dbSlug:            field.dbSlug,
                                                                                 relationSlugId:    field.relationSlugId,

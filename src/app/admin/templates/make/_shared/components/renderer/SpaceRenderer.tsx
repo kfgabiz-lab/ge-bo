@@ -63,6 +63,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
     /** action-button 클릭 핸들러 — connType에 따라 동작 분기 */
     const handleButtonClick = (field: SearchFieldConfig) => {
         if (mode === 'preview') return;
+        /* 저장 컨펌 토글 활성화 시 — 사용자 확인 후 취소 시 중단 */
+        if (field.saveConfirm && !window.confirm('저장 하시겠습니까?')) return;
         /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
         if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
             onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction);

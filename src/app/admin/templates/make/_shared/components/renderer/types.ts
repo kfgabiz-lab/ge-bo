@@ -320,6 +320,8 @@ export interface TableActionHandlers {
     onFileClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
     /** 행 선택 변경 — 선택된 행 ID 배열 전달 (enableRowSelection=true 전용) */
     onRowsSelect?: (selectedIds: number[]) => void;
+    /** inlineEdit 셀 즉시 수정 — row id, 필드 경로, 새 값 전달 */
+    onInlineEdit?: (id: number, fieldKey: string, value: unknown) => void;
 }
 
 /** 검색폼 핸들러 (live 모드 전용) */

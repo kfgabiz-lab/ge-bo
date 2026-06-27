@@ -459,6 +459,18 @@ export function buildDataJson(
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
 
+    /* 현재 저장 대상 위젯들의 contentKey 집합 — cross-tab generationKey 판별용
+     * 첫 세그먼트가 이 집합에 없으면 다른 탭 참조(cross-tab) → 저장 단계에서 skip */
+    const currentContentKeys = new Set(
+        widgets.map(w => w.contentKey).filter((k): k is string => !!k)
+    );
+    /* generationKey의 첫 세그먼트가 현재 저장 대상 contentKey가 아니면 cross-tab으로 판별 */
+    const isCrossTabKey = (generationKey: string): boolean => {
+        if (!generationKey.includes('.')) return false;
+        if (currentContentKeys.size === 0) return false;
+        return !currentContentKeys.has(generationKey.split('.')[0]);
+    };
+
     for (const w of widgets) {
         if (w.type === 'form') {
             const rawValues = formValuesMap[w.widgetId ?? ''] ?? {};
@@ -502,8 +514,9 @@ export function buildDataJson(
                 if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
                 const sourceValue = rawValues[f.id] ?? '';
 
-                /* 단일 generationKey 처리 (기존 호환) */
-                if (f.generationKey) {
+                /* 단일 generationKey 처리 (기존 호환)
+                 * cross-tab 참조(다른 탭 contentKey)는 UI에서 이미 반영되므로 저장 단계에서 skip */
+                if (f.generationKey && !isCrossTabKey(f.generationKey)) {
                     const transformed = applyDataGeneration(sourceValue, f.dataReplacement, f.caseChange, f.appendText, f.truncateLength);
                     writeToGenerationPath(dataJson, f.generationKey, transformed);
                 }
@@ -511,6 +524,16 @@ export function buildDataJson(
                 /* 다중 dataGenerations 배열 처리 */
                 (f.dataGenerations ?? []).forEach(dg => {
                     if (!dg.generationKey) return;
+                    /* cross-tab 참조는 저장 단계에서 skip — UI(crossTabFormValues 경로)에서 이미 반영됨 */
+                    if (isCrossTabKey(dg.generationKey)) return;
+                    /* onlyIfEmpty=true이고 같은 폼 내 대상 필드가 이미 값 있으면 저장도 건너뜀 */
+                    if (dg.onlyIfEmpty) {
+                        const targetField = (w.fields ?? []).find(f2 => f2.fieldKey === dg.generationKey);
+                        if (targetField) {
+                            const currentVal = rawValues[targetField.id] ?? '';
+                            if (currentVal !== '') return;
+                        }
+                    }
                     const transformed = applyDataGeneration(sourceValue, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength, dg.stripHtml);
                     writeToGenerationPath(dataJson, dg.generationKey, transformed);
                 });
@@ -1028,4 +1051,48 @@ export async function saveTableRows(opts: {
         savedCount++;
     }
     return savedCount;
+}
+
+/**
+ * dateRange 최대 조회 기간 검증 — 검색 실행 전 호출
+ * maxRangeValue 미설정 필드는 건너뜀 (기존 동작 유지)
+ * yearMonth 타입(YYYY-MM)은 1일로 보정 후 비교
+ *
+ * @example if (!validateSearchDateRange(searchFields, searchValues)) return;
+ */
+export function validateSearchDateRange(
+    fields: import('./types').SearchFieldConfig[],
+    searchValues: Record<string, string>,
+): boolean {
+    for (const f of fields) {
+        if ((f.type !== 'dateRange' && f.type !== 'yearMonthRange') || !f.maxRangeValue) continue;
+        const from = searchValues[f.id + '_from'];
+        const to   = searchValues[f.id + '_to'];
+        if (!from || !to) continue;
+
+        /* yearMonth(YYYY-MM)은 해당 월 1일로 보정 */
+        const fromDate = new Date(from.length === 7 ? from + '-01' : from);
+        const toDate   = new Date(to.length   === 7 ? to   + '-01' : to);
+        const unit  = f.maxRangeUnit ?? 'day';
+        const label = f.label || '날짜 범위';
+
+        /* month/year: toDate 기준 N개월/년 전 날짜와 fromDate 비교 */
+        if (unit === 'month' || unit === 'year') {
+            const limit = new Date(toDate);
+            if (unit === 'month') limit.setMonth(limit.getMonth() - f.maxRangeValue);
+            else limit.setFullYear(limit.getFullYear() - f.maxRangeValue);
+            if (fromDate < limit) {
+                toast.warning(`'${label}' 최대 ${f.maxRangeValue}${unit === 'month' ? '개월' : '년'} 이내로 조회하세요.`);
+                return false;
+            }
+        } else {
+            /* day/week: ms 차이 비교 */
+            const maxMs = f.maxRangeValue * (unit === 'week' ? 7 : 1) * 86400000;
+            if (toDate.getTime() - fromDate.getTime() > maxMs) {
+                toast.warning(`'${label}' 최대 ${f.maxRangeValue}${unit === 'week' ? '주' : '일'} 이내로 조회하세요.`);
+                return false;
+            }
+        }
+    }
+    return true;
 }

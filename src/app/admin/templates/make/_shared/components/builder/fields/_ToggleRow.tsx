@@ -17,7 +17,7 @@ interface ToggleRowProps {
 export function ToggleRow({ label, value, onChange }: ToggleRowProps) {
     return (
         <div className="flex items-center justify-between px-1 py-1">
-            <span className="text-[10px] font-medium text-slate-500">{label}</span>
+            <span className="text-[10px] font-medium text-slate-500 whitespace-nowrap">{label}</span>
             <button
                 type="button"
                 onClick={() => onChange(!value)}

@@ -23,7 +23,7 @@
  *   />
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import type { FormFieldItem } from '../builder/FormBuilder';
 import type { RendererMode } from './types';
 import { FieldRenderer } from './FieldRenderer';
@@ -147,6 +147,12 @@ export function FormRenderer({
     const shouldDisable = (f: FormFieldItem): boolean =>
         !isPreview && !!f.disableCondition && evalCondition(f.disableCondition);
 
+    /* 페이지 최초 로드 시 값을 저장 — onlyIfEmpty 체크 기준
+     * 신규 등록: 초기값 모두 "" → 항상 반영 (연속 타이핑 가능)
+     * 편집 모드: 초기값이 있는 필드 → 소스 변경해도 skip (기존값 보호) */
+    const initialValuesRef = useRef<Record<string, string>>(values);
+    const initialAllFormValuesRef = useRef<Record<string, string> | undefined>(allFormValues);
+
     /**
      * 필드값 변경 핸들러 — generationKey 설정 시 대상 필드에 변환값 자동 입력
      * - generationKey 마지막 '.' 이후 세그먼트 = 대상 fieldKey
@@ -196,24 +202,23 @@ export function FormRenderer({
             const targetFieldId = resolveTargetFieldId(dg.generationKey);
             const transformed = applyDataGeneration(value, dg.dataReplacement, dg.caseChange, dg.appendText, dg.truncateLength, dg.stripHtml);
             if (targetFieldId && targetFieldId !== fieldId) {
-                /* onlyIfEmpty=true면 대상 필드가 빈값일 때만 반영 */
+                /* onlyIfEmpty=true: 초기값 기준 체크 — 신규 등록은 연속 반영, 편집 모드는 기존값 보호 */
                 if (dg.onlyIfEmpty) {
-                    const currentVal = values[targetFieldId] ?? allFormValues?.[targetFieldId] ?? '';
-                    if (currentVal !== '') return;
+                    const initialVal = initialValuesRef.current[targetFieldId] ?? initialAllFormValuesRef.current?.[targetFieldId] ?? '';
+                    if (initialVal !== '') return;
                 }
                 dispatchValue(targetFieldId, transformed);
             } else if (!targetFieldId) {
                 /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
                 if (dg.onlyIfEmpty) {
-                    /* generationKey는 fieldKey — allFieldKeyToId로 fieldId 변환 후 allFormValues 조회 */
                     const crossFieldId = allFieldKeyToId?.[dg.generationKey];
-                    const currentVal = (crossFieldId ? allFormValues?.[crossFieldId] : undefined) ?? '';
-                    if (currentVal !== '') return;
+                    const initialCrossVal = (crossFieldId ? initialAllFormValuesRef.current?.[crossFieldId] : undefined) ?? '';
+                    if (initialCrossVal !== '') return;
                 }
                 onChangeAllFormValues?.(dg.generationKey, transformed);
             }
         });
-    }, [fields, keyToId, allFieldKeyToId, values, allFormValues, onChangeValues, onChangeAllFormValues]);
+    }, [fields, keyToId, allFieldKeyToId, onChangeValues, onChangeAllFormValues]);
 
 
     if (!fields.length) {

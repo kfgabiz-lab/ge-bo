@@ -19,7 +19,7 @@ import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition } from "../utils";
+import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition, validateSearchDateRange } from "../utils";
 import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
@@ -678,6 +678,11 @@ export function useWidgetPageState(
     (searchWidgetId: string) => {
       const fieldsMap = buildSearchFieldsMap(widgetItems);
       const sv = searchValuesRef.current;
+
+      /* dateRange 최대 조회 기간 검증 — 초과 시 API 호출 차단 */
+      const searchFields = fieldsMap[searchWidgetId] ?? [];
+      if (!validateSearchDateRange(searchFields, sv)) return;
+
       flatWidgets(widgetItems).forEach((w) => {
         if (w.type !== "table") return;
         if (!(w as TableWidget).connectedSearchIds.includes(searchWidgetId)) return;
@@ -846,7 +851,10 @@ export function useWidgetPageState(
       connectedContentWidgetIds: string[],
       action: "save" | "delete",
       goBackAfterAction?: boolean,
+      resolvedFormValuesMap?: Record<string, Record<string, string>>,
     ) => {
+      /* resolvedFormValuesMap: PageGridRenderer가 crossTab 값 병합 후 전달 — 없으면 내부 formValuesMap 사용 */
+      const mapToUse = resolvedFormValuesMap ?? formValuesMap;
       const allFlat = flatWidgets(widgetItems);
 
       /* 대상 위젯 수집 — form / sublist / multiselect */
@@ -902,7 +910,7 @@ export function useWidgetPageState(
         /* ── SAVE ── */
 
         /* 유효성 검사 — cross-form hideCondition 평가를 위해 전체 values/keyToId 통합 구성 */
-        const allFormValues = Object.assign({}, ...Object.values(formValuesMap)) as Record<string, string>;
+        const allFormValues = Object.assign({}, ...Object.values(mapToUse)) as Record<string, string>;
         const allFieldKeyToId: Record<string, string> = {};
         flatWidgets(widgetItems)
           .filter(w => w.type === 'form')
@@ -922,7 +930,7 @@ export function useWidgetPageState(
           if (
             !validateFormFields(
               fw.fields,
-              formValuesMap[fw.widgetId] ?? {},
+              mapToUse[fw.widgetId] ?? {},
               fileValuesMap[fw.widgetId] ?? {},
               existingFileMetaMap[fw.widgetId] ?? {},
               allFormValues,
@@ -1028,7 +1036,7 @@ export function useWidgetPageState(
           /* 5. dataJson 구성 */
           const { dataJson, pkKeys } = buildDataJson(
             widgets as Parameters<typeof buildDataJson>[0],
-            formValuesMap,
+            mapToUse,
             formFileIdsMap,
             processedSubListRowsMap,
             multiSelectMap,
