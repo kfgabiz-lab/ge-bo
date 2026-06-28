@@ -227,6 +227,11 @@ export function useWidgetPageState(
           }
           const val = sv[f.id];
           if (!val || !val.trim()) return;
+          /* category + relationSlugId: FILTER slug_relation 파라미터 */
+          if (f.type === 'category' && f.relationSlugId) {
+            params[`rel_${f.relationSlugId}`] = val;
+            return;
+          }
           /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
           if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
             params[`drs_${f.linkedDateRangeKey}`] = val;
@@ -1424,6 +1429,11 @@ export function useWidgetPageState(
       }
       const val = searchValues[f.id];
       if (!val || !val.trim()) return;
+      /* category + relationSlugId: FILTER slug_relation 파라미터 */
+      if (f.type === 'category' && f.relationSlugId) {
+        params[`rel_${f.relationSlugId}`] = val;
+        return;
+      }
       if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
         params[`drs_${f.linkedDateRangeKey}`] = val;
       } else {

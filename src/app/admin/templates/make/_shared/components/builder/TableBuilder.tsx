@@ -58,7 +58,6 @@ export interface TableWidget {
     columns: TableColumnConfig[];           /* List 빌더와 동일한 컬럼 타입 */
     connectedSearchIds: string[];           /* 연결된 Search 위젯 widgetId 목록 */
     connectedSlug?: string;                 /* DB Slug — 데이터 API 호출 대상 */
-    fetchRelationId?: number;               /* FETCH 연동 slug-relation ID */
     pageSize: number;
     displayMode: DisplayMode;              /* 표시 방식 (pagination | scroll) */
     /** 행 다중선택 체크박스 표시 여부 (기본 false) */
@@ -387,35 +386,16 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 />
             </div>
 
-            {/* 페이지당 건수 | 연동 Slug — 2열 그리드 */}
-            <div className="grid grid-cols-2 gap-2">
-                <div>
-                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
-                    {(widget.displayMode ?? 'pagination') === 'pagination' ? (
-                        <input type="number" min={5} max={100} value={widget.pageSize}
-                            onChange={e => onChange({ ...widget, pageSize: Number(e.target.value) || 10 })}
-                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
-                    ) : (
-                        <span className="text-[10px] text-slate-400 italic">스크롤 모드</span>
-                    )}
-                </div>
-                <div>
-                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">연동 Slug</label>
-                    <select
-                        value={widget.fetchRelationId ?? ''}
-                        onChange={e => onChange({ ...widget, fetchRelationId: e.target.value ? Number(e.target.value) : undefined })}
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
-                    >
-                        <option value="">연동 없음</option>
-                        {allSlugRelations.map(r => (
-                            <option key={r.id} value={r.id}>
-                                {r.description
-                                    ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
-                                    : `${r.masterSlug} → ${r.slaveSlug}`}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+            {/* 페이지당 건수 */}
+            <div>
+                <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
+                {(widget.displayMode ?? 'pagination') === 'pagination' ? (
+                    <input type="number" min={5} max={100} value={widget.pageSize}
+                        onChange={e => onChange({ ...widget, pageSize: Number(e.target.value) || 10 })}
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
+                ) : (
+                    <span className="text-[10px] text-slate-400 italic">스크롤 모드</span>
+                )}
             </div>
 
             {/* 체크박스 */}
