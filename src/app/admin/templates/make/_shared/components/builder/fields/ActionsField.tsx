@@ -17,6 +17,7 @@ import { Plus, X } from 'lucide-react';
 import { TemplateItem, EditPageRule } from '../../../types';
 import { createIdGenerator, getTemplateLabel } from '../../../utils';
 import { ColEditProps } from './col-types';
+import { SlugSelectField } from './SlugSelectField';
 
 /* 수정 버튼 페이지 이동 규칙 고유 ID 생성기 */
 const epUid = createIdGenerator('tb-ep');
@@ -113,43 +114,57 @@ export function ActionsField({ values, onChange, layerTemplates, onRequestLayerT
                     </div>
                     {/* 수정 체크 시 페이지 이동 규칙 목록 */}
                     {action === 'edit' && presetActions.includes('edit') && editPageRules.map(rule => (
-                            <div key={rule.id} className="ml-5 space-y-1">
-                                {/* 1행: connType select + 페이지 슬러그 select + 이동 파라미터 input */}
-                                <div className="flex items-center gap-1">
-                                    <select
-                                        value={rule.connType ?? 'page'}
-                                        onChange={e => updateEditPageRule(rule.id, { connType: e.target.value as 'page' | 'popup' })}
-                                        className="w-14 shrink-0 text-[10px] border border-slate-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:border-slate-900">
-                                        <option value="page">페이지</option>
-                                        <option value="popup">팝업</option>
-                                    </select>
-                                    <select
-                                        value={rule.pageSlug}
-                                        onChange={e => updateEditPageRule(rule.id, { pageSlug: e.target.value })}
-                                        className="flex-1 min-w-0 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:border-slate-900">
-                                        <option value="">슬러그 없음</option>
-                                        {layerTemplates.map(t => <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>)}
-                                    </select>
-                                    <input
-                                        type="text"
-                                        value={rule.conditionParam}
-                                        onChange={e => updateEditPageRule(rule.id, { conditionParam: e.target.value })}
-                                        placeholder="이동조건 (예: title=1)"
-                                        className="w-20 shrink-0 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
-                                    />
+                            <div key={rule.id} className="ml-5 space-y-1.5">
+                                {/* 1행: 페이지(connType) | page slug — 2열 그리드 */}
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <div>
+                                        <label className="text-[10px] font-medium text-slate-500 mb-0.5 block">페이지</label>
+                                        <select
+                                            value={rule.connType ?? 'page'}
+                                            onChange={e => updateEditPageRule(rule.id, { connType: e.target.value as 'page' | 'popup' })}
+                                            className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 bg-white focus:outline-none focus:border-slate-900"
+                                        >
+                                            <option value="page">페이지</option>
+                                            <option value="popup">팝업</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <SlugSelectField
+                                            label="page slug"
+                                            value={rule.pageSlug}
+                                            onChange={slug => updateEditPageRule(rule.id, { pageSlug: slug })}
+                                            slugOptions={layerTemplates}
+                                            emptyLabel="슬러그 없음"
+                                        />
+                                    </div>
                                 </div>
-                                {/* 2행: 전달 파라미터 input + x 버튼 */}
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type="text"
-                                        value={rule.passParam}
-                                        onChange={e => updateEditPageRule(rule.id, { passParam: e.target.value })}
-                                        placeholder="전달 파라미터 (예: id,title=abc)"
-                                        className="flex-1 text-[10px] border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-slate-900"
-                                    />
+                                {/* 2행: 이동조건 | 전달파라미터 + x 버튼 — 2열 그리드 */}
+                                <div className="flex items-end gap-1.5">
+                                    <div className="grid grid-cols-2 gap-1.5 flex-1">
+                                        <div>
+                                            <label className="text-[10px] font-medium text-slate-500 mb-0.5 block">이동조건</label>
+                                            <input
+                                                type="text"
+                                                value={rule.conditionParam}
+                                                onChange={e => updateEditPageRule(rule.id, { conditionParam: e.target.value })}
+                                                placeholder="예: title=1"
+                                                className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-slate-900"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-medium text-slate-500 mb-0.5 block">전달파라미터</label>
+                                            <input
+                                                type="text"
+                                                value={rule.passParam}
+                                                onChange={e => updateEditPageRule(rule.id, { passParam: e.target.value })}
+                                                placeholder="예: id,title=abc"
+                                                className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-slate-900"
+                                            />
+                                        </div>
+                                    </div>
                                     <button
                                         onClick={e => { e.stopPropagation(); removeEditPageRule(rule.id); }}
-                                        className="text-slate-300 hover:text-red-400 transition-all"
+                                        className="text-slate-300 hover:text-red-400 transition-all pb-1.5"
                                         title="규칙 삭제"
                                     >
                                         <X className="w-3 h-3" />

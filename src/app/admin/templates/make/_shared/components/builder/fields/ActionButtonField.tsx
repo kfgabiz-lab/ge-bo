@@ -346,16 +346,13 @@ export function ActionButtonField({
                     {/* 페이지 — Quick-Detail 템플릿 선택 (팝업/상세 구분 표시) */}
                     {connType === 'popup' && (
                         <div className="space-y-1">
-                            <select
+                            <SlugSelectField
+                                hideLabel
                                 value={values.popupSlug ?? ''}
-                                onChange={e => onChange({ popupSlug: e.target.value || undefined })}
-                                className={SELECT_CLS}
-                            >
-                                <option value="">— 페이지 선택 —</option>
-                                {pageTemplates.map(t => (
-                                    <option key={t.id} value={t.slug}>{getTemplateLabel(t)} ({t.slug})</option>
-                                ))}
-                            </select>
+                                onChange={slug => onChange({ popupSlug: slug || undefined })}
+                                slugOptions={pageTemplates}
+                                emptyLabel="— 페이지 선택 —"
+                            />
                             {/* 연결 페이지가 선택된 경우에만 파라미터 입력란 노출 */}
                             {values.popupSlug && (
                                 <div className="space-y-0.5">

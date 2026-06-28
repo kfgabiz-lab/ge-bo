@@ -202,16 +202,13 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                     {/* 페이지 선택 — 남은 너비 채움 */}
                     {widget.createConnType === 'popup' && (
                         <div className="flex-1 min-w-0">
-                            <select
+                            <SlugSelectField
+                                hideLabel
                                 value={widget.createPopupSlug ?? ''}
-                                onChange={e => onChange({ ...widget, createPopupSlug: e.target.value || undefined })}
-                                className={INPUT_CLS}
-                            >
-                                <option value="">— 페이지 선택 —</option>
-                                {pageTemplates.map(t => (
-                                    <option key={t.id} value={t.slug}>{t.name} ({t.slug})</option>
-                                ))}
-                            </select>
+                                onChange={slug => onChange({ ...widget, createPopupSlug: slug || undefined })}
+                                slugOptions={pageTemplates}
+                                emptyLabel="— 페이지 선택 —"
+                            />
                         </div>
                     )}
                     {/* 경로 직접 입력 — 남은 너비 채움 */}
@@ -284,16 +281,13 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                         {/* 페이지 선택 — 남은 너비 채움 */}
                         {widget.editConnType === 'popup' && (
                             <div className="flex-1 min-w-0">
-                                <select
+                                <SlugSelectField
+                                    hideLabel
                                     value={widget.editPopupSlug ?? ''}
-                                    onChange={e => onChange({ ...widget, editPopupSlug: e.target.value || undefined })}
-                                    className={INPUT_CLS}
-                                >
-                                    <option value="">— 페이지 선택 —</option>
-                                    {pageTemplates.map(t => (
-                                        <option key={t.id} value={t.slug}>{t.name} ({t.slug})</option>
-                                    ))}
-                                </select>
+                                    onChange={slug => onChange({ ...widget, editPopupSlug: slug || undefined })}
+                                    slugOptions={pageTemplates}
+                                    emptyLabel="— 페이지 선택 —"
+                                />
                             </div>
                         )}
                         {/* 경로 직접 입력 — 남은 너비 채움 */}
@@ -367,16 +361,13 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                         {/* 페이지 선택 */}
                         {widget.detailConnType === 'popup' && (
                             <div className="flex-1 min-w-0">
-                                <select
+                                <SlugSelectField
+                                    hideLabel
                                     value={widget.detailPopupSlug ?? ''}
-                                    onChange={e => onChange({ ...widget, detailPopupSlug: e.target.value || undefined })}
-                                    className={INPUT_CLS}
-                                >
-                                    <option value="">— 페이지 선택 —</option>
-                                    {pageTemplates.map(t => (
-                                        <option key={t.id} value={t.slug}>{t.name} ({t.slug})</option>
-                                    ))}
-                                </select>
+                                    onChange={slug => onChange({ ...widget, detailPopupSlug: slug || undefined })}
+                                    slugOptions={pageTemplates}
+                                    emptyLabel="— 페이지 선택 —"
+                                />
                             </div>
                         )}
                         {/* 경로 직접 입력 */}

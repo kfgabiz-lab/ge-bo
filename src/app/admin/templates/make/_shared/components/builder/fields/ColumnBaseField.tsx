@@ -16,6 +16,7 @@
 import React from 'react';
 import { ColEditProps } from './col-types';
 import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
+import { SlugSelectField } from './SlugSelectField';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 import type { SlugRelationOption } from '../../SearchBuilder';
@@ -62,31 +63,31 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
                             )}
                         </div>
                         <div>
-                            <label className={LABEL_CLS}>연결 Slug</label>
-                            <select
-                                value={values.relationSlugId ?? ''}
-                                onChange={e => {
-                                    if (e.target.value) {
-                                        const selected = fetchRelations.find(r => r.id === Number(e.target.value));
+                            <SlugSelectField
+                                label="연결 Slug"
+                                value={String(values.relationSlugId ?? '')}
+                                onChange={slug => {
+                                    if (slug) {
+                                        const id = Number(slug);
+                                        const selected = fetchRelations.find(r => r.id === id);
                                         onChange({
-                                            relationSlugId: Number(e.target.value),
+                                            relationSlugId: id,
                                             accessor: selected ? buildFetchKey(selected.id) : values.accessor,
                                         });
                                     } else {
                                         onChange({ relationSlugId: undefined });
                                     }
                                 }}
-                                className={INPUT_CLS}
-                            >
-                                <option value="">연동 없음</option>
-                                {fetchRelations.map(r => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.description
-                                            ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
-                                            : `${r.masterSlug} → ${r.slaveSlug}`}
-                                    </option>
-                                ))}
-                            </select>
+                                slugOptions={fetchRelations.map(r => ({
+                                    id: r.id,
+                                    slug: String(r.id),
+                                    name: r.description
+                                        ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                                        : `${r.masterSlug} → ${r.slaveSlug}`,
+                                }))}
+                                formatDisplay={opt => opt.name}
+                                emptyLabel="연동 없음"
+                            />
                         </div>
                     </div>
 

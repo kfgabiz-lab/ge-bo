@@ -33,6 +33,8 @@ export interface TemplatePopupConfig {
     mainConnectedSlug?: string;
     /** 운영페이지 이탈 시 변경사항 확인 여부 */
     leaveCheck?: boolean;
+    /** 페이지 레벨 연결 Slug Entity ID */
+    slugEntityId?: number;
     /** 위젯 목록 — PageWidgetItem[] 구조 (PageGridRenderer에 바로 사용) */
     widgetItems: PageWidgetItem[];
 }
@@ -91,6 +93,7 @@ export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupCo
         layerWidth:        raw.layerWidth        || 'md',
         mainConnectedSlug: (raw.mainConnectedSlug as string) || undefined,
         leaveCheck:        (raw.leaveCheck as boolean)       ?? false,
+        slugEntityId:      (raw.slugEntityId as number)      || undefined,
         widgetItems,
     };
 }

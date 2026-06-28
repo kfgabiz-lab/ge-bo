@@ -20,20 +20,21 @@ const TEMPLATE_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
 };
 
 function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string) => void }) {
-    const [open, setOpen] = useState(false);
-    const [list, setList] = useState<{ id: number; name: string; slug: string; pageUrl: string; templateType?: string }[]>([]);
+    const [open, setOpen]       = useState(false);
+    const [query, setQuery]     = useState('');
+    const [list, setList]       = useState<{ id: number; name: string; slug: string; pageUrl: string; templateType?: string; configJson?: string }[]>([]);
     const [loading, setLoading] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-    const { t } = useI18n();
+    const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null);
+    const ref     = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const { t }   = useI18n();
 
-    /* 드롭다운 열기 시 목록 조회 */
-    const handleOpen = async () => {
-        setOpen(v => !v);
+    /* 템플릿 목록 조회 (최초 1회) */
+    const loadList = async () => {
         if (list.length > 0) return;
         setLoading(true);
         try {
             const res = await api.get('/page-templates');
-            /* LAYER(팝업)는 메뉴 URL로 부적합하므로 제외, LIST·PAGE(Widget) 표시 */
             setList(res.data.filter((tpl: { templateType?: string }) => tpl.templateType !== 'LAYER'));
         } catch {
             toast.error(t('menu.template.error'));
@@ -42,17 +43,64 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
         }
     };
 
+    /* 버튼 클릭 → 드롭다운 위치 계산 후 열기 */
+    const handleOpen = async () => {
+        if (!open) {
+            const rect = ref.current?.getBoundingClientRect();
+            if (rect) {
+                const dropWidth = Math.max(rect.width, 280);
+                /* 드롭다운 우측이 viewport를 초과하면 버튼 오른쪽 끝 기준 좌측 정렬 */
+                const overflows = rect.left + dropWidth > window.innerWidth;
+                const left = overflows ? rect.right - dropWidth : rect.left;
+                setDropPos({
+                    top:   rect.bottom + 4,
+                    left:  Math.max(0, left),
+                    width: dropWidth,
+                });
+            }
+            await loadList();
+            setOpen(true);
+            setTimeout(() => inputRef.current?.focus(), 50);
+        } else {
+            setOpen(false);
+            setQuery('');
+        }
+    };
+
     /* 외부 클릭 시 닫기 */
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+            const drop = document.getElementById('template-url-picker-drop');
+            if (
+                ref.current && !ref.current.contains(e.target as Node) &&
+                drop && !drop.contains(e.target as Node)
+            ) {
+                setOpen(false);
+                setQuery('');
+            }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    /* 검색어 기반 필터링 */
+    const filtered = list.filter(tpl =>
+        tpl.name.toLowerCase().includes(query.toLowerCase()) ||
+        tpl.slug.toLowerCase().includes(query.toLowerCase())
+    );
+
+    /* URL 생성 헬퍼 */
+    const resolveUrl = (tpl: typeof list[0]) => {
+        const isWidgetType = tpl.templateType === 'PAGE' || tpl.templateType === 'QUICK_LIST' || tpl.templateType === 'QUICK_DETAIL';
+        const isSinglePage = isWidgetType && (() => { try { return !!JSON.parse(tpl.configJson || '{}').singlePage; } catch { return false; } })();
+        return isWidgetType
+            ? (isSinglePage ? `/admin/widgetSub/${tpl.slug}` : `/admin/widget/${tpl.slug}`)
+            : tpl.pageUrl;
+    };
+
     return (
         <div ref={ref} className="relative">
+            {/* 트리거 버튼 */}
             <button
                 type="button"
                 onClick={handleOpen}
@@ -63,31 +111,44 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
                 <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
-            {open && (
-                <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-lg shadow-lg w-72 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-slate-100 text-[11px] font-medium text-slate-500 bg-slate-50">
-                        {t('menu.template.dropdown_title')}
+            {/* fixed 포지션 드롭다운 — 화면 잘림 방지 */}
+            {open && dropPos && (
+                <div
+                    id="template-url-picker-drop"
+                    style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}
+                    className="bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden"
+                >
+                    {/* 검색 입력 */}
+                    <div className="px-2 py-2 border-b border-slate-100 bg-slate-50">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="템플릿 검색..."
+                            className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-md outline-none focus:border-blue-400 bg-white"
+                        />
                     </div>
+
+                    {/* 목록 */}
                     {loading ? (
                         <div className="flex items-center justify-center gap-2 py-4 text-xs text-slate-400">
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />{t('common.loading')}
                         </div>
-                    ) : list.length === 0 ? (
-                        <div className="py-4 text-center text-xs text-slate-400">{t('menu.template.empty')}</div>
+                    ) : filtered.length === 0 ? (
+                        <div className="py-4 text-center text-xs text-slate-400">
+                            {query ? '검색 결과가 없습니다.' : t('menu.template.empty')}
+                        </div>
                     ) : (
                         <ul className="max-h-52 overflow-y-auto divide-y divide-slate-50">
-                            {list.map(tpl => {
-                                const badge = TEMPLATE_TYPE_BADGE[tpl.templateType || ''];
-                                /* PAGE/QUICK_LIST/QUICK_DETAIL 타입은 위젯 렌더러 경로, LIST는 기존 pageUrl 사용 */
-                                const isWidgetType = tpl.templateType === 'PAGE' || tpl.templateType === 'QUICK_LIST' || tpl.templateType === 'QUICK_DETAIL';
-                                const menuUrl = isWidgetType
-                                    ? `/admin/widget/${tpl.slug}`
-                                    : tpl.pageUrl;
+                            {filtered.map(tpl => {
+                                const badge  = TEMPLATE_TYPE_BADGE[tpl.templateType || ''];
+                                const menuUrl = resolveUrl(tpl);
                                 return (
                                     <li key={tpl.id}>
                                         <button
                                             type="button"
-                                            onClick={() => { onSelect(menuUrl, tpl.name); setOpen(false); }}
+                                            onClick={() => { onSelect(menuUrl, tpl.name); setOpen(false); setQuery(''); }}
                                             className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors"
                                         >
                                             <div className="flex items-center gap-1.5">
@@ -98,7 +159,7 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-[11px] text-slate-400 font-mono mt-0.5">{menuUrl}</p>
+                                            <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">{menuUrl}</p>
                                         </button>
                                     </li>
                                 );
@@ -295,7 +356,11 @@ function MenuForm({
                     ref={urlRef}
                     type="text"
                     value={url}
-                    onChange={e => { onUrlChange(e.target.value); onLinkedTemplateNameChange(''); }}
+                    onChange={e => {
+                        onUrlChange(e.target.value);
+                        /* base path(? 이전)가 바뀔 때만 템플릿 연결 해제 — ?id=1 같은 파라미터 추가는 유지 */
+                        if (e.target.value.split('?')[0] !== url.split('?')[0]) onLinkedTemplateNameChange('');
+                    }}
                     onBlur={onUrlBlur}
                     onKeyDown={e => { if (e.key === 'Enter') onEnterSubmit(); }}
                     className={`${inputCls(urlError)} font-mono`}
@@ -584,14 +649,21 @@ export function MenuDetail() {
                         if (templatesCache.current.length === 0) {
                             const res = await api.get('/page-templates');
                             const isWidget = (type?: string) => type === 'PAGE' || type === 'QUICK_LIST' || type === 'QUICK_DETAIL';
-                            templatesCache.current = (res.data as { pageUrl: string; name: string; slug: string; templateType?: string }[])
+                            templatesCache.current = (res.data as { pageUrl: string; name: string; slug: string; templateType?: string; configJson?: string }[])
                                 .filter((t) => t.templateType === 'LIST' || isWidget(t.templateType))
-                                .map((t) => ({
-                                    pageUrl: isWidget(t.templateType) ? `/admin/widget/${t.slug}` : t.pageUrl,
-                                    name: t.name,
-                                }));
+                                .map((t) => {
+                                    const isSinglePage = isWidget(t.templateType) && (() => { try { return !!JSON.parse(t.configJson || '{}').singlePage; } catch { return false; } })();
+                                    return {
+                                        pageUrl: isWidget(t.templateType)
+                                            ? (isSinglePage ? `/admin/widgetSub/${t.slug}` : `/admin/widget/${t.slug}`)
+                                            : t.pageUrl,
+                                        name: t.name,
+                                    };
+                                });
                         }
-                        const matched = templatesCache.current.find(t => t.pageUrl === currentUrl);
+                        /* base path 기준 매칭 — URL에 ?id=1 같은 파라미터가 있어도 연결 표시 유지 */
+                        const currentBase = currentUrl.split('?')[0];
+                        const matched = templatesCache.current.find(t => t.pageUrl === currentBase);
                         setLinkedTemplateName(matched ? matched.name : '');
                     } catch {
                         setLinkedTemplateName('');

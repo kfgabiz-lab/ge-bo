@@ -13,6 +13,7 @@
  */
 
 import { LABEL_CLS, INPUT_CLS } from "./fields/_FieldBase";
+import { SlugSelectField } from "./fields";
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
 import type { TabWidget, TabItem } from "../renderer/types";
@@ -129,19 +130,13 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
             {/* 연결 페이지 + 필수여부 — 한 줄 배치 */}
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className={LABEL_CLS}>연결 페이지</label>
-                <select
+                <SlugSelectField
+                  label="연결 페이지"
                   value={tab.pageSlug ?? ""}
-                  onChange={(e) => handleTabChange(idx, { pageSlug: e.target.value })}
-                  className={INPUT_CLS}
-                >
-                  <option value="">-- 연결 없음 --</option>
-                  {pageTemplates.map((t) => (
-                    <option key={t.id} value={t.slug}>
-                      {t.name} ({t.slug})
-                    </option>
-                  ))}
-                </select>
+                  onChange={slug => handleTabChange(idx, { pageSlug: slug })}
+                  slugOptions={pageTemplates}
+                  emptyLabel="-- 연결 없음 --"
+                />
               </div>
 
               {/* 필수여부 — 첫 번째 탭에만 표시 */}

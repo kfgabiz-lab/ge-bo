@@ -205,6 +205,14 @@ export default function PageBuilderPage() {
             .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
     }, []);
 
+    /* ── Slug Entity 목록 — 페이지 연결용 ── */
+    const [slugEntityOptions, setSlugEntityOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
+    useEffect(() => {
+        api.get('/slug-entity/active')
+            .then(res => setSlugEntityOptions(res.data || []))
+            .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
+    }, []);
+
     /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
     const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
     useEffect(() => {
@@ -294,10 +302,10 @@ export default function PageBuilderPage() {
             switch (type) {
                 case 'search':   return { type: 'search', widgetId: id, contentKey: '', rows: [] } as SearchWidget;
                 case 'table':    return { type: 'table', widgetId: id, contentKey: '', columns: [], connectedSearchIds: [], pageSize: 10, displayMode: 'pagination' } as TableWidget;
-                case 'form':     return { type: 'form', widgetId: id, contentKey: '', fields: [] } as FormWidget;
+                case 'form':     return { type: 'form', widgetId: id, contentKey: '', fields: [], ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as FormWidget;
                 case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
                 case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
-                case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true } as SubListWidget;
+                case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true, ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as SubListWidget;
                 case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', sourceSlug: '', connectedSlug: '', labelFields: 'name' } as MultiSelectWidget;
                 case 'tab':         return { type: 'tab', widgetId: id, tabs: [{ id: `tab-${Date.now()}-0`, label: '탭 1', pageSlug: '' }] } as TabWidget;
             }
@@ -506,6 +514,8 @@ export default function PageBuilderPage() {
                 layerWidth:          om.layerWidth,
                 mainConnectedSlug:   om.mainConnectedSlug || undefined,
                 leaveCheck:          om.leaveCheck || undefined,
+                singlePage:          om.singlePage || undefined,
+                slugEntityId:        om.slugEntityId || undefined,
             },
         );
     };
@@ -564,8 +574,15 @@ export default function PageBuilderPage() {
                         mainConnectedSlug={om.mainConnectedSlug}
                         onMainConnectedSlugChange={handleMainConnectedSlugChange}
                         slugOptions={slugOptions}
+                        slugEntityOptions={slugEntityOptions}
+                        slugEntityId={om.slugEntityId}
+                        onSlugEntityIdChange={om.setSlugEntityId}
                         leaveCheck={om.leaveCheck}
                         onLeaveCheckChange={om.setLeaveCheck}
+                        singlePage={om.singlePage}
+                        onSinglePageChange={om.setSinglePage}
+                        connectedType={om.connectedType}
+                        onConnectedTypeChange={om.setConnectedType}
                         onOutputModeChange={om.setOutputMode}
                         onPageTitleChange={om.setPageTitle}
                         onPageTitleMsgKeyChange={om.setPageTitleMsgKey}

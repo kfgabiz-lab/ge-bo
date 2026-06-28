@@ -92,23 +92,20 @@ export function CategoryField({
             )}
 
             {/* 연동 Slug 선택 (slug-relation 목록) */}
-            <div>
-                <label className={LABEL_CLS}>연동 Slug</label>
-                <select
-                    value={values.relationSlugId ?? ''}
-                    onChange={e => onChange({ relationSlugId: e.target.value ? Number(e.target.value) : undefined })}
-                    className={INPUT_CLS}
-                >
-                    <option value="">연동 없음</option>
-                    {slugRelationOptions.map(opt => (
-                        <option key={opt.id} value={opt.id}>
-                            {opt.description
-                                ? `${opt.description} (${opt.masterSlug} → ${opt.slaveSlug})`
-                                : `${opt.masterSlug} → ${opt.slaveSlug}`}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            <SlugSelectField
+                label="연동 Slug"
+                value={String(values.relationSlugId ?? '')}
+                onChange={slug => onChange({ relationSlugId: slug ? Number(slug) : undefined })}
+                slugOptions={slugRelationOptions.map(r => ({
+                    id: r.id,
+                    slug: String(r.id),
+                    name: r.description
+                        ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                        : `${r.masterSlug} → ${r.slaveSlug}`,
+                }))}
+                formatDisplay={opt => opt.name}
+                emptyLabel="연동 없음"
+            />
 
             {/* 최대 Depth 선택 (1~4 버튼형) */}
             <div className="flex items-center justify-between">

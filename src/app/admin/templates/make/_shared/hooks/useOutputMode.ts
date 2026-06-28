@@ -16,6 +16,8 @@ import type { LayerType, LayerWidth } from '../types';
 
 export type OutputMode = 'page' | 'layerpopup';
 
+export type ConnectedType = 'none' | 'slug' | 'entity';
+
 export interface OutputModeValue {
     outputMode: OutputMode;
     /** page 모드 전용 제목 */
@@ -29,6 +31,12 @@ export interface OutputModeValue {
     mainConnectedSlug: string;
     /** 운영페이지 이탈 시 변경사항 확인 여부 */
     leaveCheck: boolean;
+    /** 단일페이지 여부 — true 시 /widgetSub/{slug}?id=N URL 사용 안내 */
+    singlePage: boolean;
+    /** 메인 연결 Slug Entity ID */
+    slugEntityId: number | undefined;
+    /** 연결 타입 — mainConnectedSlug·slugEntityId 기반, restore 시 함께 복원 */
+    connectedType: ConnectedType;
     /** 우측 드로어 여부 — layerpopup + right 조합일 때 true */
     isRightDrawer: boolean;
     setOutputMode: (v: OutputMode) => void;
@@ -40,6 +48,9 @@ export interface OutputModeValue {
     setLayerWidth: (v: LayerWidth) => void;
     setMainConnectedSlug: (v: string) => void;
     setLeaveCheck: (v: boolean) => void;
+    setSinglePage: (v: boolean) => void;
+    setSlugEntityId: (v: number | undefined) => void;
+    setConnectedType: (v: ConnectedType) => void;
     /**
      * 저장된 configJson에서 outputMode 관련 값 일괄 복원
      * @param cfg JSON.parse(tpl.configJson) 결과 객체
@@ -57,6 +68,9 @@ export function useOutputMode(): OutputModeValue {
     const [layerWidth, setLayerWidth]             = useState<LayerWidth>('md');
     const [mainConnectedSlug, setMainConnectedSlug] = useState('');
     const [leaveCheck, setLeaveCheck]               = useState(false);
+    const [singlePage, setSinglePage]               = useState(false);
+    const [slugEntityId, setSlugEntityId]           = useState<number | undefined>(undefined);
+    const [connectedType, setConnectedType]         = useState<ConnectedType>('none');
 
     const isRightDrawer = outputMode === 'layerpopup' && layerType === 'right';
 
@@ -70,13 +84,20 @@ export function useOutputMode(): OutputModeValue {
         setLayerWidth        ((cfg.layerWidth         as LayerWidth)  || 'md');
         setMainConnectedSlug ((cfg.mainConnectedSlug  as string)      || '');
         setLeaveCheck        ((cfg.leaveCheck         as boolean)     ?? false);
+        setSinglePage        ((cfg.singlePage         as boolean)     ?? false);
+        setSlugEntityId      ((cfg.slugEntityId       as number)      || undefined);
+        /* connectedType — mainConnectedSlug·slugEntityId 기반으로 파생 복원 */
+        setConnectedType(
+            (cfg.slugEntityId as number)     ? 'entity' :
+            (cfg.mainConnectedSlug as string) ? 'slug'   : 'none'
+        );
     };
 
     return {
         outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
-        mainConnectedSlug, leaveCheck, isRightDrawer,
+        mainConnectedSlug, leaveCheck, singlePage, slugEntityId, connectedType, isRightDrawer,
         setOutputMode, setPageTitle, setPageTitleMsgKey, setLayerType, setLayerTitle, setLayerTitleMsgKey, setLayerWidth,
-        setMainConnectedSlug, setLeaveCheck,
+        setMainConnectedSlug, setLeaveCheck, setSinglePage, setSlugEntityId, setConnectedType,
         restore,
     };
 }

@@ -12,7 +12,7 @@ export const MENU_ICON_LIST = [
 
 /** Validation 정규식 */
 export const NAME_REGEX = /^[가-힣a-zA-Z0-9\s\-_()&]{1,50}$/;
-export const URL_REGEX = /^\/[a-zA-Z0-9\-_/]*$/;
+export const URL_REGEX = /^\/[a-zA-Z0-9\-_/?=&]*$/;
 export const XSS_CHARS = /[<>"']/;
 
 /** Validation 에러 메시지 */

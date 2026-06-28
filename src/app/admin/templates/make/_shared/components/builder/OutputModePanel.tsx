@@ -23,10 +23,11 @@
 import { useState } from 'react';
 import { FileText, LayoutTemplate, PanelRight, Globe } from 'lucide-react';
 import type { LayerType, LayerWidth } from '../../types';
-import type { OutputMode } from '../../hooks/useOutputMode';
+import type { OutputMode, ConnectedType } from '../../hooks/useOutputMode';
 import { inputCls, selectCls } from '../../styles';
 import { SelectArrow } from '../SelectArrow';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { SlugSelectField } from './fields/SlugSelectField';
 
 const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
     { value: 'sm', label: 'Small — 380px' },
@@ -50,10 +51,24 @@ interface OutputModePanelProps {
     onMainConnectedSlugChange?: (v: string) => void;
     /** slug 목록 — 드롭다운 옵션 */
     slugOptions?: { id: number; slug: string; name: string }[];
+    /** slug entity 목록 — 드롭다운 옵션 */
+    slugEntityOptions?: { id: number; slug: string; name: string }[];
+    /** 연결된 slug entity ID */
+    slugEntityId?: number;
+    /** slug entity ID 변경 핸들러 */
+    onSlugEntityIdChange?: (v: number | undefined) => void;
     /** 운영페이지 이탈 시 변경사항 확인 여부 */
     leaveCheck?: boolean;
     /** 이탈체크 변경 핸들러 */
     onLeaveCheckChange?: (v: boolean) => void;
+    /** 단일페이지 여부 — true 시 /widgetSub/{slug}?id=N URL 사용 */
+    singlePage?: boolean;
+    /** 단일페이지 변경 핸들러 */
+    onSinglePageChange?: (v: boolean) => void;
+    /** 연결 타입 — useOutputMode에서 restore 시 함께 복원됨 */
+    connectedType?: ConnectedType;
+    /** 연결 타입 변경 핸들러 */
+    onConnectedTypeChange?: (v: ConnectedType) => void;
     onOutputModeChange: (v: OutputMode) => void;
     onPageTitleChange: (v: string) => void;
     onPageTitleMsgKeyChange: (v: string) => void;
@@ -70,12 +85,25 @@ interface OutputModePanelProps {
 export function OutputModePanel({
     outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
     mainConnectedSlug = '', onMainConnectedSlugChange, slugOptions = [],
+    slugEntityOptions = [], slugEntityId, onSlugEntityIdChange,
     leaveCheck = false, onLeaveCheckChange,
+    singlePage = false, onSinglePageChange,
+    connectedType: connectedTypeProp, onConnectedTypeChange,
     onOutputModeChange, onPageTitleChange, onPageTitleMsgKeyChange,
     onLayerTypeChange, onLayerTitleChange, onLayerTitleMsgKeyChange, onLayerWidthChange,
 }: OutputModePanelProps) {
     /* 제목 다국어 모드 — BuilderI18nModeProvider 외부이므로 자체 state로 관리 */
     const [i18nMode, setI18nMode] = useState(true);
+
+    /* 연결 타입 — useOutputMode 훅에서 restore 시 함께 복원되므로 prop으로 수신 */
+    const connectedType: ConnectedType = connectedTypeProp ?? 'none';
+
+    /* 타입 변경 시 반대쪽 값 초기화 */
+    const handleTypeChange = (type: ConnectedType) => {
+        onConnectedTypeChange?.(type);
+        if (type !== 'slug') onMainConnectedSlugChange?.('');
+        if (type !== 'entity') onSlugEntityIdChange?.(undefined);
+    };
 
     return (
         <>
@@ -108,13 +136,39 @@ export function OutputModePanel({
                 <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
                     <div className="flex items-center justify-between mb-1">
                         <label className="text-[10px] font-semibold text-slate-500">페이지 제목</label>
-                        <button
-                            onClick={() => setI18nMode(v => !v)}
-                            className={`p-1 rounded transition-all ${i18nMode ? 'text-blue-500 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
-                            title="다국어 모드"
-                        >
-                            <Globe className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {/* 단일페이지 체크박스 — widget 빌더 전용 */}
+                            {onSinglePageChange && (
+                                <label className="flex items-center gap-1 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={singlePage}
+                                        onChange={e => onSinglePageChange(e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                                    />
+                                    <span className="text-[10px] font-semibold text-slate-500">단일페이지</span>
+                                </label>
+                            )}
+                            {/* 이탈체크 체크박스 */}
+                            {onLeaveCheckChange && (
+                                <label className="flex items-center gap-1 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={leaveCheck}
+                                        onChange={e => onLeaveCheckChange(e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                                    />
+                                    <span className="text-[10px] font-semibold text-slate-500">이탈체크</span>
+                                </label>
+                            )}
+                            <button
+                                onClick={() => setI18nMode(v => !v)}
+                                className={`p-1 rounded transition-all ${i18nMode ? 'text-blue-500 bg-blue-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                                title="다국어 모드"
+                            >
+                                <Globe className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                     </div>
                     {i18nMode ? (
                         <MessageKeySelector
@@ -135,46 +189,56 @@ export function OutputModePanel({
                 </div>
             )}
 
-            {/* 메인 연결 slug / 이탈체크 — outputMode 관계없이 항상 표시 */}
-            {(onMainConnectedSlugChange || onLeaveCheckChange) && (
+            {/* 연결 타입 + 대상 선택 — outputMode 관계없이 항상 표시 */}
+            {(onMainConnectedSlugChange || onSlugEntityIdChange) && (
                 <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
-                    {/* 헤더 행: slug 라벨(좌) + 이탈체크 체크박스(우) */}
-                    <div className="flex items-center justify-between mb-1.5">
-                        {onMainConnectedSlugChange ? (
-                            <label className="text-[10px] font-semibold text-slate-500">
-                                메인 연결 Slug <span className="font-normal text-slate-400">(선택)</span>
-                            </label>
-                        ) : <span />}
-                        {onLeaveCheckChange && (
-                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                <input
-                                    type="checkbox"
-                                    checked={leaveCheck}
-                                    onChange={e => onLeaveCheckChange(e.target.checked)}
-                                    className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                    <div className={`flex gap-2 ${connectedType === 'none' ? '' : 'items-end'}`}>
+                        {/* 타입 selectbox */}
+                        <div className={connectedType === 'none' ? 'w-full' : 'w-[45%] shrink-0'}>
+                            <label className="text-[10px] font-semibold text-slate-500 mb-1 block">타입</label>
+                            <div className="relative">
+                                <select
+                                    value={connectedType}
+                                    onChange={e => handleTypeChange(e.target.value as 'none' | 'slug' | 'entity')}
+                                    className={selectCls}
+                                >
+                                    <option value="none">없음</option>
+                                    <option value="slug">메인 연결 Slug</option>
+                                    <option value="entity">Slug Entity</option>
+                                </select>
+                                <SelectArrow />
+                            </div>
+                        </div>
+
+                        {/* 메인 연결 Slug 자동완성 */}
+                        {connectedType === 'slug' && onMainConnectedSlugChange && (
+                            <div className="flex-1">
+                                <SlugSelectField
+                                    label="메인 연결 Slug"
+                                    value={mainConnectedSlug}
+                                    onChange={onMainConnectedSlugChange}
+                                    slugOptions={slugOptions}
+                                    emptyLabel="— 없음 —"
                                 />
-                                <span className="text-[10px] font-semibold text-slate-500">이탈체크</span>
-                            </label>
+                            </div>
+                        )}
+
+                        {/* Slug Entity 자동완성 — id↔slug 변환 후 SlugSelectField 재사용 */}
+                        {connectedType === 'entity' && onSlugEntityIdChange && (
+                            <div className="flex-1">
+                                <SlugSelectField
+                                    label="Slug Entity"
+                                    value={slugEntityOptions.find(o => o.id === slugEntityId)?.slug ?? ''}
+                                    onChange={slug => {
+                                        const opt = slugEntityOptions.find(o => o.slug === slug);
+                                        onSlugEntityIdChange(opt?.id);
+                                    }}
+                                    slugOptions={slugEntityOptions}
+                                    emptyLabel="— 없음 —"
+                                />
+                            </div>
                         )}
                     </div>
-                    {/* 메인 연결 Slug 드롭다운 */}
-                    {onMainConnectedSlugChange && (
-                        <div className="relative">
-                            <select
-                                value={mainConnectedSlug}
-                                onChange={e => onMainConnectedSlugChange(e.target.value)}
-                                className={selectCls}
-                            >
-                                <option value="">— 없음 —</option>
-                                {slugOptions.map(opt => (
-                                    <option key={opt.id} value={opt.slug}>
-                                        {opt.name} ({opt.slug})
-                                    </option>
-                                ))}
-                            </select>
-                            <SelectArrow />
-                        </div>
-                    )}
                 </div>
             )}
 
