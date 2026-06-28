@@ -182,6 +182,8 @@ export interface FieldEditProps {
     hideConditionFields?: boolean;
     /** 추가 모드: 라벨 input 키 핸들러 (Enter/Escape) */
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+    /** Slug Entity 필드 목록 — 있을 때 fieldKey 입력을 selectbox로 전환 (form 빌더 전용) */
+    slugEntityFields?: { key: string | null; label: string }[];
 }
 
 export type { CodeGroupDef };

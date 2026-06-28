@@ -17,7 +17,7 @@ import { DataGenerationSection } from './DataGenerationSection';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
-export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
+export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
 
     return (
@@ -39,6 +39,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 excludeFromSearch={values.excludeFromSearch}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
+                slugEntityFields={slugEntityFields}
                 onChange={onChange}
             />
             {/* Placeholder */}

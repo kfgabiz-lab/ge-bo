@@ -33,7 +33,7 @@ const calcOffsetValue = (offset: number, subType: RangeSubType): string => {
     return iso.slice(0, 10); // date (기본)
 };
 
-export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
+export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
     /* yearMonthRange 기존 타입은 yearMonth subType으로 fallback */
     const subType: RangeSubType = (values.rangeSubType as RangeSubType) ?? 'date';
     const isTime = subType === 'time';
@@ -155,6 +155,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 excludeFromSearch={values.excludeFromSearch}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
+                slugEntityFields={slugEntityFields}
                 onChange={onChange}
             />
 

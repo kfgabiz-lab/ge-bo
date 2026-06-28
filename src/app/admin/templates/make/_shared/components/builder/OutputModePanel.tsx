@@ -69,6 +69,8 @@ interface OutputModePanelProps {
     connectedType?: ConnectedType;
     /** 연결 타입 변경 핸들러 */
     onConnectedTypeChange?: (v: ConnectedType) => void;
+    /** entity 타입 선택 + slugEntityId 선택 시 빌드 버튼 클릭 핸들러 (widget 빌더 전용) */
+    onBuildFromEntity?: () => void;
     onOutputModeChange: (v: OutputMode) => void;
     onPageTitleChange: (v: string) => void;
     onPageTitleMsgKeyChange: (v: string) => void;
@@ -88,7 +90,7 @@ export function OutputModePanel({
     slugEntityOptions = [], slugEntityId, onSlugEntityIdChange,
     leaveCheck = false, onLeaveCheckChange,
     singlePage = false, onSinglePageChange,
-    connectedType: connectedTypeProp, onConnectedTypeChange,
+    connectedType: connectedTypeProp, onConnectedTypeChange, onBuildFromEntity,
     onOutputModeChange, onPageTitleChange, onPageTitleMsgKeyChange,
     onLayerTypeChange, onLayerTitleChange, onLayerTitleMsgKeyChange, onLayerWidthChange,
 }: OutputModePanelProps) {
@@ -225,17 +227,34 @@ export function OutputModePanel({
 
                         {/* Slug Entity 자동완성 — id↔slug 변환 후 SlugSelectField 재사용 */}
                         {connectedType === 'entity' && onSlugEntityIdChange && (
-                            <div className="flex-1">
-                                <SlugSelectField
-                                    label="Slug Entity"
-                                    value={slugEntityOptions.find(o => o.id === slugEntityId)?.slug ?? ''}
-                                    onChange={slug => {
-                                        const opt = slugEntityOptions.find(o => o.slug === slug);
-                                        onSlugEntityIdChange(opt?.id);
-                                    }}
-                                    slugOptions={slugEntityOptions}
-                                    emptyLabel="— 없음 —"
-                                />
+                            <div className="flex-1 flex items-end gap-1">
+                                <div className="flex-1">
+                                    <SlugSelectField
+                                        label="Slug Entity"
+                                        value={slugEntityOptions.find(o => o.id === slugEntityId)?.slug ?? ''}
+                                        onChange={slug => {
+                                            const opt = slugEntityOptions.find(o => o.slug === slug);
+                                            onSlugEntityIdChange(opt?.id);
+                                        }}
+                                        slugOptions={slugEntityOptions}
+                                        emptyLabel="— 없음 —"
+                                    />
+                                </div>
+                                {/* 빌드 버튼 — slugEntityId 선택 시 활성화 */}
+                                {onBuildFromEntity && (
+                                    <button
+                                        onClick={onBuildFromEntity}
+                                        disabled={!slugEntityId}
+                                        className={`shrink-0 px-2 py-1.5 text-[11px] font-semibold rounded border transition-all ${
+                                            slugEntityId
+                                                ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-700'
+                                                : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
+                                        }`}
+                                        title="Slug Entity 필드로 Form 자동 생성"
+                                    >
+                                        빌드
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

@@ -14,14 +14,39 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { SlugEntityItem, SlugEntityFieldItem } from './EntityList';
 
+/* ── 공통코드 그룹 타입 ── */
+interface CodeGroupDef {
+    groupCode: string;
+    groupName: string;
+}
+
 /* ── DB 타입 선택 옵션 ── */
 const DB_TYPES = ['VARCHAR', 'TEXT', 'BIGINT', 'INT', 'BOOLEAN', 'TIMESTAMPTZ', 'DATE', 'JSONB'];
+
+/* ── 빌더 필드 타입 선택 옵션 ── */
+const BUILDER_FIELD_TYPES = [
+    'input', 'textarea', 'select', 'radio', 'checkbox',
+    'date', 'dateRange', 'yearMonth', 'yearMonthRange', 'time',
+    'editor', 'file', 'image', 'video', 'media',
+    'color', 'hidden', 'action-button', 'message-key-select', 'category',
+];
+
+/** DB 타입 → 빌더 필드 타입 자동 매핑 */
+const mapDbTypeToFieldType = (dbType: string): string => {
+    switch (dbType) {
+        case 'VARCHAR':                  return 'input';
+        case 'BIGINT': case 'INT':       return 'input';
+        case 'BOOLEAN':                  return 'checkbox';
+        case 'DATE': case 'TIMESTAMPTZ': return 'date';
+        default:                         return 'textarea';
+    }
+};
 
 /* ── 빈 필드 행 생성 ── */
 const emptyField = (): SlugEntityFieldItem => ({
     key: null, label: '', columnType: 'VARCHAR',
-    columnLength: null, isNullable: true,
-    description: null, sortOrder: 0,
+    columnLength: null, fieldType: 'input', codeGroupCode: null,
+    isNullable: true, description: null, sortOrder: 0,
 });
 
 /* ── 스타일 상수 ── */
@@ -37,9 +62,15 @@ interface Props {
 }
 
 export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
-    const [fields, setFields]     = useState<SlugEntityFieldItem[]>([]);
-    const [saving, setSaving]     = useState(false);
-    const [deleting, setDeleting] = useState(false);
+    const [fields, setFields]         = useState<SlugEntityFieldItem[]>([]);
+    const [saving, setSaving]         = useState(false);
+    const [deleting, setDeleting]     = useState(false);
+    const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
+
+    /* 마운트 시 공통코드 목록 로드 */
+    useEffect(() => {
+        api.get<CodeGroupDef[]>('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
+    }, []);
 
     /* entity 선택 시 fields 로컬 복사 */
     useEffect(() => {
@@ -79,13 +110,15 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
         setSaving(true);
         try {
             const body = fields.map((f, i) => ({
-                key:          f.key?.trim() || null,
-                label:        f.label.trim(),
-                columnType:   f.columnType,
-                columnLength: f.columnLength || null,
-                isNullable:   f.isNullable,
-                description:  f.description || null,
-                sortOrder:    i,
+                key:           f.key?.trim() || null,
+                label:         f.label.trim(),
+                columnType:    f.columnType,
+                columnLength:  f.columnLength || null,
+                fieldType:     f.fieldType || null,
+                codeGroupCode: f.codeGroupCode || null,
+                isNullable:    f.isNullable,
+                description:   f.description || null,
+                sortOrder:     i,
             }));
             const res = await api.put<SlugEntityItem>(`/slug-entity/${entity.id}/fields`, body);
             toast.success('저장되었습니다.');
@@ -150,7 +183,9 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-8">#</th>
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[90px]">key</th>
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[100px]">label</th>
-                            <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[120px]">DB 타입</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[110px]">DB 타입</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[130px]">빌더필드타입</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[140px]">공통코드</th>
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[70px]">길이</th>
                             <th className="text-center px-2 py-2.5 font-semibold text-slate-600 w-14">NULL</th>
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 min-w-[100px]">설명</th>
@@ -161,7 +196,7 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                     <tbody>
                         {fields.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="py-12 text-center text-slate-400 text-xs">
+                                <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
                                     필드가 없습니다. 아래 [+ 필드 추가]를 클릭하세요.
                                 </td>
                             </tr>
@@ -192,14 +227,49 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                                         />
                                     </td>
 
-                                    {/* DB 타입 */}
+                                    {/* DB 타입 — 변경 시 빌더필드타입 자동 매핑 (사용자가 이후 직접 변경 가능) */}
                                     <td className="px-1 py-1">
                                         <select
                                             value={f.columnType}
-                                            onChange={e => updateField(idx, 'columnType', e.target.value)}
+                                            onChange={e => {
+                                                const newDbType = e.target.value;
+                                                setFields(prev => prev.map((field, i) => i === idx ? {
+                                                    ...field,
+                                                    columnType: newDbType,
+                                                    fieldType: mapDbTypeToFieldType(newDbType),
+                                                } : field));
+                                            }}
                                             className={SELECT_SM}
                                         >
                                             {DB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </td>
+
+                                    {/* 빌더필드타입 — DB 타입 자동 매핑, 직접 변경 가능 */}
+                                    <td className="px-1 py-1">
+                                        <select
+                                            value={f.fieldType ?? ''}
+                                            onChange={e => updateField(idx, 'fieldType', e.target.value || null)}
+                                            className={SELECT_SM}
+                                        >
+                                            <option value="">— 없음 —</option>
+                                            {BUILDER_FIELD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </td>
+
+                                    {/* 공통코드 — 선택 시 빌더 select/radio/checkbox 옵션 자동 연결 */}
+                                    <td className="px-1 py-1">
+                                        <select
+                                            value={f.codeGroupCode ?? ''}
+                                            onChange={e => updateField(idx, 'codeGroupCode', e.target.value || null)}
+                                            className={SELECT_SM}
+                                        >
+                                            <option value="">— 없음 —</option>
+                                            {codeGroups.map(g => (
+                                                <option key={g.groupCode} value={g.groupCode}>
+                                                    {g.groupCode} - {g.groupName}
+                                                </option>
+                                            ))}
                                         </select>
                                     </td>
 

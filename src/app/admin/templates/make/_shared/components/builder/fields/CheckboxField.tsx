@@ -16,7 +16,7 @@ import { FieldBase } from './_FieldBase';
 import { FieldOptions } from './_FieldOptions';
 import { ValidationSection } from '../../ValidationSection';
 
-export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown }: FieldEditProps) {
+export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, slugEntityFields }: FieldEditProps) {
     return (
         <div className="space-y-1.5">
             <FieldBase
@@ -33,6 +33,7 @@ export function CheckboxField({ values, onChange, colSpanMode, rowSpanConfig, co
                 hideCondition={values.hideCondition}
                 disableCondition={values.disableCondition}
                 excludeFromSearch={values.excludeFromSearch}
+                slugEntityFields={slugEntityFields}
                 onChange={onChange}
             />
             {/* 옵션 */}

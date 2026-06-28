@@ -21,7 +21,7 @@ import { DataGenerationSection } from './DataGenerationSection';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
-export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
+export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
     return (
         <div className="space-y-1.5">
@@ -40,6 +40,7 @@ export function FormTextareaField({ values, onChange, colSpanMode, rowSpanConfig
                 disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
+                slugEntityFields={slugEntityFields}
                 onChange={onChange}
             />
             {/* Placeholder */}

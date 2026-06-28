@@ -35,6 +35,10 @@ export interface SlugEntityFieldItem {
     label: string;
     columnType: string;
     columnLength: number | null;
+    /** 빌더 필드 타입 (예: input, textarea, date 등) — 빌드 시 columnType 자동 매핑보다 우선 적용 */
+    fieldType?: string | null;
+    /** 공통코드 그룹 코드 — select/radio/checkbox 옵션 자동 연결용 */
+    codeGroupCode?: string | null;
     isNullable: boolean;
     description: string | null;
     sortOrder: number;

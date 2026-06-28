@@ -181,10 +181,12 @@ interface FormBuilderProps {
     slugOptions: { id: number; slug: string; name: string }[];
     /** 필드 ColSpan 최대값 (기본 12, 우측 드로어 등 좁은 공간에서 2로 제한) */
     maxColSpan?: number;
+    /** Slug Entity 필드 목록 — fieldKey selectbox 전환용 (widget 빌더 전용) */
+    slugEntityFields?: { key: string | null; label: string }[];
 }
 
 /** Form 위젯 필드 설정 빌더 */
-export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: FormBuilderProps) {
+export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, slugEntityFields }: FormBuilderProps) {
     const { i18nMode } = useBuilderI18nMode();
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -322,6 +324,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12 }: 
             rowSpanConfig: { min: 1, max: 30 },
             codeGroups,
             codeGroupsLoading,
+            slugEntityFields,
         };
 
         switch (f.type) {

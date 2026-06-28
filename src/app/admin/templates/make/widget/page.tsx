@@ -38,8 +38,10 @@ import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
 import type { SearchWidget, SpaceWidget, CategoryWidget, SubListWidget, MultiSelectWidget, TabWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
-import type { FormWidget } from '../_shared/components/builder/FormBuilder';
+import type { FormWidget, FormFieldItem } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug } from '../_shared/utils';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
+import type { SearchFieldType } from '../_shared/types';
 import PageLayout from '@/components/layout/page-layout';
 import { SaveModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
@@ -197,8 +199,8 @@ export default function PageBuilderPage() {
     /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
     const tm = useTemplateManagement('PAGE');
 
-    /* ── Slug 레지스트리 — connectedSlug 드롭다운 용도 ── */
-    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
+    /* ── Slug 레지스트리 — connectedSlug 드롭다운 용도 (entityId 포함) ── */
+    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string; entityId?: number }[]>([]);
     useEffect(() => {
         api.get('/slug-registry/active')
             .then(res => setSlugOptions((res.data || []).filter((s: { type: string }) => s.type === 'PAGE_DATA')))
@@ -212,6 +214,15 @@ export default function PageBuilderPage() {
             .then(res => setSlugEntityOptions(res.data || []))
             .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
     }, []);
+
+    /* ── 선택된 Slug Entity 필드 목록 — fieldKey selectbox 및 빌드용 ── */
+    const [slugEntityFields, setSlugEntityFields] = useState<SlugEntityFieldItem[]>([]);
+    useEffect(() => {
+        if (!om.slugEntityId) { setSlugEntityFields([]); return; }
+        api.get(`/slug-entity/${om.slugEntityId}`)
+            .then(res => setSlugEntityFields(res.data.fields ?? []))
+            .catch(() => setSlugEntityFields([]));
+    }, [om.slugEntityId]);
 
     /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
     const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
@@ -407,6 +418,151 @@ export default function PageBuilderPage() {
         })));
     };
 
+    /* ── Slug Entity 변경 — entity와 연결된 data slug를 form connectedSlug에 자동 설정 ── */
+    const handleSlugEntityIdChange = (id: number | undefined) => {
+        om.setSlugEntityId(id);
+        const connectedSlug = slugOptions.find(s => s.entityId === id)?.slug;
+        setWidgetItems(prev => prev.map(item => ({
+            ...item,
+            contents: item.contents.map(c => {
+                if (c.widget.type !== 'form') return c;
+                return { ...c, widget: { ...c.widget, connectedSlug: connectedSlug || undefined } };
+            }),
+        })));
+    };
+
+    /* snake_case → camelCase 변환 */
+    const toCamelCase = (str: string): string =>
+        str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+
+    /* dateRange suffix 제거 — 빌더는 fieldKey만 저장하므로 entity key(_from/_to)와 비교 시 suffix 제거 */
+    const stripRangeSuffix = (key: string): string | null => {
+        if (key.endsWith('_from')) return key.slice(0, -5);
+        if (key.endsWith('_to'))   return key.slice(0, -3);
+        return null;
+    };
+
+    /* entity key → 비교 가능한 모든 변형 반환 (원본·camelCase·suffix제거·suffix제거+camelCase) */
+    const getKeyVariants = (key: string): string[] => {
+        const variants = new Set<string>();
+        variants.add(key);
+        variants.add(toCamelCase(key));
+        const base = stripRangeSuffix(key);
+        if (base) {
+            variants.add(base);
+            variants.add(toCamelCase(base));
+        }
+        return [...variants];
+    };
+
+    /** columnType → Form 필드 타입 매핑 (widget 빌더 전용) */
+    const mapColumnTypeToFieldType = (columnType: string): SearchFieldType => {
+        switch (columnType.toUpperCase()) {
+            case 'VARCHAR':                  return 'input';
+            case 'BIGINT': case 'INT':       return 'input';
+            case 'DATE': case 'TIMESTAMPTZ': return 'date';
+            case 'BOOLEAN':                  return 'checkbox';
+            default:                         return 'textarea';
+        }
+    };
+
+    /* ── entity field → FormFieldItem 생성 헬퍼 ──
+       1순위: entity에 직접 지정된 fieldType 사용
+       2순위: fieldType 없으면 DB 타입(columnType)으로 자동 매핑 */
+    const buildFieldItem = (f: SlugEntityFieldItem): FormFieldItem => {
+        const type = (f.fieldType as SearchFieldType | undefined) ?? mapColumnTypeToFieldType(f.columnType);
+        const wideTypes = ['textarea', 'dateRange', 'yearMonthRange'];
+        return {
+            id: uid(),
+            type,
+            label: f.label,
+            fieldKey: f.key!,
+            colSpan: wideTypes.includes(type) ? 2 : 1,
+            rowSpan: 1,
+            required: f.isNullable === false,
+            ...(type === 'date' && { dateSubType: 'date' as const }),
+            ...(f.codeGroupCode ? { codeGroupCode: f.codeGroupCode } : {}),
+        } as FormFieldItem;
+    };
+
+    /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 ── */
+    const handleBuildFromEntity = () => {
+        if (!om.slugEntityId || slugEntityFields.length === 0) return;
+
+        /* entity field를 key 기준으로 맵 생성 — 원본·camelCase·_from/_to suffix 제거 등 모든 변형 등록 */
+        const entityFieldMap = new Map<string, SlugEntityFieldItem>();
+        slugEntityFields.filter(f => f.key).forEach(f => {
+            getKeyVariants(f.key!).forEach(v => entityFieldMap.set(v, f));
+        });
+
+        const hasFormContent = widgetItems.some(item =>
+            item.contents.some(c => c.widget.type === 'form')
+        );
+
+        if (hasFormContent) {
+            /* ── 케이스 1: form 위젯이 이미 있는 경우 ── */
+            setWidgetItems(prev => prev.map(item => ({
+                ...item,
+                contents: item.contents.map(c => {
+                    if (c.widget.type !== 'form') return c;
+                    const formWidget = c.widget as FormWidget;
+
+                    /* 1-1. key가 같은 기존 필드 → 라벨/required 업데이트만 */
+                    const updatedFields = formWidget.fields.map(f => {
+                        const entityField = f.fieldKey ? entityFieldMap.get(f.fieldKey) : undefined;
+                        if (!entityField) return f;
+                        return {
+                            ...f,
+                            /* 라벨이 없는 경우에만 entity 라벨 적용 */
+                            label: f.label || entityField.label,
+                            /* entity not null → required 반영 */
+                            required: entityField.isNullable === false ? true : f.required,
+                        };
+                    });
+
+                    /* 1-2. 기존 form에 없는 entity field → 하단에 추가
+                       원본·camelCase·_from/_to suffix 제거 등 모든 변형이 existingKeys에 없는 경우에만 추가 */
+                    const existingKeys = new Set(
+                        formWidget.fields.map(f => f.fieldKey).filter(Boolean) as string[]
+                    );
+                    const appendFields = slugEntityFields
+                        .filter(f => f.key && getKeyVariants(f.key!).every(v => !existingKeys.has(v)))
+                        .map(buildFieldItem);
+
+                    return { ...c, widget: { ...formWidget, fields: [...updatedFields, ...appendFields] } };
+                }),
+            })));
+        } else {
+            /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ── */
+            const newFields = slugEntityFields.filter(f => f.key).map(buildFieldItem);
+            const connectedSlug = slugOptions.find(s => s.entityId === om.slugEntityId)?.slug;
+
+            const newFormWidget: FormWidget = {
+                type: 'form',
+                widgetId: wuid(),
+                contentKey: '',
+                fields: newFields,
+                ...(connectedSlug ? { connectedSlug } : {}),
+            };
+
+            const newContent: PageContentItem = {
+                id: uid(),
+                colSpan: 12,
+                rowSpan: 1,
+                widget: newFormWidget,
+            };
+
+            const newWidgetItem: PageWidgetItem = {
+                id: wuid(),
+                colSpan: 12,
+                rowSpan: 1,
+                contents: [newContent],
+            };
+
+            setWidgetItems(prev => [...prev, newWidgetItem]);
+        }
+    };
+
     /**
      * 저장 전 공통 validation — 저장 버튼(상단)과 모달 확인 버튼 양쪽에서 동일하게 사용
      * @returns 오류가 없으면 true
@@ -576,7 +732,8 @@ export default function PageBuilderPage() {
                         slugOptions={slugOptions}
                         slugEntityOptions={slugEntityOptions}
                         slugEntityId={om.slugEntityId}
-                        onSlugEntityIdChange={om.setSlugEntityId}
+                        onSlugEntityIdChange={handleSlugEntityIdChange}
+                        onBuildFromEntity={handleBuildFromEntity}
                         leaveCheck={om.leaveCheck}
                         onLeaveCheckChange={om.setLeaveCheck}
                         singlePage={om.singlePage}
@@ -735,6 +892,7 @@ export default function PageBuilderPage() {
                                                                                                     ],
                                                                                                     categoryWidgets: (collectWidgets(widgetItems, 'category') as CategoryWidget[]).map(w => ({ widgetId: w.widgetId, label: w.label, depth: w.depth })),
                                                                                                     maxColSpan: om.isRightDrawer ? 2 : 12,
+                                                                                                    slugEntityFields,
                                                                                                 }}
                                                                                             />
                                                                                         </div>

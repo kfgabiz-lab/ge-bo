@@ -58,6 +58,8 @@ interface FieldBaseProps {
     disableCondition?: string;
     /** 검색제외 — true 시 검색 API 파라미터에 포함하지 않음 (검색 모드에서만 표시) */
     excludeFromSearch?: boolean;
+    /** Slug Entity 필드 목록 — 있을 때 Key 입력을 selectbox로 전환 (form 빌더 전용) */
+    slugEntityFields?: { key: string | null; label: string }[];
     onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; saveConfirm: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
@@ -69,7 +71,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -110,13 +112,27 @@ export function FieldBase(props: FieldBaseProps) {
                 </div>
                 <div>
                     <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                    <input
-                        type="text"
-                        value={fieldKey}
-                        onChange={e => onChange({ fieldKey: e.target.value })}
-                        placeholder="예: userName, status..."
-                        className={`${INPUT_CLS} font-mono`}
-                    />
+                    {/* Slug Entity 선택 시 selectbox로 전환, 없으면 기존 text input */}
+                    {slugEntityFields && slugEntityFields.length > 0 ? (
+                        <select
+                            value={fieldKey ?? ''}
+                            onChange={e => onChange({ fieldKey: e.target.value || '' })}
+                            className={`${INPUT_CLS} font-mono`}
+                        >
+                            <option value="">— 선택없음 —</option>
+                            {slugEntityFields.filter(f => f.key).map(f => (
+                                <option key={f.key} value={f.key!}>{f.key} ({f.label})</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <input
+                            type="text"
+                            value={fieldKey}
+                            onChange={e => onChange({ fieldKey: e.target.value })}
+                            placeholder="예: userName, status..."
+                            className={`${INPUT_CLS} font-mono`}
+                        />
+                    )}
                 </div>
             </div>
 

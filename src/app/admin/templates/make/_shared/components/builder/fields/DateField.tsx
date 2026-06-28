@@ -33,7 +33,7 @@ const calcOffsetValue = (offset: number, subType: DateSubType): string => {
     return iso.slice(0, 10);
 };
 
-export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
+export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
     /* yearMonth 기존 타입은 yearMonth subType으로 fallback */
     const subType: DateSubType = (values.dateSubType as DateSubType) ?? 'date';
     const offset = values.defaultDateOffset ?? 0;
@@ -115,6 +115,7 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 excludeFromSearch={values.excludeFromSearch}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
+                slugEntityFields={slugEntityFields}
                 onChange={onChange}
             />
 

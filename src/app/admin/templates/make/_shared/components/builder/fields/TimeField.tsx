@@ -19,7 +19,7 @@ const BTN_BASE = 'px-2 py-1 text-xs rounded border transition-colors';
 const BTN_ACTIVE = 'bg-slate-900 text-white border-slate-900';
 const BTN_INACTIVE = 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50';
 
-export function TimeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields }: FieldEditProps) {
+export function TimeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
     const currentStep = values.timeStep ?? 1;
 
     return (
@@ -39,6 +39,7 @@ export function TimeField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 disableCondition={values.disableCondition}
                 hideColSpan={hideColSpan}
                 hideConditionFields={hideConditionFields}
+                slugEntityFields={slugEntityFields}
                 onChange={onChange}
             />
             {/* 기본값 */}

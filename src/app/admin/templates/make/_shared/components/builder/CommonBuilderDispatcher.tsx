@@ -37,11 +37,13 @@ interface CommonBuilderDispatcherProps {
         categoryWidgets?: { widgetId: string; label?: string; depth: number }[];
         /** Space 위젯에서 ActionButton만 추가 가능하도록 제한 (quick-list, quick-detail 전용) */
         actionButtonOnly?: boolean;
+        /** Slug Entity 필드 목록 — FormBuilder fieldKey selectbox 전환용 (widget 빌더 전용) */
+        slugEntityFields?: { key: string | null; label: string }[];
     };
 }
 
 export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBuilderDispatcherProps) {
-    const { slugOptions, pageTemplates = [], searchWidgets = [], contentWidgets, formWidgets = [], maxColSpan, categoryWidgets = [], actionButtonOnly } = context;
+    const { slugOptions, pageTemplates = [], searchWidgets = [], contentWidgets, formWidgets = [], maxColSpan, categoryWidgets = [], actionButtonOnly, slugEntityFields } = context;
 
     switch (widget.type) {
         case 'search':
@@ -69,6 +71,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     onChange={w => onChange(w)}
                     slugOptions={slugOptions}
                     maxColSpan={maxColSpan}
+                    slugEntityFields={slugEntityFields}
                 />
             );
 
