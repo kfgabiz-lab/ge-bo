@@ -1,5 +1,7 @@
 ﻿"use client";
 
+import type React from "react";
+
 /**
  * useWidgetPageState — 위젯 페이지 공통 상태 관리 훅
  *
@@ -98,6 +100,127 @@ function findSection(dataJson: Record<string, unknown>, contentKey: string | und
     }
   }
   return dataJson;
+}
+
+/**
+ * Form/SubList/MultiSelect/파일 메타를 dataJson에서 복원하는 공통 순수 함수
+ *
+ * enableUrlEditMode useEffect와 sharedDataId useEffect 양쪽에서 재사용.
+ * 훅 외부에 위치하여 클로저 의존성 없이 동작한다.
+ *
+ * 사용법:
+ *   await restoreFormDataFromJson(dataJson, forms, sublists, multiSels,
+ *     setFormValuesMap, setSubListRowsMap,
+ *     setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
+ *     setExistingFileMetaMap, setImgBlobUrls);
+ */
+async function restoreFormDataFromJson(
+  dataJson: Record<string, unknown>,
+  forms: FormWidget[],
+  sublists: SubListWidget[],
+  multiSels: MultiSelectWidget[],
+  setFormValuesMap: React.Dispatch<React.SetStateAction<Record<string, Record<string, string>>>>,
+  setSubListRowsMap: React.Dispatch<React.SetStateAction<Record<string, SubListRow[]>>>,
+  setMultiSelectValuesMap: React.Dispatch<React.SetStateAction<Record<string, number[]>>>,
+  setMultiSelectExtraFieldValuesMap: React.Dispatch<React.SetStateAction<Record<string, Record<number, Record<string, string>>>>>,
+  setExistingFileMetaMap: React.Dispatch<React.SetStateAction<Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>>>,
+  setImgBlobUrls: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+): Promise<void> {
+  /* 폼 필드 값 복원 */
+  forms.forEach(fw => {
+    const section = findSection(dataJson, fw.contentKey);
+    const vals: Record<string, string> = {};
+    fw.fields.forEach(f => {
+      if (!f.fieldKey) return;
+      if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+        /* dateRange/yearMonthRange: dataJson에서 _from/_to 분리 키로 복원 */
+        const fromVal = section[f.fieldKey + '_from'];
+        const toVal = section[f.fieldKey + '_to'];
+        if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
+        if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
+      } else if (section[f.fieldKey] !== undefined) {
+        const raw = section[f.fieldKey];
+        if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
+      }
+    });
+    setFormValuesMap(prev => ({ ...prev, [fw.widgetId]: vals }));
+  });
+
+  /* SubList 행 복원 */
+  sublists.forEach(sw => {
+    const raw = sw.contentKey ? dataJson[sw.contentKey] : null;
+    /* { rows } 래핑 제거 후 배열 직접 저장 방식 */
+    const rawRows = Array.isArray(raw) ? raw as Record<string, unknown>[] : [];
+    setSubListRowsMap(prev => ({
+      ...prev,
+      [sw.widgetId]: rawRows.map((r, i) => ({
+        _rowId: (r.id as string) ?? `row-${i}`,
+        ...r,
+      })),
+    }));
+  });
+
+  /* MultiSelect 값 복원 */
+  multiSels.forEach(mw => {
+    if (!mw.contentKey) return;
+    /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
+    const rel = dataJson['_rel'] as Record<string, unknown> | undefined;
+    const raw = (mw.connectedSlug && rel?.[mw.connectedSlug]) ?? dataJson[mw.contentKey];
+    if (!Array.isArray(raw)) return;
+    if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
+      const items = raw as { id: number; [key: string]: unknown }[];
+      setMultiSelectValuesMap(prev => ({ ...prev, [mw.widgetId]: items.map(i => i.id) }));
+      const extraVals: Record<number, Record<string, string>> = {};
+      items.forEach(item => {
+        const { id, ...fields } = item;
+        extraVals[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')]));
+      });
+      setMultiSelectExtraFieldValuesMap(prev => ({ ...prev, [mw.widgetId]: extraVals }));
+    } else {
+      setMultiSelectValuesMap(prev => ({
+        ...prev,
+        [mw.widgetId]: (raw as unknown[]).filter(x => typeof x === 'number') as number[],
+      }));
+    }
+  });
+
+  /* 파일 메타 + blob URL 복원 */
+  try {
+    const fileIds: number[] = [];
+    const collectIds = (obj: Record<string, unknown>) => {
+      Object.values(obj).forEach(v => {
+        if (Array.isArray(v) && v.every(x => typeof x === 'number')) fileIds.push(...v as number[]);
+        else if (v && typeof v === 'object' && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
+      });
+    };
+    collectIds(dataJson);
+
+    if (fileIds.length > 0) {
+      const metaRes = await api.get('/page-files/meta', { params: { ids: fileIds.join(',') } });
+      const metaList = metaRes.data as { id: number; origName: string; fileSize: number; mimeType: string }[];
+      forms.forEach(fw => {
+        const section = findSection(dataJson, fw.contentKey);
+        const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
+        fw.fields.forEach(f => {
+          if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
+          const ids = section[f.fieldKey];
+          if (!Array.isArray(ids)) return;
+          metaByFieldId[f.id] = (ids as number[]).map(id => {
+            const m = metaList.find(m => m.id === id);
+            return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
+          });
+          if (f.type === 'image' || f.type === 'video' || f.type === 'media') {
+            (ids as number[]).forEach(id => {
+              api.get(`/page-files/${id}`, { responseType: 'blob' })
+                .then(r => setImgBlobUrls(prev => ({ ...prev, [id]: URL.createObjectURL(r.data) })))
+                .catch(() => {});
+            });
+          }
+        });
+        setExistingFileMetaMap(prev => ({ ...prev, [fw.widgetId]: metaByFieldId }));
+      });
+    }
+  } catch { /* 파일 없으면 조용히 처리 */ }
 }
 
 export function useWidgetPageState(
@@ -592,94 +715,32 @@ export function useWidgetPageState(
   }, [widgetItems, searchParams, options?.enableUrlEditMode]);
 
   /* 수정 모드 초기 데이터 로드 — sharedDataId(탭 공유 row id) 있을 때
-   * 흐름: GET /page-data/{connectedSlug}/{sharedDataId}
-   *   → dataJson[TabItem.contentKey] → section
-   *   → section[FormWidget.contentKey] → 필드값
-   *   → formValuesMap 세팅
+   * Form/SubList/MultiSelect 모두 restoreFormDataFromJson 공통 함수로 복원
    */
   useEffect(() => {
     if (!widgetItems.length) return;
     const id = options?.sharedDataId ?? null;
     if (!id) return;
 
-    const forms = flatWidgets(widgetItems).filter((w) => w.type === 'form') as FormWidget[];
+    const allWidgets    = flatWidgets(widgetItems);
+    const forms         = allWidgets.filter((w) => w.type === 'form')        as FormWidget[];
+    const sublists      = allWidgets.filter((w) => w.type === 'sublist')     as SubListWidget[];
+    const multiSels     = allWidgets.filter((w) => w.type === 'multiselect') as MultiSelectWidget[];
     if (!forms.length) return;
 
     const connectedSlug = forms[0].connectedSlug;
     if (!connectedSlug) return;
 
     api.get(`/page-data/${connectedSlug}/${id}`)
-      .then((dataRes) => {
+      .then(async (dataRes) => {
         const rawDataJson = (dataRes.data.dataJson ?? {}) as Record<string, unknown>;
-
-        /* 폼 contentKey 레벨에서 바로 접근 (탭키 감싸기 제거) */
-        const tabSection: Record<string, unknown> = rawDataJson;
-
-        /* 파일 ID 수집 (메타 로드용) */
-        const allFileIds: number[] = [];
-        const collectIds = (obj: Record<string, unknown>) => {
-          Object.values(obj).forEach((v) => {
-            if (Array.isArray(v) && v.every((x) => typeof x === 'number')) allFileIds.push(...(v as number[]));
-            else if (v && typeof v === 'object' && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
-          });
-        };
-        collectIds(rawDataJson);
-
-        forms.forEach((fw) => {
-          /* form contentKey 레벨 추출 (form1) */
-          const section: Record<string, unknown> = fw.contentKey
-            ? ((tabSection[fw.contentKey] as Record<string, unknown>) ?? tabSection)
-            : tabSection;
-
-          const vals: Record<string, string> = {};
-          fw.fields.forEach((f) => {
-            if (!f.fieldKey) return;
-            if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-              /* dateRange/yearMonthRange: _from/_to 분리 키로 복원 */
-              const fromVal = section[f.fieldKey + '_from'];
-              const toVal = section[f.fieldKey + '_to'];
-              if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
-              if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
-            } else if (section[f.fieldKey] !== undefined) {
-              const raw = section[f.fieldKey];
-              if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
-            }
-          });
-          setFormValuesMap((prev) => ({ ...prev, [fw.widgetId]: vals }));
-        });
-
-        /* 파일 메타 복원 */
-        if (allFileIds.length > 0) {
-          api.get('/page-files/meta', { params: { ids: allFileIds.join(',') } })
-            .then((metaRes) => {
-              const metaList = metaRes.data as { id: number; fieldKey: string; origName: string; fileSize: number; mimeType: string }[];
-              forms.forEach((fw) => {
-                const section: Record<string, unknown> = fw.contentKey
-                  ? ((tabSection[fw.contentKey] as Record<string, unknown>) ?? tabSection)
-                  : tabSection;
-                const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
-                fw.fields.forEach((f) => {
-                  if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
-                  const ids = section[f.fieldKey];
-                  if (!Array.isArray(ids)) return;
-                  metaByFieldId[f.id] = (ids as number[]).map((id) => {
-                    const m = metaList.find((m) => m.id === id);
-                    return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
-                  });
-                  /* 이미지/동영상/미디어 타입: blob URL 생성 → 미리보기·플레이어용 */
-                  if (f.type === 'image' || f.type === 'video' || f.type === 'media') {
-                    (ids as number[]).forEach((id) => {
-                      api.get(`/page-files/${id}`, { responseType: 'blob' })
-                        .then((blobRes) => setImgBlobUrls((prev) => ({ ...prev, [id]: URL.createObjectURL(blobRes.data) })))
-                        .catch(() => {});
-                    });
-                  }
-                });
-                setExistingFileMetaMap((prev) => ({ ...prev, [fw.widgetId]: metaByFieldId }));
-              });
-            })
-            .catch(() => {});
-        }
+        await restoreFormDataFromJson(
+          rawDataJson,
+          forms, sublists, multiSels,
+          setFormValuesMap, setSubListRowsMap,
+          setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
+          setExistingFileMetaMap, setImgBlobUrls,
+        );
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps

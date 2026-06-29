@@ -61,6 +61,14 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
   /* URL ?id — 수정 진입 시 초기 row id */
   const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
 
+  /* hideCondition/disableCondition 평가용 URL 파라미터 — id/group_id 제외 */
+  const urlParams = useMemo(() => {
+    const SKIP = new Set(['id', 'group_id']);
+    const map: Record<string, string> = {};
+    searchParams.forEach((value, key) => { if (!SKIP.has(key)) map[key] = value; });
+    return map;
+  }, [searchParams]);
+
   /**
    * 저장 완료된 탭 인덱스 집합
    * - 수정 진입(urlId 있음): 첫 번째 탭(0)을 사전 포함 (이미 저장된 상태)
@@ -162,6 +170,7 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
                   onCrossTabFormChange={handleCrossTabFormChange}
                   leaveCheck={leaveCheck}
                   onRegisterConfirmLeave={(tabIdx, fn) => { confirmLeaveMap.current[tabIdx] = fn; }}
+                  urlParams={urlParams}
                 />
               ) : (
                 <PreviewTabPanel tab={tab} activeIdx={idx} />
@@ -238,6 +247,8 @@ interface LiveTabPanelProps {
   leaveCheck?: boolean;
   /** 탭 전환 가드용 confirmLeave 함수 등록 콜백 */
   onRegisterConfirmLeave?: (tabIdx: number, fn: () => boolean) => void;
+  /** URL 쿼리 파라미터 — hideCondition/disableCondition 평가용 */
+  urlParams?: Record<string, string>;
 }
 
 /**
@@ -245,7 +256,7 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange, leaveCheck, onRegisterConfirmLeave }: LiveTabPanelProps) {
+function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange, leaveCheck, onRegisterConfirmLeave, urlParams }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [subPageMainConnectedSlug, setSubPageMainConnectedSlug] = useState<string | undefined>(undefined);
@@ -342,6 +353,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
       widgetItems={widgetItems}
       codeGroups={codeGroups}
       dataSlug={dataSlug}
+      urlParams={urlParams}
       crossTabFormValues={crossTabFormValues}
       onCrossTabFormChange={onCrossTabFormChange}
       {...gridProps}
