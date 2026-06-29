@@ -424,6 +424,13 @@ export function FieldRenderer({
             };
             /* offset 기반 기본값 계산 — 서브타입별 포맷 */
             const calcDateDefault = (offset?: number, date?: string): string => {
+                /* defaultToday ON 시 오늘 날짜 최우선 반환 */
+                if (field.defaultToday) {
+                    const iso = new Date().toISOString();
+                    if (dateSubType === 'yearMonth') return iso.slice(0, 7);
+                    if (dateSubType === 'datetime') return iso.slice(0, 16);
+                    return iso.slice(0, 10);
+                }
                 if (offset !== undefined && offset !== 0) {
                     const d = new Date();
                     d.setDate(d.getDate() - offset);
@@ -678,7 +685,7 @@ export function FieldRenderer({
                             className={`${inputCls} resize-none flex-1 min-h-0${readonlyCls}`}
                             value={value}
                             maxLength={field.maxLength}
-                            placeholder={field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요')}
+                            placeholder={isReadOnly ? '' : (field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요'))}
                             onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
                         />
                         <div className="text-right text-[10px] text-slate-400 mt-0.5">
@@ -693,7 +700,7 @@ export function FieldRenderer({
                     readOnly={isReadOnly}
                     className={`${inputCls} resize-none h-full${readonlyCls}`}
                     value={value}
-                    placeholder={field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요')}
+                    placeholder={isReadOnly ? '' : (field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요'))}
                     onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
                 />
             );

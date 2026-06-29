@@ -29,6 +29,7 @@ import { FieldRenderer } from './FieldRenderer';
 import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from './types';
 import type { SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
+import { buildTableRow } from '../../utils';
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
 const PREVIEW_OPTIONS = [
@@ -122,7 +123,11 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
         api.get(`/page-data/${widget.sourceSlug}`, { params: { size: 9999 } })
             .then(res => {
                 const rows = (res.data.content ?? []) as { dataJson: Record<string, unknown> }[];
-                setOptions(rows.map(r => ({ id: Number(r.dataJson['id'] ?? 0), ...r.dataJson })));
+                /* buildTableRow로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */
+                setOptions(rows.map(r => {
+                    const row = buildTableRow(r as Parameters<typeof buildTableRow>[0]);
+                    return { ...row, id: Number(row._id ?? 0) };
+                }));
             })
             .catch(() => {});
     }, [isPreview, widget.sourceSlug]);

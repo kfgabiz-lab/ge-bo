@@ -102,6 +102,7 @@ export interface FieldEditValues {
     defaultDateOffset?: number;      // date: 오늘 기준 N일 전 기본값 (0=오늘)
     defaultDate?: string;            // date: 기본값 날짜 미리보기용 (YYYY-MM-DD)
     disablePast?: boolean;           // date: 오늘 이전 날짜 비활성화
+    defaultToday?: boolean;          // date: 오늘 날짜를 기본값으로 자동 적용
     defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
     defaultStartDate?: string;       // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
     disableStartPast?: boolean;      // dateRange: 시작일 이전 비활성화

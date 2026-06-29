@@ -296,6 +296,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 defaultDateOffset:      f.defaultDateOffset,
                 defaultDate:            f.defaultDate,
                 disablePast:            f.disablePast,
+                defaultToday:           f.defaultToday,
                 defaultStartDateOffset: f.defaultStartDateOffset,
                 defaultStartDate:       f.defaultStartDate,
                 disableStartPast:       f.disableStartPast,

@@ -113,6 +113,7 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         defaultDateOffset: col.defaultDateOffset,
         defaultDate:       col.defaultDate,
         disablePast:       col.disablePast,
+        defaultToday:      col.defaultToday,
         /* dateRange */
         defaultStartDateOffset: col.defaultStartDateOffset,
         defaultStartDate:       col.defaultStartDate,
@@ -165,6 +166,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.defaultDateOffset  !== undefined) patch.defaultDateOffset  = updates.defaultDateOffset;
     if (updates.defaultDate        !== undefined) patch.defaultDate        = updates.defaultDate;
     if (updates.disablePast        !== undefined) patch.disablePast        = updates.disablePast;
+    if (updates.defaultToday       !== undefined) patch.defaultToday       = updates.defaultToday;
     /* dateRange */
     if (updates.defaultStartDateOffset !== undefined) patch.defaultStartDateOffset = updates.defaultStartDateOffset;
     if (updates.defaultStartDate       !== undefined) patch.defaultStartDate       = updates.defaultStartDate;

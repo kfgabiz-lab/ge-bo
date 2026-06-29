@@ -747,29 +747,50 @@ export function initFormDefaultValues(
     formWidgets: import('./components/builder/FormBuilder').FormWidget[],
     t?: (key: string) => string,
 ): Record<string, Record<string, string>> {
-    const calcDate = (offset: number) => {
+    /* subType에 따라 날짜 포맷 분기 (date/yearMonth/datetime) */
+    const calcDate = (offset: number, subType: string = 'date') => {
         const d = new Date();
         d.setDate(d.getDate() - offset);
-        return d.toISOString().slice(0, 10);
+        const iso = d.toISOString();
+        if (subType === 'yearMonth') return iso.slice(0, 7);
+        if (subType === 'datetime') return iso.slice(0, 16);
+        return iso.slice(0, 10);
     };
 
     const result: Record<string, Record<string, string>> = {};
     formWidgets.forEach(fw => {
         const vals: Record<string, string> = {};
         fw.fields.forEach(f => {
-            if (f.type === 'date' && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+            if (f.type === 'date' && (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)) {
                 let dateVal = '';
-                if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
-                    dateVal = calcDate(f.defaultDateOffset);
+                if (f.defaultToday) {
+                    /* 오늘날짜 ON: dateSubType에 맞는 포맷으로 오늘 날짜 반환 */
+                    const iso = new Date().toISOString();
+                    const subType = f.dateSubType ?? 'date';
+                    if (subType === 'yearMonth') dateVal = iso.slice(0, 7);
+                    else if (subType === 'datetime') dateVal = iso.slice(0, 16);
+                    else dateVal = iso.slice(0, 10);
+                } else if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
+                    dateVal = calcDate(f.defaultDateOffset, f.dateSubType ?? 'date');
                 } else if (f.defaultDate) {
                     dateVal = f.defaultDate;
                 }
                 if (dateVal) vals[f.id] = dateVal;
             } else if (f.type === 'dateRange') {
-                const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0)
-                    ? calcDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
-                const end = (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0)
-                    ? calcDate(f.defaultEndDateOffset) : (f.defaultEndDate ?? '');
+                const subType = f.rangeSubType ?? 'date';
+                let start = '', end = '';
+                if (f.defaultToday) {
+                    /* 오늘날짜 ON: rangeSubType에 맞는 포맷으로 from/to 모두 오늘로 설정 */
+                    const iso = new Date().toISOString();
+                    if (subType === 'yearMonth') { start = iso.slice(0, 7); end = iso.slice(0, 7); }
+                    else if (subType === 'datetime') { start = iso.slice(0, 16); end = iso.slice(0, 16); }
+                    else { start = iso.slice(0, 10); end = iso.slice(0, 10); }
+                } else {
+                    start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0)
+                        ? calcDate(f.defaultStartDateOffset, subType) : (f.defaultStartDate ?? '');
+                    end = (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0)
+                        ? calcDate(f.defaultEndDateOffset, subType) : (f.defaultEndDate ?? '');
+                }
                 /* dateRange: _from/_to 분리 키로 초기값 저장 */
                 if (start) vals[f.id + '_from'] = start;
                 if (end) vals[f.id + '_to'] = end;

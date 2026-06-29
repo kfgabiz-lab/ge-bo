@@ -339,7 +339,7 @@ export function useWidgetPageState(
     flatWidgets(widgetItems).forEach(w => {
       if (w.type !== 'search') return;
       (w.rows as { fields: SearchFieldConfig[] }[]).flatMap(r => r.fields).forEach((f: SearchFieldConfig) => {
-        if ((f.type === 'date' || f.type === 'yearMonth') && (f.defaultDateOffset !== undefined || f.defaultDate)) {
+        if ((f.type === 'date' || f.type === 'yearMonth') && (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)) {
           /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
           const subType = f.type === 'yearMonth' ? 'yearMonth' : (f.dateSubType ?? 'date');
           const calcDateBySubType = (offset: number): string => {
@@ -349,7 +349,16 @@ export function useWidgetPageState(
             if (subType === 'datetime') return iso.slice(0, 16);
             return iso.slice(0, 10);
           };
-          const val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) ? calcDateBySubType(f.defaultDateOffset) : (f.defaultDate ?? '');
+          let val = '';
+          if (f.defaultToday) {
+            /* 오늘날짜 ON: 오늘 날짜를 subType 포맷으로 반환 */
+            const iso = new Date().toISOString();
+            if (subType === 'yearMonth') val = iso.slice(0, 7);
+            else if (subType === 'datetime') val = iso.slice(0, 16);
+            else val = iso.slice(0, 10);
+          } else {
+            val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) ? calcDateBySubType(f.defaultDateOffset) : (f.defaultDate ?? '');
+          }
           if (val) initVals[f.id] = val;
         } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
           /* rangeSubType에 따라 날짜 포맷 분기 */
@@ -624,7 +633,14 @@ export function useWidgetPageState(
 
           const vals: Record<string, string> = {};
           fw.fields.forEach((f) => {
-            if (f.fieldKey && section[f.fieldKey] !== undefined) {
+            if (!f.fieldKey) return;
+            if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+              /* dateRange/yearMonthRange: _from/_to 분리 키로 복원 */
+              const fromVal = section[f.fieldKey + '_from'];
+              const toVal = section[f.fieldKey + '_to'];
+              if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
+              if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
+            } else if (section[f.fieldKey] !== undefined) {
               const raw = section[f.fieldKey];
               if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
             }

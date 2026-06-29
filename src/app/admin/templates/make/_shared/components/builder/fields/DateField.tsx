@@ -39,6 +39,8 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
     const offset = values.defaultDateOffset ?? 0;
     /* 0이 아닌 경우 자동계산 표시 */
     const isAutoCalc = offset !== 0;
+    /* 오늘날짜 토글 ON 시 +/- 버튼·입력 전체 비활성화 */
+    const isTodayLocked = values.defaultToday === true;
 
     /* 서브타입 변경 시 날짜 기본값 초기화 */
     const handleSubTypeChange = (val: DateSubType) => {
@@ -79,9 +81,9 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
         : subType === 'datetime' ? 'datetime-local'
         : 'date';
 
-    const disableLabel = subType === 'yearMonth' ? '토글 on - 이전 년월 비활성화'
-        : subType === 'datetime' ? '토글 on - 이전 일시 비활성화'
-        : '토글 on - 이전 날짜 비활성화';
+    const disableLabel = subType === 'yearMonth' ? '이전 년월 비활성화'
+        : subType === 'datetime' ? '이전 일시 비활성화'
+        : '이전 날짜 비활성화';
 
     return (
         <div className="space-y-1.5">
@@ -119,44 +121,75 @@ export function DateField({ values, onChange, colSpanMode, rowSpanConfig, autoFo
                 onChange={onChange}
             />
 
-            {/* 기본값 | 비활성화 토글 */}
-            <div className="flex items-end gap-2">
-                <div className="flex-1">
-                    <label className={LABEL_CLS}>기본값 <span className="text-slate-300 font-normal">({disableLabel})</span></label>
-                    <div className="flex items-center gap-1">
-                        <button type="button" onClick={handleMinus} className={BTN_CLS}>-</button>
-                        <input
-                            type="number"
-                            value={offset}
-                            onChange={handleOffsetInput}
-                            className={INPUT_NUM_CLS}
-                        />
-                        <button type="button" onClick={handlePlus} className={BTN_CLS}>+</button>
-                        {/* 날짜 input — offset≠0이면 자동계산 readonly, 0이면 수동 입력 */}
-                        <div className={DATE_WRAP_CLS}>
-                            {isAutoCalc ? (
-                                <input
-                                    type={inputType}
-                                    value={calcOffsetValue(offset, subType)}
-                                    readOnly
-                                    className={INPUT_DATE_READONLY_CLS}
-                                />
-                            ) : (
-                                <input
-                                    type={inputType}
-                                    value={values.defaultDate ?? ''}
-                                    onChange={e => onChange({ defaultDate: e.target.value || undefined })}
-                                    className={INPUT_DATE_CLS}
-                                />
-                            )}
-                        </div>
+            {/* 기본값 섹션 */}
+            <div>
+                <label className={LABEL_CLS}>기본값</label>
+                <div className="flex items-center gap-1">
+                    {/* 오늘날짜 ON 시 +/- 버튼·숫자 input 비활성화 */}
+                    <button
+                        type="button"
+                        onClick={handleMinus}
+                        disabled={isTodayLocked}
+                        className={`${BTN_CLS} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >-</button>
+                    <input
+                        type="number"
+                        value={offset}
+                        onChange={handleOffsetInput}
+                        disabled={isTodayLocked}
+                        className={`${INPUT_NUM_CLS} disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed`}
+                    />
+                    <button
+                        type="button"
+                        onClick={handlePlus}
+                        disabled={isTodayLocked}
+                        className={`${BTN_CLS} disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >+</button>
+                    {/* 날짜 input — offset≠0이면 자동계산 readonly, 0이면 수동 입력, 오늘날짜 ON 시 비활성화 */}
+                    <div className={DATE_WRAP_CLS}>
+                        {isTodayLocked ? (
+                            <input
+                                type={inputType}
+                                value={calcOffsetValue(0, subType)}
+                                readOnly
+                                disabled
+                                className={INPUT_DATE_READONLY_CLS}
+                            />
+                        ) : isAutoCalc ? (
+                            <input
+                                type={inputType}
+                                value={calcOffsetValue(offset, subType)}
+                                readOnly
+                                className={INPUT_DATE_READONLY_CLS}
+                            />
+                        ) : (
+                            <input
+                                type={inputType}
+                                value={values.defaultDate ?? ''}
+                                onChange={e => onChange({ defaultDate: e.target.value || undefined })}
+                                className={INPUT_DATE_CLS}
+                            />
+                        )}
                     </div>
                 </div>
-                <div className="flex-shrink-0 pb-1">
+                {/* 하단 토글 2개 — 이전 날짜 비활성화 | 오늘날짜 */}
+                <div className="flex items-center justify-between mt-2">
                     <ToggleRow
-                        label=""
+                        label={disableLabel}
                         value={values.disablePast ?? false}
                         onChange={v => onChange({ disablePast: v || undefined })}
+                    />
+                    <ToggleRow
+                        label="오늘날짜"
+                        value={values.defaultToday ?? false}
+                        onChange={v => {
+                            /* 오늘날짜 ON 시 offset·수동날짜 초기화 */
+                            onChange({
+                                defaultToday: v || undefined,
+                                defaultDateOffset: v ? undefined : values.defaultDateOffset,
+                                defaultDate: v ? undefined : values.defaultDate,
+                            });
+                        }}
                     />
                 </div>
             </div>
