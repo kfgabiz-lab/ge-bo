@@ -17,7 +17,7 @@ import { ToggleRow } from './_ToggleRow';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
-export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
+export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields, slugOptions }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
     return (
         <div className="space-y-1.5">
@@ -57,13 +57,20 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                         className={INPUT_CLS} />
                 )}
             </div>
-            {/* 옵션 */}
+            {/* 옵션 — SLUG 탭 포함 (select 전용) */}
             <FieldOptions
-                options={values.options} codeGroupCode={values.codeGroupCode}
-                codeGroups={codeGroups} codeGroupsLoading={codeGroupsLoading}
+                options={values.options}
+                codeGroupCode={values.codeGroupCode}
+                optionSlug={values.optionSlug}
+                optionValueKey={values.optionValueKey}
+                optionTextKey={values.optionTextKey}
+                codeGroups={codeGroups}
+                codeGroupsLoading={codeGroupsLoading}
                 onChange={updates => onChange(updates)}
                 defaultOptionValue={values.defaultOptionValue}
                 onDefaultOptionChange={v => onChange({ defaultOptionValue: v || undefined })}
+                showSlugTab={true}
+                slugOptions={slugOptions}
             />
             {/* 필수 항목 */}
         </div>

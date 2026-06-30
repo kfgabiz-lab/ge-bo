@@ -274,6 +274,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
             rangeSubType, dateSubType, singleDateRange,
+            /* select SLUG 옵션 소스 */
+            optionSlug, optionValueKey, optionTextKey,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -339,6 +341,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             /* 동적 조건 */
             hideCondition:     hideCondition?.trim()    || undefined,
             disableCondition:  disableCondition?.trim() || undefined,
+            /* select SLUG 옵션 소스 */
+            optionSlug:        pendingType === 'select' ? (optionSlug || undefined) : undefined,
+            optionValueKey:    pendingType === 'select' ? (optionValueKey || undefined) : undefined,
+            optionTextKey:     pendingType === 'select' ? (optionTextKey || undefined) : undefined,
         };
 
         onChange(rows.map(r =>
@@ -385,7 +391,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
         };
         switch (type) {
             case 'input':          return <InputField {...props} />;
-            case 'select':         return <SelectField {...props} />;
+            /* slugOptions: PAGE_DATA slug 목록 전달 — SLUG 탭 옵션 소스 선택에 사용 */
+            case 'select':         return <SelectField {...props} slugOptions={slugOptions} />;
             case 'date':           return <DateField {...props} />;
             case 'dateRange':      return <DateRangeField {...props} />;
             case 'yearMonth':      return <DateField {...props} />;
@@ -549,6 +556,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 /* 동적 조건 */
                                                                                 hideCondition:       field.hideCondition,
                                                                                 disableCondition:    field.disableCondition,
+                                                                                /* select SLUG 옵션 소스 */
+                                                                                optionSlug:          field.optionSlug,
+                                                                                optionValueKey:      field.optionValueKey,
+                                                                                optionTextKey:       field.optionTextKey,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

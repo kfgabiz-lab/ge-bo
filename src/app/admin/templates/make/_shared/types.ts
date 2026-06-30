@@ -35,9 +35,9 @@ export interface SearchFieldConfig {
     label2MsgKey?: string;  // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
     /** dateRange 통합 서브타입 — 범위 입력 방식 (기본: 'date') */
-    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time';
+    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
     /** date 통합 서브타입 — 단독 날짜 입력 방식 (기본: 'date') */
-    dateSubType?: 'date' | 'yearMonth' | 'datetime';
+    dateSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
     /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
     singleDateRange?: boolean;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
@@ -148,6 +148,13 @@ export interface SearchFieldConfig {
     truncateLength?: number;
     /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
     dataGenerations?: { generationKey: string; onlyIfEmpty?: boolean; stripHtml?: boolean; dataReplacement?: 'none' | 'hyphen'; caseChange?: 'none' | 'upper' | 'lower'; appendText?: string; truncateLength?: number; }[];
+    /* ── select SLUG 옵션 소스 전용 ── */
+    /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
+    optionSlug?: string;
+    /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원, 예: id, form1.code) */
+    optionValueKey?: string;
+    /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원, 예: name, form1.title) */
+    optionTextKey?: string;
 }
 
 /** 검색폼 행 설정 */

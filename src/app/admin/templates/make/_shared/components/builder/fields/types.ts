@@ -6,6 +6,7 @@
  */
 
 import { CodeGroupDef } from '../../../types';
+import type { SlugOption } from './SlugSelectField';
 
 /** ColSpan 표시 방식 */
 export type ColSpanMode =
@@ -111,10 +112,10 @@ export interface FieldEditValues {
     disableEndPast?: boolean;        // dateRange: 종료일 이전 비활성화
     maxRangeValue?: number;          // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
     maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
-    /** dateRange 통합 서브타입 — 날짜/년월/일시분초/시분초 (기본: 'date') */
-    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time';
-    /** date 통합 서브타입 — 날짜/년월/일시분초 (기본: 'date') */
-    dateSubType?: 'date' | 'yearMonth' | 'datetime';
+    /** dateRange 통합 서브타입 — 날짜/년월/일시분초/시분/시분초 (기본: 'date') */
+    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
+    /** date 통합 서브타입 — 날짜/년월/일시분초/시분/시분초 (기본: 'date') */
+    dateSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
     /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
     singleDateRange?: boolean;
     /* ── category 전용 ── */
@@ -152,6 +153,13 @@ export interface FieldEditValues {
     dataGenerations?: DataGenerationEntry[];
     /* ── action 컬럼 전용 (SubList action 타입 컬럼에서 사용) ── */
     actions?: ('edit' | 'detail' | 'delete' | 'copy')[];
+    /* ── select SLUG 옵션 소스 전용 ── */
+    /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
+    optionSlug?: string;
+    /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원, 예: id, form1.code) */
+    optionValueKey?: string;
+    /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원, 예: name, form1.title) */
+    optionTextKey?: string;
 }
 
 /**
@@ -185,6 +193,8 @@ export interface FieldEditProps {
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     /** Slug Entity 필드 목록 — 있을 때 fieldKey 입력을 selectbox로 전환 (form 빌더 전용) */
     slugEntityFields?: { key: string | null; label: string }[];
+    /** SLUG 옵션 소스 목록 — select 필드의 SLUG 탭에서 연결할 slug 목록 (SlugSelectField에 전달) */
+    slugOptions?: SlugOption[];
 }
 
-export type { CodeGroupDef };
+export type { CodeGroupDef, SlugOption };

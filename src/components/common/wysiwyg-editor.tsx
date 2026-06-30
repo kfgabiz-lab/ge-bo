@@ -29,6 +29,8 @@ export default function WysiwygEditor({
   const isReadyRef = useRef(false);
   /* 사용자가 실제 수정/모드전환한 이후 외부 props 덮어쓰기 차단용 */
   const hasUserEditedRef = useRef(false);
+  /* setHTML 프로그래매틱 호출 중 change 이벤트 차단용 — DB 로드 시 오탐 방지 */
+  const isProgrammaticSetRef = useRef(false);
 
   useEffect(() => {
     /* 다음 tick 이후부터 onChange 허용 */
@@ -41,11 +43,14 @@ export default function WysiwygEditor({
   /* DB 데이터 로드 시 에디터에 반영 — 사용자가 직접 수정하기 전까지만 */
   useEffect(() => {
     if (!initialValue || hasUserEditedRef.current) return;
+    /* setHTML이 동기적으로 change를 발화하므로 호출 전후로 차단 플래그 설정 */
+    isProgrammaticSetRef.current = true;
     editorRef.current?.getInstance()?.setHTML(initialValue);
+    setTimeout(() => { isProgrammaticSetRef.current = false; }, 0);
   }, [initialValue]);
 
   const handleChange = useCallback(() => {
-    if (!isReadyRef.current) return;
+    if (!isReadyRef.current || isProgrammaticSetRef.current) return;
     hasUserEditedRef.current = true;
     const html = editorRef.current?.getInstance().getHTML();
     if (html !== undefined) onChange?.(html);

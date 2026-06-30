@@ -17,7 +17,7 @@
  *   <FieldRenderer mode={mode} field={f} fileList={...} onFileChange={...} />
  */
 
-import React, { useRef, useId } from 'react';
+import React, { useRef, useId, useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { CategorySearchField } from './CategorySearchField';
@@ -38,7 +38,7 @@ const fmtSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
         : `${Math.round(bytes / 1024)}KB`;
-import { parseOpt } from '../../utils';
+import { parseOpt, flattenPageDataItem } from '../../utils';
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -318,6 +318,69 @@ function ColorPresetSelector({ colors, selectedColor, disabled, onChange }: Colo
     );
 }
 
+/**
+ * SlugOptionSelect — SLUG 옵션 소스 select 컴포넌트 (live 모드 전용)
+ *
+ * field.optionSlug로 지정된 SLUG에서 데이터를 API fetch하여 select 옵션을 채운다.
+ * optionValueKey / optionTextKey: dot notation으로 dataJson에서 값을 추출.
+ */
+function SlugOptionSelect({
+    field,
+    value,
+    onChange,
+    isDisabled,
+    isReadOnly,
+    placeholder,
+    readonlyCls,
+}: {
+    field: SearchFieldConfig;
+    value: string;
+    onChange?: (v: string) => void;
+    isDisabled: boolean;
+    isReadOnly: boolean;
+    placeholder: string;
+    readonlyCls: string;
+}) {
+    const [slugOpts, setSlugOpts] = useState<{ value: string; text: string }[]>([]);
+
+    /* optionSlug / optionValueKey / optionTextKey 변경 시 API fetch */
+    useEffect(() => {
+        if (!field.optionSlug) return;
+        api.get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })
+            .then((res) => {
+                const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
+                setSlugOpts(
+                    rows.map((item) => {
+                        /* flattenPageDataItem으로 contentKey 중첩 → flat key 접근 (form.prdNm → prdNm) */
+                        const row = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
+                        return {
+                            value: String(row[field.optionValueKey ?? ''] ?? ''),
+                            text:  String(row[field.optionTextKey ?? ''] ?? ''),
+                        };
+                    })
+                );
+            })
+            .catch(() => setSlugOpts([]));
+    }, [field.optionSlug, field.optionValueKey, field.optionTextKey]);
+
+    return (
+        <div className="relative">
+            <select
+                disabled={isDisabled || isReadOnly}
+                className={`${selectCls}${readonlyCls}`}
+                value={value}
+                onChange={isReadOnly ? undefined : (e) => onChange?.(e.target.value)}
+            >
+                <option value="">{placeholder}</option>
+                {slugOpts.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.text}</option>
+                ))}
+            </select>
+            <SelectArrow />
+        </div>
+    );
+}
+
 export function FieldRenderer({
     mode,
     field,
@@ -387,7 +450,23 @@ export function FieldRenderer({
         }
 
         /* ── select ── */
-        case 'select':
+        case 'select': {
+            const selectPlaceholder = field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || t('common.select.placeholder'));
+            /* SLUG 옵션 소스: live 모드에서 SLUG 데이터를 API fetch하여 옵션 채움 */
+            if (field.optionSlug && !isPreview) {
+                return (
+                    <SlugOptionSelect
+                        field={field}
+                        value={value}
+                        onChange={onChange}
+                        isDisabled={isDisabled}
+                        isReadOnly={isReadOnly}
+                        placeholder={selectPlaceholder}
+                        readonlyCls={readonlyCls}
+                    />
+                );
+            }
+            /* 수동/공통코드 기존 렌더링 */
             return (
                 <div className="relative">
                     <select
@@ -396,7 +475,7 @@ export function FieldRenderer({
                         value={value}
                         onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                     >
-                        <option value="">{field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || t('common.select.placeholder'))}</option>
+                        <option value="">{selectPlaceholder}</option>
                         {opts.map(opt => {
                             const { text, value: val } = parseOpt(opt);
                             return <option key={opt} value={val}>{t(text)}</option>;
@@ -405,6 +484,7 @@ export function FieldRenderer({
                     <SelectArrow />
                 </div>
             );
+        }
 
         /* ── yearMonth — date 통합 케이스로 fall-through (하위 호환) ── */
         case 'yearMonth':
@@ -414,12 +494,16 @@ export function FieldRenderer({
             const dateSubType = field.type === 'yearMonth' ? 'yearMonth' : (field.dateSubType ?? 'date');
             const inputType = dateSubType === 'yearMonth' ? 'month'
                 : dateSubType === 'datetime' ? 'datetime-local'
+                : (dateSubType === 'time' || dateSubType === 'timeSec') ? 'time'
                 : 'date';
             /* 오늘 값 (min 제약에 사용) — 서브타입별 포맷 */
             const getTodayVal = (): string => {
                 const iso = new Date().toISOString();
+                const d = new Date();
                 if (dateSubType === 'yearMonth') return iso.slice(0, 7);
                 if (dateSubType === 'datetime') return iso.slice(0, 16);
+                if (dateSubType === 'time') return d.toTimeString().slice(0, 5);
+                if (dateSubType === 'timeSec') return d.toTimeString().slice(0, 8);
                 return iso.slice(0, 10);
             };
             /* offset 기반 기본값 계산 — 서브타입별 포맷 */
@@ -427,10 +511,15 @@ export function FieldRenderer({
                 /* defaultToday ON 시 오늘 날짜 최우선 반환 */
                 if (field.defaultToday) {
                     const iso = new Date().toISOString();
+                    const d = new Date();
                     if (dateSubType === 'yearMonth') return iso.slice(0, 7);
                     if (dateSubType === 'datetime') return iso.slice(0, 16);
+                    if (dateSubType === 'time') return d.toTimeString().slice(0, 5);
+                    if (dateSubType === 'timeSec') return d.toTimeString().slice(0, 8);
                     return iso.slice(0, 10);
                 }
+                /* 시간 계열은 offset 날짜 계산 불가 — defaultDate 직접 사용 */
+                if (dateSubType === 'time' || dateSubType === 'timeSec') return date ?? '';
                 if (offset !== undefined && offset !== 0) {
                     const d = new Date();
                     d.setDate(d.getDate() - offset);
@@ -447,6 +536,7 @@ export function FieldRenderer({
             return (
                 <input
                     type={inputType}
+                    step={dateSubType === 'timeSec' ? 1 : undefined}
                     disabled={isDisabled}
                     readOnly={isReadOnly}
                     className={`${inputCls}${readonlyCls}`}
@@ -471,15 +561,17 @@ export function FieldRenderer({
 
             const inputType = subType === 'yearMonth' ? 'month'
                 : subType === 'datetime' ? 'datetime-local'
-                : subType === 'time' ? 'time'
+                : (subType === 'time' || subType === 'timeSec') ? 'time'
                 : 'date';
 
             /* 서브타입별 오늘 값 계산 (min 제약에 사용) */
             const getToday = (): string => {
                 const iso = new Date().toISOString();
+                const d = new Date();
                 if (subType === 'yearMonth') return iso.slice(0, 7);
                 if (subType === 'datetime') return iso.slice(0, 16);
-                if (subType === 'time') return new Date().toTimeString().slice(0, 5);
+                if (subType === 'time') return d.toTimeString().slice(0, 5);
+                if (subType === 'timeSec') return d.toTimeString().slice(0, 8);
                 return iso.slice(0, 10);
             };
 
@@ -508,6 +600,7 @@ export function FieldRenderer({
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
                             type={inputType}
+                            step={subType === 'timeSec' ? 1 : undefined}
                             disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}
@@ -521,6 +614,7 @@ export function FieldRenderer({
                         <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         <input
                             type={inputType}
+                            step={subType === 'timeSec' ? 1 : undefined}
                             disabled={isDisabled}
                             readOnly={isReadOnly}
                             className={`${inputCls} pl-9${readonlyCls}`}

@@ -71,7 +71,7 @@ import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
 import type { PageTableData } from './PageGridRenderer';
-import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, buildTableRow, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList } from '../../utils';
+import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList } from '../../utils';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
@@ -562,7 +562,7 @@ export function WidgetRenderer({
                         const res = await api.get(`/page-data/${tw.connectedSlug}`, {
                             params: { page: '0', size: String(pageSize) },
                         });
-                        const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
+                        const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
                         tableDataAccum[tw.widgetId] = {
                             rows,
                             totalElements: res.data.totalElements ?? 0,
@@ -737,7 +737,7 @@ export function WidgetRenderer({
             const reqParams: Record<string, string> = { page: String(page), size: String(pageSize) };
             if (sk) reqParams.sort = `${sk},${sd}`;
             const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
-            const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
+            const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
             setPopupTableDataMap(prev => ({
                 ...prev,
                 [widgetId]: { rows, totalElements: res.data.totalElements ?? 0, totalPages: res.data.totalPages ?? 0, currentPage: page, loading: false, appendLoading: false, hasMore: res.data.last === false, nextPage: res.data.last === false ? page + 1 : page },
@@ -759,7 +759,7 @@ export function WidgetRenderer({
             const reqParams: Record<string, string> = { page: '0', size: String(pageSize) };
             if (dir && accessor) reqParams.sort = `${accessor},${dir}`;
             const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
-            const rows = (res.data.content as Parameters<typeof buildTableRow>[0][]).map(buildTableRow);
+            const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
             setPopupTableDataMap(prev => ({
                 ...prev,
                 [widgetId]: { rows, totalElements: res.data.totalElements ?? 0, totalPages: res.data.totalPages ?? 0, currentPage: 0, loading: false, appendLoading: false, hasMore: res.data.last === false, nextPage: res.data.last === false ? 1 : 0 },
@@ -1303,7 +1303,7 @@ export function WidgetRenderer({
                     try {
                         await api.patch(`/page-data/${connectedSlug}/${id}/field`, { fieldKey, value });
                         /* 낙관적 업데이트 — 서버 재조회 전 즉시 UI 반영
-                         * buildTableRow가 root에 flat 병합한 값도 함께 업데이트 (accessor 읽기 일치) */
+                         * flattenPageDataItem이 root에 flat 병합한 값도 함께 업데이트 (accessor 읽기 일치) */
                         const lastKey = fieldKey.includes('.') ? fieldKey.split('.').pop()! : fieldKey;
                         setLocalTableData(prev => prev?.map(row => {
                             if ((row as { _id?: number })._id !== id) return row;

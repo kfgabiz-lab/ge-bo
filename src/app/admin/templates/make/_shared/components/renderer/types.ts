@@ -170,6 +170,8 @@ export interface SubListColumn {
     defaultDateOffset?: number;    // 오늘 기준 N일 전 기본값
     defaultDate?: string;          // 기본값 날짜 미리보기 (YYYY-MM-DD)
     disablePast?: boolean;         // 오늘 이전 날짜 비활성화
+    dateSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 날짜 단독 서브타입 (기본: 'date')
+    defaultToday?: boolean;        // 오늘 날짜를 기본값으로 자동 적용
     /* ── dateRange 전용 ── */
     label2?: string;               // 종료일 라벨
     label2MsgKey?: string;         // 종료일 라벨 다국어 키
@@ -179,8 +181,16 @@ export interface SubListColumn {
     defaultEndDateOffset?: number;
     defaultEndDate?: string;
     disableEndPast?: boolean;
+    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 날짜 범위 서브타입 (기본: 'date')
     /* ── action 타입 전용 ── */
     actions?: ('copy' | 'delete')[];    // SubList action 컬럼: copy, delete 가능
+    /* ── select SLUG 옵션 소스 전용 ── */
+    /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
+    optionSlug?: string;
+    /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원) */
+    optionValueKey?: string;
+    /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원) */
+    optionTextKey?: string;
 }
 
 /**

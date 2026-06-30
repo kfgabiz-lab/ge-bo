@@ -2,7 +2,7 @@
 
 /**
  * DateRangeField — 날짜 범위 (from~to) 필드 설정 컴포넌트
- * rangeSubType으로 날짜/년월/일시분초/시분초 4가지 범위 타입 통합 지원
+ * rangeSubType으로 날짜/년월/일시분/시분/시분초 5가지 범위 타입 통합 지원
  *
  * 사용법:
  *   <DateRangeField values={field} onChange={onChange}
@@ -15,7 +15,7 @@ import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import { ToggleRow } from './_ToggleRow';
 
-type RangeSubType = 'date' | 'yearMonth' | 'datetime' | 'time';
+type RangeSubType = 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
 
 const BTN_CLS = 'w-6 h-7 text-xs font-bold rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 transition-colors flex-shrink-0';
 const INPUT_DATE_CLS = 'w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900';
@@ -23,8 +23,9 @@ const INPUT_DATE_READONLY_CLS = 'w-full border border-slate-200 rounded px-2 py-
 const DATE_WRAP_CLS = 'flex-1 overflow-hidden flex-shrink-0';
 const INPUT_NUM_CLS = 'w-10 border border-slate-200 rounded px-1 py-1.5 text-xs text-center bg-white focus:outline-none focus:border-slate-900';
 
-/** 서브타입별 오늘 기준 N일 전 값 계산 */
+/** 서브타입별 오늘 기준 N일 전 값 계산 — time/timeSec는 offset 무의미 */
 const calcOffsetValue = (offset: number, subType: RangeSubType): string => {
+    if (subType === 'time' || subType === 'timeSec') return '';
     const d = new Date();
     d.setDate(d.getDate() - offset);
     const iso = d.toISOString();
@@ -36,7 +37,7 @@ const calcOffsetValue = (offset: number, subType: RangeSubType): string => {
 export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
     /* yearMonthRange 기존 타입은 yearMonth subType으로 fallback */
     const subType: RangeSubType = (values.rangeSubType as RangeSubType) ?? 'date';
-    const isTime = subType === 'time';
+    const isTime = subType === 'time' || subType === 'timeSec'; // 시간 계열 타입 여부
 
     const startOffset = values.defaultStartDateOffset ?? 0;
     const endOffset   = values.defaultEndDateOffset   ?? 0;
@@ -83,20 +84,22 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
     /* 서브타입별 input type / 라벨 */
     const inputType = subType === 'yearMonth' ? 'month'
         : subType === 'datetime' ? 'datetime-local'
-        : subType === 'time' ? 'time'
+        : (subType === 'time' || subType === 'timeSec') ? 'time'
         : 'date';
 
-    const startLabel = subType === 'time' ? '시작 시간 기본값'
+    const startLabel = subType === 'timeSec' ? '시작 시분초 기본값'
+        : subType === 'time' ? '시작 시분 기본값'
         : subType === 'yearMonth' ? '시작 년월 기본값'
         : subType === 'datetime' ? '시작 일시 기본값'
         : '시작일 기본값';
 
-    const endLabel = subType === 'time' ? '종료 시간 기본값'
+    const endLabel = subType === 'timeSec' ? '종료 시분초 기본값'
+        : subType === 'time' ? '종료 시분 기본값'
         : subType === 'yearMonth' ? '종료 년월 기본값'
         : subType === 'datetime' ? '종료 일시 기본값'
         : '종료일 기본값';
 
-    const disableLabel = subType === 'time' ? '(토글 on - 이전 시간 비활성화)'
+    const disableLabel = isTime ? '(토글 on - 이전 시간 비활성화)'
         : subType === 'yearMonth' ? '(토글 on - 이전 년월 비활성화)'
         : '(토글 on - 이전 날짜 비활성화)';
 
@@ -124,7 +127,8 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                     <option value="date">날짜 (YYYY-MM-DD)</option>
                     <option value="yearMonth">년월 (YYYY-MM)</option>
                     <option value="datetime">일시분초 (YYYY-MM-DD HH:mm)</option>
-                    <option value="time">시분초 (HH:mm)</option>
+                    <option value="time">시분 (HH:mm)</option>
+                    <option value="timeSec">시분초 (HH:mm:ss)</option>
                 </select>
             </div>
 
@@ -167,9 +171,10 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                         {!isTime && <span className="text-slate-300 font-normal"> {disableLabel}</span>}
                     </label>
                     {isTime ? (
-                        /* time 타입: 직접 시간 입력 (offset 없음) */
+                        /* 시간 계열: 직접 시간 입력 (offset 없음), timeSec는 초 단위 step=1 */
                         <input
                             type="time"
+                            step={subType === 'timeSec' ? 1 : undefined}
                             value={values.defaultStartDate ?? ''}
                             onChange={e => onChange({ defaultStartDate: e.target.value || undefined })}
                             className={INPUT_DATE_CLS}
@@ -203,8 +208,10 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                         {!isTime && <span className="text-slate-300 font-normal"> {disableLabel}</span>}
                     </label>
                     {isTime ? (
+                        /* 시간 계열: 직접 시간 입력 (offset 없음), timeSec는 초 단위 step=1 */
                         <input
                             type="time"
+                            step={subType === 'timeSec' ? 1 : undefined}
                             value={values.defaultEndDate ?? ''}
                             onChange={e => onChange({ defaultEndDate: e.target.value || undefined })}
                             className={INPUT_DATE_CLS}

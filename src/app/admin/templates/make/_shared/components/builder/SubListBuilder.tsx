@@ -114,6 +114,7 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         defaultDate:       col.defaultDate,
         disablePast:       col.disablePast,
         defaultToday:      col.defaultToday,
+        dateSubType:       col.dateSubType,
         /* dateRange */
         defaultStartDateOffset: col.defaultStartDateOffset,
         defaultStartDate:       col.defaultStartDate,
@@ -121,8 +122,13 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         defaultEndDateOffset:   col.defaultEndDateOffset,
         defaultEndDate:         col.defaultEndDate,
         disableEndPast:         col.disableEndPast,
+        rangeSubType:           col.rangeSubType,
         /* action */
         actions: col.actions as FieldEditValues['actions'],
+        /* select SLUG 옵션 소스 */
+        optionSlug:      col.optionSlug,
+        optionValueKey:  col.optionValueKey,
+        optionTextKey:   col.optionTextKey,
     };
 }
 
@@ -167,6 +173,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.defaultDate        !== undefined) patch.defaultDate        = updates.defaultDate;
     if (updates.disablePast        !== undefined) patch.disablePast        = updates.disablePast;
     if (updates.defaultToday       !== undefined) patch.defaultToday       = updates.defaultToday;
+    if (updates.dateSubType        !== undefined) patch.dateSubType        = updates.dateSubType;
     /* dateRange */
     if (updates.defaultStartDateOffset !== undefined) patch.defaultStartDateOffset = updates.defaultStartDateOffset;
     if (updates.defaultStartDate       !== undefined) patch.defaultStartDate       = updates.defaultStartDate;
@@ -174,8 +181,13 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.defaultEndDateOffset   !== undefined) patch.defaultEndDateOffset   = updates.defaultEndDateOffset;
     if (updates.defaultEndDate         !== undefined) patch.defaultEndDate         = updates.defaultEndDate;
     if (updates.disableEndPast         !== undefined) patch.disableEndPast         = updates.disableEndPast;
+    if (updates.rangeSubType           !== undefined) patch.rangeSubType           = updates.rangeSubType;
     /* action */
     if (updates.actions                !== undefined) patch.actions                = updates.actions as ('copy')[];
+    /* select SLUG 옵션 소스 */
+    if (updates.optionSlug             !== undefined) patch.optionSlug             = updates.optionSlug;
+    if (updates.optionValueKey         !== undefined) patch.optionValueKey         = updates.optionValueKey;
+    if (updates.optionTextKey          !== undefined) patch.optionTextKey          = updates.optionTextKey;
     return patch;
 }
 
@@ -282,12 +294,14 @@ function SortableColumnItem({
 /* ══════════════════════════════════════════ */
 
 function ColumnEditPanel({
-    col, onChange, codeGroups, codeGroupsLoading,
+    col, onChange, codeGroups, codeGroupsLoading, slugOptions,
 }: {
     col: SubListColumn;
     onChange: (patch: Partial<SubListColumn>) => void;
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
+    /** SLUG 옵션 소스 목록 — select 컬럼의 SLUG 탭 옵션 선택에 사용 */
+    slugOptions: { id: number; slug: string; name: string }[];
 }) {
     const values = toFieldValues(col);
     const handleChange = (updates: Partial<FieldEditValues>) =>
@@ -308,7 +322,8 @@ function ColumnEditPanel({
         <div className="space-y-3">
             {/* 타입별 공통 필드 컴포넌트 */}
             {col.type === 'input'     && <InputField        {...commonProps} />}
-            {col.type === 'select'    && <SelectField       {...commonProps} />}
+            {/* slugOptions: SLUG 탭 옵션 소스 선택에 사용 */}
+            {col.type === 'select'    && <SelectField       {...commonProps} slugOptions={slugOptions} />}
             {col.type === 'radio'     && <RadioField        {...commonProps} />}
             {col.type === 'checkbox'  && <CheckboxField     {...commonProps} />}
             {col.type === 'date'      && <DateField         {...commonProps} />}
@@ -500,6 +515,8 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
                                         onChange={patch => updateColumn(col.id, patch)}
                                         codeGroups={codeGroups}
                                         codeGroupsLoading={codeGroupsLoading}
+                                        /* slugOptions: select 컬럼의 SLUG 탭 옵션 소스 선택에 사용 */
+                                        slugOptions={slugOptions}
                                     />
                                 </SortableColumnItem>
                             ))}

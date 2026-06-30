@@ -93,6 +93,8 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
         defaultDateOffset:  col.defaultDateOffset,
         defaultDate:        col.defaultDate,
         disablePast:        col.disablePast,
+        dateSubType:        col.dateSubType,
+        defaultToday:       col.defaultToday,
         /* dateRange */
         label2:                  col.label2,
         label2MsgKey:            col.label2MsgKey,
@@ -102,6 +104,11 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
         defaultEndDateOffset:    col.defaultEndDateOffset,
         defaultEndDate:          col.defaultEndDate,
         disableEndPast:          col.disableEndPast,
+        rangeSubType:            col.rangeSubType,
+        /* select SLUG 옵션 소스 */
+        optionSlug:              col.optionSlug,
+        optionValueKey:          col.optionValueKey,
+        optionTextKey:           col.optionTextKey,
     } as SearchFieldConfig;
 }
 

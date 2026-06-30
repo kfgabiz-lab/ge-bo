@@ -21,7 +21,7 @@ import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, buildTableRow, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition, validateSearchDateRange } from "../utils";
+import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, flattenPageDataItem, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition, validateSearchDateRange } from "../utils";
 import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
@@ -375,7 +375,7 @@ export function useWidgetPageState(
             updatedAt?: string | null;
             updatedBy?: string | null;
           }[]
-        ).map(buildTableRow);
+        ).map(flattenPageDataItem);
 
         const hasMore = res.data.last === false;
         setTableDataMap((prev) => ({

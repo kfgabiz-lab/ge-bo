@@ -296,10 +296,10 @@ export async function uploadFiles(
  *   3단계 (tab+contentKey) 탭 섹션 하위 → accessor: "tab1.form1.title" (dot notation)
  *
  * @example
- * buildTableRow({ id: 1, dataJson: { form1: { title: 'A', use: '1' } }, ... })
+ * flattenPageDataItem({ id: 1, dataJson: { form1: { title: 'A', use: '1' } }, ... })
  * // → { _id: 1, title: 'A', use: '1', form1: { title: 'A', use: '1' }, createdAt: ... }
  */
-export function buildTableRow(item: {
+export function flattenPageDataItem(item: {
     id: number;
     groupId?: string | null;
     dataJson: Record<string, unknown>;
@@ -747,8 +747,10 @@ export function initFormDefaultValues(
     formWidgets: import('./components/builder/FormBuilder').FormWidget[],
     t?: (key: string) => string,
 ): Record<string, Record<string, string>> {
-    /* subType에 따라 날짜 포맷 분기 (date/yearMonth/datetime) */
+    /* subType에 따라 날짜 포맷 분기 (date/yearMonth/datetime/time/timeSec) */
     const calcDate = (offset: number, subType: string = 'date') => {
+        /* 시간 계열은 날짜 offset 계산 불가 */
+        if (subType === 'time' || subType === 'timeSec') return '';
         const d = new Date();
         d.setDate(d.getDate() - offset);
         const iso = d.toISOString();
@@ -763,28 +765,43 @@ export function initFormDefaultValues(
         fw.fields.forEach(f => {
             if (f.type === 'date' && (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)) {
                 let dateVal = '';
+                const dateSubType = f.dateSubType ?? 'date';
+                const isDateTimeBased = dateSubType === 'time' || dateSubType === 'timeSec';
                 if (f.defaultToday) {
-                    /* 오늘날짜 ON: dateSubType에 맞는 포맷으로 오늘 날짜 반환 */
+                    /* 오늘날짜 ON: dateSubType에 맞는 포맷으로 오늘 날짜/시간 반환 */
                     const iso = new Date().toISOString();
-                    const subType = f.dateSubType ?? 'date';
-                    if (subType === 'yearMonth') dateVal = iso.slice(0, 7);
-                    else if (subType === 'datetime') dateVal = iso.slice(0, 16);
+                    const d = new Date();
+                    if (dateSubType === 'yearMonth') dateVal = iso.slice(0, 7);
+                    else if (dateSubType === 'datetime') dateVal = iso.slice(0, 16);
+                    else if (dateSubType === 'time') dateVal = d.toTimeString().slice(0, 5);
+                    else if (dateSubType === 'timeSec') dateVal = d.toTimeString().slice(0, 8);
                     else dateVal = iso.slice(0, 10);
+                } else if (isDateTimeBased) {
+                    /* 시간 계열: offset 무의미 — defaultDate 직접 사용 */
+                    dateVal = f.defaultDate ?? '';
                 } else if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
-                    dateVal = calcDate(f.defaultDateOffset, f.dateSubType ?? 'date');
+                    dateVal = calcDate(f.defaultDateOffset, dateSubType);
                 } else if (f.defaultDate) {
                     dateVal = f.defaultDate;
                 }
                 if (dateVal) vals[f.id] = dateVal;
             } else if (f.type === 'dateRange') {
                 const subType = f.rangeSubType ?? 'date';
+                const isRangeTimeBased = subType === 'time' || subType === 'timeSec';
                 let start = '', end = '';
                 if (f.defaultToday) {
                     /* 오늘날짜 ON: rangeSubType에 맞는 포맷으로 from/to 모두 오늘로 설정 */
                     const iso = new Date().toISOString();
+                    const d = new Date();
                     if (subType === 'yearMonth') { start = iso.slice(0, 7); end = iso.slice(0, 7); }
                     else if (subType === 'datetime') { start = iso.slice(0, 16); end = iso.slice(0, 16); }
+                    else if (subType === 'time') { start = d.toTimeString().slice(0, 5); end = d.toTimeString().slice(0, 5); }
+                    else if (subType === 'timeSec') { start = d.toTimeString().slice(0, 8); end = d.toTimeString().slice(0, 8); }
                     else { start = iso.slice(0, 10); end = iso.slice(0, 10); }
+                } else if (isRangeTimeBased) {
+                    /* 시간 계열: offset 무의미 — defaultStartDate/defaultEndDate 직접 사용 */
+                    start = f.defaultStartDate ?? '';
+                    end   = f.defaultEndDate   ?? '';
                 } else {
                     start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0)
                         ? calcDate(f.defaultStartDateOffset, subType) : (f.defaultStartDate ?? '');

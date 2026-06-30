@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * _FieldOptions — 옵션 입력 섹션 (수동/공통코드 토글)
+ * _FieldOptions — 옵션 입력 섹션 (수동/공통코드/SLUG 탭 전환)
  * select / radio / checkbox / button 필드 공통 사용하는 내부 컴포넌트.
+ * SLUG 탭은 showSlugTab=true일 때만 노출 (select 전용).
  */
 
 import React, { useState } from 'react';
@@ -10,37 +11,86 @@ import { CodeGroupDef } from '../../../types';
 import { OptionInputRows, stringsToOpts, optsToStrings } from '../../OptionInputRows';
 import { CodeGroupSelector } from '../../CodeGroupSelector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import { SlugSelectField } from './SlugSelectField';
+import type { SlugOption } from './SlugSelectField';
+import { LABEL_CLS, INPUT_CLS } from './_FieldBase';
+
+/** 옵션 소스 탭 유형 */
+type OptionsMode = 'manual' | 'code' | 'slug';
 
 interface FieldOptionsProps {
     options?: string[];
     codeGroupCode?: string;
+    /** SLUG 옵션 소스 연결 SLUG */
+    optionSlug?: string;
+    /** SLUG 데이터에서 value로 쓸 필드 key */
+    optionValueKey?: string;
+    /** SLUG 데이터에서 text로 쓸 필드 key */
+    optionTextKey?: string;
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
-    onChange: (updates: { options?: string[]; codeGroupCode?: string }) => void;
+    onChange: (updates: {
+        options?: string[];
+        codeGroupCode?: string;
+        optionSlug?: string;
+        optionValueKey?: string;
+        optionTextKey?: string;
+    }) => void;
     /** 현재 기본값으로 선택된 option value */
     defaultOptionValue?: string;
     /** 기본값 변경 핸들러 */
     onDefaultOptionChange?: (value: string) => void;
+    /** SLUG 탭 노출 여부 — select 전용, 기본값 false */
+    showSlugTab?: boolean;
+    /** SLUG 탭에서 사용할 slug 목록 — SlugSelectField에 전달 */
+    slugOptions?: SlugOption[];
 }
 
 /**
- * 수동 입력 / 공통코드 탭 전환 + 옵션 입력 영역
- * - 초기 mode는 codeGroupCode 유무로 결정
+ * 수동 입력 / 공통코드 / SLUG 탭 전환 + 옵션 입력 영역
+ * - 초기 mode: optionSlug 유무 → 'slug', codeGroupCode 유무 → 'code', 그 외 → 'manual'
  */
-export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoading, onChange, defaultOptionValue, onDefaultOptionChange }: FieldOptionsProps) {
-    const [mode, setMode] = useState<'manual' | 'code'>(codeGroupCode ? 'code' : 'manual');
+export function FieldOptions({
+    options,
+    codeGroupCode,
+    optionSlug,
+    optionValueKey,
+    optionTextKey,
+    codeGroups,
+    codeGroupsLoading,
+    onChange,
+    defaultOptionValue,
+    onDefaultOptionChange,
+    showSlugTab = false,
+    slugOptions = [],
+}: FieldOptionsProps) {
+    /* 초기 탭: SLUG → 공통코드 → 수동 순서로 판단 */
+    const initMode = (): OptionsMode => {
+        if (showSlugTab && optionSlug) return 'slug';
+        if (codeGroupCode) return 'code';
+        return 'manual';
+    };
+    const [mode, setMode] = useState<OptionsMode>(initMode);
     const { i18nMode } = useBuilderI18nMode();
 
-    const handleModeChange = (next: 'manual' | 'code') => {
+    /** 탭 전환 — 반대편 값 초기화 */
+    const handleModeChange = (next: OptionsMode) => {
         setMode(next);
-        /* 모드 전환 시 반대편 값 초기화 */
-        if (next === 'manual') onChange({ codeGroupCode: undefined });
-        else onChange({ options: undefined });
+        if (next === 'manual') {
+            /* 수동 탭 선택 시: 공통코드·SLUG 초기화 */
+            onChange({ codeGroupCode: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined });
+        } else if (next === 'code') {
+            /* 공통코드 탭 선택 시: 수동 옵션·SLUG 초기화 */
+            onChange({ options: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined });
+        } else if (next === 'slug') {
+            /* SLUG 탭 선택 시: 수동 옵션·공통코드 초기화 */
+            onChange({ options: undefined, codeGroupCode: undefined });
+        }
     };
 
     return (
         <div className="space-y-1.5">
-            {/* 수동 / 공통코드 탭 토글 */}
+            {/* 탭 토글 — SLUG 탭은 showSlugTab일 때만 표시 */}
             <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
                 <button
                     type="button"
@@ -54,9 +104,18 @@ export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoa
                     className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all
                         ${mode === 'code' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >공통코드</button>
+                {showSlugTab && (
+                    <button
+                        type="button"
+                        onClick={() => handleModeChange('slug')}
+                        className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all
+                            ${mode === 'slug' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >SLUG</button>
+                )}
             </div>
 
-            {mode === 'code' ? (
+            {/* 공통코드 탭 */}
+            {mode === 'code' && (
                 <>
                     <CodeGroupSelector
                         codeGroups={codeGroups}
@@ -81,7 +140,10 @@ export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoa
                         </div>
                     )}
                 </>
-            ) : (
+            )}
+
+            {/* 수동 입력 탭 */}
+            {mode === 'manual' && (
                 <OptionInputRows
                     options={stringsToOpts(options || [])}
                     onChange={opts => onChange({ options: optsToStrings(opts), codeGroupCode: undefined })}
@@ -89,6 +151,48 @@ export function FieldOptions({ options, codeGroupCode, codeGroups, codeGroupsLoa
                     defaultValue={defaultOptionValue}
                     onDefaultChange={onDefaultOptionChange}
                 />
+            )}
+
+            {/* SLUG 탭 — select 전용, showSlugTab=true일 때만 렌더링 */}
+            {mode === 'slug' && showSlugTab && (
+                <div className="space-y-1.5">
+                    {/* 연결 SLUG 선택 */}
+                    <SlugSelectField
+                        label="연결 SLUG"
+                        value={optionSlug ?? ''}
+                        onChange={(slug) => onChange({
+                            optionSlug: slug || undefined,
+                            optionValueKey: undefined,
+                            optionTextKey: undefined,
+                        })}
+                        slugOptions={slugOptions}
+                        emptyLabel="SLUG 선택"
+                    />
+
+                    {/* value key 입력 */}
+                    <div>
+                        <label className={LABEL_CLS}>Value 키 <span className="text-slate-400 font-normal">(dot notation)</span></label>
+                        <input
+                            type="text"
+                            value={optionValueKey ?? ''}
+                            onChange={(e) => onChange({ optionValueKey: e.target.value || undefined })}
+                            placeholder="예: id, form1.code"
+                            className={INPUT_CLS}
+                        />
+                    </div>
+
+                    {/* text key 입력 */}
+                    <div>
+                        <label className={LABEL_CLS}>Text 키 <span className="text-slate-400 font-normal">(dot notation)</span></label>
+                        <input
+                            type="text"
+                            value={optionTextKey ?? ''}
+                            onChange={(e) => onChange({ optionTextKey: e.target.value || undefined })}
+                            placeholder="예: name, form1.title"
+                            className={INPUT_CLS}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

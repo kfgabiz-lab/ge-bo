@@ -316,6 +316,10 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 appendText:         f.appendText,
                 truncateLength:     f.truncateLength,
                 dataGenerations:    f.dataGenerations,
+                /* ── select SLUG 옵션 소스 ── */
+                optionSlug:         f.optionSlug,
+                optionValueKey:     f.optionValueKey,
+                optionTextKey:      f.optionTextKey,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),
@@ -330,7 +334,8 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
 
         switch (f.type) {
             case 'input':          return <InputField {...props} />;
-            case 'select':         return <SelectField {...props} />;
+            /* slugOptions: FormBuilder props에서 전달받은 PAGE_DATA slug 목록 — SLUG 탭 옵션 소스 선택에 사용 */
+            case 'select':         return <SelectField {...props} slugOptions={slugOptions} />;
             case 'date':           return <DateField {...props} />;
             case 'dateRange':      return <DateRangeField {...props} />;
             case 'yearMonth':      return <DateField {...props} />;
