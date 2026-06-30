@@ -91,15 +91,27 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
                         </div>
                     </div>
 
-                    {/* KEY — 단독 행 */}
-                    <div>
-                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                        <input
-                            type="text"
-                            value={values.accessor ?? ''}
-                            onChange={e => onChange({ accessor: e.target.value })}
-                            className={`${INPUT_CLS} font-mono`}
-                        />
+                    {/* KEY / DATA — 2열 그리드 */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                            <input
+                                type="text"
+                                value={values.accessor ?? ''}
+                                onChange={e => onChange({ accessor: e.target.value })}
+                                className={`${INPUT_CLS} font-mono`}
+                            />
+                        </div>
+                        <div>
+                            <label className={LABEL_CLS}>Data</label>
+                            <input
+                                type="text"
+                                value={values.data ?? ''}
+                                onChange={e => onChange({ data: e.target.value || undefined })}
+                                className={`${INPUT_CLS} font-mono`}
+                                placeholder="예: code=1?title|title2"
+                            />
+                        </div>
                     </div>
                 </>
             )}

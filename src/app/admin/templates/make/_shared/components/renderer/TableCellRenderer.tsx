@@ -21,7 +21,7 @@ import { Pencil, Trash2, Paperclip, CopyPlus } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
-import { resolveAccessor } from '../../utils';
+import { evalColumnDataExpr } from '../../utils';
 
 /* ────────────────────────────────────────────────────────── */
 /*  색상 정적 맵 (Tailwind purge 방지 — 동적 문자열 사용 금지) */
@@ -68,8 +68,10 @@ export function TableCellRenderer({
 }: TableCellRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
-    /* dot notation accessor 지원 — "tab1.form1.title" 형태로 중첩 구조 접근 */
-    const value = resolveAccessor(row, col.accessor);
+    /* data 표현식이 있으면 평가, 없으면 flattenPageDataItem으로 만들어진 row에서 직접 접근 */
+    const value = col.data && !isPreview
+        ? evalColumnDataExpr(col.data, row)
+        : row[col.accessor];
 
     switch (col.cellType) {
 
@@ -219,10 +221,10 @@ export function TableCellRenderer({
             }
             /* live: 연결된 dateRange 컬럼의 _from/_to 분리 값으로 오늘 날짜 비교 → 상태 텍스트 반환 */
             const fromStr = col.linkedDateRangeKey
-                ? String(resolveAccessor(row, col.linkedDateRangeKey + '_from') ?? '')
+                ? String(row[col.linkedDateRangeKey + '_from'] ?? '')
                 : '';
             const toStr = col.linkedDateRangeKey
-                ? String(resolveAccessor(row, col.linkedDateRangeKey + '_to') ?? '')
+                ? String(row[col.linkedDateRangeKey + '_to'] ?? '')
                 : '';
             if (!fromStr && !toStr) return <span className="text-sm text-slate-400">-</span>;
             const today = new Date().toISOString().slice(0, 10);
@@ -243,7 +245,7 @@ export function TableCellRenderer({
             /* inlineEdit는 저장 경로(inlineEditFieldKey)가 표시값 경로와 동일해야 함
              * accessor가 다르게 설정된 경우에도 inlineEditFieldKey로 현재 값을 읽음 */
             const inlineValue = col.inlineEditFieldKey
-                ? resolveAccessor(row, col.inlineEditFieldKey)
+                ? row[col.inlineEditFieldKey]
                 : value;
 
             /* 옵션 파싱: "텍스트|값" 형식 → { text, value } 배열 */

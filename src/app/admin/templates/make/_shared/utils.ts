@@ -286,6 +286,115 @@ export async function uploadFiles(
     return ids;
 }
 
+/** flattenPageDataItem 내부 — 중첩 객체의 dot notation 키를 재귀적으로 target에 추가 */
+function addDotNotationKeys(
+    target: Record<string, unknown>,
+    obj: Record<string, unknown>,
+    prefix: string,
+): void {
+    Object.entries(obj).forEach(([k, v]) => {
+        const dotKey = `${prefix}.${k}`;
+        target[dotKey] = v;
+        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+            addDotNotationKeys(target, v as Record<string, unknown>, dotKey);
+        }
+    });
+}
+
+/**
+ * 컬럼 data 표현식 평가 (flattenPageDataItem row를 스코프로 사용)
+ *
+ * 지원 패턴:
+ *   - 조건식: condition?trueExpr|falseExpr (중첩 가능, 재귀 평가)
+ *   - 연결식: token1+token2+... (따옴표 없는 토큰은 row 필드, 따옴표 있는 토큰은 리터럴)
+ *   - 조건 연산자: = (같음), != (다름) — 문자열 비교
+ *
+ * @example
+ * evalColumnDataExpr("code=1?title|title2", { code: '1', title: '타이틀' }) // → '타이틀'
+ * evalColumnDataExpr("title+'-'+code", { title: '타이틀', code: '1' }) // → '타이틀-1'
+ * evalColumnDataExpr("code=1?title+'-'+code|title2", { code: '1', title: '타이틀', ... }) // → '타이틀-1'
+ */
+export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): string {
+    const trimmed = expr.trim();
+
+    /* 조건식 감지: condition?trueExpr|falseExpr */
+    const qIdx = trimmed.indexOf('?');
+    if (qIdx !== -1) {
+        const condition = trimmed.substring(0, qIdx).trim();
+        const rest = trimmed.substring(qIdx + 1);
+        /* 중첩 ?/| 고려 — depth=0인 첫 번째 | 위치 탐색 */
+        const pipeIdx = findTopLevelPipeIdx(rest);
+        if (pipeIdx !== -1) {
+            const trueExpr = rest.substring(0, pipeIdx).trim();
+            const falseExpr = rest.substring(pipeIdx + 1).trim();
+            return evalColumnDataExpr(
+                evalRowCondition(condition, row) ? trueExpr : falseExpr,
+                row,
+            );
+        }
+    }
+
+    /* 연결식: token1+token2+... */
+    return parseConcatTokens(trimmed, row);
+}
+
+/** 최상위(depth=0)의 | 위치 반환 — 중첩 조건식 내 | 건너뜀 */
+function findTopLevelPipeIdx(str: string): number {
+    let depth = 0;
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] === '?') depth++;
+        if (str[i] === '|') {
+            if (depth === 0) return i;
+            depth--;
+        }
+    }
+    return -1;
+}
+
+/** 조건 문자열(field=val, field!=val) 평가 — 문자열 비교 */
+function evalRowCondition(condition: string, row: Record<string, unknown>): boolean {
+    const neqIdx = condition.indexOf('!=');
+    if (neqIdx !== -1) {
+        const field = condition.substring(0, neqIdx).trim();
+        const val = condition.substring(neqIdx + 2).trim();
+        return String(row[field] ?? '') !== val;
+    }
+    const eqIdx = condition.indexOf('=');
+    if (eqIdx !== -1) {
+        const field = condition.substring(0, eqIdx).trim();
+        const val = condition.substring(eqIdx + 1).trim();
+        return String(row[field] ?? '') === val;
+    }
+    return false;
+}
+
+/** + 기준으로 토큰 분리 후 row 필드값 또는 리터럴로 변환해 합산 */
+function parseConcatTokens(expr: string, row: Record<string, unknown>): string {
+    const tokens: string[] = [];
+    let current = '';
+    let inQuote = false;
+    for (let i = 0; i < expr.length; i++) {
+        const ch = expr[i];
+        if (ch === "'") {
+            inQuote = !inQuote;
+            current += ch;
+        } else if (ch === '+' && !inQuote) {
+            tokens.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+    if (current.trim()) tokens.push(current.trim());
+
+    return tokens
+        .map(token => {
+            if (token.startsWith("'") && token.endsWith("'")) return token.slice(1, -1);
+            return String(row[token] ?? '');
+        })
+        .join('');
+}
+
 /**
  * API 응답 단일 item → 테이블 표시용 row 변환 (공통)
  *
@@ -327,15 +436,18 @@ export function flattenPageDataItem(item: {
                 keyCount[k] = (keyCount[k] ?? 0) + 1;
             })
         );
-        sectionEntries.forEach(([sectionKey, section]) =>
+        sectionEntries.forEach(([sectionKey, section]) => {
+            /* dot notation accessor 키를 재귀적으로 root에 추가 — row['form1.title'], row['tab1.form1.title'] 직접 접근 */
+            addDotNotationKeys(flatExtra, section as Record<string, unknown>, sectionKey);
+
             Object.entries(section as Record<string, unknown>).forEach(([k, v]) => {
                 if (keyCount[k] === 1) {
                     flatExtra[k] = v;
                     /* 단순 fieldKey → 실제 JSONB 경로 기록 */
                     _pathMap[k] = `${sectionKey}.${k}`;
                 }
-            })
-        );
+            });
+        });
     }
 
     return {

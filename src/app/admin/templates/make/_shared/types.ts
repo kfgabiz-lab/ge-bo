@@ -233,6 +233,7 @@ export interface TableColumnConfig {
     header: string;
     headerMsgKey?: string;    // 헤더명 다국어 키 (있으면 t(key), 없으면 header 표시)
     accessor: string;
+    data?: string;          // 표현식 (예: code=1?title|title2, title+'-'+code)
     width?: number;
     widthUnit?: 'px' | '%';
     align: 'left' | 'center' | 'right';

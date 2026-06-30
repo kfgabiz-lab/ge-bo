@@ -169,28 +169,28 @@ export function FieldOptions({
                         emptyLabel="SLUG 선택"
                     />
 
-                    {/* value key 입력 */}
-                    <div>
-                        <label className={LABEL_CLS}>Value 키 <span className="text-slate-400 font-normal">(dot notation)</span></label>
-                        <input
-                            type="text"
-                            value={optionValueKey ?? ''}
-                            onChange={(e) => onChange({ optionValueKey: e.target.value || undefined })}
-                            placeholder="예: id, form1.code"
-                            className={INPUT_CLS}
-                        />
-                    </div>
-
-                    {/* text key 입력 */}
-                    <div>
-                        <label className={LABEL_CLS}>Text 키 <span className="text-slate-400 font-normal">(dot notation)</span></label>
-                        <input
-                            type="text"
-                            value={optionTextKey ?? ''}
-                            onChange={(e) => onChange({ optionTextKey: e.target.value || undefined })}
-                            placeholder="예: name, form1.title"
-                            className={INPUT_CLS}
-                        />
+                    {/* value키 | text키 한 줄 배치 */}
+                    <div className="flex gap-1.5">
+                        <div className="flex-1">
+                            <label className={LABEL_CLS}>Value 키</label>
+                            <input
+                                type="text"
+                                value={optionValueKey ?? ''}
+                                onChange={(e) => onChange({ optionValueKey: e.target.value || undefined })}
+                                placeholder="예: id"
+                                className={INPUT_CLS}
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className={LABEL_CLS}>Text 키</label>
+                            <input
+                                type="text"
+                                value={optionTextKey ?? ''}
+                                onChange={(e) => onChange({ optionTextKey: e.target.value || undefined })}
+                                placeholder="예: name"
+                                className={INPUT_CLS}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
