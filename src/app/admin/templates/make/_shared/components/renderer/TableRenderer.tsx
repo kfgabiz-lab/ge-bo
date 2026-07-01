@@ -428,8 +428,12 @@ export function TableRenderer({
                             </button>
                         ))
                     ) : (
-                        /* live: 실제 페이지 버튼 */
-                        Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i).map(p => (
+                        /* live: 실제 페이지 버튼 — 10개 단위 그룹 표시 */
+                        (() => {
+                            const groupStart = Math.floor(currentPage / 10) * 10;
+                            const groupEnd = Math.min(groupStart + 10, totalPages);
+                            return Array.from({ length: groupEnd - groupStart }, (_, i) => groupStart + i);
+                        })().map(p => (
                             <button
                                 key={p}
                                 onClick={() => onPageChange?.(p)}
