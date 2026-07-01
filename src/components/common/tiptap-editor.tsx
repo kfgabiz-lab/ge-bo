@@ -644,7 +644,7 @@ export default function TiptapEditor({
     if (!initialValue || !editor || hasUserEditedRef.current) return;
     /* setContent가 onUpdate를 트리거할 수 있으므로 호출 전후에 차단 플래그 설정 */
     isProgrammaticSetRef.current = true;
-    editor.commands.setContent(initialValue, false);
+    editor.commands.setContent(initialValue, { emitUpdate: false });
     setTimeout(() => {
       isProgrammaticSetRef.current = false;
     }, 0);
