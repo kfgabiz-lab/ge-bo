@@ -151,6 +151,9 @@ export interface FieldEditValues {
     truncateLength?: number;
     /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
     dataGenerations?: DataGenerationEntry[];
+    /* ── editor 전용 ── */
+    /** 에디터 종류 선택 — tiptap(기본) 또는 toast (과도기 공존) */
+    editorType?: 'tiptap' | 'toast';
     /* ── action 컬럼 전용 (SubList action 타입 컬럼에서 사용) ── */
     actions?: ('edit' | 'detail' | 'delete' | 'copy')[];
     /* ── select SLUG 옵션 소스 전용 ── */
@@ -160,6 +163,10 @@ export interface FieldEditValues {
     optionValueKey?: string;
     /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원, 예: name, form1.title) */
     optionTextKey?: string;
+    /** SLUG 데이터 정렬 기준 필드 key */
+    optionOrderKey?: string;
+    /** SLUG 데이터 정렬 방향 (ASC / DESC) */
+    optionOrderDir?: 'ASC' | 'DESC';
 }
 
 /**

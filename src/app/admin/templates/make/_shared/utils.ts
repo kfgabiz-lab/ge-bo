@@ -310,9 +310,9 @@ function addDotNotationKeys(
  *   - 조건 연산자: = (같음), != (다름) — 문자열 비교
  *
  * @example
- * evalColumnDataExpr("code=1?title|title2", { code: '1', title: '타이틀' }) // → '타이틀'
+ * evalColumnDataExpr("code=1?title:title2", { code: '1', title: '타이틀' }) // → '타이틀'
  * evalColumnDataExpr("title+'-'+code", { title: '타이틀', code: '1' }) // → '타이틀-1'
- * evalColumnDataExpr("code=1?title+'-'+code|title2", { code: '1', title: '타이틀', ... }) // → '타이틀-1'
+ * evalColumnDataExpr("code=1?title+'-'+code:title2", { code: '1', title: '타이틀', ... }) // → '타이틀-1'
  */
 export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): string {
     const trimmed = expr.trim();
@@ -323,7 +323,7 @@ export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): 
         const condition = trimmed.substring(0, qIdx).trim();
         const rest = trimmed.substring(qIdx + 1);
         /* 중첩 ?/| 고려 — depth=0인 첫 번째 | 위치 탐색 */
-        const pipeIdx = findTopLevelPipeIdx(rest);
+        const pipeIdx = findTopLevelColonIdx(rest);
         if (pipeIdx !== -1) {
             const trueExpr = rest.substring(0, pipeIdx).trim();
             const falseExpr = rest.substring(pipeIdx + 1).trim();
@@ -338,12 +338,12 @@ export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): 
     return parseConcatTokens(trimmed, row);
 }
 
-/** 최상위(depth=0)의 | 위치 반환 — 중첩 조건식 내 | 건너뜀 */
-function findTopLevelPipeIdx(str: string): number {
+/** 최상위(depth=0)의 : 위치 반환 — 중첩 조건식 내 : 건너뜀 */
+function findTopLevelColonIdx(str: string): number {
     let depth = 0;
     for (let i = 0; i < str.length; i++) {
         if (str[i] === '?') depth++;
-        if (str[i] === '|') {
+        if (str[i] === ':') {
             if (depth === 0) return i;
             depth--;
         }

@@ -247,11 +247,15 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
     /** 드래그 오버: 삽입 위치 갱신 (기본 동작 막아서 drop 이벤트 허용) */
     const handleDragOver = (e: React.DragEvent, index: number) => {
         e.preventDefault();
+        // 같은 인덱스면 불필요한 리렌더 방지
+        if (dropIndex === index) return;
         setDropIndex(index);
     };
 
     /** 드래그 영역 이탈: 파란 선 제거 */
-    const handleDragLeave = () => {
+    const handleDragLeave = (e: React.DragEvent) => {
+        // 자식 요소 경계 이탈 시 오탐 방지 — 실제 컨테이너 밖으로 나갈 때만 초기화
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
         setDropIndex(null);
     };
 
@@ -276,8 +280,9 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
         const updated = reordered.map((item, i) => ({ ...item, sortOrder: i + 1 }));
         setItems(updated);
 
-        /* 변경된 항목만 BE 업데이트 (기존 sortOrder와 다른 항목) */
-        const changed = updated.filter((item, i) => item.sortOrder !== items[i]?.sortOrder);
+        /* ID 기준으로 이전 sortOrder와 달라진 항목만 BE 업데이트 */
+        const originalSortMap = new Map(items.map(item => [item.id, item.sortOrder]));
+        const changed = updated.filter(item => item.sortOrder !== originalSortMap.get(item.id));
         try {
             await Promise.all(
                 changed.map(item => {
@@ -397,16 +402,16 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 {!parentNotSelected && !loading && items.length > 0 && (
                     <div className="p-2 space-y-1.5">
                         {items.map((item, index) => (
-                            <div key={item.id}>
-                                {/* 드롭 위치 표시선 — 해당 인덱스 위에 표시 */}
+                            <div key={item.id} className="relative">
+                                {/* 드롭 위치 표시선 — absolute 오버레이로 레이아웃 밀림 없음 */}
                                 {!isPreview && dropIndex === index && dragIndexRef.current !== index && (
-                                    <div className="h-0.5 bg-blue-400 rounded mb-1.5 mx-1" />
+                                    <div className="absolute top-0 left-1 right-1 h-0.5 bg-blue-400 rounded z-10 pointer-events-none" />
                                 )}
                             <div
                                 draggable={!isPreview}
                                 onDragStart={() => handleDragStart(index)}
                                 onDragOver={e => handleDragOver(e, index)}
-                                onDragLeave={handleDragLeave}
+                                onDragLeave={e => handleDragLeave(e)}
                                 onDrop={e => handleDrop(e, index)}
                                 onClick={() => handleSelect(item)}
                                 className={`group relative rounded-lg border cursor-pointer transition-all

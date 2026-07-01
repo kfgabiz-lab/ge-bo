@@ -489,8 +489,11 @@ export function useWidgetPageState(
           const calcRangeDate = (offset: number): string => {
             const d = new Date(); d.setDate(d.getDate() - offset);
             const iso = d.toISOString();
+            const pad = (n: number) => String(n).padStart(2, '0');
             if (subType === 'yearMonth') return iso.slice(0, 7);
-            if (subType === 'datetime') return iso.slice(0, 16);
+            if (subType === 'datetime')  return iso.slice(0, 16);
+            if (subType === 'time')      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            if (subType === 'timeSec')   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
             return iso.slice(0, 10);
           };
           const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcRangeDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');

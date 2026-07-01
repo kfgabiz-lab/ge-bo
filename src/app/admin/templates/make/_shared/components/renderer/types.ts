@@ -191,6 +191,10 @@ export interface SubListColumn {
     optionValueKey?: string;
     /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원) */
     optionTextKey?: string;
+    /** SLUG 데이터 정렬 기준 필드 key */
+    optionOrderKey?: string;
+    /** SLUG 데이터 정렬 방향 (ASC / DESC) */
+    optionOrderDir?: 'ASC' | 'DESC';
 }
 
 /**

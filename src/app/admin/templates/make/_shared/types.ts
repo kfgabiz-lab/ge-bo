@@ -135,6 +135,9 @@ export interface SearchFieldConfig {
     afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
     afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
     statusDisplayStyle?: 'select' | 'radio'; // 검색 UI 표시 방식 (기본: select)
+    /* ── editor 전용 ── */
+    /** 에디터 종류 선택 — tiptap(기본) 또는 toast (과도기 공존) */
+    editorType?: 'tiptap' | 'toast';
     /* ── 데이터생성 전용 (Input/FormTextarea) ── */
     /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
     generationKey?: string;
@@ -155,6 +158,10 @@ export interface SearchFieldConfig {
     optionValueKey?: string;
     /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원, 예: name, form1.title) */
     optionTextKey?: string;
+    /** SLUG 데이터 정렬 기준 필드 key */
+    optionOrderKey?: string;
+    /** SLUG 데이터 정렬 방향 (ASC / DESC) */
+    optionOrderDir?: 'ASC' | 'DESC';
 }
 
 /** 검색폼 행 설정 */
@@ -264,6 +271,7 @@ export interface TableColumnConfig {
     dateFormat?: string;
     /* ── dateRangeStatus 전용 ── */
     linkedDateRangeKey?: string;    // 연결할 dateRange 컬럼의 accessor (예: 'period')
+    linkedRangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 연결된 dateRange 컬럼의 서브타입 (기본: 'date')
     beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
     beforeTextMsgKey?: string;      // 이전 텍스트 다국어 키
     inRangeText?: string;           // 날짜 포함 표시 텍스트 (예: '진행중')

@@ -27,6 +27,7 @@ import { Image as ImageIcon } from 'lucide-react';
 
 /* 에디터는 SSR 불가 — 클라이언트에서만 로드 */
 const WysiwygEditor = dynamic(() => import('@/components/common/wysiwyg-editor'), { ssr: false });
+const TiptapEditor = dynamic(() => import('@/components/common/tiptap-editor'), { ssr: false });
 import { ROW_HEIGHT } from '@/components/layout/grid-cell';
 import { SearchFieldConfig, CodeGroupDef } from '../../types';
 import { inputCls, selectCls } from '../../styles';
@@ -343,25 +344,30 @@ function SlugOptionSelect({
 }) {
     const [slugOpts, setSlugOpts] = useState<{ value: string; text: string }[]>([]);
 
-    /* optionSlug / optionValueKey / optionTextKey 변경 시 API fetch */
+    /* optionSlug / optionValueKey / optionTextKey / optionOrderKey / optionOrderDir 변경 시 API fetch */
     useEffect(() => {
         if (!field.optionSlug) return;
         api.get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })
             .then((res) => {
                 const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
-                setSlugOpts(
-                    rows.map((item) => {
-                        /* flattenPageDataItem으로 contentKey 중첩 → flat key 접근 (form.prdNm → prdNm) */
-                        const row = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
-                        return {
-                            value: String(row[field.optionValueKey ?? ''] ?? ''),
-                            text:  String(row[field.optionTextKey ?? ''] ?? ''),
-                        };
-                    })
-                );
+                /* flattenPageDataItem으로 중첩 → flat key 변환 후 옵션 생성 */
+                let opts = rows.map((item) => {
+                    const row = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
+                    return {
+                        value: String(row[field.optionValueKey ?? ''] ?? ''),
+                        text:  String(row[field.optionTextKey ?? ''] ?? ''),
+                        _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
+                    };
+                });
+                /* optionOrderKey 지정 시 FE에서 정렬 — Value/Text 키와 동일한 flat key 기준 */
+                if (field.optionOrderKey) {
+                    const dir = field.optionOrderDir === 'DESC' ? -1 : 1;
+                    opts = opts.sort((a, b) => a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir);
+                }
+                setSlugOpts(opts.map(({ value, text }) => ({ value, text })));
             })
             .catch(() => setSlugOpts([]));
-    }, [field.optionSlug, field.optionValueKey, field.optionTextKey]);
+    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir]);
 
     return (
         <div className="relative">
@@ -1571,12 +1577,22 @@ export function FieldRenderer({
 
         /* ── editor ── 위지윅 에디터 (preview/live 모두 실제 에디터 렌더링) */
         case 'editor': {
-            /* rowSpan × ROW_HEIGHT 로 에디터 높이 계산 — Toast UI는 px 값 필요 (100% 미지원) */
-            /* 라벨 있으면 라벨 높이(~20px) 추가 차감, 없으면 더 크게 */
+            /* rowSpan × ROW_HEIGHT 로 에디터 높이 계산 */
             const rowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 3;
             const editorHeight = `${rowSpan * ROW_HEIGHT - (field.label ? 44 : 24)}px`;
+            /* editorType: tiptap(기본) 또는 toast — 빌더 설정에서 선택 */
+            const editorType = (field as unknown as { editorType?: 'tiptap' | 'toast' }).editorType ?? 'tiptap';
+            if (editorType === 'toast') {
+                return (
+                    <WysiwygEditor
+                        initialValue={value}
+                        onChange={isPreview ? undefined : v => onChange?.(v)}
+                        height={editorHeight}
+                    />
+                );
+            }
             return (
-                <WysiwygEditor
+                <TiptapEditor
                     initialValue={value}
                     onChange={isPreview ? undefined : v => onChange?.(v)}
                     height={editorHeight}

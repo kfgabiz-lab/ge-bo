@@ -227,13 +227,23 @@ export function TableCellRenderer({
                 ? String(row[col.linkedDateRangeKey + '_to'] ?? '')
                 : '';
             if (!fromStr && !toStr) return <span className="text-sm text-slate-400">-</span>;
-            const today = new Date().toISOString().slice(0, 10);
+            /* rangeSubType에 맞는 현재 시각 포맷으로 비교 기준 산출 */
+            const subType = col.linkedRangeSubType ?? 'date';
+            const now = new Date();
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const nowStr = (() => {
+                if (subType === 'yearMonth') return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+                if (subType === 'datetime')  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                if (subType === 'time')      return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                if (subType === 'timeSec')   return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+            })();
             let statusText = '-';
-            if (fromStr && today < fromStr) {
+            if (fromStr && nowStr < fromStr) {
                 statusText = beforeLabel;
-            } else if (fromStr && toStr && today >= fromStr && today <= toStr) {
+            } else if (fromStr && toStr && nowStr >= fromStr && nowStr <= toStr) {
                 statusText = inRangeLabel;
-            } else if (toStr && today > toStr) {
+            } else if (toStr && nowStr > toStr) {
                 statusText = afterLabel;
             }
             return <span className="text-sm text-slate-600">{statusText}</span>;

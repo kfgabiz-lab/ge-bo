@@ -27,6 +27,10 @@ interface FieldOptionsProps {
     optionValueKey?: string;
     /** SLUG 데이터에서 text로 쓸 필드 key */
     optionTextKey?: string;
+    /** SLUG 데이터 정렬 기준 필드 key */
+    optionOrderKey?: string;
+    /** SLUG 데이터 정렬 방향 (ASC / DESC) */
+    optionOrderDir?: 'ASC' | 'DESC';
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
     onChange: (updates: {
@@ -35,6 +39,8 @@ interface FieldOptionsProps {
         optionSlug?: string;
         optionValueKey?: string;
         optionTextKey?: string;
+        optionOrderKey?: string;
+        optionOrderDir?: 'ASC' | 'DESC';
     }) => void;
     /** 현재 기본값으로 선택된 option value */
     defaultOptionValue?: string;
@@ -56,6 +62,8 @@ export function FieldOptions({
     optionSlug,
     optionValueKey,
     optionTextKey,
+    optionOrderKey,
+    optionOrderDir,
     codeGroups,
     codeGroupsLoading,
     onChange,
@@ -78,10 +86,10 @@ export function FieldOptions({
         setMode(next);
         if (next === 'manual') {
             /* 수동 탭 선택 시: 공통코드·SLUG 초기화 */
-            onChange({ codeGroupCode: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined });
+            onChange({ codeGroupCode: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined, optionOrderKey: undefined, optionOrderDir: undefined });
         } else if (next === 'code') {
             /* 공통코드 탭 선택 시: 수동 옵션·SLUG 초기화 */
-            onChange({ options: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined });
+            onChange({ options: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined, optionOrderKey: undefined, optionOrderDir: undefined });
         } else if (next === 'slug') {
             /* SLUG 탭 선택 시: 수동 옵션·공통코드 초기화 */
             onChange({ options: undefined, codeGroupCode: undefined });
@@ -164,6 +172,8 @@ export function FieldOptions({
                             optionSlug: slug || undefined,
                             optionValueKey: undefined,
                             optionTextKey: undefined,
+                            optionOrderKey: undefined,
+                            optionOrderDir: undefined,
                         })}
                         slugOptions={slugOptions}
                         emptyLabel="SLUG 선택"
@@ -190,6 +200,32 @@ export function FieldOptions({
                                 placeholder="예: name"
                                 className={INPUT_CLS}
                             />
+                        </div>
+                    </div>
+
+                    {/* 정렬key | orderby 한 줄 배치 */}
+                    <div className="flex gap-1.5">
+                        <div className="flex-1">
+                            <label className={LABEL_CLS}>정렬 Key</label>
+                            <input
+                                type="text"
+                                value={optionOrderKey ?? ''}
+                                onChange={(e) => onChange({ optionOrderKey: e.target.value || undefined })}
+                                placeholder="예: name"
+                                className={INPUT_CLS}
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className={LABEL_CLS}>정렬 방향</label>
+                            <select
+                                value={optionOrderDir ?? ''}
+                                onChange={(e) => onChange({ optionOrderDir: (e.target.value as 'ASC' | 'DESC') || undefined })}
+                                className={INPUT_CLS}
+                            >
+                                <option value="">없음</option>
+                                <option value="ASC">ASC</option>
+                                <option value="DESC">DESC</option>
+                            </select>
                         </div>
                     </div>
                 </div>

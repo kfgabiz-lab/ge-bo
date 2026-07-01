@@ -316,10 +316,14 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 appendText:         f.appendText,
                 truncateLength:     f.truncateLength,
                 dataGenerations:    f.dataGenerations,
+                /* ── editor 전용 ── */
+                editorType:         f.editorType,
                 /* ── select SLUG 옵션 소스 ── */
                 optionSlug:         f.optionSlug,
                 optionValueKey:     f.optionValueKey,
                 optionTextKey:      f.optionTextKey,
+                optionOrderKey:     f.optionOrderKey,
+                optionOrderDir:     f.optionOrderDir,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),

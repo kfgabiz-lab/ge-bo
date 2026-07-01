@@ -64,6 +64,8 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 optionSlug={values.optionSlug}
                 optionValueKey={values.optionValueKey}
                 optionTextKey={values.optionTextKey}
+                optionOrderKey={values.optionOrderKey}
+                optionOrderDir={values.optionOrderDir}
                 codeGroups={codeGroups}
                 codeGroupsLoading={codeGroupsLoading}
                 onChange={updates => onChange(updates)}

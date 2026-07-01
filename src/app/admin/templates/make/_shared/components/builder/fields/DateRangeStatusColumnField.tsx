@@ -32,6 +32,21 @@ export function DateRangeStatusColumnField({ values, onChange }: ColEditProps) {
                     className={`${INPUT_CLS} font-mono`}
                 />
             </div>
+            {/* 연결 dateRange 서브타입 — 상태 판정 기준 포맷 결정 */}
+            <div>
+                <label className={LABEL_CLS}>날짜 범위 서브타입</label>
+                <select
+                    value={values.linkedRangeSubType ?? 'date'}
+                    onChange={e => onChange({ linkedRangeSubType: e.target.value as 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec' })}
+                    className={INPUT_CLS}
+                >
+                    <option value="date">날짜 (YYYY-MM-DD)</option>
+                    <option value="yearMonth">년월 (YYYY-MM)</option>
+                    <option value="datetime">날짜+시각 (YYYY-MM-DD HH:mm)</option>
+                    <option value="time">시분 (HH:mm)</option>
+                    <option value="timeSec">시분초 (HH:mm:ss)</option>
+                </select>
+            </div>
             {/* 3개 상태 텍스트 — 3열 그리드 */}
             <div className="grid grid-cols-3 gap-2">
                 <div>

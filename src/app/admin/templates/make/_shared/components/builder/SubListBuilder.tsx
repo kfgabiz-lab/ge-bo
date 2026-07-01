@@ -129,6 +129,8 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         optionSlug:      col.optionSlug,
         optionValueKey:  col.optionValueKey,
         optionTextKey:   col.optionTextKey,
+        optionOrderKey:  col.optionOrderKey,
+        optionOrderDir:  col.optionOrderDir,
     };
 }
 
@@ -188,6 +190,8 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.optionSlug             !== undefined) patch.optionSlug             = updates.optionSlug;
     if (updates.optionValueKey         !== undefined) patch.optionValueKey         = updates.optionValueKey;
     if (updates.optionTextKey          !== undefined) patch.optionTextKey          = updates.optionTextKey;
+    if (updates.optionOrderKey         !== undefined) patch.optionOrderKey         = updates.optionOrderKey;
+    if (updates.optionOrderDir         !== undefined) patch.optionOrderDir         = updates.optionOrderDir;
     return patch;
 }
 

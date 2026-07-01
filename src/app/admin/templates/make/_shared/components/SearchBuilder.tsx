@@ -250,7 +250,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
         if (needsOptions(pendingType)) {
             const hasCodeGroup = !!codeGroupCode;
             const hasOptions = !!options?.some(o => o.trim());
-            if (!hasCodeGroup && !hasOptions) return true;
+            const hasSlug = !!pendingValues.optionSlug;
+            if (!hasCodeGroup && !hasOptions && !hasSlug) return true;
         }
         return false;
     };
@@ -275,7 +276,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             hideCondition, disableCondition,
             rangeSubType, dateSubType, singleDateRange,
             /* select SLUG 옵션 소스 */
-            optionSlug, optionValueKey, optionTextKey,
+            optionSlug, optionValueKey, optionTextKey, optionOrderKey, optionOrderDir,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -345,6 +346,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             optionSlug:        pendingType === 'select' ? (optionSlug || undefined) : undefined,
             optionValueKey:    pendingType === 'select' ? (optionValueKey || undefined) : undefined,
             optionTextKey:     pendingType === 'select' ? (optionTextKey || undefined) : undefined,
+            optionOrderKey:    pendingType === 'select' ? (optionOrderKey || undefined) : undefined,
+            optionOrderDir:    pendingType === 'select' ? (optionOrderDir || undefined) : undefined,
         };
 
         onChange(rows.map(r =>
@@ -560,6 +563,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 optionSlug:          field.optionSlug,
                                                                                 optionValueKey:      field.optionValueKey,
                                                                                 optionTextKey:       field.optionTextKey,
+                                                                                optionOrderKey:      field.optionOrderKey,
+                                                                                optionOrderDir:      field.optionOrderDir,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

@@ -22,6 +22,26 @@ export const EditorField = (props: FieldEditProps) => {
             <div className="space-y-3 pt-1 border-t border-slate-100 mt-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">에디터 설정</p>
 
+                {/* 에디터 종류 선택 — TipTap(기본) / TOAST UI (과도기) */}
+                <div>
+                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">에디터 종류</label>
+                    <div className="flex gap-3">
+                        {(['tiptap', 'toast'] as const).map((type) => (
+                            <label key={type} className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    checked={(values.editorType ?? 'tiptap') === type}
+                                    onChange={() => onChange({ editorType: type })}
+                                    className="w-3.5 h-3.5 cursor-pointer accent-slate-800"
+                                />
+                                <span className="text-xs text-slate-700">
+                                    {type === 'tiptap' ? 'TipTap' : 'TOAST UI'}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
                 <div>
                     <label className="text-[10px] font-medium text-slate-500 mb-1 block">Placeholder</label>
                     {i18nMode ? (
