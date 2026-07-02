@@ -448,6 +448,31 @@ export function flattenPageDataItem(item: {
                 }
             });
         });
+
+        /* _fetchedRel{id} 섹션 전용 — 접두사(_fetchedRel8)는 유지하고 내부 contentKey만 생략한 단축키 추가
+           예: _fetchedRel8.currMgmtForm.currMgmtTitle → _fetchedRel8.currMgmtTitle
+           _fetchedRel8 접두사는 "이 값이 연동 slug에서 온 것"임을 나타내는 필수 식별자라 생략 대상이 아니다.
+           같은 섹션 안에 동일 필드명이 여러 경로에 있으면 모호하므로 생성하지 않는다 */
+        sectionEntries
+            .filter(([sectionKey]) => sectionKey.startsWith('_fetchedRel'))
+            .forEach(([sectionKey]) => {
+                const leafCount: Record<string, number> = {};
+                const leafFullKey: Record<string, string> = {};
+                Object.keys(flatExtra)
+                    .filter(k => k.startsWith(`${sectionKey}.`))
+                    .forEach(fullKey => {
+                        const segs = fullKey.split('.');
+                        const leaf = segs[segs.length - 1];
+                        leafCount[leaf] = (leafCount[leaf] ?? 0) + 1;
+                        leafFullKey[leaf] = fullKey;
+                    });
+                Object.entries(leafCount).forEach(([leaf, count]) => {
+                    const shortKey = `${sectionKey}.${leaf}`;
+                    if (count === 1 && !(shortKey in flatExtra)) {
+                        flatExtra[shortKey] = flatExtra[leafFullKey[leaf]];
+                    }
+                });
+            });
     }
 
     return {
