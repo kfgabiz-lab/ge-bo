@@ -71,6 +71,7 @@ import { fetchTemplateConfig } from '../../templateApi';
 import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
 import type { PageTableData } from './PageGridRenderer';
+import { PrivacyReasonModal } from '@/components/ui/privacy-reason-modal';
 import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList } from '../../utils';
 
 /**
@@ -243,6 +244,10 @@ interface WidgetRendererProps {
      * page.tsx에서 관리 중인 searchParams 상태를 그대로 전달
      */
     currentSearchParams?: Record<string, string>;
+    /**
+     * preview 모드 전용 — 엑셀 다운로드 버튼 클릭 시 호출 (builder-contents-layout 팝업 UI 미리보기용)
+     */
+    onExcelDownloadPreview?: () => void;
 
     /* ── live 모드 전용 — 팝업 컨텍스트 ── */
     /**
@@ -340,6 +345,7 @@ export function WidgetRenderer({
     /* 엑셀 다운로드 */
     tableWidgetsMap,
     currentSearchParams,
+    onExcelDownloadPreview,
     /* 팝업 컨텍스트 */
     dataSlug,
     onRefresh,
@@ -354,6 +360,10 @@ export function WidgetRenderer({
     /* ══════════════════════════════════════════ */
     /*  내부 팝업 상태                             */
     /* ══════════════════════════════════════════ */
+
+    /* 개인정보 사유 팝업 */
+    const [showPrivacyModal,     setShowPrivacyModal]     = useState(false);
+    const [pendingTableWidgetId, setPendingTableWidgetId] = useState<string | null>(null);
 
     const [popupOpen,            setPopupOpen]            = useState(false);
     const [popupCfg,             setPopupCfg]             = useState<TemplatePopupConfig | null>(null);
@@ -432,12 +442,9 @@ export function WidgetRenderer({
     }, []);
 
     /**
-     * 엑셀 다운로드 핸들러 (live 모드 전용)
-     * - tableWidgetsMap에서 위젯 정보 조회 → connectedSlug + 컬럼 추출
-     * - actions 컬럼 제외 후 headers/keys를 export API에 전달
-     * - api 인스턴스로 blob 다운로드 (인증 헤더 자동 포함)
+     * 실제 엑셀 다운로드 실행 — reason이 있으면 API에 함께 전송 (개인정보 사유 로깅)
      */
-    const handleExcelDownload = useCallback(async (tableWidgetId: string) => {
+    const doExcelDownload = useCallback(async (tableWidgetId: string, reason?: string) => {
         const tableWidget = tableWidgetsMap?.[tableWidgetId];
         if (!tableWidget?.connectedSlug) {
             toast.error('다운로드할 테이블 정보가 없습니다.');
@@ -458,7 +465,7 @@ export function WidgetRenderer({
             delete searchQuery['size'];
 
             const res = await api.get(`/page-data/${tableWidget.connectedSlug}/export`, {
-                params: { format: 'xlsx', headers, keys, dateFormats, ...searchQuery },
+                params: { format: 'xlsx', headers, keys, dateFormats, ...(reason ? { reason } : {}), ...searchQuery },
                 responseType: 'blob',
             });
 
@@ -475,6 +482,29 @@ export function WidgetRenderer({
             toast.error('엑셀 다운로드 중 오류가 발생했습니다.');
         }
     }, [tableWidgetsMap, currentSearchParams]);
+
+    /**
+     * 엑셀 다운로드 핸들러 (live 모드 전용)
+     * - privacyPopup=true 시 개인정보 사유 입력 팝업 표시 후 확인 시 다운로드
+     * - privacyPopup=false/undefined 시 바로 다운로드
+     */
+    const handleExcelDownload = useCallback((tableWidgetId: string, privacyPopup?: boolean) => {
+        if (privacyPopup) {
+            setPendingTableWidgetId(tableWidgetId);
+            setShowPrivacyModal(true);
+            return;
+        }
+        doExcelDownload(tableWidgetId);
+    }, [doExcelDownload]);
+
+    /** 개인정보 사유 입력 팝업 확인 — reason과 함께 다운로드 실행 */
+    const handlePrivacyConfirm = useCallback(async (reason: string) => {
+        setShowPrivacyModal(false);
+        if (pendingTableWidgetId) {
+            await doExcelDownload(pendingTableWidgetId, reason);
+            setPendingTableWidgetId(null);
+        }
+    }, [pendingTableWidgetId, doExcelDownload]);
 
     /* ── 팝업 닫기 ── */
     const handlePopupClose = useCallback(() => {
@@ -1397,10 +1427,26 @@ export function WidgetRenderer({
                     onDataSave={mode === 'live' ? onDataSave : undefined}
                     onClose={onClose}
                     onPopupOpen={(slug, params) => handleInternalPopupOpen(slug, null, dataSlug, params ? parseActionParams(params, {}) : undefined)}
-                    onExcelDownload={mode === 'live' ? handleExcelDownload : undefined}
+                    onExcelDownload={
+                        mode === 'live'
+                            ? handleExcelDownload
+                            : onExcelDownloadPreview
+                                ? (_tableWidgetId: string, _privacyPopup?: boolean) => onExcelDownloadPreview()
+                                : undefined
+                    }
                 />
                 {/* 팝업 오버레이 (live 모드 & open 상태일 때만 렌더링) */}
                 {popupOverlay}
+                {/* 개인정보 사유 입력 팝업 (live 모드 — excelPrivacyPopup=true 버튼 클릭 시) */}
+                {showPrivacyModal && (
+                    <PrivacyReasonModal
+                        onConfirm={handlePrivacyConfirm}
+                        onCancel={() => {
+                            setShowPrivacyModal(false);
+                            setPendingTableWidgetId(null);
+                        }}
+                    />
+                )}
             </>
         );
     }

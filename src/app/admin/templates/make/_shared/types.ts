@@ -75,6 +75,7 @@ export interface SearchFieldConfig {
     connectedSlug?: string;     // 연결 방식 slug: DB slug (레거시)
     connectedContentWidgetIds?: string[];    // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
     excelTableWidgetId?: string;             // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
+    excelPrivacyPopup?: boolean;             // 개인정보 다운로드 사유 입력 팝업 사용 여부 (connType='excel' 전용)
     contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
     goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
     dataSaveSlug?: string;                   // 데이터저장 연결 slug (connType='datasave' 전용)

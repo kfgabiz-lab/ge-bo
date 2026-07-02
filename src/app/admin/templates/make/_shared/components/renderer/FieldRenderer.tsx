@@ -852,10 +852,13 @@ export function FieldRenderer({
             const bgCls = BG_COLOR_MAP[field.color ?? 'black'] ?? BG_COLOR_MAP.black;
             const textCls = TEXT_COLOR_MAP[field.textColor ?? 'white'] ?? TEXT_COLOR_MAP.white;
 
+            // 엑셀 다운로드 버튼은 preview 모드에서도 onButtonClick이 있으면 클릭 허용 (팝업 UI 미리보기용)
+            const isActionDisabled = field.connType === 'excel' && !!onButtonClick ? false : isDisabled;
+
             return (
                 <button
                     type="button"
-                    disabled={isDisabled}
+                    disabled={isActionDisabled}
                     onClick={onButtonClick}
                     className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] min-w-[72px] w-full whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
                 >

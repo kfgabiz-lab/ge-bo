@@ -42,8 +42,8 @@ interface SpaceRendererProps {
     onClose?: () => void;
     /** 페이지/팝업/경로 연결 요청 — connType='popup'·'path' 버튼 클릭 시 slug와 파라미터 문자열 전달 */
     onPopupOpen?: (slug: string, params?: string) => void;
-    /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID 전달 */
-    onExcelDownload?: (tableWidgetId: string) => void;
+    /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID + 개인정보 팝업 여부 전달 */
+    onExcelDownload?: (tableWidgetId: string, privacyPopup?: boolean) => void;
     /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave 전달 */
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string) => void;
 }
@@ -62,7 +62,13 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
 
     /** action-button 클릭 핸들러 — connType에 따라 동작 분기 */
     const handleButtonClick = (field: SearchFieldConfig) => {
-        if (mode === 'preview') return;
+        // preview 모드에서는 엑셀 다운로드(팝업 UI 미리보기)만 허용
+        if (mode === 'preview') {
+            if (field.connType === 'excel' && onExcelDownload) {
+                onExcelDownload(field.excelTableWidgetId ?? '');
+            }
+            return;
+        }
         /* 저장 컨펌 토글 활성화 시 — 사용자 확인 후 취소 시 중단 */
         if (field.saveConfirm && !window.confirm('저장 하시겠습니까?')) return;
         /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
@@ -80,7 +86,7 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         } else if (field.connType === 'path' && field.fileLayerSlug) {
             onPopupOpen?.(field.fileLayerSlug, field.params);
         } else if (field.connType === 'excel' && field.excelTableWidgetId) {
-            onExcelDownload?.(field.excelTableWidgetId);
+            onExcelDownload?.(field.excelTableWidgetId, field.excelPrivacyPopup);
         } else if (field.connType === 'datasave' && field.dataSaveSlug) {
             /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
             onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params);

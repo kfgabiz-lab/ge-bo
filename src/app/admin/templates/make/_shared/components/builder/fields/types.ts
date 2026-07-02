@@ -72,6 +72,7 @@ export interface FieldEditValues {
     contentAction?: 'save' | 'delete';    // 컨텐츠 연결 시 동작 (저장/삭제)
     goBackAfterAction?: boolean;          // 동작 완료 후 이전 페이지 이동 / 팝업 닫기
     excelTableWidgetId?: string;          // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
+    excelPrivacyPopup?: boolean;          // 개인정보 다운로드 사유 입력 팝업 사용 여부 (connType='excel' 전용)
     params?: string;                      // popup·path 연결 시 전달 파라미터 (예: depth=1,type=create)
     dataSaveSlug?: string;                // 데이터저장 연결 slug (connType='datasave' 전용)
     saveConfirm?: boolean;                // 저장 컨펌 — true 시 live 모드 버튼 클릭 시 확인창 표시 (action-button 전용)

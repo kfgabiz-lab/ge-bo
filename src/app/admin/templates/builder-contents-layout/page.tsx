@@ -12,6 +12,7 @@ import { useState } from 'react';
 import PageLayout from '@/components/layout/page-layout';
 import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '../make/_shared/components/renderer';
+import { PrivacyReasonModal } from '@/components/ui/privacy-reason-modal';
 import type {
     SearchWidget,
     SpaceWidget,
@@ -274,6 +275,22 @@ const SAMPLE_SPACE: SpaceWidget = {
     ],
 };
 
+/** 공간영역 엑셀 다운로드 — 개인정보 사유 팝업 사용 버튼 샘플 */
+const SAMPLE_SPACE_EXCEL: SpaceWidget = {
+    type: 'space',
+    widgetId: 'guide-space-excel',
+    align: 'right',
+    showBorder: false,
+    items: [
+        {
+            id: 'se1', type: 'action-button', label: '엑셀 다운로드', colSpan: 1,
+            color: 'green', connType: 'excel',
+            excelTableWidgetId: 'guide-table',
+            excelPrivacyPopup: true,
+        },
+    ],
+};
+
 /** 카테고리 대분류 (depth 1) */
 const SAMPLE_CATEGORY_1: CategoryWidget = {
     type: 'category', widgetId: 'guide-category-1', contentKey: '', dbSlug: '',
@@ -404,7 +421,10 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
     form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 23 }],
-    space:    [{ widget: SAMPLE_SPACE,    colSpan: 12, rowSpan: 2 }],
+    space: [
+        { widget: SAMPLE_SPACE,       colSpan: 12, rowSpan: 2 },
+        { widget: SAMPLE_SPACE_EXCEL, colSpan: 12, rowSpan: 2 },
+    ],
     category: [
         { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },
         { widget: SAMPLE_CATEGORY_2, colSpan: 3, rowSpan: 8 },
@@ -428,6 +448,8 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
 
 export default function BuilderContentsLayoutPage() {
     const [activeTab, setActiveTab] = useState<TabKey>('search');
+    /* 개인정보 사유 팝업 미리보기 상태 */
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
     return (
         <div className="space-y-4">
@@ -463,10 +485,19 @@ export default function BuilderContentsLayoutPage() {
                             mode="preview"
                             widget={item.widget}
                             contentColSpan={item.colSpan}
+                            onExcelDownloadPreview={() => setShowPrivacyModal(true)}
                         />
                     </GridCell>
                 ))}
             </PageLayout>
+
+            {/* 개인정보 사유 팝업 미리보기 */}
+            {showPrivacyModal && (
+                <PrivacyReasonModal
+                    onConfirm={(_reason) => setShowPrivacyModal(false)}
+                    onCancel={() => setShowPrivacyModal(false)}
+                />
+            )}
 
         </div>
     );

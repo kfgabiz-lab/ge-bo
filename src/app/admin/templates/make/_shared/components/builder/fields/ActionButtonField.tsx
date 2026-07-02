@@ -314,7 +314,7 @@ export function ActionButtonField({
                         </div>
                     )}
 
-                    {/* 엑셀 다운로드 — 테이블 위젯 단일 선택 */}
+                    {/* 엑셀 다운로드 — 테이블 위젯 단일 선택 + 개인정보 팝업 옵션 */}
                     {connType === 'excel' && (
                         <div className="space-y-1">
                             {/* table 타입 위젯만 필터링 */}
@@ -340,6 +340,16 @@ export function ActionButtonField({
                                     }
                                 </select>
                             )}
+                            {/* 개인정보 팝업 사용 여부 */}
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={values.excelPrivacyPopup ?? false}
+                                    onChange={e => onChange({ excelPrivacyPopup: e.target.checked || undefined })}
+                                    className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                />
+                                <span className="text-xs text-slate-700">개인정보 팝업 사용</span>
+                            </label>
                         </div>
                     )}
 
