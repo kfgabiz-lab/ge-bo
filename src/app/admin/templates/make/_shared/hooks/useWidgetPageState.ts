@@ -223,6 +223,23 @@ async function restoreFormDataFromJson(
   } catch { /* 파일 없으면 조용히 처리 */ }
 }
 
+/**
+ * dataJson에서 _fetchedRel{id} 최상위 키만 추출 — FormRenderer의 rowData 확장용
+ *
+ * 사용법:
+ *   const fetchRelData = extractFetchRelData(dataJson);
+ *   // → { _fetchedRel8: { form1: { title: 'Electronics' } }, ... }
+ */
+function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  Object.entries(dataJson).forEach(([key, val]) => {
+    if (key.startsWith('_fetchedRel')) {
+      result[key] = val;
+    }
+  });
+  return result;
+}
+
 export function useWidgetPageState(
   widgetItems: PageWidgetItem[],
   pageSlug?: string,
@@ -279,6 +296,9 @@ export function useWidgetPageState(
 
   /* URL 파라미터 중 폼에 없는 값 — 저장 시 dataJson에 병합 (enableUrlEditMode 전용) */
   const [urlParamSaveExtras, setUrlParamSaveExtras] = useState<Record<string, unknown>>({});
+
+  /** widgetId → _fetchedRel{id} 원본 데이터 맵 — FormRenderer rowData 구성용 */
+  const [formFetchRelMap, setFormFetchRelMap] = useState<Record<string, Record<string, unknown>>>({});
 
   /* 테이블 데이터 fetch */
   const fetchTableData = useCallback(
@@ -703,6 +723,13 @@ export function useWidgetPageState(
           .then(async dataRes => {
             const dataJson = (dataRes.data.dataJson || {}) as Record<string, unknown>;
             await restoreFromDataJson(dataJson, formWidgets, sublistWidgets, multiSelWidgets);
+            // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
+            const fetchRelData = extractFetchRelData(dataJson);
+            if (Object.keys(fetchRelData).length > 0) {
+              formWidgets.forEach(fw => {
+                setFormFetchRelMap(prev => ({ ...prev, [fw.widgetId]: fetchRelData }));
+              });
+            }
             applyUrlParams();
           })
           .catch(() => toast.error('기존 데이터를 불러오는 중 오류가 발생했습니다.'));
@@ -744,6 +771,13 @@ export function useWidgetPageState(
           setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
           setExistingFileMetaMap, setImgBlobUrls,
         );
+        // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
+        const fetchRelData = extractFetchRelData(rawDataJson);
+        if (Object.keys(fetchRelData).length > 0) {
+          forms.forEach(fw => {
+            setFormFetchRelMap(prev => ({ ...prev, [fw.widgetId]: fetchRelData }));
+          });
+        }
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1575,6 +1609,8 @@ export function useWidgetPageState(
           [itemId]: { ...(prev[wId]?.[itemId] ?? {}), [fieldKey]: value },
         },
       })),
+    /* _fetchedRel{id} 데이터 맵 — FormRenderer rowData 확장용 */
+    formFetchRelMap,
   };
 
   return { gridProps, setSubListRowsMap, confirmLeave };

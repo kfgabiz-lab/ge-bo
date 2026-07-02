@@ -56,16 +56,6 @@ export function ActionsField({ values, onChange, layerTemplates, onRequestLayerT
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    /* disabledActions 항목이 actions 배열에 없으면 자동으로 추가 (렌더러 표시 보장) */
-    useEffect(() => {
-        if (!disabledActions.length) return;
-        const missing = disabledActions.filter(a => !presetActions.includes(a));
-        if (missing.length > 0) {
-            onChange({ actions: [...presetActions, ...missing] });
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
     /* 수정 페이지 이동 규칙 추가 */
     const addEditPageRule = () =>
         onChange({ editPageRules: [...editPageRules, { id: epUid(), connType: 'page', pageSlug: '', conditionParam: '', passParam: '' }] });
@@ -83,23 +73,20 @@ export function ActionsField({ values, onChange, layerTemplates, onRequestLayerT
             <span className="text-[10px] font-semibold text-slate-400 uppercase">액션 버튼</span>
 
             {/* 프리셋 체크박스 — edit / delete / copy */}
-            {(['edit', 'delete', 'copy'] as const).map(action => {
-                /* disabledActions에 포함된 액션: 항상 체크됨 + 체크박스 비활성 */
-                const isForced = disabledActions.includes(action);
-                const isChecked = isForced ? true : presetActions.includes(action);
+            {/* disabledActions에 포함된 항목은 빌더에서 아예 표시하지 않음 */}
+            {(['edit', 'delete', 'copy'] as const).filter(action => !disabledActions.includes(action)).map(action => {
+                const isChecked = presetActions.includes(action);
                 return (
                 <div key={action} className="space-y-1">
                     <div className="flex items-center gap-1">
-                        <label className={`flex items-center gap-2 flex-1 ${isForced ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                        <label className="flex items-center gap-2 flex-1 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={isChecked}
-                                disabled={isForced}
-                                onChange={e => !isForced && toggleAction(action, e.target.checked)}
-                                className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900 disabled:cursor-not-allowed"
+                                onChange={e => toggleAction(action, e.target.checked)}
+                                className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900"
                             />
                             <span className="text-[11px] text-slate-600">{ACTION_LABELS[action]}</span>
-                            {isForced && <span className="text-[10px] text-slate-400">(비활성)</span>}
                         </label>
                         {/* 수정 체크 시 페이지 이동 규칙 추가 버튼 */}
                         {action === 'edit' && presetActions.includes('edit') && (

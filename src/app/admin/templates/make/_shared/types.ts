@@ -41,6 +41,8 @@ export interface SearchFieldConfig {
     /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
     singleDateRange?: boolean;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
+    // 데이터 표현식 (예: code=1?title|title2, title+'-'+code) — input 필드 표시값 계산
+    data?: string;
     placeholder?: string;
     placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
     /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */

@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useSlugRelations } from '../../hooks/useSlugRelations';
 import { useI18n } from '@/hooks/use-i18n';
 import { Plus, GripVertical, Pencil, X, Globe } from 'lucide-react';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
@@ -204,6 +205,9 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
             .finally(() => setCodeGroupsLoading(false));
     }, []);
 
+    /* slug-relation 목록 — input 필드 "연결 Slug" 선택에 사용 */
+    const slugRelations = useSlugRelations();
+
     /* 편집 상태 — 현재 펼쳐진 필드 ID */
     const [editingId, setEditingId] = useState<string | null>(null);
     /* 타입 선택 피커 표시 여부 */
@@ -325,6 +329,10 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 optionTextKey:      f.optionTextKey,
                 optionOrderKey:     f.optionOrderKey,
                 optionOrderDir:     f.optionOrderDir,
+                /* ── 연결 Slug (input 전용) ── */
+                relationSlugId:     f.relationSlugId,
+                /* ── Data 표현식 (input 전용) ── */
+                data:               f.data,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),
@@ -338,7 +346,8 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
         };
 
         switch (f.type) {
-            case 'input':          return <InputField {...props} />;
+            /* fetchRelations: slug-relation 목록 전달 → InputField "연결 Slug" 섹션 표시 */
+            case 'input':          return <InputField {...props} fetchRelations={slugRelations.filter(r => r.relationDir === 'FETCH')} />;
             /* slugOptions: FormBuilder props에서 전달받은 PAGE_DATA slug 목록 — SLUG 탭 옵션 소스 선택에 사용 */
             case 'select':         return <SelectField {...props} slugOptions={slugOptions} />;
             case 'date':           return <DateField {...props} />;

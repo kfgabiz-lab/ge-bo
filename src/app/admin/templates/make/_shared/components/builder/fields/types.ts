@@ -7,6 +7,7 @@
 
 import { CodeGroupDef } from '../../../types';
 import type { SlugOption } from './SlugSelectField';
+import type { SlugRelationOption } from '../../SearchBuilder';
 
 /** ColSpan 표시 방식 */
 export type ColSpanMode =
@@ -123,6 +124,8 @@ export interface FieldEditValues {
     /* ── category 전용 ── */
     dbSlug?: string;                 // 카테고리 연결 slug (PAGE_DATA 타입)
     relationSlugId?: number;         // 연동 slug-relation ID
+    // 데이터 표현식 (ColumnBaseField와 동일, 예: code=1?title|title2)
+    data?: string;
     maxDepth?: 1 | 2 | 3 | 4;       // 표시할 최대 depth 수
     depthLabels?: string[];          // depth별 라벨 배열
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열
@@ -204,6 +207,8 @@ export interface FieldEditProps {
     slugEntityFields?: { key: string | null; label: string }[];
     /** SLUG 옵션 소스 목록 — select 필드의 SLUG 탭에서 연결할 slug 목록 (SlugSelectField에 전달) */
     slugOptions?: SlugOption[];
+    /** FETCH 슬러그 관계 목록 — input 필드의 "연결 Slug" 선택에 사용 */
+    fetchRelations?: SlugRelationOption[];
 }
 
-export type { CodeGroupDef, SlugOption };
+export type { CodeGroupDef, SlugOption, SlugRelationOption };

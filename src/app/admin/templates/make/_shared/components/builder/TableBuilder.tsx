@@ -17,6 +17,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useSlugRelations } from '../../hooks/useSlugRelations';
 import { Plus, Trash2, X, Pencil, GripVertical } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import api from '@/lib/api';
@@ -200,8 +201,8 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     const [layerTemplates, setLayerTemplates] = useState<TemplateItem[]>([]);
     const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
 
-    /* 전체 slug-relation 목록 — SearchBuilder와 동일한 패턴 */
-    const [allSlugRelations, setAllSlugRelations] = useState<SlugRelationOption[]>([]);
+    /* 전체 slug-relation 목록 — 공통 훅으로 fetch */
+    const allSlugRelations = useSlugRelations();
 
     /* 드래그 센서 — 3px 이상 이동 시 드래그 시작 (클릭 오인 방지) */
     const sensors = useSensors(
@@ -212,13 +213,6 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
     /* 공통코드 로딩 */
     useEffect(() => {
         api.get('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
-    }, []);
-
-    /* slug-relation 전체 목록 1회 로드 — SearchBuilder와 동일한 방식 */
-    useEffect(() => {
-        api.get('/slug-relations', { params: { size: 200 } })
-            .then(res => setAllSlugRelations(res.data?.content || []))
-            .catch(() => {});
     }, []);
 
     /* 전체 템플릿 목록 lazy 로딩 (QUICK_DETAIL · PAGE 등 모든 타입 포함) */
@@ -343,7 +337,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
         const patch = (p: Partial<TableColumnConfig>) => updateColumn(col.id, p);
         return (
             <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
-                <ColumnBaseField values={col} onChange={patch} fetchRelations={allSlugRelations} />
+                <ColumnBaseField values={col} onChange={patch} fetchRelations={allSlugRelations.filter(r => r.relationDir === 'FETCH')} />
                 {col.cellType === 'badge'            && <BadgeOptionsField          values={col} onChange={patch} />}
                 {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
                 {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
@@ -488,7 +482,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                     values={pendingCol}
                                     onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                     autoFocus
-                                    fetchRelations={allSlugRelations}
+                                    fetchRelations={allSlugRelations.filter(r => r.relationDir === 'FETCH')}
                                 />
                                 {pendingCol.cellType === 'badge' && (
                                     <BadgeOptionsField

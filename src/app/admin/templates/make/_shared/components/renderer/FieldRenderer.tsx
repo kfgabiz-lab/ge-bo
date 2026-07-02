@@ -39,7 +39,7 @@ const fmtSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
         : `${Math.round(bytes / 1024)}KB`;
-import { parseOpt, flattenPageDataItem } from '../../utils';
+import { parseOpt, flattenPageDataItem, evalColumnDataExpr } from '../../utils';
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -152,6 +152,8 @@ interface FieldRendererProps {
     onRemoveExisting?: (fileId: number) => void;
     /** 동적 Disable 조건 결과 — true 시 live 모드에서도 disabled 처리 */
     forceDisabled?: boolean;
+    /** data 표현식 평가용 — 현재 폼의 fieldKey→value 맵 */
+    rowData?: Record<string, unknown>;
 }
 
 /**
@@ -404,6 +406,7 @@ export function FieldRenderer({
     onFileChange,
     onRemoveExisting,
     forceDisabled = false,
+    rowData,
 }: FieldRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
@@ -425,6 +428,42 @@ export function FieldRenderer({
 
         /* ── input ── */
         case 'input': {
+            /* 연결 Slug 연동 시 — rowData[fieldKey]에서 fetchRelData 값 참조 */
+            if (field.relationSlugId) {
+                let displayVal: string;
+                if (field.data && !isPreview) {
+                    /* data 표현식 있으면 공통함수로 계산 — TABLE과 동일한 evalColumnDataExpr 사용 */
+                    displayVal = evalColumnDataExpr(field.data, rowData ?? {});
+                } else {
+                    /* data 없으면 rowData[fieldKey] 직접 참조 (FormRenderer에서 fetchRelData 주입된 값) */
+                    const fetched = rowData ? rowData[field.fieldKey ?? ''] : undefined;
+                    displayVal = isPreview ? '' : String(fetched ?? value ?? '');
+                }
+                return (
+                    <input
+                        type="text"
+                        disabled={isDisabled}
+                        readOnly
+                        className={`${inputCls}${readonlyCls}`}
+                        value={displayVal}
+                        onChange={undefined}
+                    />
+                );
+            }
+            /* data 표현식 있으면 evalColumnDataExpr로 계산 후 읽기전용 표시 */
+            if (field.data) {
+                const displayVal = isPreview ? '' : evalColumnDataExpr(field.data, rowData ?? {});
+                return (
+                    <input
+                        type="text"
+                        disabled={isDisabled}
+                        readOnly
+                        className={`${inputCls}${readonlyCls}`}
+                        value={displayVal}
+                        onChange={undefined}
+                    />
+                );
+            }
             /* 공통코드 연동 시 코드값 → 이름/코드값 변환 표시 (읽기 전용 텍스트로 처리) */
             if (field.codeGroupCode && codeGroups?.length) {
                 const group  = codeGroups.find(g => g.groupCode === field.codeGroupCode);

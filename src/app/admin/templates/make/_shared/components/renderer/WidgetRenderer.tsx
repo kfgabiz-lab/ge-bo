@@ -263,6 +263,8 @@ interface WidgetRendererProps {
     mainConnectedSlug?: string;
     /** 이탈체크 활성 여부 — TabRenderer에 전달하여 탭 내부 폼 변경 감지 */
     leaveCheck?: boolean;
+    /** _fetchedRel{id} 원본 데이터 — FormRenderer rowData dot-notation 확장용 */
+    fetchRelData?: Record<string, unknown>;
     /**
      * 외부에서 팝업을 직접 트리거할 때 사용 (LIST 버튼바, test 페이지 등).
      * ts가 변경될 때마다 팝업을 오픈한다.
@@ -353,6 +355,7 @@ export function WidgetRenderer({
     mainConnectedSlug,
     leaveCheck,
     externalPopupTrigger,
+    fetchRelData,
 }: WidgetRendererProps) {
     const router  = useRouter();
     const { t }   = useI18n();
@@ -1408,6 +1411,7 @@ export function WidgetRenderer({
                 imgBlobUrls={imgBlobUrls}
                 onFileChange={onFileChange}
                 onRemoveExisting={onRemoveExisting}
+                fetchRelData={fetchRelData}
             />
         );
     }

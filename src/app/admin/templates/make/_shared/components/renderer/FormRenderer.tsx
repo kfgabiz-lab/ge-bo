@@ -24,6 +24,27 @@
  */
 
 import { useMemo, useCallback, useRef } from 'react';
+
+/**
+ * _fetchedRel{id} 중첩 객체를 dot-notation 키로 평탄화 — evalColumnDataExpr 스코프 확장용
+ *
+ * 예: prefix="_fetchedRel8", obj={ form1: { title: 'A' } }
+ *   → target["_fetchedRel8.form1"] = { title: 'A' }
+ *   → target["_fetchedRel8.form1.title"] = 'A'
+ */
+function addRelDotNotationKeys(
+    target: Record<string, unknown>,
+    obj: Record<string, unknown>,
+    prefix: string,
+): void {
+    Object.entries(obj).forEach(([k, v]) => {
+        const dotKey = `${prefix}.${k}`;
+        target[dotKey] = v;
+        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+            addRelDotNotationKeys(target, v as Record<string, unknown>, dotKey);
+        }
+    });
+}
 import type { FormFieldItem } from '../builder/FormBuilder';
 import type { RendererMode } from './types';
 import { FieldRenderer } from './FieldRenderer';
@@ -78,6 +99,8 @@ interface FormRendererProps {
     onFileChange?: (fieldId: string, files: File[]) => void;
     /** 기존 파일 제거 핸들러 */
     onRemoveExisting?: (fieldId: string, fileId: number) => void;
+    /** _fetchedRel{id} 원본 데이터 — TABLE과 동일한 dot-notation rowData 구성용 */
+    fetchRelData?: Record<string, unknown>;
 }
 
 export function FormRenderer({
@@ -104,6 +127,7 @@ export function FormRenderer({
     imgBlobUrls,
     onFileChange,
     onRemoveExisting,
+    fetchRelData,
 }: FormRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
@@ -114,6 +138,26 @@ export function FormRenderer({
         fields.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; });
         return map;
     }, [fields]);
+
+    /* data 표현식 평가용 — fieldKey → 현재 값 맵 */
+    const rowData = useMemo(() => {
+        const map: Record<string, unknown> = {};
+        fields.forEach(f => {
+            if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? '';
+        });
+        /* _fetchedRel{id} 데이터를 dot-notation으로 확장 — TABLE의 flattenPageDataItem과 동일한 방식 */
+        if (fetchRelData) {
+            Object.entries(fetchRelData).forEach(([relKey, relVal]) => {
+                /* string/원시값도 rowData에 직접 주입 — fetch_fields 설정 시 BE가 string 반환 */
+                map[relKey] = relVal;
+                /* 객체인 경우 dot-notation 하위 키도 추가 */
+                if (relVal !== null && typeof relVal === 'object' && !Array.isArray(relVal)) {
+                    addRelDotNotationKeys(map, relVal as Record<string, unknown>, relKey);
+                }
+            });
+        }
+        return map;
+    }, [fields, values, fetchRelData]);
 
     /** hideCondition / disableCondition 공통 평가 함수
      *  형식: "key=값" (일치) / "key!=값" (불일치) / "k1=v1,k2=v2" (AND 복수)
@@ -310,6 +354,7 @@ export function FormRenderer({
                             onFileChange={isPreview ? undefined : files => onFileChange?.(f.id, files)}
                             onRemoveExisting={isPreview ? undefined : fileId => onRemoveExisting?.(f.id, fileId)}
                             forceDisabled={shouldDisable(f)}
+                            rowData={rowData}
                         />
                     </div>
                 </div>

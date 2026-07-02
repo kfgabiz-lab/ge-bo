@@ -17,6 +17,7 @@ import React from 'react';
 import { ColEditProps } from './col-types';
 import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { SlugSelectField } from './SlugSelectField';
+import { buildFetchKey } from './utils';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 import type { SlugRelationOption } from '../../SearchBuilder';
@@ -26,11 +27,6 @@ interface ColumnBaseFieldProps extends ColEditProps {
     autoFocus?: boolean;
     /** 연결 가능한 FETCH 슬러그 목록 (TableBuilder에서 connectedSlug 기준으로 필터링하여 전달) */
     fetchRelations?: SlugRelationOption[];
-}
-
-/** relationId → FETCH 결과 키 변환: 2 → "_fetchedRel2" */
-function buildFetchKey(relationId: number): string {
-    return `_fetchedRel${relationId}`;
 }
 
 export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = [] }: ColumnBaseFieldProps) {

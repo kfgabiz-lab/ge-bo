@@ -17,8 +17,10 @@ import { DataGenerationSection } from './DataGenerationSection';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 import { CodeGroupSelector } from '../../CodeGroupSelector';
+import { SlugSelectField } from './SlugSelectField';
+import { buildFetchKey } from './utils';
 
-export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields, codeGroups, codeGroupsLoading }: FieldEditProps) {
+export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields, codeGroups, codeGroupsLoading, fetchRelations = [] }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
 
     return (
@@ -42,6 +44,48 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 hideConditionFields={hideConditionFields}
                 slugEntityFields={slugEntityFields}
                 onChange={onChange}
+                labelSideSlot={
+                    /* 연결 Slug — 라벨 오른쪽 슬롯으로 배치 */
+                    <SlugSelectField
+                        label="연결 Slug"
+                        value={String(values.relationSlugId ?? '')}
+                        onChange={slug => {
+                            if (slug) {
+                                const id = Number(slug);
+                                const selected = fetchRelations.find(r => r.id === id);
+                                onChange({
+                                    relationSlugId: id,
+                                    fieldKey: selected ? buildFetchKey(selected.id) : values.fieldKey,
+                                    readonly: true,
+                                });
+                            } else {
+                                onChange({ relationSlugId: undefined });
+                            }
+                        }}
+                        slugOptions={fetchRelations.map(r => ({
+                            id: r.id,
+                            slug: String(r.id),
+                            name: r.description
+                                ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                                : `${r.masterSlug} → ${r.slaveSlug}`,
+                        }))}
+                        formatDisplay={opt => opt.name}
+                        emptyLabel="연동 없음"
+                    />
+                }
+                keySideSlot={
+                    /* Data 표현식 — 연결 Slug 설정 시 표시값 계산식 입력 */
+                    <div>
+                        <label className={LABEL_CLS}>Data</label>
+                        <input
+                            type="text"
+                            value={values.data ?? ''}
+                            onChange={e => onChange({ data: e.target.value || undefined })}
+                            className={`${INPUT_CLS} font-mono`}
+                            placeholder="예: code=1?title|title2"
+                        />
+                    </div>
+                }
             />
             {/* Placeholder */}
             <div>

@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { Pencil, Trash2, Paperclip, CopyPlus } from 'lucide-react';
+import { Pencil, Trash2, Paperclip } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
@@ -126,7 +126,7 @@ export function TableCellRenderer({
                 col.align === 'right'  ? 'justify-end'    : 'justify-start';
             return (
                 <div className={`flex items-center gap-1 flex-wrap ${justifyCls}`}>
-                    {/* 프리셋 버튼 — edit → detail → delete 고정 순서 */}
+                    {/* 프리셋 버튼 — edit → delete 고정 순서 */}
                     {(col.actions || []).includes('edit') && (
                         <button
                             onClick={!isPreview ? () => handlers?.onEdit?.(row) : undefined}
@@ -136,23 +136,13 @@ export function TableCellRenderer({
                             <Pencil className="w-3.5 h-3.5" />
                         </button>
                     )}
-{(col.actions || []).includes('delete') && (
+                    {(col.actions || []).includes('delete') && (
                         <button
                             onClick={!isPreview ? () => handlers?.onDelete?.(row._id as number) : undefined}
                             className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
                             title="삭제"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                    {/* 복사 버튼 — DataTable에서는 disabled (SubList 전용 기능) */}
-                    {(col.actions || []).includes('copy') && (
-                        <button
-                            disabled
-                            className="p-1.5 rounded text-slate-300 cursor-not-allowed"
-                            title="복사 (SubList 전용)"
-                        >
-                            <CopyPlus className="w-3.5 h-3.5" />
                         </button>
                     )}
                 </div>

@@ -60,6 +60,10 @@ interface FieldBaseProps {
     excludeFromSearch?: boolean;
     /** Slug Entity 필드 목록 — 있을 때 Key 입력을 selectbox로 전환 (form 빌더 전용) */
     slugEntityFields?: { key: string | null; label: string }[];
+    /** 라벨 오른쪽 슬롯 — 전달 시 Key가 아래 행으로 이동 (InputField의 연결 Slug용) */
+    labelSideSlot?: React.ReactNode;
+    /** Key 오른쪽 슬롯 — labelSideSlot 전달 시에만 나타나는 Data 입력 자리 */
+    keySideSlot?: React.ReactNode;
     onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; saveConfirm: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
@@ -71,7 +75,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, labelSideSlot, keySideSlot, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -81,9 +85,31 @@ export function FieldBase(props: FieldBaseProps) {
     /* 전역 다국어 모드 — SizeSettingPanel의 🌐 토글로 제어 */
     const { i18nMode } = useBuilderI18nMode();
 
+    /* Key 입력 요소 — labelSideSlot 있을 때 두 번째 행으로 이동되므로 변수로 추출 */
+    const keyInputEl = slugEntityFields && slugEntityFields.length > 0 ? (
+        <select
+            value={fieldKey ?? ''}
+            onChange={e => onChange({ fieldKey: e.target.value || '' })}
+            className={`${INPUT_CLS} font-mono`}
+        >
+            <option value="">— 선택없음 —</option>
+            {slugEntityFields.filter(f => f.key).map(f => (
+                <option key={f.key} value={f.key!}>{f.key} ({f.label})</option>
+            ))}
+        </select>
+    ) : (
+        <input
+            type="text"
+            value={fieldKey}
+            onChange={e => onChange({ fieldKey: e.target.value })}
+            placeholder="예: userName, status..."
+            className={`${INPUT_CLS} font-mono`}
+        />
+    );
+
     return (
         <>
-            {/* 라벨 | Key — 한 줄 배치 */}
+            {/* 라벨 행 — labelSideSlot 있으면 오른쪽에 슬롯(연결 Slug 등), 없으면 기존 Key */}
             <div className="grid grid-cols-2 gap-2">
                 <div>
                     <label className={LABEL_CLS}>
@@ -111,30 +137,31 @@ export function FieldBase(props: FieldBaseProps) {
                     )}
                 </div>
                 <div>
-                    <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                    {/* Slug Entity 선택 시 selectbox로 전환, 없으면 기존 text input */}
-                    {slugEntityFields && slugEntityFields.length > 0 ? (
-                        <select
-                            value={fieldKey ?? ''}
-                            onChange={e => onChange({ fieldKey: e.target.value || '' })}
-                            className={`${INPUT_CLS} font-mono`}
-                        >
-                            <option value="">— 선택없음 —</option>
-                            {slugEntityFields.filter(f => f.key).map(f => (
-                                <option key={f.key} value={f.key!}>{f.key} ({f.label})</option>
-                            ))}
-                        </select>
+                    {labelSideSlot !== undefined ? (
+                        /* labelSideSlot 있으면 슬롯 표시 (Key는 아래 행으로 이동) */
+                        labelSideSlot
                     ) : (
-                        <input
-                            type="text"
-                            value={fieldKey}
-                            onChange={e => onChange({ fieldKey: e.target.value })}
-                            placeholder="예: userName, status..."
-                            className={`${INPUT_CLS} font-mono`}
-                        />
+                        /* 기존 동작 — Key 입력 */
+                        <>
+                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                            {keyInputEl}
+                        </>
                     )}
                 </div>
             </div>
+
+            {/* Key + Data 행 — labelSideSlot 있을 때만 추가 표시 */}
+            {labelSideSlot !== undefined && (
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                        {keyInputEl}
+                    </div>
+                    <div>
+                        {keySideSlot}
+                    </div>
+                </div>
+            )}
 
             {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}
             <div>

@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useSlugRelations } from '../hooks/useSlugRelations';
 import {
     Plus, Trash2, GripVertical,
     ChevronUp, ChevronDown, X, Pencil,
@@ -141,14 +142,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             .finally(() => setSlugOptionsLoading(false));
     }, []);
 
-    /* ── slug-relation 목록 ── */
-    const [slugRelationOptions, setSlugRelationOptions] = useState<SlugRelationOption[]>([]);
-
-    useEffect(() => {
-        api.get('/slug-relations', { params: { size: 200 } })
-            .then(res => setSlugRelationOptions(res.data?.content || []))
-            .catch(() => {});
-    }, []);
+    /* ── slug-relation 목록 — 공통 훅으로 fetch ── */
+    const slugRelationOptions = useSlugRelations();
 
     /* ══════════════════════════════════════════ */
     /*  행 조작                                   */
@@ -411,7 +406,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                         {...props}
                         slugOptions={slugOptions}
                         slugOptionsLoading={slugOptionsLoading}
-                        slugRelationOptions={slugRelationOptions}
+                        slugRelationOptions={slugRelationOptions.filter(r => r.relationDir === 'FILTER')}
                     />
                 );
             default:               return null;
