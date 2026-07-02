@@ -93,6 +93,7 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         readonly:         col.readonly,
         options:          col.options,
         codeGroupCode:    col.codeGroup,
+        displayAs:        col.displayAs,
         /* 파일 */
         maxFileCount:     col.maxFileCount,
         maxFileSizeMB:    col.maxFileSizeMB,
@@ -154,6 +155,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.readonly          !== undefined) patch.readonly          = updates.readonly;
     if (updates.options           !== undefined) patch.options           = updates.options;
     if (updates.codeGroupCode     !== undefined) patch.codeGroup         = updates.codeGroupCode;
+    if (updates.displayAs         !== undefined) patch.displayAs         = updates.displayAs;
     /* 파일 */
     if (updates.maxFileCount      !== undefined) patch.maxFileCount      = updates.maxFileCount;
     if (updates.maxFileSizeMB     !== undefined) patch.maxFileSizeMB     = updates.maxFileSizeMB;

@@ -58,6 +58,7 @@ export interface SearchFieldConfig {
     minSelect?: number;
     maxSelect?: number;
     codeGroupCode?: string;
+    displayAs?: 'text' | 'value';  // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
     multiSelect?: boolean;      // button 전용: 다중선택 여부
     /* ── textarea 전용 ── */
     content?: string;           // 표시할 텍스트 내용
@@ -189,6 +190,7 @@ export interface BaseFieldConfig {
     minSelect?: number;
     maxSelect?: number;
     codeGroupCode?: string;
+    displayAs?: 'text' | 'value';  // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
 }
 
 /** 행 설정 공통 인터페이스 */

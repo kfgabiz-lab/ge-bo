@@ -48,6 +48,7 @@ export interface FieldEditValues {
     required?: boolean;
     options?: string[];      // select/radio/checkbox/button 전용 ("텍스트:값" 형식)
     codeGroupCode?: string;  // 공통코드 그룹 코드
+    displayAs?: 'text' | 'value';  // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
     multiSelect?: boolean;   // button 전용 다중선택 여부
     minLength?: number;
     maxLength?: number;

@@ -425,6 +425,24 @@ export function FieldRenderer({
 
         /* ── input ── */
         case 'input': {
+            /* 공통코드 연동 시 코드값 → 이름/코드값 변환 표시 (읽기 전용 텍스트로 처리) */
+            if (field.codeGroupCode && codeGroups?.length) {
+                const group  = codeGroups.find(g => g.groupCode === field.codeGroupCode);
+                const detail = group?.details.find(d => d.code === value && d.active);
+                const displayValue = field.displayAs === 'value'
+                    ? value
+                    : (detail ? (detail.nameMsgKey ? t(detail.nameMsgKey) : detail.name) : value);
+                return (
+                    <input
+                        type="text"
+                        disabled={isDisabled}
+                        readOnly
+                        className={`${inputCls}${readonlyCls}`}
+                        value={displayValue}
+                        onChange={undefined}
+                    />
+                );
+            }
             const inputEl = (
                 <input
                     type="text"

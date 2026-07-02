@@ -149,7 +149,8 @@ export interface SubListColumn {
     description?: string;          // 필드 설명
     descriptionMsgKey?: string;    // 필드 설명 다국어 키
     options?: string[];            // select 타입 전용 옵션 목록
-    codeGroup?: string;            // 공통코드 그룹 연결 (select 타입)
+    codeGroup?: string;            // 공통코드 그룹 연결 (select/input 타입)
+    displayAs?: 'text' | 'value'; // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
     maxFileCount?: number;         // file/image 타입 최대 파일 수 (기본 1)
     maxFileSizeMB?: number;        // file 타입 개당 최대 용량 (MB)
     maxTotalSizeMB?: number;       // file 타입 전체 최대 용량 (MB)

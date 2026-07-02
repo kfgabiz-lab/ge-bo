@@ -270,6 +270,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 required:           f.required,
                 options:            f.options,
                 codeGroupCode:      f.codeGroupCode,
+                displayAs:          f.displayAs,
                 multiSelect:        f.multiSelect,
                 minLength:          f.minLength,
                 maxLength:          f.maxLength,

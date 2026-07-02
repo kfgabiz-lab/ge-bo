@@ -16,8 +16,9 @@ import { ValidationSection } from '../../ValidationSection';
 import { DataGenerationSection } from './DataGenerationSection';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import { CodeGroupSelector } from '../../CodeGroupSelector';
 
-export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields }: FieldEditProps) {
+export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields, codeGroups, codeGroupsLoading }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
 
     return (
@@ -86,6 +87,34 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                 }}
                 onChange={updates => onChange(updates)}
             />
+            {/* 공통코드 연동 — codeGroups가 전달된 경우에만 표시 */}
+            {codeGroups && codeGroups.length > 0 && (
+                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase">공통코드 연동</span>
+                    <CodeGroupSelector
+                        codeGroups={codeGroups}
+                        codeGroupsLoading={codeGroupsLoading ?? false}
+                        value={values.codeGroupCode ?? ''}
+                        onChange={code => onChange({
+                            codeGroupCode: code || undefined,
+                            displayAs: code ? (values.displayAs ?? 'text') : undefined,
+                        })}
+                    />
+                    {/* 표시 방식 선택 — 공통코드 연동 시만 표시 */}
+                    {values.codeGroupCode && (
+                        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
+                            <button type="button" onClick={() => onChange({ displayAs: 'text' })}
+                                className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${(values.displayAs ?? 'text') === 'text' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                이름 표시
+                            </button>
+                            <button type="button" onClick={() => onChange({ displayAs: 'value' })}
+                                className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${values.displayAs === 'value' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                                코드값 표시
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
             {/* 데이터생성 — 이 필드 값을 변환하여 생성KEY 대상 필드에 자동 입력 */}
             <DataGenerationSection values={values} onChange={onChange} />
         </div>

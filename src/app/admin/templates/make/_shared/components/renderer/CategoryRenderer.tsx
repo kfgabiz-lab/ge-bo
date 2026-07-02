@@ -36,7 +36,7 @@ import { RendererContainer } from './RendererContainer';
 import type { CategoryWidget } from './types';
 import type { RendererMode } from './types';
 import { useI18n } from '@/hooks/use-i18n';
-import { resolveAccessor, parseActionParams } from '../../utils';
+import { flattenPageDataItem, parseActionParams } from '../../utils';
 
 /** 카테고리 항목 하나 */
 interface CategoryItem {
@@ -48,6 +48,7 @@ interface CategoryItem {
     code?: string;                              // 항목 코드 (예: A-001)
     description?: string;                       // 항목 설명
     _dataJson?: Record<string, unknown>;        // 원본 dataJson 보관 (드래그 정렬 시 구조 유지용)
+    _flatJson?: Record<string, unknown>;        // 평탄화된 row (parseActionParams용)
 }
 
 interface CategoryRendererProps {
@@ -126,23 +127,25 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             const titleKey = widget.fieldTitle || 'name';
             const descKey  = widget.fieldDesc  || 'description';
 
-            /* resolveAccessor: 1/2/3단계 dot notation 공통 처리 (utils.ts) */
-            const readField = (dataJson: Record<string, unknown>, fieldKey: string): unknown =>
-                resolveAccessor(dataJson, fieldKey);
-
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
-                .map(item => ({
-                    /* ID: dataJson의 설정 키 값 또는 item.id */
-                    id: readField(item.dataJson, idKey) != null ? Number(readField(item.dataJson, idKey)) : item.id,
-                    name: String(readField(item.dataJson, titleKey) ?? ''),
-                    depth: Number(item.dataJson.depth ?? widget.depth),
-                    parentId: item.dataJson.parentId != null ? Number(item.dataJson.parentId) : null,
-                    sortOrder: item.dataJson.sortOrder != null ? Number(item.dataJson.sortOrder) : undefined,
-                    code: readField(item.dataJson, codeKey) != null ? String(readField(item.dataJson, codeKey)) : undefined,
-                    description: readField(item.dataJson, descKey) != null ? String(readField(item.dataJson, descKey)) : undefined,
-                    /* 원본 dataJson 보관 — 드래그 정렬 시 구조 유지용 */
-                    _dataJson: item.dataJson,
-                }))
+                .map(item => {
+                    /* flattenPageDataItem으로 중첩 구조 평탄화 — dot notation key 접근 가능 */
+                    const flat = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
+                    return {
+                        /* ID: 평탄화된 row의 설정 키 값 또는 item.id */
+                        id: flat[idKey] != null ? Number(flat[idKey]) : item.id,
+                        name: String(flat[titleKey] ?? ''),
+                        depth: Number(item.dataJson.depth ?? widget.depth),
+                        parentId: item.dataJson.parentId != null ? Number(item.dataJson.parentId) : null,
+                        sortOrder: item.dataJson.sortOrder != null ? Number(item.dataJson.sortOrder) : undefined,
+                        code: flat[codeKey] != null ? String(flat[codeKey]) : undefined,
+                        description: flat[descKey] != null ? String(flat[descKey]) : undefined,
+                        /* 원본 dataJson 보관 — 드래그 정렬 시 구조 유지용 */
+                        _dataJson: item.dataJson,
+                        /* 평탄화된 row — parseActionParams 파라미터 바인딩용 */
+                        _flatJson: flat,
+                    };
+                })
                 /* sortOrder 기준 오름차순 정렬 — sortOrder 없는 항목은 뒤로 */
                 .sort((a, b) => {
                     if (a.sortOrder == null && b.sortOrder == null) return 0;
@@ -186,7 +189,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
         e.stopPropagation();
         if (isPreview) return;
         if (widget.detailConnType === 'popup' && widget.detailPopupSlug) {
-            const staticParams = parseActionParams(widget.detailParams, item._dataJson ?? {});
+            const staticParams = parseActionParams(widget.detailParams, item._flatJson ?? {});
             onPopupOpen?.(widget.detailPopupSlug, item.id, widget.dbSlug, staticParams);
             return;
         }
@@ -469,10 +472,10 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                                             if (isPreview) return;
                                                             if (widget.editConnType === 'popup' && widget.editPopupSlug) {
                                                                 /* 팝업/페이지로 이동하며 파라미터를 initialValues로 전달, autoSave 플래그 전달 */
-                                                                onPopupOpen?.(widget.editPopupSlug, item.id, widget.dbSlug, parseActionParams(widget.editParams, item._dataJson ?? {}), widget.editParamSave);
+                                                                onPopupOpen?.(widget.editPopupSlug, item.id, widget.dbSlug, parseActionParams(widget.editParams, item._flatJson ?? {}), widget.editParamSave);
                                                             } else if (widget.editConnType === 'path' && widget.editPath) {
                                                                 /* parseActionParams로 파싱 후 URLSearchParams로 올바른 쿼리스트링 생성 */
-                                                                const parsed = parseActionParams(widget.editParams, item._dataJson ?? {});
+                                                                const parsed = parseActionParams(widget.editParams, item._flatJson ?? {});
                                                                 if (widget.editParamSave) parsed['_paramSave'] = 'true';
                                                                 const qs = Object.keys(parsed).length > 0 ? `&${new URLSearchParams(parsed).toString()}` : '';
                                                                 router.push(`${widget.editPath}?id=${item.id}${qs}`);
