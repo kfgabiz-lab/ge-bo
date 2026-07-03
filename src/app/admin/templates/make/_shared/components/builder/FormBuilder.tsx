@@ -323,6 +323,8 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 dataGenerations:    f.dataGenerations,
                 /* ── editor 전용 ── */
                 editorType:         f.editorType,
+                /* ── select 표시 방식 ── */
+                selectType:         f.selectType,
                 /* ── select SLUG 옵션 소스 ── */
                 optionSlug:         f.optionSlug,
                 optionValueKey:     f.optionValueKey,

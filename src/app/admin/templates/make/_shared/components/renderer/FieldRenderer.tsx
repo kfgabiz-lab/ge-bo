@@ -322,6 +322,144 @@ function ColorPresetSelector({ colors, selectedColor, disabled, onChange }: Colo
 }
 
 /**
+ * AutocompleteInput — 자동완성 선택 컴포넌트 (live 모드 전용)
+ *
+ * 텍스트를 입력하면 옵션 목록에서 부분 일치하는 항목을 필터링하여 드롭다운으로 표시한다.
+ * 항목 선택 시 해당 value를 onChange로 전달하고, input에는 text(표시 텍스트)를 보여준다.
+ *
+ * 사용법:
+ *   <AutocompleteInput value="ko" onChange={v => setValue(v)} opts={["한국어:ko", "영어:en"]} />
+ */
+interface AutocompleteInputProps {
+    /** 현재 선택된 값 (value 부분, 예: "ko") */
+    value: string;
+    onChange: (val: string) => void;
+    /** "텍스트:값" 형식 옵션 배열 */
+    opts: string[];
+    placeholder?: string;
+    isDisabled?: boolean;
+    isReadOnly?: boolean;
+}
+
+function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isReadOnly }: AutocompleteInputProps) {
+    const { t } = useI18n();
+
+    /* 옵션 배열을 { text, value } 객체로 변환 */
+    const parsedOpts = opts.map(opt => parseOpt(opt));
+
+    /* value(키값)로 displayText 실시간 계산 — <select value={value}>와 동일 패턴
+       value가 외부에서 바뀌어도 state 동기화 없이 즉시 반영됨 */
+    const matched = parsedOpts.find(o => o.value === value);
+    const displayText = matched ? t(matched.text) : '';
+
+    /* 사용자 입력 중일 때만 사용하는 필터 텍스트 */
+    const [filterText, setFilterText] = useState('');
+    /* 드롭다운 열림/닫힘 상태 */
+    const [isOpen, setIsOpen] = useState(false);
+    /* 외부 클릭 감지용 래퍼 ref */
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    /* input에 표시할 텍스트 — 열려있을 때는 필터 텍스트, 닫혔을 때는 displayText */
+    const shownText = isOpen ? filterText : displayText;
+
+    /* 외부 클릭 시 드롭다운 닫기 */
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    /* filterText 기준 옵션 필터링 (대소문자 무관 부분 일치) — isOpen일 때만 의미 있음 */
+    const filteredOpts = parsedOpts.filter(opt =>
+        t(opt.text).toLowerCase().includes(filterText.toLowerCase())
+    );
+
+    /* input 변경 핸들러 — 직접 입력 중에는 선택 value를 초기화하고 드롭다운 열기 */
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFilterText(e.target.value);
+        setIsOpen(true);
+        /* 입력 중에는 미선택 상태로 처리 */
+        onChange('');
+    };
+
+    /* 옵션 항목 선택 핸들러 — isOpen=false가 되면 shownText=displayText로 자동 전환 */
+    const handleSelect = (opt: { text: string; value: string }) => {
+        onChange(opt.value);
+        setIsOpen(false);
+    };
+
+    /* 읽기 전용 스타일 */
+    const readonlyCls = isReadOnly ? ' bg-slate-50 text-slate-500 cursor-default' : '';
+
+    return (
+        <div className="relative" ref={wrapperRef}>
+            <input
+                type="text"
+                disabled={isDisabled}
+                readOnly={isReadOnly}
+                placeholder={placeholder}
+                /* 값이 선택된 상태면 오른쪽에 × 버튼 공간 확보 */
+                className={`${inputCls}${readonlyCls}${value ? ' pr-7' : ''}`}
+                value={shownText}
+                /* 포커스 시 드롭다운 열기 + 기존 displayText를 필터 초기값으로 설정 */
+                onFocus={() => {
+                    if (!isReadOnly) {
+                        setFilterText(displayText);
+                        setIsOpen(true);
+                    }
+                }}
+                onChange={isReadOnly ? undefined : handleInputChange}
+            />
+            {/* 선택값 초기화 버튼 — 값이 선택된 상태이고 비활성/읽기전용이 아닐 때만 표시 */}
+            {value && !isDisabled && !isReadOnly && (
+                <button
+                    type="button"
+                    /* mousedown: input blur보다 먼저 발화하여 클릭 누락 방지 */
+                    onMouseDown={e => {
+                        e.preventDefault(); // input blur 방지
+                        onChange('');
+                        setFilterText('');
+                        setIsOpen(false);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    tabIndex={-1}
+                    aria-label="선택 초기화"
+                >
+                    <X className="w-3.5 h-3.5" />
+                </button>
+            )}
+            {/* 드롭다운 옵션 목록 — 열린 상태이고 읽기전용이 아닐 때만 표시 */}
+            {isOpen && !isReadOnly && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                    <ul className="max-h-48 overflow-y-auto py-1">
+                        {filteredOpts.length > 0 ? (
+                            filteredOpts.map(opt => (
+                                <li key={opt.value}>
+                                    <button
+                                        type="button"
+                                        /* mousedown: input의 blur보다 먼저 발화하여 클릭 누락 방지 */
+                                        onMouseDown={() => handleSelect(opt)}
+                                        className="w-full px-3 py-2 text-sm text-slate-700 text-left hover:bg-slate-50 cursor-pointer"
+                                    >
+                                        {t(opt.text)}
+                                    </button>
+                                </li>
+                            ))
+                        ) : (
+                            <li className="px-3 py-2 text-sm text-slate-400 italic">일치하는 항목 없음</li>
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/**
  * SlugOptionSelect — SLUG 옵션 소스 select 컴포넌트 (live 모드 전용)
  *
  * field.optionSlug로 지정된 SLUG에서 데이터를 API fetch하여 select 옵션을 채운다.
@@ -386,6 +524,78 @@ function SlugOptionSelect({
             </select>
             <SelectArrow />
         </div>
+    );
+}
+
+/**
+ * SlugAutocompleteInput — SLUG API에서 옵션을 fetch하여 AutocompleteInput에 전달
+ *
+ * optionSlug로 /page-data/{slug} API를 호출하고,
+ * optionValueKey / optionTextKey로 옵션 배열("텍스트:값" 형식)을 구성한 뒤
+ * AutocompleteInput에 전달하여 자동완성 UI를 제공한다.
+ *
+ * optionOrderKey / optionOrderDir 지정 시 FE에서 정렬 적용.
+ */
+function SlugAutocompleteInput({
+    field,
+    value,
+    onChange,
+    isDisabled,
+    isReadOnly,
+    placeholder,
+}: {
+    field: SearchFieldConfig;
+    value: string;
+    onChange?: (v: string) => void;
+    isDisabled: boolean;
+    isReadOnly: boolean;
+    placeholder: string;
+}) {
+    /* SLUG API에서 fetch한 옵션 목록 ("텍스트:값" 형식) */
+    const [slugOpts, setSlugOpts] = useState<string[]>([]);
+
+    /* optionSlug 변경 시 API fetch → 옵션 배열 구성 */
+    useEffect(() => {
+        if (!field.optionSlug) return;
+
+        api.get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })
+            .then((res) => {
+                const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
+
+                /* flattenPageDataItem으로 중첩 dataJson → flat key 변환 */
+                let opts = rows.map((item) => {
+                    const row = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
+                    return {
+                        value:    String(row[field.optionValueKey ?? ''] ?? ''),
+                        text:     String(row[field.optionTextKey  ?? ''] ?? ''),
+                        /* 정렬 기준 값 (optionOrderKey 지정 시 사용) */
+                        _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
+                    };
+                });
+
+                /* optionOrderKey 지정 시 FE 정렬 */
+                if (field.optionOrderKey) {
+                    const dir = field.optionOrderDir === 'DESC' ? -1 : 1;
+                    opts = opts.sort((a, b) =>
+                        a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir
+                    );
+                }
+
+                /* AutocompleteInput이 받는 "텍스트:값" 형식으로 변환 */
+                setSlugOpts(opts.map(({ value, text }) => `${text}:${value}`));
+            })
+            .catch(() => setSlugOpts([]));
+    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir]);
+
+    return (
+        <AutocompleteInput
+            value={value}
+            onChange={v => onChange?.(v)}
+            opts={slugOpts}
+            placeholder={placeholder}
+            isDisabled={isDisabled}
+            isReadOnly={isReadOnly}
+        />
     );
 }
 
@@ -515,6 +725,66 @@ export function FieldRenderer({
         /* ── select ── */
         case 'select': {
             const selectPlaceholder = field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || t('common.select.placeholder'));
+
+            /* autocomplete + live 모드: 실제 자동완성 동작 */
+            if (field.selectType === 'autocomplete' && !isPreview) {
+                /* SLUG + autocomplete 조합: SLUG API fetch 후 AutocompleteInput으로 자동완성 제공 */
+                if (field.optionSlug) {
+                    return (
+                        <SlugAutocompleteInput
+                            field={field}
+                            value={value}
+                            onChange={onChange}
+                            isDisabled={isDisabled}
+                            isReadOnly={isReadOnly}
+                            placeholder={selectPlaceholder}
+                        />
+                    );
+                }
+                return (
+                    <AutocompleteInput
+                        value={value}
+                        onChange={v => onChange?.(v)}
+                        opts={opts}
+                        placeholder={selectPlaceholder}
+                        isDisabled={isDisabled}
+                        isReadOnly={isReadOnly}
+                    />
+                );
+            }
+
+            /* autocomplete + preview 모드: 드롭다운을 펼쳐서 UI 확인 가능하도록 */
+            if (field.selectType === 'autocomplete' && isPreview) {
+                return (
+                    <div className="relative">
+                        {/* 텍스트 입력 — preview에서는 입력 비활성 */}
+                        <input
+                            type="text"
+                            disabled={isDisabled}
+                            readOnly={isReadOnly}
+                            placeholder={selectPlaceholder}
+                            className={`${inputCls}${readonlyCls}`}
+                            defaultValue=""
+                        />
+                        {/* preview 모드에서 드롭다운을 펼쳐서 UI 확인 가능하도록 */}
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                            <ul className="max-h-48 overflow-y-auto py-1">
+                                {opts.map(opt => {
+                                    const { text } = parseOpt(opt);
+                                    return (
+                                        <li key={opt}>
+                                            <div className="px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-default">
+                                                {t(text)}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                );
+            }
+
             /* SLUG 옵션 소스: live 모드에서 SLUG 데이터를 API fetch하여 옵션 채움 */
             if (field.optionSlug && !isPreview) {
                 return (

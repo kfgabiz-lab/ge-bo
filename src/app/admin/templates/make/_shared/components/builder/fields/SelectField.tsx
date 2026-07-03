@@ -16,11 +16,24 @@ import { FieldOptions } from './_FieldOptions';
 import { ToggleRow } from './_ToggleRow';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import { selectCls } from '../../../styles';
 
 export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, codeGroups, codeGroupsLoading, autoFocus, onLabelKeyDown, hideColSpan, hideConditionFields, slugEntityFields, slugOptions }: FieldEditProps) {
     const { i18nMode } = useBuilderI18nMode();
     return (
         <div className="space-y-1.5">
+            {/* 타입 선택 — selectbox(기본) 또는 autocomplete */}
+            <div>
+                <label className={LABEL_CLS}>타입</label>
+                <select
+                    value={values.selectType ?? 'selectbox'}
+                    onChange={e => onChange({ selectType: e.target.value as 'selectbox' | 'autocomplete' })}
+                    className={selectCls}
+                >
+                    <option value="selectbox">selectbox</option>
+                    <option value="autocomplete">autocomplete</option>
+                </select>
+            </div>
             <FieldBase
                 label={values.label} labelMsgKey={values.labelMsgKey}
                 fieldKey={values.fieldKey}

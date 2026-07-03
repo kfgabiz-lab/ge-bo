@@ -82,7 +82,7 @@ export function InputField({ values, onChange, colSpanMode, rowSpanConfig, autoF
                             value={values.data ?? ''}
                             onChange={e => onChange({ data: e.target.value || undefined })}
                             className={`${INPUT_CLS} font-mono`}
-                            placeholder="예: code=1?title|title2"
+                            placeholder="예: code=1?title:title2"
                         />
                     </div>
                 }

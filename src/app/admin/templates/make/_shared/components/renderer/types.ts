@@ -185,6 +185,9 @@ export interface SubListColumn {
     rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 날짜 범위 서브타입 (기본: 'date')
     /* ── action 타입 전용 ── */
     actions?: ('copy' | 'delete')[];    // SubList action 컬럼: copy, delete 가능
+    /* ── select 표시 방식 ── */
+    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+    selectType?: 'selectbox' | 'autocomplete';
     /* ── select SLUG 옵션 소스 전용 ── */
     /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
     optionSlug?: string;

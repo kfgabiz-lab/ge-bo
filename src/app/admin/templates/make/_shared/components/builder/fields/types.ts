@@ -48,6 +48,8 @@ export interface FieldEditValues {
     descriptionMsgKey?: string; // 설명 다국어 키
     required?: boolean;
     options?: string[];      // select/radio/checkbox/button 전용 ("텍스트:값" 형식)
+    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+    selectType?: 'selectbox' | 'autocomplete';
     codeGroupCode?: string;  // 공통코드 그룹 코드
     displayAs?: 'text' | 'value';  // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
     multiSelect?: boolean;   // button 전용 다중선택 여부
@@ -124,7 +126,7 @@ export interface FieldEditValues {
     /* ── category 전용 ── */
     dbSlug?: string;                 // 카테고리 연결 slug (PAGE_DATA 타입)
     relationSlugId?: number;         // 연동 slug-relation ID
-    // 데이터 표현식 (ColumnBaseField와 동일, 예: code=1?title|title2)
+    // 데이터 표현식 (ColumnBaseField와 동일, 예: code=1?title:title2)
     data?: string;
     maxDepth?: 1 | 2 | 3 | 4;       // 표시할 최대 depth 수
     depthLabels?: string[];          // depth별 라벨 배열

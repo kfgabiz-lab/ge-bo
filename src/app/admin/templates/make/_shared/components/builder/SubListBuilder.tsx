@@ -126,6 +126,8 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         rangeSubType:           col.rangeSubType,
         /* action */
         actions: col.actions as FieldEditValues['actions'],
+        /* select 표시 방식 */
+        selectType:      col.selectType,
         /* select SLUG 옵션 소스 */
         optionSlug:      col.optionSlug,
         optionValueKey:  col.optionValueKey,
@@ -188,6 +190,8 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.rangeSubType           !== undefined) patch.rangeSubType           = updates.rangeSubType;
     /* action */
     if (updates.actions                !== undefined) patch.actions                = updates.actions as ('copy')[];
+    /* select 표시 방식 */
+    if (updates.selectType             !== undefined) patch.selectType             = updates.selectType;
     /* select SLUG 옵션 소스 */
     if (updates.optionSlug             !== undefined) patch.optionSlug             = updates.optionSlug;
     if (updates.optionValueKey         !== undefined) patch.optionValueKey         = updates.optionValueKey;

@@ -98,6 +98,21 @@ const SAMPLE_SEARCH: SearchWidget = {
                 },
             ],
         },
+        {
+            id: 'r_auto', cols: 3,
+            fields: [
+                {
+                    id: 'f_auto1', type: 'select', label: 'selectbox 예시', colSpan: 1,
+                    options: ['전체:','김철수:kim','이영희:lee','박민수:park'],
+                },
+                {
+                    id: 'f_auto2', type: 'select', label: 'autocomplete 예시', colSpan: 1,
+                    selectType: 'autocomplete' as const,
+                    options: ['전체:','김철수:kim','이영희:lee','박민수:park'],
+                    placeholder: '이름 입력',
+                },
+            ],
+        },
     ],
 };
 
@@ -415,7 +430,7 @@ const SAMPLE_TAB: TabWidget = {
 /* 탭별 위젯 배열 — 순서대로 PageLayout 그리드에 배치됨 */
 const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: number }[]> = {
     search: [
-        { widget: SAMPLE_SEARCH,          colSpan: 12, rowSpan: 5 },
+        { widget: SAMPLE_SEARCH,          colSpan: 12, rowSpan: 7 },
         { widget: SAMPLE_SEARCH_SIMPLE,   colSpan: 12, rowSpan: 1 },
         { widget: SAMPLE_SEARCH_CATEGORY, colSpan: 12, rowSpan: 3 },
     ],

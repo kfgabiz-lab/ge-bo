@@ -41,7 +41,7 @@ export interface SearchFieldConfig {
     /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
     singleDateRange?: boolean;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
-    // 데이터 표현식 (예: code=1?title|title2, title+'-'+code) — input 필드 표시값 계산
+    // 데이터 표현식 (예: code=1?title:title2, title+'-'+code) — input 필드 표시값 계산
     data?: string;
     placeholder?: string;
     placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
@@ -52,6 +52,8 @@ export interface SearchFieldConfig {
     rowSpan?: number;
     required?: boolean;
     options?: string[];
+    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+    selectType?: 'selectbox' | 'autocomplete';
     minLength?: number;
     maxLength?: number;
     showCharCount?: boolean;    // 글자수 표시 여부 (input/textarea 전용)
@@ -186,6 +188,8 @@ export interface BaseFieldConfig {
     rowSpan?: number;
     required?: boolean;
     options?: string[];
+    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+    selectType?: 'selectbox' | 'autocomplete';
     minLength?: number;
     maxLength?: number;
     pattern?: string;
@@ -245,7 +249,7 @@ export interface TableColumnConfig {
     header: string;
     headerMsgKey?: string;    // 헤더명 다국어 키 (있으면 t(key), 없으면 header 표시)
     accessor: string;
-    data?: string;          // 표현식 (예: code=1?title|title2, title+'-'+code)
+    data?: string;          // 표현식 (예: code=1?title:title2, title+'-'+code)
     width?: number;
     widthUnit?: 'px' | '%';
     align: 'left' | 'center' | 'right';

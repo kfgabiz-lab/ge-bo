@@ -70,9 +70,39 @@ export const showValidationError = (errors: string[]): void => {
 };
 
 /**
- * hideCondition / disableCondition 평가 — "key=val" (일치) / "key!=val" (불일치) / AND 복수 조건 지원
+ * 단일 조건 평가 공통 함수 — evalFieldCondition · evalRowCondition 에서 공유
+ * 파싱 순서: != → <= → >= → < → > → = (2글자 연산자를 먼저 감지해 오파싱 방지)
+ * 숫자 비교 (<, >, <=, >=): Number() 변환 후 비교, 어느 한쪽이 NaN이면 false 반환
+ * @param lhsVal 좌변 실제 값 (row 또는 form values에서 꺼낸 값)
+ * @param op     연산자 문자열 ('=', '!=', '<', '>', '<=', '>=')
+ * @param rhsVal 우변 비교 값 (리터럴 문자열)
+ */
+function evalConditionOp(lhsVal: string, op: string, rhsVal: string): boolean {
+    if (op === '!=') return lhsVal !== rhsVal;
+    if (op === '=')  return lhsVal === rhsVal;
+
+    /* 숫자 비교 연산자 처리 */
+    const lhsNum = Number(lhsVal);
+    const rhsNum = Number(rhsVal);
+    /* 어느 한쪽이 숫자로 변환 불가능하면 비교 불가 */
+    if (isNaN(lhsNum) || isNaN(rhsNum)) return false;
+
+    if (op === '<')  return lhsNum <  rhsNum;
+    if (op === '>')  return lhsNum >  rhsNum;
+    if (op === '<=') return lhsNum <= rhsNum;
+    if (op === '>=') return lhsNum >= rhsNum;
+
+    return false;
+}
+
+/** 연산자 파싱 순서 — 2글자 연산자를 먼저 감지해야 1글자 연산자와 충돌하지 않음 */
+const CONDITION_OPS = ['!=', '<=', '>=', '<', '>', '='] as const;
+
+/**
+ * hideCondition / disableCondition 평가
+ * 지원 연산자: = (문자열 일치) / != (불일치) / < > <= >= (숫자 비교) / AND 복수 조건(쉼표)
  * FormRenderer.evalCondition과 동일 로직 — validateFormFields에서 HIDE 필드 건너뜀 판단에 사용
- * @param condition "status=1,type=Y" 형식의 조건 문자열
+ * @param condition "status=1,price>=1000" 형식의 조건 문자열
  * @param keyToId   fieldKey → fieldId 역매핑
  * @param values    fieldId → 현재값 맵
  */
@@ -82,22 +112,20 @@ export const evalFieldCondition = (
     values: Record<string, string>,
 ): boolean =>
     condition.split(',').every(cond => {
-        /* != 연산자 우선 감지 */
-        const neqIdx = cond.indexOf('!=');
-        if (neqIdx !== -1) {
-            const key     = cond.slice(0, neqIdx).trim();
-            const val     = cond.slice(neqIdx + 2).trim();
+        /* 연산자 순서대로 감지 (2글자 먼저) */
+        for (const op of CONDITION_OPS) {
+            const idx = cond.indexOf(op);
+            if (idx === -1) continue;
+
+            const key     = cond.slice(0, idx).trim();
+            const rhsVal  = cond.slice(idx + op.length).trim();
             const fieldId = keyToId[key];
+            /* fieldId 없으면 조건 불충족 */
             if (!fieldId) return false;
-            return (values[fieldId] ?? '') !== val;
+
+            return evalConditionOp(values[fieldId] ?? '', op, rhsVal);
         }
-        const eqIdx = cond.indexOf('=');
-        if (eqIdx === -1) return false;
-        const key     = cond.slice(0, eqIdx).trim();
-        const val     = cond.slice(eqIdx + 1).trim();
-        const fieldId = keyToId[key];
-        if (!fieldId) return false;
-        return (values[fieldId] ?? '') === val;
+        return false;
     });
 
 /**
@@ -305,9 +333,9 @@ function addDotNotationKeys(
  * 컬럼 data 표현식 평가 (flattenPageDataItem row를 스코프로 사용)
  *
  * 지원 패턴:
- *   - 조건식: condition?trueExpr|falseExpr (중첩 가능, 재귀 평가)
+ *   - 조건식: condition?trueExpr:falseExpr (중첩 가능, 재귀 평가)
  *   - 연결식: token1+token2+... (따옴표 없는 토큰은 row 필드, 따옴표 있는 토큰은 리터럴)
- *   - 조건 연산자: = (같음), != (다름) — 문자열 비교
+ *   - 조건 연산자: = (같음), != (다름) — 문자열 비교 / < > <= >= — 숫자 비교
  *
  * @example
  * evalColumnDataExpr("code=1?title:title2", { code: '1', title: '타이틀' }) // → '타이틀'
@@ -317,12 +345,12 @@ function addDotNotationKeys(
 export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): string {
     const trimmed = expr.trim();
 
-    /* 조건식 감지: condition?trueExpr|falseExpr */
+    /* 조건식 감지: condition?trueExpr:falseExpr */
     const qIdx = trimmed.indexOf('?');
     if (qIdx !== -1) {
         const condition = trimmed.substring(0, qIdx).trim();
         const rest = trimmed.substring(qIdx + 1);
-        /* 중첩 ?/| 고려 — depth=0인 첫 번째 | 위치 탐색 */
+        /* 중첩 ?/: 고려 — depth=0인 첫 번째 : 위치 탐색 */
         const pipeIdx = findTopLevelColonIdx(rest);
         if (pipeIdx !== -1) {
             const trueExpr = rest.substring(0, pipeIdx).trim();
@@ -351,19 +379,20 @@ function findTopLevelColonIdx(str: string): number {
     return -1;
 }
 
-/** 조건 문자열(field=val, field!=val) 평가 — 문자열 비교 */
+/**
+ * 조건 문자열 평가 — evalConditionOp 공통 헬퍼 재사용
+ * 지원 연산자: = / != / < > <= >= (숫자 비교)
+ */
 function evalRowCondition(condition: string, row: Record<string, unknown>): boolean {
-    const neqIdx = condition.indexOf('!=');
-    if (neqIdx !== -1) {
-        const field = condition.substring(0, neqIdx).trim();
-        const val = condition.substring(neqIdx + 2).trim();
-        return String(row[field] ?? '') !== val;
-    }
-    const eqIdx = condition.indexOf('=');
-    if (eqIdx !== -1) {
-        const field = condition.substring(0, eqIdx).trim();
-        const val = condition.substring(eqIdx + 1).trim();
-        return String(row[field] ?? '') === val;
+    for (const op of CONDITION_OPS) {
+        const idx = condition.indexOf(op);
+        if (idx === -1) continue;
+
+        const field  = condition.slice(0, idx).trim();
+        const rhsVal = condition.slice(idx + op.length).trim();
+        const lhsVal = String(row[field] ?? '');
+
+        return evalConditionOp(lhsVal, op, rhsVal);
     }
     return false;
 }

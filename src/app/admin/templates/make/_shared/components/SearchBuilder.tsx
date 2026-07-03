@@ -270,6 +270,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
             rangeSubType, dateSubType, singleDateRange,
+            /* select 표시 방식 */
+            selectType,
             /* select SLUG 옵션 소스 */
             optionSlug, optionValueKey, optionTextKey, optionOrderKey, optionOrderDir,
         } = pendingValues;
@@ -337,6 +339,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             /* 동적 조건 */
             hideCondition:     hideCondition?.trim()    || undefined,
             disableCondition:  disableCondition?.trim() || undefined,
+            /* select 표시 방식 */
+            selectType:        pendingType === 'select' ? (selectType ?? 'selectbox') : undefined,
             /* select SLUG 옵션 소스 */
             optionSlug:        pendingType === 'select' ? (optionSlug || undefined) : undefined,
             optionValueKey:    pendingType === 'select' ? (optionValueKey || undefined) : undefined,
@@ -554,6 +558,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 /* 동적 조건 */
                                                                                 hideCondition:       field.hideCondition,
                                                                                 disableCondition:    field.disableCondition,
+                                                                                /* select 표시 방식 */
+                                                                                selectType:          field.selectType,
                                                                                 /* select SLUG 옵션 소스 */
                                                                                 optionSlug:          field.optionSlug,
                                                                                 optionValueKey:      field.optionValueKey,
