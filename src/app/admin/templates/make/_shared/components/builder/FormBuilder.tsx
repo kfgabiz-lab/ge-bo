@@ -32,7 +32,7 @@ import { SearchFieldType, SearchFieldConfig } from '../SearchBuilder';
 import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
 import { createIdGenerator } from '../../utils';
 import {
-    InputField, SelectField, DateField, DateRangeField,
+    InputField, TextField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
     EditorField, FileField, ImageField, VideoField, MediaField,
     FormTextareaField, TimeField,
@@ -77,6 +77,7 @@ export interface FormWidget {    type: 'form';
 /** Form 위젯 지원 필드 타입 */
 const FORM_FIELD_TYPES: FieldTypeItem[] = [
     { type: 'input',          label: 'Input',            desc: '텍스트 입력',              defaultColSpan: 1 },
+    { type: 'text',           label: 'Text',             desc: '연결 Slug 값 표시',        defaultColSpan: 1 },
     { type: 'select',         label: 'Select',           desc: '셀렉트 박스',              defaultColSpan: 1 },
     { type: 'date',           label: 'Date',             desc: '날짜/년월/일시 단독',      defaultColSpan: 1 },
     { type: 'dateRange',      label: 'Date Range',       desc: '날짜/년월/일시/시간 범위', defaultColSpan: 2 },
@@ -331,10 +332,12 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 optionTextKey:      f.optionTextKey,
                 optionOrderKey:     f.optionOrderKey,
                 optionOrderDir:     f.optionOrderDir,
-                /* ── 연결 Slug (input 전용) ── */
+                /* ── 연결 Slug (input/text 전용) ── */
                 relationSlugId:     f.relationSlugId,
-                /* ── Data 표현식 (input 전용) ── */
+                /* ── Data 표현식 (input/text 전용) ── */
                 data:               f.data,
+                /* ── 다건 매칭 표시 방식 (text 전용) ── */
+                fetchDisplayMode:   f.fetchDisplayMode,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),
@@ -350,6 +353,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
         switch (f.type) {
             /* fetchRelations: slug-relation 목록 전달 → InputField "연결 Slug" 섹션 표시 */
             case 'input':          return <InputField {...props} fetchRelations={slugRelations.filter(r => r.relationDir === 'FETCH')} />;
+            case 'text':            return <TextField {...props} fetchRelations={slugRelations.filter(r => r.relationDir === 'FETCH')} />;
             /* slugOptions: FormBuilder props에서 전달받은 PAGE_DATA slug 목록 — SLUG 탭 옵션 소스 선택에 사용 */
             case 'select':         return <SelectField {...props} slugOptions={slugOptions} />;
             case 'date':           return <DateField {...props} />;

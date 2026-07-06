@@ -17,6 +17,7 @@ import React from 'react';
 import { ColEditProps } from './col-types';
 import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
 import { SlugSelectField } from './SlugSelectField';
+import { FetchDisplayField } from './FetchDisplayField';
 import { buildFetchKey } from './utils';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
@@ -87,28 +88,23 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
                         </div>
                     </div>
 
-                    {/* KEY / DATA — 2열 그리드 */}
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                            <input
-                                type="text"
-                                value={values.accessor ?? ''}
-                                onChange={e => onChange({ accessor: e.target.value })}
-                                className={`${INPUT_CLS} font-mono`}
-                            />
-                        </div>
-                        <div>
-                            <label className={LABEL_CLS}>Data</label>
-                            <input
-                                type="text"
-                                value={values.data ?? ''}
-                                onChange={e => onChange({ data: e.target.value || undefined })}
-                                className={`${INPUT_CLS} font-mono`}
-                                placeholder="예: code=1?title:title2"
-                            />
-                        </div>
+                    {/* Key — 단독 row */}
+                    <div>
+                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                        <input
+                            type="text"
+                            value={values.accessor ?? ''}
+                            onChange={e => onChange({ accessor: e.target.value })}
+                            className={`${INPUT_CLS} font-mono`}
+                        />
                     </div>
+
+                    {/* 출력방식 | Data — 3:7 비율 (다건 매칭 시 표시 방식 + 반복 평가할 표현식) */}
+                    <FetchDisplayField
+                        fetchDisplayMode={values.fetchDisplayMode}
+                        data={values.data}
+                        onChange={patch => onChange(patch)}
+                    />
                 </>
             )}
 

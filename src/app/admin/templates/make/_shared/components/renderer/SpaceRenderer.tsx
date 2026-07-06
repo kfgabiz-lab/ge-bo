@@ -11,7 +11,7 @@
  *   - connType='content' + contentAction → onContentAction 콜백 호출 (Form/SubList 다중 연결)
  *   - connType='popup' → 팝업 오픈
  *   - connType='path'  → 경로 이동 (향후 구현)
- *   - connType='close' → onClose 있으면 팝업 닫기, 없으면 router.back() 뒤로가기
+ *   - connType='close' → 이탈체크(confirmLeave) 통과 시 onClose 있으면 팝업 닫기, 없으면 router.back() 뒤로가기
  *
  * 사용법:
  *   <SpaceRenderer mode="preview" items={widget.items} />
@@ -25,6 +25,7 @@ import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { SearchFieldConfig } from '../../types';
 import type { RendererMode } from './types';
+import { useLeaveCheckStore } from '@/store/use-leave-check-store';
 
 interface SpaceRendererProps {
     mode: RendererMode;
@@ -50,6 +51,8 @@ interface SpaceRendererProps {
 
 export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave }: SpaceRendererProps) {
     const router = useRouter();
+    /* 이탈체크 가드 — leaveCheck 옵션이 켜져 있고 폼이 dirty 상태일 때만 함수가 등록됨 */
+    const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
     if (!items.length) {
         return (
             <RendererContainer showBorder={showBorder} bgColor={bgColor} className="flex items-center justify-center">
@@ -75,6 +78,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
             onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction);
         } else if (field.connType === 'close') {
+            /* 이탈체크 — 저장되지 않은 변경사항이 있으면 사용자 확인 후 취소 시 닫기 중단 */
+            if (confirmLeave && !confirmLeave()) return;
             /* LayerPopup이면 onClose(), 상세페이지면 router.back() */
             if (onClose) {
                 onClose();

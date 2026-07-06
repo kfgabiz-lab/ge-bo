@@ -6,7 +6,7 @@
  * - 핸들러 타입: live 모드에서 테이블·검색폼에 전달하는 이벤트 콜백
  */
 
-import type { SearchRowConfig, TableColumnConfig, SearchFieldConfig } from '../../types';
+import type { SearchRowConfig, TableColumnConfig, SearchFieldConfig, DateSubType } from '../../types';
 import type { FormWidget } from '../builder/FormBuilder';
 import type { TableWidget } from '../builder/TableBuilder';
 
@@ -171,7 +171,7 @@ export interface SubListColumn {
     defaultDateOffset?: number;    // 오늘 기준 N일 전 기본값
     defaultDate?: string;          // 기본값 날짜 미리보기 (YYYY-MM-DD)
     disablePast?: boolean;         // 오늘 이전 날짜 비활성화
-    dateSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 날짜 단독 서브타입 (기본: 'date')
+    dateSubType?: DateSubType; // 날짜 단독 서브타입 (기본: 'date')
     defaultToday?: boolean;        // 오늘 날짜를 기본값으로 자동 적용
     /* ── dateRange 전용 ── */
     label2?: string;               // 종료일 라벨
@@ -182,7 +182,7 @@ export interface SubListColumn {
     defaultEndDateOffset?: number;
     defaultEndDate?: string;
     disableEndPast?: boolean;
-    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 날짜 범위 서브타입 (기본: 'date')
+    rangeSubType?: DateSubType; // 날짜 범위 서브타입 (기본: 'date')
     /* ── action 타입 전용 ── */
     actions?: ('copy' | 'delete')[];    // SubList action 컬럼: copy, delete 가능
     /* ── select 표시 방식 ── */

@@ -10,6 +10,7 @@ export type SearchFieldType =
     | 'input' | 'select' | 'date' | 'dateRange'
     | 'yearMonth' | 'yearMonthRange'            // 년월 선택 (저장값: YYYY-MM)
     | 'radio' | 'checkbox' | 'button'
+    | 'text'            // 연결 Slug 값 표시 전용 (다건 매칭 시 한줄/여러줄 표시 지원)
     | 'textarea'        // 여러 줄 텍스트 표시 (Space 텍스트 아이템 등)
     | 'action-button'   // 액션 버튼 (팝업·API·경로 연결)
     | 'file' | 'image' | 'video' | 'media' // 파일 업로드 및 미디어 타입
@@ -20,6 +21,9 @@ export type SearchFieldType =
     | 'category'        // 카테고리 계층 검색 (1~4 depth selectbox 연동)
     | 'dateRangeStatus'  // 날짜 범위 상태 필터 (이전/포함/이후 선택)
     | 'time';            // 시간 선택 (HH:MM, input[type="time"])
+
+/** date/dateRange 계열 필드의 입력 단위 서브타입 (dateSubType·rangeSubType·linkedRangeSubType 공용) */
+export type DateSubType = 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -35,14 +39,16 @@ export interface SearchFieldConfig {
     label2MsgKey?: string;  // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
     /** dateRange 통합 서브타입 — 범위 입력 방식 (기본: 'date') */
-    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
+    rangeSubType?: DateSubType;
     /** date 통합 서브타입 — 단독 날짜 입력 방식 (기본: 'date') */
-    dateSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
+    dateSubType?: DateSubType;
     /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
     singleDateRange?: boolean;
     accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
     // 데이터 표현식 (예: code=1?title:title2, title+'-'+code) — input 필드 표시값 계산
     data?: string;
+    /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 (text 타입 전용) */
+    fetchDisplayMode?: 'ONE_LINE' | 'MULTI_LINE';
     placeholder?: string;
     placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
     /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
@@ -250,6 +256,8 @@ export interface TableColumnConfig {
     headerMsgKey?: string;    // 헤더명 다국어 키 (있으면 t(key), 없으면 header 표시)
     accessor: string;
     data?: string;          // 표현식 (예: code=1?title:title2, title+'-'+code)
+    /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 */
+    fetchDisplayMode?: 'ONE_LINE' | 'MULTI_LINE';
     width?: number;
     widthUnit?: 'px' | '%';
     align: 'left' | 'center' | 'right';
@@ -280,7 +288,7 @@ export interface TableColumnConfig {
     dateFormat?: string;
     /* ── dateRangeStatus 전용 ── */
     linkedDateRangeKey?: string;    // 연결할 dateRange 컬럼의 accessor (예: 'period')
-    linkedRangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'; // 연결된 dateRange 컬럼의 서브타입 (기본: 'date')
+    linkedRangeSubType?: DateSubType; // 연결된 dateRange 컬럼의 서브타입 (기본: 'date')
     beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
     beforeTextMsgKey?: string;      // 이전 텍스트 다국어 키
     inRangeText?: string;           // 날짜 포함 표시 텍스트 (예: '진행중')

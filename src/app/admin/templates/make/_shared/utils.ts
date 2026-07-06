@@ -6,6 +6,31 @@ import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { FILE_FIELD_TYPES } from './constants';
+import type { DateSubType } from './types';
+
+/**
+ * 현재 시각을 date/dateRange 서브타입에 맞는 문자열로 변환
+ * - date·dateRange 필드의 min 제약(오늘 이전 날짜 비활성화), dateRangeStatus 컬럼의 상태 판정(오늘과 비교) 등
+ *   "지금"을 필드와 동일한 포맷으로 나타내야 하는 모든 곳에서 공용으로 사용
+ * - 네이티브 input(date/month/time/datetime-local)의 value는 항상 "로컬" 시간 기준이므로,
+ *   반드시 로컬 시간 getter(getFullYear/getHours 등)로 조립해야 함.
+ *   ⚠️ new Date().toISOString()은 UTC 기준이라 사용 금지 — 시차만큼(KST는 9시간) 어긋난 값이 나와
+ *   dateRangeStatus 등에서 실제 시각과 다른 판정 결과를 만든다.
+ * @example formatNowBySubType('datetime') // "2026-07-03T16:41" (input[type=datetime-local] value와 동일 포맷, 로컬 기준)
+ * @example formatNowBySubType('date')     // "2026-07-03"
+ */
+export const formatNowBySubType = (subType: DateSubType): string => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const YYYY = now.getFullYear();
+    const MM = pad(now.getMonth() + 1);
+    const DD = pad(now.getDate());
+    if (subType === 'yearMonth') return `${YYYY}-${MM}`;
+    if (subType === 'datetime')  return `${YYYY}-${MM}-${DD}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    if (subType === 'time')      return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    if (subType === 'timeSec')   return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    return `${YYYY}-${MM}-${DD}`;
+};
 
 /**
  * "텍스트:값" 형식의 옵션 문자열 파싱
@@ -521,6 +546,86 @@ export function flattenPageDataItem(item: {
         updatedAt: item.updatedAt ?? null,
         updatedBy: item.updatedBy ?? null,
     };
+}
+
+/**
+ * 연결 Slug(FETCH) 다건 매칭 시 서버가 함께 내려주는 구분자(sep) 조회
+ * - TABLE/CATEGORY(EQ) relation에서 매칭이 2건 이상이면 서버가 `_fetchedRel{id}` 값 배열과 함께
+ *   형제 키 `_fetchedRel{id}_sep`(관리자가 설정한 fetchSeparator, 없으면 기본값 ',')를 내려준다.
+ * - relationSlugId가 없으면(=일반 필드) 기본 구분자 ','를 그대로 반환한다.
+ * - FieldRenderer(input/text)·TableCellRenderer가 공통으로 사용한다.
+ *
+ * @example resolveFetchSeparator(rowData, 8) // rowData._fetchedRel8_sep 값이 '|'면 '|' 반환
+ * @example resolveFetchSeparator(rowData, undefined) // ','
+ */
+export function resolveFetchSeparator(
+    rowData: Record<string, unknown>,
+    relationSlugId: number | undefined,
+): string {
+    const DEFAULT_SEP = ',';
+    if (!relationSlugId) return DEFAULT_SEP;
+    const sep = rowData[`_fetchedRel${relationSlugId}_sep`];
+    return typeof sep === 'string' && sep !== '' ? sep : DEFAULT_SEP;
+}
+
+/**
+ * ARRAY_CONTAINS 연결 Slug 다건 매칭 결과 배열 → 표시용 문자열 변환
+ * 매칭된 slave 레코드마다 flattenPageDataItem으로 평탄화 후 data 표현식(evalColumnDataExpr)을 반복 평가.
+ * data 표현식이 없으면 레코드의 id를 기본값으로 사용.
+ * TableCellRenderer(Table Text 셀)와 FieldRenderer(Form Text 필드)가 공통으로 사용.
+ *
+ * @example
+ * formatFetchedRelArray([{id:1,form1:{title:'A'}},{id:2,form1:{title:'B'}}], 'form1.title', 'ONE_LINE')
+ * // → "A, B"
+ * formatFetchedRelArray([...], 'form1.title', 'MULTI_LINE') // → "A\nB"
+ */
+export function formatFetchedRelArray(
+    records: Record<string, unknown>[],
+    dataExpr: string | undefined,
+    mode: 'ONE_LINE' | 'MULTI_LINE' = 'ONE_LINE',
+    separator = ',',
+): string {
+    if (!Array.isArray(records) || records.length === 0) return '';
+    const expr = dataExpr && dataExpr.trim() ? dataExpr : 'id';
+    const values = records
+        .map(record => {
+            const flat = flattenPageDataItem({ id: Number((record as Record<string, unknown>).id ?? 0), dataJson: record });
+            return evalColumnDataExpr(expr, flat);
+        })
+        .filter(v => v !== '');
+    if (values.length === 0) return '';
+    return mode === 'MULTI_LINE' ? values.join('\n') : values.join(`${separator} `);
+}
+
+/**
+ * 연결 Slug(FETCH) 다건 매칭 배열 → 표시용 문자열 변환 (공통 헬퍼)
+ * - 원소가 string이면 TABLE/CATEGORY(EQ) 다건 매칭 — resolveFetchSeparator로 구한 구분자로 join
+ *   (mode가 MULTI_LINE이면 개행으로 join)
+ * - 원소가 record(object)이면 ARRAY_CONTAINS 다건 매칭 — 기존 formatFetchedRelArray로 위임
+ * - FieldRenderer(input/text 케이스)·TableCellRenderer(default 텍스트 케이스)가 공통으로 사용
+ *
+ * @param fetched        다건 매칭 배열 (string[] 또는 Record<string, unknown>[])
+ * @param rowData        구분자(_fetchedRel{id}_sep) 조회용 원본 row 데이터
+ * @param relationSlugId 연동 slug-relation ID (구분자 조회 키) — 없으면 기본 구분자 ',' 사용
+ * @param dataExpr       record 배열용 Data 표현식 (formatFetchedRelArray에 그대로 전달)
+ * @param mode           'ONE_LINE' | 'MULTI_LINE' — input 케이스는 한 줄만 표시 가능하므로 항상 'ONE_LINE' 고정 호출
+ *
+ * @example formatFetchedRelValue(['A', 'B'], rowData, 8, undefined, 'ONE_LINE') // "A,B" (구분자 ',' 기준)
+ * @example formatFetchedRelValue([{id:1,form1:{title:'A'}}], rowData, 8, 'form1.title', 'MULTI_LINE') // "A"
+ */
+export function formatFetchedRelValue(
+    fetched: unknown[],
+    rowData: Record<string, unknown>,
+    relationSlugId: number | undefined,
+    dataExpr: string | undefined,
+    mode: 'ONE_LINE' | 'MULTI_LINE' = 'ONE_LINE',
+): string {
+    if (!Array.isArray(fetched) || fetched.length === 0) return '';
+    if (typeof fetched[0] === 'string') {
+        const sep = resolveFetchSeparator(rowData, relationSlugId);
+        return mode === 'MULTI_LINE' ? (fetched as string[]).join('\n') : (fetched as string[]).join(sep);
+    }
+    return formatFetchedRelArray(fetched as Record<string, unknown>[], dataExpr, mode);
 }
 
 /**

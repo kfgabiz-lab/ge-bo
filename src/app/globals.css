@@ -101,3 +101,15 @@ body {
 .btn-premium:hover::after {
   opacity: 1;
 }
+
+/* TipTap 에디터 콘텐츠 기본 스타일 — Tailwind Preflight로 리셋된 heading/list 시각 스타일 복원 (공통 적용) */
+.ProseMirror h1 { font-size: 2em; font-weight: 700; margin: 0.67em 0; }
+.ProseMirror h2 { font-size: 1.5em; font-weight: 700; margin: 0.75em 0; }
+.ProseMirror h3 { font-size: 1.25em; font-weight: 600; margin: 0.83em 0; }
+.ProseMirror h4 { font-size: 1.1em; font-weight: 600; margin: 1em 0; }
+.ProseMirror h5 { font-size: 1em; font-weight: 600; margin: 1.2em 0; }
+.ProseMirror h6 { font-size: 0.9em; font-weight: 600; margin: 1.5em 0; }
+.ProseMirror ul { list-style: disc; padding-left: 1.5em; }
+.ProseMirror ol { list-style: decimal; padding-left: 1.5em; }
+.ProseMirror li { margin: 0.25em 0; }
+.ProseMirror blockquote { border-left: 3px solid #cbd5e1; padding-left: 1em; color: #64748b; margin: 0.5em 0; }

@@ -12,8 +12,6 @@ import Color from '@tiptap/extension-color';
 import Superscript from '@tiptap/extension-superscript';
 import Subscript from '@tiptap/extension-subscript';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
-import TiptapUnderline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
 import api from '@/lib/api';
 import {
   Bold,
@@ -606,8 +604,9 @@ export default function TiptapEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      TiptapUnderline,
+      /* StarterKit이 Underline·Link를 기본 포함하므로 별도 확장 등록 대신
+         StarterKit 내장 옵션(link)으로 openOnClick 설정을 적용한다 (중복 확장 방지) */
+      StarterKit.configure({ link: { openOnClick: false } }),
       Image.configure({ inline: false }),
       Youtube.configure({ width: 640, height: 480 }),
       Highlight.configure({ multicolor: true }),
@@ -620,7 +619,6 @@ export default function TiptapEditor({
       TableRow,
       TableHeader,
       TableCell,
-      Link.configure({ openOnClick: false }),
     ],
     content: initialValue,
     onUpdate: ({ editor: updatedEditor }) => {
@@ -688,12 +686,12 @@ export default function TiptapEditor({
         onLinkOpen={() => setShowLinkDialog(true)}
       />
 
-      {/* 에디터 콘텐츠 영역 — 남은 공간 채움 */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
+      {/* 에디터 콘텐츠 영역 — 남은 공간 채움 (퍼센트 min-height 체이닝 대신 flex 패턴으로 통일) */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0 flex flex-col">
         {/* @tailwindcss/typography 미설치로 prose 미사용 — ProseMirror 기본 스타일로 동작 */}
         <EditorContent
           editor={editor}
-          className="min-h-full [&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-full"
+          className="flex-1 flex flex-col [&_.ProseMirror]:outline-none [&_.ProseMirror]:flex-1"
         />
       </div>
 

@@ -28,6 +28,7 @@ interface SlugRelation {
     fetchSeparator: string;
     slaveType: string;
     categoryDepth: number;
+    categoryDepthFrom: number | null;
     description: string | null;
     createdBy: string;
     createdAt: string;
@@ -56,6 +57,7 @@ const EMPTY_FORM = {
     fetchSeparator: ',',
     slaveType: 'TABLE',
     categoryDepth: '1',
+    categoryDepthFrom: '',
     description: '',
 };
 
@@ -170,6 +172,7 @@ export default function SlugRelationPage() {
             fetchSeparator: item.fetchSeparator,
             slaveType:     item.slaveType     ?? 'TABLE',
             categoryDepth: String(item.categoryDepth ?? 1),
+            categoryDepthFrom: item.categoryDepthFrom != null ? String(item.categoryDepthFrom) : '',
             description:   item.description   ?? '',
         });
         setModalOpen(true);
@@ -192,9 +195,12 @@ export default function SlugRelationPage() {
                 slaveFilter:   form.slaveFilter.trim()    || null,
                 relationDir:   form.relationDir,
                 fetchFields:   form.fetchFields.trim()    || null,
-                fetchSeparator: form.fetchSeparator || ',',
+                fetchSeparator: form.fetchSeparator,
                 slaveType:     form.relationDir === 'FETCH' ? (form.slaveType || 'TABLE') : 'TABLE',
                 categoryDepth: form.slaveType === 'CATEGORY' ? (Number(form.categoryDepth) || 1) : 1,
+                categoryDepthFrom: form.slaveType === 'CATEGORY' && form.categoryDepthFrom.trim()
+                    ? (Number(form.categoryDepthFrom) || null)
+                    : null,
                 description:   form.description.trim()   || null,
             };
             if (editTarget) {
@@ -322,19 +328,20 @@ export default function SlugRelationPage() {
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap w-[130px]">Slave Filter</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[90px]">방향</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[100px]">Slave Type</th>
+                                <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-left whitespace-nowrap">설명</th>
                                 <th className="px-4 py-3 text-xs font-semibold text-slate-600 text-center whitespace-nowrap w-[80px]">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={10} className="py-16 text-center">
+                                    <td colSpan={11} className="py-16 text-center">
                                         <Loader2 className="w-5 h-5 animate-spin text-slate-300 mx-auto" />
                                     </td>
                                 </tr>
                             ) : items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="py-16 text-center text-sm text-slate-400">
+                                    <td colSpan={11} className="py-16 text-center text-sm text-slate-400">
                                         등록된 SLUG 연동이 없습니다.
                                     </td>
                                 </tr>
@@ -362,6 +369,9 @@ export default function SlugRelationPage() {
                                                 {item.slaveType ?? 'TABLE'}
                                             </span>
                                         )}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-slate-600 max-w-[240px] truncate" title={item.description ?? ''}>
+                                        {item.description || <span className="text-slate-300">-</span>}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center gap-1.5">
@@ -543,19 +553,34 @@ export default function SlugRelationPage() {
                                 <p className="mt-1 text-xs text-slate-400">TABLE: slave에서 직접 추출 / CATEGORY: 상위 계층 거슬러 추출</p>
                             </div>
 
-                            {/* Category Depth — CATEGORY 타입일 때만 표시 */}
+                            {/* Category Depth / 시작 Depth — CATEGORY 타입일 때만 표시 */}
                             {form.slaveType === 'CATEGORY' && (
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Category Depth</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        max={5}
-                                        value={form.categoryDepth}
-                                        onChange={e => setField('categoryDepth', e.target.value)}
-                                        className={inputCls}
-                                    />
-                                    <p className="mt-1 text-xs text-slate-400">표시할 계층 수 (1=상위명, 2=대분류 &gt; 중분류, 최대 5)</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">Category Depth (끝)</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={5}
+                                            value={form.categoryDepth}
+                                            onChange={e => setField('categoryDepth', e.target.value)}
+                                            className={inputCls}
+                                        />
+                                        <p className="mt-1 text-xs text-slate-400">표시할 마지막 계층 (최대 5)</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">시작 Depth <span className="text-slate-300 font-normal">(선택)</span></label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={5}
+                                            placeholder="비우면 끝 Depth와 동일"
+                                            value={form.categoryDepthFrom}
+                                            onChange={e => setField('categoryDepthFrom', e.target.value)}
+                                            className={inputCls}
+                                        />
+                                        <p className="mt-1 text-xs text-slate-400">비우면 끝 Depth 하나만, 값 있으면 시작~끝 범위를 " &gt; "로 합쳐 표시 (예: 1~2 = "대분류 &gt; 중분류"). 매칭 레코드가 여러 건이면 그 사이는 Fetch Separator로 구분</p>
+                                    </div>
                                 </div>
                             )}
 

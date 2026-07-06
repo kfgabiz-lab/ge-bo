@@ -5,7 +5,7 @@
  *   import { FieldEditProps, FieldEditValues, ColSpanMode } from './_shared/components/builder/fields/types';
  */
 
-import { CodeGroupDef } from '../../../types';
+import { CodeGroupDef, DateSubType } from '../../../types';
 import type { SlugOption } from './SlugSelectField';
 import type { SlugRelationOption } from '../../SearchBuilder';
 
@@ -118,9 +118,9 @@ export interface FieldEditValues {
     maxRangeValue?: number;          // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
     maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
     /** dateRange 통합 서브타입 — 날짜/년월/일시분초/시분/시분초 (기본: 'date') */
-    rangeSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
+    rangeSubType?: DateSubType;
     /** date 통합 서브타입 — 날짜/년월/일시분초/시분/시분초 (기본: 'date') */
-    dateSubType?: 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
+    dateSubType?: DateSubType;
     /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
     singleDateRange?: boolean;
     /* ── category 전용 ── */
@@ -128,6 +128,8 @@ export interface FieldEditValues {
     relationSlugId?: number;         // 연동 slug-relation ID
     // 데이터 표현식 (ColumnBaseField와 동일, 예: code=1?title:title2)
     data?: string;
+    /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 (text 타입 전용) */
+    fetchDisplayMode?: 'ONE_LINE' | 'MULTI_LINE';
     maxDepth?: 1 | 2 | 3 | 4;       // 표시할 최대 depth 수
     depthLabels?: string[];          // depth별 라벨 배열
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열

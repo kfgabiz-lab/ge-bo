@@ -62,8 +62,10 @@ interface FieldBaseProps {
     slugEntityFields?: { key: string | null; label: string }[];
     /** 라벨 오른쪽 슬롯 — 전달 시 Key가 아래 행으로 이동 (InputField의 연결 Slug용) */
     labelSideSlot?: React.ReactNode;
-    /** Key 오른쪽 슬롯 — labelSideSlot 전달 시에만 나타나는 Data 입력 자리 */
+    /** Key 오른쪽 슬롯 — labelSideSlot 전달 시에만 나타나는 Data 입력 자리 (Key와 50:50 폭 공유) */
     keySideSlot?: React.ReactNode;
+    /** Key 아래 전체 폭 슬롯 — keySideSlot 대신 사용, Key를 단독 row로 분리하고 그 아래 전체 폭으로 표시 (TextField의 출력방식+Data용) */
+    keySideSlotFullWidth?: React.ReactNode;
     onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; saveConfirm: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
@@ -75,7 +77,7 @@ export function FieldBase(props: FieldBaseProps) {
         label, labelMsgKey, label2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, labelSideSlot, keySideSlot, onChange, onLabelKeyDown,
+        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, labelSideSlot, keySideSlot, keySideSlotFullWidth, onChange, onLabelKeyDown,
         children
     } = props;
 
@@ -152,15 +154,27 @@ export function FieldBase(props: FieldBaseProps) {
 
             {/* Key + Data 행 — labelSideSlot 있을 때만 추가 표시 */}
             {labelSideSlot !== undefined && (
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                        {keyInputEl}
+                keySideSlotFullWidth !== undefined ? (
+                    /* keySideSlotFullWidth 전달 시 — Key 단독 row + 슬롯 내용 전체 폭 row로 분리 (TextField 등) */
+                    <>
+                        <div>
+                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                            {keyInputEl}
+                        </div>
+                        {keySideSlotFullWidth}
+                    </>
+                ) : (
+                    /* 기존 동작 — Key : keySideSlot 50:50 (InputField의 Data 입력 등) */
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
+                            {keyInputEl}
+                        </div>
+                        <div>
+                            {keySideSlot}
+                        </div>
                     </div>
-                    <div>
-                        {keySideSlot}
-                    </div>
-                </div>
+                )
             )}
 
             {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}

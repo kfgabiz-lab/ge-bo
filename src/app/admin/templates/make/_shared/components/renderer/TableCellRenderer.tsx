@@ -21,7 +21,7 @@ import { Pencil, Trash2, Paperclip } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
-import { evalColumnDataExpr } from '../../utils';
+import { evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType } from '../../utils';
 
 /* ────────────────────────────────────────────────────────── */
 /*  색상 정적 맵 (Tailwind purge 방지 — 동적 문자열 사용 금지) */
@@ -68,10 +68,13 @@ export function TableCellRenderer({
 }: TableCellRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
-    /* data 표현식이 있으면 평가, 없으면 flattenPageDataItem으로 만들어진 row에서 직접 접근 */
-    const value = col.data && !isPreview
+    /* data 표현식이 있으면 평가, 없으면 flattenPageDataItem으로 만들어진 row에서 직접 접근
+       단, row[accessor]가 배열(ARRAY_CONTAINS 다건 매칭)이면 evalColumnDataExpr을 거치지 않고 그대로 둔다 —
+       default 케이스에서 formatFetchedRelValue(→formatFetchedRelArray)로 레코드별 data 표현식을 반복 평가하기 위함 */
+    const rawValue = row[col.accessor];
+    const value = col.data && !isPreview && !Array.isArray(rawValue)
         ? evalColumnDataExpr(col.data, row)
-        : row[col.accessor];
+        : rawValue;
 
     switch (col.cellType) {
 
@@ -217,17 +220,9 @@ export function TableCellRenderer({
                 ? String(row[col.linkedDateRangeKey + '_to'] ?? '')
                 : '';
             if (!fromStr && !toStr) return <span className="text-sm text-slate-400">-</span>;
-            /* rangeSubType에 맞는 현재 시각 포맷으로 비교 기준 산출 */
+            /* rangeSubType에 맞는 현재 시각 포맷으로 비교 기준 산출 — 저장값(input value)과 동일 포맷이어야 함 */
             const subType = col.linkedRangeSubType ?? 'date';
-            const now = new Date();
-            const pad = (n: number) => String(n).padStart(2, '0');
-            const nowStr = (() => {
-                if (subType === 'yearMonth') return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-                if (subType === 'datetime')  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-                if (subType === 'time')      return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-                if (subType === 'timeSec')   return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-                return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-            })();
+            const nowStr = formatNowBySubType(subType);
             let statusText = '-';
             if (fromStr && nowStr < fromStr) {
                 statusText = beforeLabel;
@@ -356,6 +351,18 @@ export function TableCellRenderer({
         default: {
             if (isPreview) {
                 return <span className="text-slate-400 text-sm">샘플 텍스트</span>;
+            }
+            /* 연결 Slug(FETCH) 다건 매칭 배열 — col.relationSlugId가 있는 컬럼만 해당(회귀 방지 가드).
+               relationSlugId 없이 배열이 온 경우(체크박스 다중선택 string[], multiSelect number[] 등)는
+               이 분기를 타지 않고 아래 공통 로직(typeof === 'object' → 빈값)으로 처리한다 */
+            if (Array.isArray(value) && col.relationSlugId) {
+                /* 다건 매칭 배열(string[]/record[]) — 공통 헬퍼로 위임, 출력방식(한줄/여러줄)은 col.fetchDisplayMode 따름 */
+                const formatted = formatFetchedRelValue(value, row, col.relationSlugId, col.data, col.fetchDisplayMode ?? 'ONE_LINE');
+                if (!formatted) return <span className="text-sm text-slate-400">-</span>;
+                if (col.fetchDisplayMode === 'MULTI_LINE') {
+                    return <span className="text-sm text-slate-700 whitespace-pre-wrap block" title={formatted}>{formatted}</span>;
+                }
+                return <span className="text-sm text-slate-700 truncate block" title={formatted}>{formatted}</span>;
             }
             /* Object인 경우 빈값 처리 — fetch_fields 없이 Map 전체가 들어온 경우 방어 */
             const strVal = (value == null || typeof value === 'object') ? '' : String(value);

@@ -24,34 +24,16 @@
  */
 
 import { useMemo, useCallback, useRef } from 'react';
-
-/**
- * _fetchedRel{id} 중첩 객체를 dot-notation 키로 평탄화 — evalColumnDataExpr 스코프 확장용
- *
- * 예: prefix="_fetchedRel8", obj={ form1: { title: 'A' } }
- *   → target["_fetchedRel8.form1"] = { title: 'A' }
- *   → target["_fetchedRel8.form1.title"] = 'A'
- */
-function addRelDotNotationKeys(
-    target: Record<string, unknown>,
-    obj: Record<string, unknown>,
-    prefix: string,
-): void {
-    Object.entries(obj).forEach(([k, v]) => {
-        const dotKey = `${prefix}.${k}`;
-        target[dotKey] = v;
-        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-            addRelDotNotationKeys(target, v as Record<string, unknown>, dotKey);
-        }
-    });
-}
 import type { FormFieldItem } from '../builder/FormBuilder';
 import type { RendererMode } from './types';
 import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { CodeGroupDef, SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
-import { applyDataGeneration } from '../../utils';
+import { applyDataGeneration, flattenPageDataItem } from '../../utils';
+
+/** flattenPageDataItem이 항상 붙이는 부가 키 — rowData 병합 시 제외 */
+const FLATTEN_META_KEYS = new Set(['_id', '_groupId', '_pathMap', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
 
 interface FormRendererProps {
     mode: RendererMode;
@@ -145,15 +127,12 @@ export function FormRenderer({
         fields.forEach(f => {
             if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? '';
         });
-        /* _fetchedRel{id} 데이터를 dot-notation으로 확장 — TABLE의 flattenPageDataItem과 동일한 방식 */
+        /* _fetchedRel{id} 데이터를 공통함수(flattenPageDataItem)로 평탄화 — TABLE(TableCellRenderer)과 완전히 동일한 방식
+           (dot-notation 전체 경로 + 유일한 필드명일 때의 짧은 키 승격까지 동일하게 지원) */
         if (fetchRelData) {
-            Object.entries(fetchRelData).forEach(([relKey, relVal]) => {
-                /* string/원시값도 rowData에 직접 주입 — fetch_fields 설정 시 BE가 string 반환 */
-                map[relKey] = relVal;
-                /* 객체인 경우 dot-notation 하위 키도 추가 */
-                if (relVal !== null && typeof relVal === 'object' && !Array.isArray(relVal)) {
-                    addRelDotNotationKeys(map, relVal as Record<string, unknown>, relKey);
-                }
+            const flatRel = flattenPageDataItem({ id: 0, dataJson: fetchRelData });
+            Object.entries(flatRel).forEach(([k, v]) => {
+                if (!FLATTEN_META_KEYS.has(k)) map[k] = v;
             });
         }
         return map;

@@ -39,7 +39,7 @@ const fmtSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
         : `${Math.round(bytes / 1024)}KB`;
-import { parseOpt, flattenPageDataItem, evalColumnDataExpr } from '../../utils';
+import { parseOpt, flattenPageDataItem, evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType } from '../../utils';
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -647,7 +647,14 @@ export function FieldRenderer({
                 } else {
                     /* data 없으면 rowData[fieldKey] 직접 참조 (FormRenderer에서 fetchRelData 주입된 값) */
                     const fetched = rowData ? rowData[field.fieldKey ?? ''] : undefined;
-                    displayVal = isPreview ? '' : String(fetched ?? value ?? '');
+                    if (isPreview) {
+                        displayVal = '';
+                    } else if (Array.isArray(fetched)) {
+                        /* 다건 매칭 배열(string[]/record[]) — 공통 헬퍼로 위임, input은 한 줄만 표시 가능하므로 항상 ONE_LINE 고정 */
+                        displayVal = formatFetchedRelValue(fetched, rowData ?? {}, field.relationSlugId, field.data, 'ONE_LINE');
+                    } else {
+                        displayVal = String(fetched ?? value ?? '');
+                    }
                 }
                 return (
                     <input
@@ -720,6 +727,36 @@ export function FieldRenderer({
                 );
             }
             return inputEl;
+        }
+
+        /* ── text — 연결 Slug 값 표시 전용 (다건 매칭 시 한줄/여러줄 지원) ── */
+        case 'text': {
+            const fetched = rowData ? rowData[field.fieldKey ?? ''] : undefined;
+
+            /* 다건 매칭 배열 — 원소가 string이면 TABLE/CATEGORY(EQ) 다건, object이면 ARRAY_CONTAINS 다건 */
+            if (Array.isArray(fetched)) {
+                let formatted = '';
+                if (!isPreview) {
+                    /* 다건 매칭 배열(string[]/record[]) — 공통 헬퍼로 위임, 출력방식(한줄/여러줄)은 field.fetchDisplayMode 따름 */
+                    formatted = formatFetchedRelValue(fetched, rowData ?? {}, field.relationSlugId, field.data, field.fetchDisplayMode ?? 'ONE_LINE');
+                }
+                return (
+                    <div
+                        className={`text-sm text-slate-700 ${field.fetchDisplayMode === 'MULTI_LINE' ? 'whitespace-pre-wrap' : 'truncate'}`}
+                    >
+                        {isPreview ? '' : (formatted || '-')}
+                    </div>
+                );
+            }
+
+            /* 단건 매칭(EQ) — input case와 동일한 방식: data 표현식 or rowData 직접 참조 */
+            let displayVal: string;
+            if (field.data && !isPreview) {
+                displayVal = evalColumnDataExpr(field.data, rowData ?? {});
+            } else {
+                displayVal = isPreview ? '' : String(fetched ?? value ?? '');
+            }
+            return <div className="text-sm text-slate-700 truncate">{displayVal}</div>;
         }
 
         /* ── select ── */
@@ -829,16 +866,6 @@ export function FieldRenderer({
                 : dateSubType === 'datetime' ? 'datetime-local'
                 : (dateSubType === 'time' || dateSubType === 'timeSec') ? 'time'
                 : 'date';
-            /* 오늘 값 (min 제약에 사용) — 서브타입별 포맷 */
-            const getTodayVal = (): string => {
-                const iso = new Date().toISOString();
-                const d = new Date();
-                if (dateSubType === 'yearMonth') return iso.slice(0, 7);
-                if (dateSubType === 'datetime') return iso.slice(0, 16);
-                if (dateSubType === 'time') return d.toTimeString().slice(0, 5);
-                if (dateSubType === 'timeSec') return d.toTimeString().slice(0, 8);
-                return iso.slice(0, 10);
-            };
             /* offset 기반 기본값 계산 — 서브타입별 포맷 */
             const calcDateDefault = (offset?: number, date?: string): string => {
                 /* defaultToday ON 시 오늘 날짜 최우선 반환 */
@@ -865,7 +892,7 @@ export function FieldRenderer({
             };
             const dateDefault = calcDateDefault(field.defaultDateOffset, field.defaultDate);
             /* 토글 ON: 기본값(또는 오늘)을 고정 min으로 */
-            const dateMin = field.disablePast ? (dateDefault || getTodayVal()) : undefined;
+            const dateMin = field.disablePast ? (dateDefault || formatNowBySubType(dateSubType)) : undefined;
             return (
                 <input
                     type={inputType}
@@ -897,17 +924,6 @@ export function FieldRenderer({
                 : (subType === 'time' || subType === 'timeSec') ? 'time'
                 : 'date';
 
-            /* 서브타입별 오늘 값 계산 (min 제약에 사용) */
-            const getToday = (): string => {
-                const iso = new Date().toISOString();
-                const d = new Date();
-                if (subType === 'yearMonth') return iso.slice(0, 7);
-                if (subType === 'datetime') return iso.slice(0, 16);
-                if (subType === 'time') return d.toTimeString().slice(0, 5);
-                if (subType === 'timeSec') return d.toTimeString().slice(0, 8);
-                return iso.slice(0, 10);
-            };
-
             /* offset 기반 기본값 계산 — 서브타입에 따라 포맷 분기 */
             const calcRangeDefault = (offset?: number, date?: string): string => {
                 if (offset !== undefined && offset !== 0) {
@@ -923,7 +939,7 @@ export function FieldRenderer({
 
             const startDefault = calcRangeDefault(field.defaultStartDateOffset, field.defaultStartDate);
             const endDefault   = calcRangeDefault(field.defaultEndDateOffset,   field.defaultEndDate);
-            const todayVal     = getToday();
+            const todayVal     = formatNowBySubType(subType);
             const startMin = field.disableStartPast ? (startDefault || todayVal) : undefined;
             const endMin   = field.disableEndPast   ? (endDefault   || todayVal) : undefined;
 

@@ -5,7 +5,7 @@ import { Toaster } from 'sonner';
 import { QueryProvider } from '@/components/providers/query-provider';
 
 export const metadata: Metadata = {
-  title: 'Global Backoffice - WeMade',
+  title: 'Global Backoffice',
   description: 'Corporate Admin Dashboard',
 };
 
