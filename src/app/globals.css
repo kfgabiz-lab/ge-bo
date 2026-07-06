@@ -113,3 +113,42 @@ body {
 .ProseMirror ol { list-style: decimal; padding-left: 1.5em; }
 .ProseMirror li { margin: 0.25em 0; }
 .ProseMirror blockquote { border-left: 3px solid #cbd5e1; padding-left: 1em; color: #64748b; margin: 0.5em 0; }
+
+/* TipTap 테이블 — Preflight로 사라진 border/padding/배경 복원 + prosemirror-tables 리사이즈/셀선택 기능 CSS(공식 참조: node_modules/prosemirror-tables/style/tables.css) */
+.ProseMirror .tableWrapper { overflow-x: auto; }
+.ProseMirror table { border-collapse: collapse; table-layout: fixed; width: 100%; margin: 0.5em 0; overflow: hidden; }
+.ProseMirror td, .ProseMirror th {
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+    vertical-align: top;
+    box-sizing: border-box;
+    position: relative;
+    min-width: 100px;
+}
+.ProseMirror th { background: #f1f5f9; font-weight: 600; text-align: left; }
+.ProseMirror .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    z-index: 20;
+    background-color: #93c5fd;
+    pointer-events: none;
+}
+.ProseMirror.resize-cursor { cursor: col-resize; }
+.ProseMirror .selectedCell:after {
+    z-index: 2;
+    position: absolute;
+    content: '';
+    inset: 0;
+    background: rgba(147, 197, 253, 0.35);
+    pointer-events: none;
+}
+
+/* TipTap 링크 — Preflight의 a{color:inherit;text-decoration:inherit} 복원 */
+.ProseMirror a { color: #2563eb; text-decoration: underline; cursor: pointer; }
+
+/* TipTap 유튜브 임베드 — 고정 width/height(640×480) 반응형 처리 */
+.ProseMirror div[data-youtube-video] { max-width: 100%; }
+.ProseMirror div[data-youtube-video] iframe { max-width: 100%; width: 100%; height: auto; aspect-ratio: 4 / 3; border: 0; border-radius: 4px; }
