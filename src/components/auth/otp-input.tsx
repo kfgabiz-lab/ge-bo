@@ -6,10 +6,12 @@ interface OtpInputProps {
     length: number;
     value: string;
     onChange: (val: string) => void;
+    // Enter 키 입력 시 실행할 콜백 (선택) — 부모의 제출 핸들러 연결용
+    onEnter?: () => void;
 }
 
 /** 6자리 OTP 입력 컴포넌트 — 각 칸 자동 포커스 이동, 붙여넣기 지원 */
-export default function OtpInput({ length, value, onChange }: OtpInputProps) {
+export default function OtpInput({ length, value, onChange, onEnter }: OtpInputProps) {
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const digits = value.padEnd(length, "").split("").slice(0, length);
 
@@ -31,6 +33,10 @@ export default function OtpInput({ length, value, onChange }: OtpInputProps) {
         if (e.key === "Backspace" && !digits[idx] && idx > 0) {
             update(idx - 1, "");
             inputRefs.current[idx - 1]?.focus();
+        }
+        // Enter 키 입력 시 부모의 제출 핸들러 실행
+        if (e.key === "Enter") {
+            onEnter?.();
         }
     };
 

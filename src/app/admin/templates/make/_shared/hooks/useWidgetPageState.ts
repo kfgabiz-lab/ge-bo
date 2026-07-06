@@ -1054,6 +1054,7 @@ export function useWidgetPageState(
               existingFileMetaMap[fw.widgetId] ?? {},
               allFormValues,
               allFieldKeyToId,
+              t,
             )
           )
             return;
@@ -1384,6 +1385,7 @@ export function useWidgetPageState(
         subListFileMap,
         multiSelectValuesMap,
         tableSelectedRowsMap,
+        t,
       })) return;
 
       const nonTableWidgets = targetWidgets.filter(w => w.type !== 'table') as (FormWidget | SubListWidget | MultiSelectWidget)[];

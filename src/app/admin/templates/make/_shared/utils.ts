@@ -149,6 +149,7 @@ export const validateFormFields = (
     existingFileMeta: Record<string, unknown[]>,
     allValues?: Record<string, string>,
     allKeyToId?: Record<string, string>,
+    t?: (key: string) => string,
 ): boolean => {
     /* fieldKey → fieldId 역매핑 (이 Form 내 필드) */
     const keyToId: Record<string, string> = {};
@@ -163,15 +164,19 @@ export const validateFormFields = (
         /* hideCondition 조건 충족 시 건너뜀 */
         if (f.hideCondition && evalFieldCondition(f.hideCondition, resolvedKeyToId, resolvedValues)) continue;
 
-        const label     = f.label || f.fieldKey || f.id;
-        /* dateRange/yearMonthRange: _from/_to 분리 키 사용 — required 체크 시 시작일 기준 */
-        const val       = (f.type === 'dateRange' || f.type === 'yearMonthRange')
+        const label       = (f.labelMsgKey && t ? t(f.labelMsgKey) : f.label) || f.fieldKey || f.id;
+        const isRangeType = f.type === 'dateRange' || f.type === 'yearMonthRange';
+        /* dateRange/yearMonthRange: _from/_to 분리 키 사용 */
+        const val       = isRangeType
             ? (values[f.id + '_from'] || '').trim()
             : (values[f.id] || '').trim();
+        const valTo     = isRangeType ? (values[f.id + '_to'] || '').trim() : '';
         const fileCount = (existingFileMeta[f.id]?.length || 0) + (fileValues[f.id]?.length || 0);
 
         if (f.required) {
-            const empty = FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) ? fileCount === 0 : !val;
+            const empty = FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])
+                ? fileCount === 0
+                : (isRangeType ? (!val || !valTo) : !val);
             if (empty) { toast.warning(`'${label}' 항목은 필수 입력입니다.`); return false; }
         }
         if (val && !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
@@ -246,6 +251,7 @@ export const validateSubListRows = (
     }>,
     rowsMap: Record<string, { _rowId: string; [key: string]: unknown }[]>,
     fileMap: Record<string, Record<string, Record<string, File[]>>>,
+    t?: (key: string) => string,
 ): boolean => {
     for (const w of widgets) {
         if (w.type !== 'sublist') continue;
@@ -262,7 +268,7 @@ export const validateSubListRows = (
             const row = rows[i];
             for (const col of cols) {
                 if (!col.required) continue;
-                const label = col.label || col.key;
+                const label = (col.labelMsgKey && t ? t(col.labelMsgKey) : col.label) || col.key;
                 if (col.type === 'file' || col.type === 'image') {
                     const existingCount = Array.isArray(row[col.key]) ? (row[col.key] as number[]).length : 0;
                     const newCount      = fileMap[wid]?.[row._rowId]?.[col.id]?.length ?? 0;
@@ -1054,8 +1060,9 @@ export function validateDataSaveWidgets(opts: {
     subListFileMap: Record<string, Record<string, Record<string, File[]>>>;
     multiSelectValuesMap: Record<string, number[]>;
     tableSelectedRowsMap?: Record<string, number[]>;
+    t?: (key: string) => string;
 }): boolean {
-    const { targetWidgets, formValuesMap, fileValuesMap, existingFileMetaMap, subListRowsMap, subListFileMap, multiSelectValuesMap, tableSelectedRowsMap } = opts;
+    const { targetWidgets, formValuesMap, fileValuesMap, existingFileMetaMap, subListRowsMap, subListFileMap, multiSelectValuesMap, tableSelectedRowsMap, t } = opts;
 
     /* Form 유효성 검사 */
     const allFormValues = Object.assign({}, ...Object.values(formValuesMap)) as Record<string, string>;
@@ -1078,6 +1085,7 @@ export function validateDataSaveWidgets(opts: {
             existingFileMetaMap[wid] ?? {},
             allFormValues,
             allKeyToId,
+            t,
         )) return false;
     }
 
@@ -1086,6 +1094,7 @@ export function validateDataSaveWidgets(opts: {
         targetWidgets.filter(w => w.type === 'sublist') as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('./components/renderer/types').SubListColumn[] }>,
         subListRowsMap,
         subListFileMap,
+        t,
     )) return false;
 
     /* MultiSelect 유효성 검사 */

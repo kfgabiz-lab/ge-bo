@@ -851,12 +851,13 @@ export function WidgetRenderer({
                 popupExistingMetaMap[fwId] ?? {},
                 popupAllFormValues,
                 popupAllKeyToId,
+                t,
             )) return;
         }
 
         /* 유효성 검사 — sublist 위젯별로 수행 */
         const subWidgetsForValidation = saveSublistContents.map(c => c.widget) as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('./types').SubListColumn[] }>;
-        if (!validateSubListRows(subWidgetsForValidation, popupSubListRowsMap, popupSubListFileMap)) return;
+        if (!validateSubListRows(subWidgetsForValidation, popupSubListRowsMap, popupSubListFileMap, t)) return;
 
         setPopupSaving(true);
         try {
@@ -1008,6 +1009,7 @@ export function WidgetRenderer({
             subListFileMap: popupSubListFileMap,
             multiSelectValuesMap: popupMultiSelectValuesMap,
             tableSelectedRowsMap: popupTableSelectedRowsMap,
+            t,
         })) return;
 
         setPopupSaving(true);

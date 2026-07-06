@@ -47,7 +47,7 @@ export default function TotpVerifyForm({ tempToken }: TotpVerifyFormProps) {
             </div>
 
             <div className="bg-white rounded-xl border border-[#e2e4e9] shadow-sm p-6 space-y-5">
-                <OtpInput length={6} value={totpCode} onChange={setTotpCode} />
+                <OtpInput length={6} value={totpCode} onChange={setTotpCode} onEnter={handleVerify} />
 
                 <button
                     type="button"
