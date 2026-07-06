@@ -284,6 +284,15 @@ export interface TableColumnConfig {
     codeGroupCode?: string;
     /** 공통코드 연동 시 표시 방식: 'text'=이름 표시(기본), 'value'=코드값 표시 */
     displayAs?: 'text' | 'value';
+    /* ── 마스킹 전용 (text 셀 전용) ── */
+    /** 마스킹 타입 — 미설정 시 마스킹 없음 */
+    maskType?: 'email' | 'phone' | 'name' | 'custom';
+    /** maskType별 패턴 키 — email: idMid/idFull/prefix3/suffix3, phone: mid4/suffix4/midSuffix, name: mid/initial/full */
+    maskPattern?: string;
+    /** maskType='custom' 전용 — 매칭할 정규식 문자열 */
+    maskCustomRegex?: string;
+    /** maskType='custom' 전용 — 매칭부 치환 문자열 */
+    maskCustomReplacement?: string;
     /** date 타입 — 날짜 표시 포맷 (예: 'YYYY-MM-DD HH:mm') */
     dateFormat?: string;
     /* ── dateRangeStatus 전용 ── */

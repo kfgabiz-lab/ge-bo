@@ -6,7 +6,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { FILE_FIELD_TYPES } from './constants';
-import type { DateSubType } from './types';
+import type { DateSubType, CodeGroupDef } from './types';
 
 /**
  * 현재 시각을 date/dateRange 서브타입에 맞는 문자열로 변환
@@ -626,6 +626,192 @@ export function formatFetchedRelValue(
         return mode === 'MULTI_LINE' ? (fetched as string[]).join('\n') : (fetched as string[]).join(sep);
     }
     return formatFetchedRelArray(fetched as Record<string, unknown>[], dataExpr, mode);
+}
+
+/**
+ * 공통코드 상세 1건 → 화면 표시 라벨 변환
+ * - nameMsgKey가 있으면 다국어 번역(t) 결과, 없으면 name(한글 고정값) 그대로 반환
+ * - resolveCodeLabel(단건 변환)과 엑셀 export 코드→라벨 딕셔너리(WidgetRenderer) 양쪽에서 공통으로 사용
+ */
+export function codeDetailToLabel(
+    detail: { name: string; nameMsgKey?: string },
+    t: (key: string) => string,
+): string {
+    return detail.nameMsgKey ? t(detail.nameMsgKey) : detail.name;
+}
+
+/**
+ * 공통코드 값(들) → 화면 표시 라벨로 변환 (쉼표 구분 다중값 + nameMsgKey 다국어 지원)
+ * - TableCellRenderer(테이블 셀 텍스트)·FieldRenderer(Form 읽기전용 표시)가 공통으로 사용
+ * - strVal을 쉼표로 나눠 각각 code→label 변환 후 다시 쉼표로 합친다 (값이 1개뿐이면 그 값 그대로 처리됨)
+ * - 매칭되는 공통코드가 없으면 원본 코드값을 그대로 폴백 표시한다
+ *
+ * @param strVal        원본 값 (쉼표 구분 다중값 가능, 예: "Y,N")
+ * @param codeGroupCode 연결된 공통코드 그룹 코드
+ * @param displayAs     'value'면 변환 없이 원본 값 그대로 반환 (코드값 표시 모드)
+ * @param codeGroups    로드된 전체 공통코드 그룹 목록
+ * @param t             다국어 변환 함수 — nameMsgKey 해석용
+ * @param requireActive true면 active=true인 공통코드만 매칭 (기본 false — FieldRenderer는 true로 호출해 기존 동작 유지)
+ *
+ * @example resolveCodeLabel('Y,N', 'YN_TYPE', undefined, codeGroups, t) // → "예,아니오"
+ * @example resolveCodeLabel('Y', 'YN_TYPE', 'value', codeGroups, t)     // → "Y" (원본 그대로)
+ */
+export function resolveCodeLabel(
+    strVal: string,
+    codeGroupCode: string | undefined,
+    displayAs: string | undefined,
+    codeGroups: CodeGroupDef[],
+    t: (key: string) => string,
+    requireActive = false,
+): string {
+    if (!codeGroupCode || displayAs === 'value') return strVal;
+    const details = codeGroups.find(g => g.groupCode === codeGroupCode)?.details ?? [];
+    const names = strVal.split(',').filter(Boolean)
+        .map(code => {
+            const trimmed = code.trim();
+            const detail = details.find(d => d.code === trimmed && (!requireActive || d.active));
+            return detail ? codeDetailToLabel(detail, t) : trimmed;
+        })
+        .join(',');
+    return names || strVal;
+}
+
+/* ── 마스킹 관련 내부 헬퍼 (applyMask 전용) ── */
+
+/**
+ * 이메일 마스킹 — '@' 앞 아이디 부분만 패턴에 따라 마스킹, 도메인은 그대로 유지
+ * @example maskEmail('abcdefg@gmail.com', 'idMid') // → 'a*****g@gmail.com'
+ */
+function maskEmail(value: string, pattern: string | undefined): string {
+    const atIdx = value.indexOf('@');
+    if (atIdx === -1) return value; // '@'가 없으면 이메일 형식이 아니므로 원본 그대로 반환
+
+    const local = value.slice(0, atIdx);
+    const domain = value.slice(atIdx); // '@'부터 끝까지(도메인 포함)
+
+    switch (pattern) {
+        case 'idMid':
+            /* 첫 글자 + 가운데 마스킹 + 마지막 글자 (2글자 이하면 전체 마스킹) */
+            return local.length <= 2
+                ? '*'.repeat(local.length) + domain
+                : local[0] + '*'.repeat(local.length - 2) + local[local.length - 1] + domain;
+        case 'idFull':
+            /* 아이디 전체 마스킹 */
+            return '*'.repeat(local.length) + domain;
+        case 'prefix3': {
+            /* 앞 3글자(또는 전체 길이가 더 짧으면 전체) 마스킹 */
+            const n = Math.min(3, local.length);
+            return '*'.repeat(n) + local.slice(n) + domain;
+        }
+        case 'suffix3': {
+            /* 뒤 3글자를 제외한 나머지(앞부분) 전체 마스킹, 뒤 3글자만 그대로 노출 (전체 길이가 3자 이하면 전체 마스킹) */
+            const n = Math.min(3, local.length);
+            return '*'.repeat(local.length - n) + local.slice(local.length - n) + domain;
+        }
+        default:
+            return value;
+    }
+}
+
+/**
+ * 전화번호 마스킹 — '010-1234-5678' 형식은 구분자(-) 기준, 구분자가 없으면 뒤에서부터 자리수 기준으로 처리
+ * @example maskPhone('010-1234-5678', 'mid4') // → '010-****-5678'
+ */
+function maskPhone(value: string, pattern: string | undefined): string {
+    const parts = value.split('-');
+
+    if (parts.length === 3) {
+        /* 010-1234-5678 형식 — 구분자 기준으로 각 구간을 통째로 마스킹 */
+        const [p1, p2, p3] = parts;
+        switch (pattern) {
+            case 'mid4':      return `${p1}-${'*'.repeat(p2.length)}-${p3}`;
+            case 'suffix4':   return `${p1}-${p2}-${'*'.repeat(p3.length)}`;
+            case 'midSuffix': return `${p1}-${'*'.repeat(p2.length)}-${'*'.repeat(p3.length)}`;
+            default:          return value;
+        }
+    }
+
+    /* 구분자가 없는 번호 — 뒤에서부터 자리수 기준으로 마스킹 (길이가 부족하면 원본 유지) */
+    const len = value.length;
+    switch (pattern) {
+        case 'mid4':
+            return len >= 8 ? value.slice(0, len - 8) + '*'.repeat(4) + value.slice(len - 4) : value;
+        case 'suffix4':
+            return len >= 4 ? value.slice(0, len - 4) + '*'.repeat(4) : value;
+        case 'midSuffix':
+            return len >= 8 ? value.slice(0, len - 8) + '*'.repeat(8) : value;
+        default:
+            return value;
+    }
+}
+
+/**
+ * 이름 마스킹 — 글자 수와 무관하게 동작하는 일반화 로직
+ * @example maskName('홍길동', 'mid') // → '홍*동'
+ */
+function maskName(value: string, pattern: string | undefined): string {
+    const len = value.length;
+    if (len === 0) return value;
+
+    switch (pattern) {
+        case 'mid':
+            /* 첫 글자 + 가운데 마스킹 + 마지막 글자 (2글자 이하면 첫 글자만 노출) */
+            return len <= 2 ? value[0] + '*'.repeat(len - 1) : value[0] + '*'.repeat(len - 2) + value[len - 1];
+        case 'initial':
+            /* 첫 글자만 노출, 나머지 마스킹 */
+            return value[0] + '*'.repeat(len - 1);
+        case 'full':
+            /* 전체 마스킹 */
+            return '*'.repeat(len);
+        default:
+            return value;
+    }
+}
+
+/**
+ * 커스텀 정규식 마스킹 — 매칭부를 치환값으로 대체
+ * - 정규식 파싱 실패 시 원본 값 그대로 반환 (validateFormFields의 new RegExp try/catch 컨벤션과 동일)
+ */
+function maskCustom(value: string, regexStr: string | undefined, replacement: string | undefined): string {
+    if (!regexStr) return value; // 정규식 미입력 시 마스킹하지 않음
+    try {
+        const re = new RegExp(regexStr, 'g');
+        return value.replace(re, replacement ?? '');
+    } catch {
+        /* 잘못된 정규식(오탈자 등) — 원본 그대로 반환 */
+        return value;
+    }
+}
+
+/**
+ * 텍스트 값에 마스킹 규칙을 적용한다 (email/phone/name/custom)
+ * - TableCellRenderer(테이블 셀 텍스트 live 모드)에서 사용
+ * - maskType이 없으면 원본 값을 그대로 반환한다
+ *
+ * @param value                  원본 표시 값
+ * @param maskType               마스킹 타입 — 미지정 시 마스킹 없음
+ * @param maskPattern            email/phone/name 타입의 패턴 키
+ * @param maskCustomRegex        maskType='custom' 전용 — 매칭할 정규식 문자열
+ * @param maskCustomReplacement  maskType='custom' 전용 — 매칭부 치환 문자열
+ *
+ * @example applyMask('abcdefg@gmail.com', 'email', 'idMid', undefined, undefined) // → 'a*****g@gmail.com'
+ * @example applyMask('010-1234-5678', 'phone', 'mid4', undefined, undefined)      // → '010-****-5678'
+ */
+export function applyMask(
+    value: string,
+    maskType: 'email' | 'phone' | 'name' | 'custom' | undefined,
+    maskPattern: string | undefined,
+    maskCustomRegex: string | undefined,
+    maskCustomReplacement: string | undefined,
+): string {
+    if (!maskType) return value;
+    switch (maskType) {
+        case 'email':  return maskEmail(value, maskPattern);
+        case 'phone':  return maskPhone(value, maskPattern);
+        case 'name':   return maskName(value, maskPattern);
+        case 'custom': return maskCustom(value, maskCustomRegex, maskCustomReplacement);
+        default:       return value;
+    }
 }
 
 /**

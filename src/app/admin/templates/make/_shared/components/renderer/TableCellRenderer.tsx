@@ -21,7 +21,7 @@ import { Pencil, Trash2, Paperclip } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
-import { evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType } from '../../utils';
+import { evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel, applyMask } from '../../utils';
 
 /* ────────────────────────────────────────────────────────── */
 /*  색상 정적 맵 (Tailwind purge 방지 — 동적 문자열 사용 금지) */
@@ -366,14 +366,15 @@ export function TableCellRenderer({
             }
             /* Object인 경우 빈값 처리 — fetch_fields 없이 Map 전체가 들어온 경우 방어 */
             const strVal = (value == null || typeof value === 'object') ? '' : String(value);
-            /* 공통코드 연동 — 코드값을 이름으로 변환 (쉼표 구분 복수값 포함) */
+            /* 공통코드 연동 — 코드값을 이름으로 변환 (쉼표 구분 복수값 + nameMsgKey 다국어 공통함수 사용) */
             if (col.codeGroupCode && col.displayAs !== 'value') {
-                const details = codeGroups.find(g => g.groupCode === col.codeGroupCode)?.details ?? [];
-                const names = strVal.split(',').filter(Boolean)
-                    .map(code => details.find(d => d.code === code.trim())?.name ?? code.trim())
-                    .join(',');
-                const displayNames = names || strVal;
+                const displayNames = resolveCodeLabel(strVal, col.codeGroupCode, col.displayAs, codeGroups, t);
                 return <span className="text-sm text-slate-700 truncate block" title={displayNames}>{displayNames}</span>;
+            }
+            /* 마스킹 처리 — 공통코드 연동 대상이 아닌 순수 텍스트에만 적용 (email/phone/name/custom) */
+            if (col.maskType) {
+                const masked = applyMask(strVal, col.maskType, col.maskPattern, col.maskCustomRegex, col.maskCustomReplacement);
+                return <span className="text-sm text-slate-700 truncate block" title={masked}>{masked}</span>;
             }
             /* 숫자 포맷 — isNumber이고 실제 숫자인 경우에만 3자리 콤마 */
             const displayVal =
