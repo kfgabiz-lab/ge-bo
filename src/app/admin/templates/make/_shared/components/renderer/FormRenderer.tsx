@@ -30,7 +30,7 @@ import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { CodeGroupDef, SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
-import { applyDataGeneration, flattenPageDataItem } from '../../utils';
+import { applyDataGeneration, flattenPageDataItem, evalConditionExpr } from '../../utils';
 
 /** flattenPageDataItem이 항상 붙이는 부가 키 — rowData 병합 시 제외 */
 const FLATTEN_META_KEYS = new Set(['_id', '_groupId', '_pathMap', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
@@ -138,37 +138,18 @@ export function FormRenderer({
         return map;
     }, [fields, values, fetchRelData]);
 
-    /** hideCondition / disableCondition 공통 평가 함수
-     *  형식: "key=값" (일치) / "key!=값" (불일치) / "k1=v1,k2=v2" (AND 복수)
-     *  cross-form 참조: allFieldKeyToId/allFormValues로 다른 Form 위젯 필드도 조회 */
+    /** hideCondition / disableCondition 공통 평가 함수 — 공용 evalConditionExpr에 위임
+     *  resolver 순서: 폼 필드(현재+cross-form) → urlParams → crossTabFormValues
+     *  형식: 콤마AND 다중조건, today() 함수토큰, 날짜비교(</>/<=/>=) 등 공용 파서가 지원하는 문법 전체 */
     const evalCondition = (condition: string): boolean => {
         const resolvedKeyToId = { ...(allFieldKeyToId ?? {}), ...keyToId };
         const resolvedValues  = { ...(allFormValues  ?? {}), ...values  };
-        return condition.split(',').every(cond => {
-            /* != 연산자 우선 감지 — = 보다 먼저 체크해야 key에 ! 가 붙는 파싱 오류 방지 */
-            const neqIdx = cond.indexOf('!=');
-            if (neqIdx !== -1) {
-                const key     = cond.slice(0, neqIdx).trim();
-                const val     = cond.slice(neqIdx + 2).trim();
-                const fieldId = resolvedKeyToId[key];
-                /* 폼 필드에 없으면 URL 파라미터에서 조회 */
-                if (fieldId) return (resolvedValues[fieldId] ?? '') !== val;
-                if (urlParams && key in urlParams) return (urlParams[key] ?? '') !== val;
-                /* cross-tab: fieldKey로 직접 참조 — 다른 탭 필드 값 조회 */
-                if (crossTabFormValues && key in crossTabFormValues) return (crossTabFormValues[key] ?? '') !== val;
-                return false;
-            }
-            const eqIdx = cond.indexOf('=');
-            if (eqIdx === -1) return false;
-            const key     = cond.slice(0, eqIdx).trim();
-            const val     = cond.slice(eqIdx + 1).trim();
+        return evalConditionExpr(condition, (key) => {
             const fieldId = resolvedKeyToId[key];
-            /* 폼 필드에 없으면 URL 파라미터에서 조회 */
-            if (fieldId) return (resolvedValues[fieldId] ?? '') === val;
-            if (urlParams && key in urlParams) return (urlParams[key] ?? '') === val;
-            /* cross-tab: fieldKey로 직접 참조 — 다른 탭 필드 값 조회 */
-            if (crossTabFormValues && key in crossTabFormValues) return (crossTabFormValues[key] ?? '') === val;
-            return false;
+            if (fieldId) return resolvedValues[fieldId] ?? '';
+            if (urlParams && key in urlParams) return urlParams[key] ?? '';
+            if (crossTabFormValues && key in crossTabFormValues) return crossTabFormValues[key] ?? '';
+            return undefined;
         });
     };
 

@@ -32,6 +32,21 @@ export const formatNowBySubType = (subType: DateSubType): string => {
     return `${YYYY}-${MM}-${DD}`;
 };
 
+/** 조건식 함수토큰 레지스트리 — subType은 상대 피연산자 값에서 추론되어 주입됨. 향후 now()/yesterday() 확장 */
+const FUNCTION_TOKENS: Record<string, (subType: DateSubType) => string> = {
+    'today()': (subType) => formatNowBySubType(subType),
+};
+
+/** 값 문자열 형태에서 dateSubType 추론 (구체적 패턴 먼저). 날짜류 아니면 null */
+function inferDateSubType(val: string): DateSubType | null {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(val)) return 'datetime';
+    if (/^\d{2}:\d{2}:\d{2}$/.test(val))            return 'timeSec';
+    if (/^\d{2}:\d{2}$/.test(val))                  return 'time';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val))            return 'date';
+    if (/^\d{4}-\d{2}$/.test(val))                  return 'yearMonth';
+    return null;
+}
+
 /**
  * "텍스트:값" 형식의 옵션 문자열 파싱
  * @example parseOpt("전체:all") // { text: "전체", value: "all" }
@@ -106,6 +121,15 @@ function evalConditionOp(lhsVal: string, op: string, rhsVal: string): boolean {
     if (op === '!=') return lhsVal !== rhsVal;
     if (op === '=')  return lhsVal === rhsVal;
 
+    /* 날짜/시간 형식 비교 — formatNowBySubType 출력·필드 저장값 모두 zero-padded ISO 포맷이라
+       사전식(lexicographic) 문자열 비교로 날짜 순서가 정확히 맞음 (today() 지원 위해 숫자 변환보다 먼저 분기) */
+    if (inferDateSubType(lhsVal) !== null && inferDateSubType(rhsVal) !== null) {
+        if (op === '<')  return lhsVal <  rhsVal;
+        if (op === '>')  return lhsVal >  rhsVal;
+        if (op === '<=') return lhsVal <= rhsVal;
+        if (op === '>=') return lhsVal >= rhsVal;
+    }
+
     /* 숫자 비교 연산자 처리 */
     const lhsNum = Number(lhsVal);
     const rhsNum = Number(rhsVal);
@@ -123,6 +147,69 @@ function evalConditionOp(lhsVal: string, op: string, rhsVal: string): boolean {
 /** 연산자 파싱 순서 — 2글자 연산자를 먼저 감지해야 1글자 연산자와 충돌하지 않음 */
 const CONDITION_OPS = ['!=', '<=', '>=', '<', '>', '='] as const;
 
+/** 최상위 콤마로 조건 분리 — 따옴표 내부 콤마는 구분자로 보지 않음 */
+function splitTopLevelComma(str: string): string[] {
+    const out: string[] = [];
+    let cur = '', inQuote = false;
+    for (const ch of str) {
+        if (ch === "'") { inQuote = !inQuote; cur += ch; }
+        else if (ch === ',' && !inQuote) { out.push(cur.trim()); cur = ''; }
+        else cur += ch;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+}
+
+/** 함수토큰 아닌 피연산자의 원시값 — 함수토큰의 sibling 포맷 추론용 (함수토큰이면 '' 반환해 재귀 차단) */
+function rawOperandValue(token: string, resolveField: (k: string) => string | undefined): string {
+    if (token in FUNCTION_TOKENS) return '';
+    if (token.startsWith("'") && token.endsWith("'")) return token.slice(1, -1);
+    const fv = resolveField(token);
+    return fv !== undefined ? fv : token;
+}
+
+/** 피연산자 최종값 — 함수토큰 → 리터럴 → 필드참조 → bare 리터럴 순 */
+function resolveOperand(token: string, sibling: string, resolveField: (k: string) => string | undefined): string {
+    if (token in FUNCTION_TOKENS) {
+        const subType = inferDateSubType(rawOperandValue(sibling, resolveField)) ?? 'date';
+        return FUNCTION_TOKENS[token](subType);
+    }
+    if (token.startsWith("'") && token.endsWith("'")) return token.slice(1, -1);
+    const fv = resolveField(token);
+    return fv !== undefined ? fv : token;
+}
+
+/** 단일 조건("lhs op rhs") 평가 — 대칭 리졸버 통과 후 evalConditionOp 위임 */
+function evalSingleCondition(cond: string, resolveField: (k: string) => string | undefined): boolean {
+    for (const op of CONDITION_OPS) {
+        const idx = cond.indexOf(op);
+        if (idx === -1) continue;
+        const lhsToken = cond.slice(0, idx).trim();
+        const rhsToken = cond.slice(idx + op.length).trim();
+        return evalConditionOp(
+            resolveOperand(lhsToken, rhsToken, resolveField),
+            op,
+            resolveOperand(rhsToken, lhsToken, resolveField),
+        );
+    }
+    return false;
+}
+
+/**
+ * 조건식(콤마 AND 다중조건) 평가 — 저수준 공용 함수
+ * resolveField로 "키 → 현재값" 조회 방식을 주입받아, 호출부마다 다른 값 소스(Form 필드/행 데이터/URL 파라미터 등)에
+ * 동일한 조건식 문법(=, !=, <, >, <=, >=, today() 함수토큰, 콤마 AND)을 적용할 수 있게 한다.
+ * FormRenderer(폼필드→urlParams→crossTab 폴백), evalFieldCondition, evalRowCondition이 공유한다.
+ * @param condition    "status=1,price>=1000" 형식의 조건 문자열
+ * @param resolveField 키를 현재값 문자열로 변환하는 함수 (값이 없으면 undefined 반환 → 리터럴로 취급)
+ * @example evalConditionExpr("status=1", (k) => k === 'status' ? '1' : undefined) // true
+ */
+export const evalConditionExpr = (
+    condition: string,
+    resolveField: (key: string) => string | undefined,
+): boolean =>
+    splitTopLevelComma(condition).every(cond => evalSingleCondition(cond, resolveField));
+
 /**
  * hideCondition / disableCondition 평가
  * 지원 연산자: = (문자열 일치) / != (불일치) / < > <= >= (숫자 비교) / AND 복수 조건(쉼표)
@@ -136,21 +223,9 @@ export const evalFieldCondition = (
     keyToId: Record<string, string>,
     values: Record<string, string>,
 ): boolean =>
-    condition.split(',').every(cond => {
-        /* 연산자 순서대로 감지 (2글자 먼저) */
-        for (const op of CONDITION_OPS) {
-            const idx = cond.indexOf(op);
-            if (idx === -1) continue;
-
-            const key     = cond.slice(0, idx).trim();
-            const rhsVal  = cond.slice(idx + op.length).trim();
-            const fieldId = keyToId[key];
-            /* fieldId 없으면 조건 불충족 */
-            if (!fieldId) return false;
-
-            return evalConditionOp(values[fieldId] ?? '', op, rhsVal);
-        }
-        return false;
+    evalConditionExpr(condition, (key) => {
+        const fieldId = keyToId[key];
+        return fieldId ? (values[fieldId] ?? '') : undefined;
     });
 
 /**
@@ -411,21 +486,11 @@ function findTopLevelColonIdx(str: string): number {
 }
 
 /**
- * 조건 문자열 평가 — evalConditionOp 공통 헬퍼 재사용
- * 지원 연산자: = / != / < > <= >= (숫자 비교)
+ * 조건 문자열 평가 — 공용 evalConditionExpr에 위임
+ * 지원 연산자: = / != / < > <= >= (날짜·숫자 비교) / today() 함수토큰 / AND 복수 조건(콤마)
  */
 function evalRowCondition(condition: string, row: Record<string, unknown>): boolean {
-    for (const op of CONDITION_OPS) {
-        const idx = condition.indexOf(op);
-        if (idx === -1) continue;
-
-        const field  = condition.slice(0, idx).trim();
-        const rhsVal = condition.slice(idx + op.length).trim();
-        const lhsVal = String(row[field] ?? '');
-
-        return evalConditionOp(lhsVal, op, rhsVal);
-    }
-    return false;
+    return evalConditionExpr(condition, (key) => (key in row) ? String(row[key] ?? '') : undefined);
 }
 
 /** + 기준으로 토큰 분리 후 row 필드값 또는 리터럴로 변환해 합산 */
