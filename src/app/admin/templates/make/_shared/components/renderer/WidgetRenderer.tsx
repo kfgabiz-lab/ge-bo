@@ -72,7 +72,7 @@ import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
 import type { PageTableData } from './PageGridRenderer';
 import { PrivacyReasonModal } from '@/components/ui/privacy-reason-modal';
-import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList } from '../../utils';
+import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList, codeDetailToLabel } from '../../utils';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
@@ -462,13 +462,30 @@ export function WidgetRenderer({
             /* 날짜 포맷 — 포맷 없는 컬럼은 빈 문자열, keys 순서와 일치 */
             const dateFormats = validCols.map(c => c.dateFormat ?? '').join(',');
 
+            /* 공통코드 연동 컬럼 → 엑셀 export용 코드값→라벨 딕셔너리 구성
+               (accessor를 key로, 해당 공통코드 그룹의 details 전체를 code→label 사전으로 매핑 —
+                화면(TableCellRenderer/FieldRenderer)과 동일한 라벨 산출 규칙(codeDetailToLabel)을 그대로 재사용) */
+            const codeMaps: Record<string, Record<string, string>> = {};
+            validCols.forEach(c => {
+                if (!c.codeGroupCode || c.displayAs === 'value') return;
+                const details = codeGroups.find(g => g.groupCode === c.codeGroupCode)?.details ?? [];
+                if (details.length === 0) return;
+                codeMaps[c.accessor] = Object.fromEntries(details.map(d => [d.code, codeDetailToLabel(d, t)]));
+            });
+
             /* 현재 검색 조건 포함 — page/size 제외 (export는 전체 데이터) */
             const searchQuery = { ...currentSearchParams };
             delete searchQuery['page'];
             delete searchQuery['size'];
 
             const res = await api.get(`/page-data/${tableWidget.connectedSlug}/export`, {
-                params: { format: 'xlsx', headers, keys, dateFormats, ...(reason ? { reason } : {}), ...searchQuery },
+                params: {
+                    format: 'xlsx', headers, keys, dateFormats,
+                    ...(reason ? { reason } : {}),
+                    /* 공통코드 매핑이 있는 컬럼이 하나도 없으면 파라미터 자체를 생략 */
+                    ...(Object.keys(codeMaps).length ? { codeMaps: JSON.stringify(codeMaps) } : {}),
+                    ...searchQuery,
+                },
                 responseType: 'blob',
             });
 
@@ -484,7 +501,7 @@ export function WidgetRenderer({
         } catch {
             toast.error('엑셀 다운로드 중 오류가 발생했습니다.');
         }
-    }, [tableWidgetsMap, currentSearchParams]);
+    }, [tableWidgetsMap, currentSearchParams, codeGroups, t]);
 
     /**
      * 엑셀 다운로드 핸들러 (live 모드 전용)

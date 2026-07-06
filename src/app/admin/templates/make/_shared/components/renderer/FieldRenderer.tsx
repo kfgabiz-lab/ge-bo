@@ -39,7 +39,7 @@ const fmtSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
         : `${Math.round(bytes / 1024)}KB`;
-import { parseOpt, flattenPageDataItem, evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType } from '../../utils';
+import { parseOpt, flattenPageDataItem, evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel } from '../../utils';
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -272,6 +272,33 @@ function FileVideoPreview({ file, cellHeight }: { file: File; cellHeight: number
             preload="auto"
             style={{ width: '100%', height: `${cellHeight}px`, display: 'block' }}
         />
+    );
+}
+
+/**
+ * 이미지/동영상/미디어 필드 하단 고정 텍스트 바의 대략적인 높이(px)
+ * video 미리보기처럼 고정 픽셀 높이가 필요한 곳에서, 전체 셀 높이에서 이 값만큼 빼서 사용한다.
+ */
+const FILE_INFO_BAR_HEIGHT = 26;
+
+/**
+ * 이미지/동영상/미디어 필드 하단 공통 파일 정보 바
+ * - 파일명 클릭 시 다운로드 실행
+ * - 파일 용량 표시 (fmtSize)
+ * case 'image' / 'video' / 'media' 3곳에서 재사용
+ */
+function FileInfoBar({ name, size, onDownload }: { name: string; size: number; onDownload: () => void }) {
+    return (
+        <div className="flex-shrink-0 px-1.5 py-1 bg-slate-50/80 border-t border-slate-100">
+            <button
+                type="button"
+                title="클릭하여 다운로드"
+                onClick={onDownload}
+                className="block w-full text-left text-xs font-medium truncate hover:text-blue-600 hover:underline transition-colors"
+            >
+                {name}<span className="text-[10px] text-slate-400 font-normal">({fmtSize(size)})</span>
+            </button>
+        </div>
     );
 }
 
@@ -681,13 +708,10 @@ export function FieldRenderer({
                     />
                 );
             }
-            /* 공통코드 연동 시 코드값 → 이름/코드값 변환 표시 (읽기 전용 텍스트로 처리) */
+            /* 공통코드 연동 시 코드값 → 이름/코드값 변환 표시 (읽기 전용 텍스트로 처리)
+               requireActive=true — 기존 동작대로 active인 공통코드만 매칭 */
             if (field.codeGroupCode && codeGroups?.length) {
-                const group  = codeGroups.find(g => g.groupCode === field.codeGroupCode);
-                const detail = group?.details.find(d => d.code === value && d.active);
-                const displayValue = field.displayAs === 'value'
-                    ? value
-                    : (detail ? (detail.nameMsgKey ? t(detail.nameMsgKey) : detail.name) : value);
+                const displayValue = resolveCodeLabel(value, field.codeGroupCode, field.displayAs, codeGroups, t, true);
                 return (
                     <input
                         type="text"
@@ -1431,28 +1455,34 @@ export function FieldRenderer({
                                     {displayItems.map((item, i) => {
                                         if (item.kind === 'existing') {
                                             return (
-                                                <div key={item.meta.id} className="relative rounded-md overflow-hidden border border-slate-200 group">
-                                                    {imgBlobUrls?.[item.meta.id]
-                                                        ? <img src={imgBlobUrls[item.meta.id]} alt={item.meta.origName} className="w-full h-full object-contain" />
-                                                        : <div className="w-full h-full flex items-center justify-center bg-slate-100"><ImageIcon className="w-5 h-5 text-slate-300" /></div>
-                                                    }
-                                                    {!isReadOnly && (
-                                                        <button type="button" onClick={() => onRemoveExisting?.(item.meta.id)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <X className="w-2.5 h-2.5 text-white" />
-                                                        </button>
-                                                    )}
+                                                <div key={item.meta.id} className="relative rounded-md overflow-hidden border border-slate-200 group flex flex-col">
+                                                    <div className="relative flex-1 min-h-0">
+                                                        {imgBlobUrls?.[item.meta.id]
+                                                            ? <img src={imgBlobUrls[item.meta.id]} alt={item.meta.origName} className="w-full h-full object-contain" />
+                                                            : <div className="w-full h-full flex items-center justify-center bg-slate-100"><ImageIcon className="w-5 h-5 text-slate-300" /></div>
+                                                        }
+                                                        {!isReadOnly && (
+                                                            <button type="button" onClick={() => onRemoveExisting?.(item.meta.id)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <X className="w-2.5 h-2.5 text-white" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <FileInfoBar name={item.meta.origName} size={item.meta.fileSize} onDownload={() => downloadFile(item.meta.id, item.meta.origName)} />
                                                 </div>
                                             );
                                         }
                                         if (item.kind === 'new') {
                                             return (
-                                                <div key={`new-${item.idx}`} className="relative rounded-md overflow-hidden border border-blue-200 group">
-                                                    <FileImagePreview file={item.file} className="w-full h-full object-contain" />
-                                                    {!isReadOnly && (
-                                                        <button type="button" onClick={() => onFileChange?.(fileList!.filter((_, fi) => fi !== item.idx))} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <X className="w-2.5 h-2.5 text-white" />
-                                                        </button>
-                                                    )}
+                                                <div key={`new-${item.idx}`} className="relative rounded-md overflow-hidden border border-blue-200 group flex flex-col">
+                                                    <div className="relative flex-1 min-h-0">
+                                                        <FileImagePreview file={item.file} className="w-full h-full object-contain" />
+                                                        {!isReadOnly && (
+                                                            <button type="button" onClick={() => onFileChange?.(fileList!.filter((_, fi) => fi !== item.idx))} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <X className="w-2.5 h-2.5 text-white" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <FileInfoBar name={item.file.name} size={item.file.size} onDownload={() => downloadLocalFile(item.file)} />
                                                 </div>
                                             );
                                         }
@@ -1610,42 +1640,52 @@ export function FieldRenderer({
                             {displayItems.map((item, i) => {
                                 if (item.kind === 'existing') {
                                     const blobUrl = imgBlobUrls?.[item.meta.id];
+                                    /* 하단 파일 정보 바 높이만큼 뺀 실제 비디오 영역 높이 */
+                                    const videoAreaH = cellH - FILE_INFO_BAR_HEIGHT;
                                     return (
                                         /* blob URL 있으면 video 플레이어, 없으면 로딩 중 아이콘 표시 */
-                                        <div key={item.meta.id} className="relative border border-slate-200 group" style={{ borderRadius: '6px' }}>
-                                            {blobUrl ? (
-                                                <video
-                                                    src={blobUrl}
-                                                    controls
-                                                    playsInline
-                                                    preload="auto"
-                                                    style={{ width: '100%', height: `${cellH}px`, display: 'block' }}
-                                                />
-                                            ) : (
-                                                <div className="w-full flex flex-col items-center justify-center gap-1 bg-slate-50" style={{ height: `${cellH}px` }}>
-                                                    <Film className="w-6 h-6 text-slate-300" />
-                                                    <span className="text-[10px] text-slate-400">로딩 중...</span>
-                                                </div>
-                                            )}
-                                            {!isReadOnly && (
-                                                <button type="button" onClick={() => onRemoveExisting?.(item.meta.id)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <X className="w-2.5 h-2.5 text-white" />
-                                                </button>
-                                            )}
+                                        <div key={item.meta.id} className="relative border border-slate-200 group flex flex-col" style={{ borderRadius: '6px' }}>
+                                            <div className="relative flex-1 min-h-0">
+                                                {blobUrl ? (
+                                                    <video
+                                                        src={blobUrl}
+                                                        controls
+                                                        playsInline
+                                                        preload="auto"
+                                                        style={{ width: '100%', height: `${videoAreaH}px`, display: 'block' }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full flex flex-col items-center justify-center gap-1 bg-slate-50" style={{ height: `${videoAreaH}px` }}>
+                                                        <Film className="w-6 h-6 text-slate-300" />
+                                                        <span className="text-[10px] text-slate-400">로딩 중...</span>
+                                                    </div>
+                                                )}
+                                                {!isReadOnly && (
+                                                    <button type="button" onClick={() => onRemoveExisting?.(item.meta.id)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <X className="w-2.5 h-2.5 text-white" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <FileInfoBar name={item.meta.origName} size={item.meta.fileSize} onDownload={() => downloadFile(item.meta.id, item.meta.origName)} />
                                         </div>
                                     );
                                 }
                                 if (item.kind === 'new') {
                                     /* 신규 파일: 비디오 플레이어로 미리보기
                                        overflow-hidden 제거 — rounded+overflow 조합이 Edge에서 video 검은화면 버그 유발 */
+                                    /* 하단 파일 정보 바 높이만큼 뺀 실제 비디오 영역 높이 */
+                                    const videoAreaH = cellH - FILE_INFO_BAR_HEIGHT;
                                     return (
-                                        <div key={`new-${item.idx}`} className="relative border border-blue-200 group" style={{ borderRadius: '6px' }}>
-                                            <FileVideoPreview file={item.file} cellHeight={cellH} />
-                                            {!isReadOnly && (
-                                                <button type="button" onClick={() => onFileChange?.(fileList!.filter((_, fi) => fi !== item.idx))} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <X className="w-2.5 h-2.5 text-white" />
-                                                </button>
-                                            )}
+                                        <div key={`new-${item.idx}`} className="relative border border-blue-200 group flex flex-col" style={{ borderRadius: '6px' }}>
+                                            <div className="relative flex-1 min-h-0">
+                                                <FileVideoPreview file={item.file} cellHeight={videoAreaH} />
+                                                {!isReadOnly && (
+                                                    <button type="button" onClick={() => onFileChange?.(fileList!.filter((_, fi) => fi !== item.idx))} className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <X className="w-2.5 h-2.5 text-white" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <FileInfoBar name={item.file.name} size={item.file.size} onDownload={() => downloadLocalFile(item.file)} />
                                         </div>
                                     );
                                 }
@@ -1854,7 +1894,7 @@ export function FieldRenderer({
                         style={{ height: mediaHeight, isolation: 'isolate' }}
                         className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
                     >
-                        <div className="flex-1 relative overflow-hidden">
+                        <div className="flex-1 min-h-0 relative overflow-hidden">
                             {existingIsImg ? (
                                 existingBlobUrl
                                     ? /* 이미지: blob URL 미리보기 */
@@ -1882,6 +1922,7 @@ export function FieldRenderer({
                                 </button>
                             )}
                         </div>
+                        <FileInfoBar name={existingMedia.origName} size={existingMedia.fileSize} onDownload={() => downloadFile(existingMedia.id, existingMedia.origName)} />
                     </div>
                 );
             }
@@ -1895,7 +1936,7 @@ export function FieldRenderer({
                     style={{ height: mediaHeight }}
                     className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
                 >
-                    <div className="flex-1 relative overflow-hidden">
+                    <div className="flex-1 min-h-0 relative overflow-hidden">
                         {selectedIsImg ? (
                             /* 이미지 미리보기 */
                             <FileImagePreview
@@ -1903,8 +1944,8 @@ export function FieldRenderer({
                                 className="w-full h-full object-contain"
                             />
                         ) : (
-                            /* 동영상: 비디오 플레이어 미리보기 */
-                            <FileVideoPreview file={selectedFile} cellHeight={mediaHeightPx} />
+                            /* 동영상: 비디오 플레이어 미리보기 — 하단 파일 정보 바 높이만큼 뺀 값 전달 */
+                            <FileVideoPreview file={selectedFile} cellHeight={mediaHeightPx - FILE_INFO_BAR_HEIGHT} />
                         )}
                         {/* 신규 파일 제거 버튼 */}
                         {!isReadOnly && (
@@ -1917,6 +1958,7 @@ export function FieldRenderer({
                             </button>
                         )}
                     </div>
+                    <FileInfoBar name={selectedFile.name} size={selectedFile.size} onDownload={() => downloadLocalFile(selectedFile)} />
                 </div>
             );
         }

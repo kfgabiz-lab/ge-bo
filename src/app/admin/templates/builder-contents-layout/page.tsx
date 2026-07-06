@@ -232,6 +232,26 @@ const SAMPLE_TABLE: TableWidget = {
             options: ['진행중|ing', '완료|done', '취소|cancel'],
         },
         {
+            id: 'c10', header: '이메일', accessor: 'email',
+            align: 'left', sortable: false, cellType: 'text',
+            maskType: 'email', maskPattern: 'idMid',
+        },
+        {
+            id: 'c11', header: '전화번호', accessor: 'phone',
+            align: 'center', sortable: false, cellType: 'text',
+            maskType: 'phone', maskPattern: 'mid4',
+        },
+        {
+            id: 'c12', header: '이름', accessor: 'name',
+            align: 'center', sortable: false, cellType: 'text',
+            maskType: 'name', maskPattern: 'mid',
+        },
+        {
+            id: 'c13', header: '커스텀마스킹', accessor: 'customField',
+            align: 'left', sortable: false, cellType: 'text',
+            maskType: 'custom', maskCustomRegex: '\\d{4}$', maskCustomReplacement: '****',
+        },
+        {
             id: 'c6', header: '관리',   accessor: '_actions',
             align: 'center', sortable: false, cellType: 'actions',
             actions: ['edit', 'delete'],

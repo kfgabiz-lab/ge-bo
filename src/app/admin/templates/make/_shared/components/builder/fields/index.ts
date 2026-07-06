@@ -43,6 +43,7 @@ export type { FieldEditProps, FieldEditValues, ColSpanMode } from './types';
 export { ColumnBaseField } from './ColumnBaseField';
 export { BadgeOptionsField } from './BadgeOptionsField';
 export { TextCodeGroupField } from './TextCodeGroupField';
+export { MaskField } from './MaskField';
 export { BooleanTextField } from './BooleanTextField';
 export { ActionsField } from './ActionsField';
 export { DateRangeStatusColumnField } from './DateRangeStatusColumnField';

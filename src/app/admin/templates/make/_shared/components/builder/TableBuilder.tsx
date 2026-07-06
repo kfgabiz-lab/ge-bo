@@ -28,6 +28,7 @@ import {
     ColumnBaseField,
     BadgeOptionsField,
     TextCodeGroupField,
+    MaskField,
     BooleanTextField,
     ActionsField,
     SlugSelectField,
@@ -319,6 +320,11 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 /* text / inlineEdit 공통 — 공통코드 연동 */
                 codeGroupCode: (p.cellType === 'text' || p.cellType === 'inlineEdit') && p.codeGroupCode ? p.codeGroupCode : undefined,
                 displayAs:     p.cellType === 'text' && p.codeGroupCode ? p.displayAs : undefined,
+                /* text 전용 — 마스킹 설정 */
+                maskType:              p.cellType === 'text' ? p.maskType : undefined,
+                maskPattern:           p.cellType === 'text' && p.maskType && p.maskType !== 'custom' ? p.maskPattern : undefined,
+                maskCustomRegex:       p.cellType === 'text' && p.maskType === 'custom' ? p.maskCustomRegex : undefined,
+                maskCustomReplacement: p.cellType === 'text' && p.maskType === 'custom' ? p.maskCustomReplacement : undefined,
                 /* inlineEdit 전용 */
                 inlineEditType:     p.cellType === 'inlineEdit' ? (p.inlineEditType ?? 'toggle') : undefined,
                 options:            p.cellType === 'inlineEdit' ? p.options : undefined,
@@ -340,6 +346,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 <ColumnBaseField values={col} onChange={patch} fetchRelations={allSlugRelations.filter(r => r.relationDir === 'FETCH')} />
                 {col.cellType === 'badge'            && <BadgeOptionsField          values={col} onChange={patch} />}
                 {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
+                {col.cellType === 'text'             && <MaskField                  values={col} onChange={patch} />}
                 {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
                 {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} disabledActions={['copy']} />}
                 {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
@@ -496,6 +503,12 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                         codeGroups={codeGroups}
                                         codeGroupsLoading={false}
+                                    />
+                                )}
+                                {pendingCol.cellType === 'text' && (
+                                    <MaskField
+                                        values={pendingCol}
+                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                     />
                                 )}
                                 {pendingCol.cellType === 'boolean' && (
