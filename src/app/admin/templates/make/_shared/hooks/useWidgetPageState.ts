@@ -165,7 +165,7 @@ async function restoreFormDataFromJson(
     if (!mw.contentKey) return;
     /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
     const rel = dataJson['_rel'] as Record<string, unknown> | undefined;
-    const raw = (mw.connectedSlug && rel?.[mw.connectedSlug]) ?? dataJson[mw.contentKey];
+    const raw = (mw.connectedSlug ? rel?.[mw.connectedSlug] : undefined) ?? dataJson[mw.contentKey];
     if (!Array.isArray(raw)) return;
     if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
       const items = raw as { id: number; [key: string]: unknown }[];
@@ -593,106 +593,6 @@ export function useWidgetPageState(
       if (Object.keys(extras).length > 0) setUrlParamSaveExtras(extras);
     };
 
-    /** dataJson → 폼·SubList·MultiSelect 상태 복원 + 파일 메타·blob URL 로드 */
-    const restoreFromDataJson = async (
-      dataJson: Record<string, unknown>,
-      forms: FormWidget[],
-      sublists: SubListWidget[],
-      multiSels: MultiSelectWidget[],
-    ) => {
-      forms.forEach(fw => {
-        const section = findSection(dataJson, fw.contentKey);
-        const vals: Record<string, string> = {};
-        fw.fields.forEach(f => {
-          if (!f.fieldKey) return;
-          if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-            /* dateRange/yearMonthRange: dataJson에서 _from/_to 분리 키로 복원 */
-            const fromVal = section[f.fieldKey + '_from'];
-            const toVal = section[f.fieldKey + '_to'];
-            if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
-            if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
-          } else if (section[f.fieldKey] !== undefined) {
-            const raw = section[f.fieldKey];
-            if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
-          }
-        });
-        setFormValuesMap(prev => ({ ...prev, [fw.widgetId]: vals }));
-      });
-
-      sublists.forEach(sw => {
-        const raw = sw.contentKey ? dataJson[sw.contentKey] : null;
-        /* { rows } 래핑 제거 후 배열 직접 저장 방식 */
-        const rawRows = Array.isArray(raw) ? raw as Record<string, unknown>[] : [];
-        setSubListRowsMap(prev => ({
-          ...prev,
-          [sw.widgetId]: rawRows.map((r, i) => ({
-            _rowId: (r.id as string) ?? `row-${i}`,
-            ...r,
-          })),
-        }));
-      });
-
-      multiSels.forEach(mw => {
-        if (!mw.contentKey) return;
-        /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
-        const rel = dataJson['_rel'] as Record<string, unknown> | undefined;
-        const raw = (mw.connectedSlug && rel?.[mw.connectedSlug]) ?? dataJson[mw.contentKey];
-        if (!Array.isArray(raw)) return;
-        if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
-          const items = raw as { id: number; [key: string]: unknown }[];
-          setMultiSelectValuesMap(prev => ({ ...prev, [mw.widgetId]: items.map(i => i.id) }));
-          const extraVals: Record<number, Record<string, string>> = {};
-          items.forEach(item => {
-            const { id, ...fields } = item;
-            extraVals[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')]));
-          });
-          setMultiSelectExtraFieldValuesMap(prev => ({ ...prev, [mw.widgetId]: extraVals }));
-        } else {
-          setMultiSelectValuesMap(prev => ({
-            ...prev,
-            [mw.widgetId]: (raw as unknown[]).filter(x => typeof x === 'number') as number[],
-          }));
-        }
-      });
-
-      try {
-        const fileIds: number[] = [];
-        const collectIds = (obj: Record<string, unknown>) => {
-          Object.values(obj).forEach(v => {
-            if (Array.isArray(v) && v.every(x => typeof x === 'number')) fileIds.push(...v as number[]);
-            else if (v && typeof v === 'object' && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
-          });
-        };
-        collectIds(dataJson);
-
-        if (fileIds.length > 0) {
-          const metaRes = await api.get('/page-files/meta', { params: { ids: fileIds.join(',') } });
-          const metaList = metaRes.data as { id: number; origName: string; fileSize: number; mimeType: string }[];
-          forms.forEach(fw => {
-            const section = findSection(dataJson, fw.contentKey);
-            const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
-            fw.fields.forEach(f => {
-              if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
-              const ids = section[f.fieldKey];
-              if (!Array.isArray(ids)) return;
-              metaByFieldId[f.id] = (ids as number[]).map(id => {
-                const m = metaList.find(m => m.id === id);
-                return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
-              });
-              if (f.type === 'image' || f.type === 'video' || f.type === 'media') {
-                (ids as number[]).forEach(id => {
-                  api.get(`/page-files/${id}`, { responseType: 'blob' })
-                    .then(r => setImgBlobUrls(prev => ({ ...prev, [id]: URL.createObjectURL(r.data) })))
-                    .catch(() => {});
-                });
-              }
-            });
-            setExistingFileMetaMap(prev => ({ ...prev, [fw.widgetId]: metaByFieldId }));
-          });
-        }
-      } catch { /* 파일 없으면 조용히 처리 */ }
-    };
-
     if (queryGroupId) {
       setCurrentGroupId(queryGroupId);
       const slugSet = new Set([
@@ -704,11 +604,14 @@ export function useWidgetPageState(
         api.get(`/page-data/${s}/group/${queryGroupId}`)
           .then(async dataRes => {
             const dataJson = (dataRes.data.dataJson || {}) as Record<string, unknown>;
-            await restoreFromDataJson(
+            await restoreFormDataFromJson(
               dataJson,
               formWidgets.filter(fw => fw.connectedSlug === s),
               sublistWidgets.filter(sw => sw.connectedSlug === s),
               multiSelWidgets.filter(mw => mw.connectedSlug === s),
+              setFormValuesMap, setSubListRowsMap,
+              setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
+              setExistingFileMetaMap, setImgBlobUrls,
             );
             applyUrlParams();
           })
@@ -722,7 +625,12 @@ export function useWidgetPageState(
         api.get(`/page-data/${connectedSlug}/${Number(queryId)}`)
           .then(async dataRes => {
             const dataJson = (dataRes.data.dataJson || {}) as Record<string, unknown>;
-            await restoreFromDataJson(dataJson, formWidgets, sublistWidgets, multiSelWidgets);
+            await restoreFormDataFromJson(
+              dataJson, formWidgets, sublistWidgets, multiSelWidgets,
+              setFormValuesMap, setSubListRowsMap,
+              setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
+              setExistingFileMetaMap, setImgBlobUrls,
+            );
             // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
             const fetchRelData = extractFetchRelData(dataJson);
             if (Object.keys(fetchRelData).length > 0) {
