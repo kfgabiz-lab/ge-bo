@@ -1060,6 +1060,13 @@ export function useWidgetPageState(
             return;
         }
 
+        /* SubList 유효성 검사 — required/minLength/maxLength/pattern/파일제한 */
+        const subWidgetsForValidation = targetWidgets.filter(
+          (w) => w.type === "sublist"
+        ) as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('../components/renderer/types').SubListColumn[] }>;
+        if (!validateSubListRows(subWidgetsForValidation, subListRowsMap, subListFileMap, t))
+          return;
+
         /* mainConnectedSlug가 있으면 전체 위젯을 하나의 slug로 통합 저장 */
         const slugGroups = options?.mainConnectedSlug
             ? [[options.mainConnectedSlug, targetWidgets] as [string, (FormWidget | SubListWidget | MultiSelectWidget)[]]]

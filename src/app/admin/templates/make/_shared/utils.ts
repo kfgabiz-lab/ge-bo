@@ -331,10 +331,10 @@ export const validateFormFields = (
 };
 
 /**
- * SubList 위젯 필수 컬럼 유효성 검사
- * - required 컬럼의 각 행 값을 검사
- * - file/image: 기존 ID + 신규 파일 합산이 0이면 오류
- * - 그 외: 빈 문자열이면 오류
+ * SubList 위젯 컬럼 유효성 검사 (required / minLength / maxLength / pattern / 파일 개수·용량)
+ * - required 컬럼의 각 행 값을 검사 (file/image: 기존 ID + 신규 파일 합산이 0이면 오류, 그 외: 빈 문자열이면 오류)
+ * - required 여부와 무관하게 값이 있으면 minLength/maxLength/pattern 검사 수행 (validateFormFields와 동일 컨벤션)
+ * - file/image 타입은 maxFileCount/maxFileSizeMB/maxTotalSizeMB 검사 수행
  * - 오류 발견 시 toast.warning 표시 후 false 반환
  * @param widgets  SubList 위젯 배열 (type/widgetId/columns)
  * @param rowsMap  widgetId → 행 배열 맵
@@ -367,20 +367,65 @@ export const validateSubListRows = (
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
             for (const col of cols) {
-                if (!col.required) continue;
                 const label = (col.labelMsgKey && t ? t(col.labelMsgKey) : col.label) || col.key;
+
                 if (col.type === 'file' || col.type === 'image') {
                     const existingCount = Array.isArray(row[col.key]) ? (row[col.key] as number[]).length : 0;
-                    const newCount      = fileMap[wid]?.[row._rowId]?.[col.id]?.length ?? 0;
-                    if (existingCount + newCount === 0) {
+                    const newFiles      = fileMap[wid]?.[row._rowId]?.[col.id] ?? [];
+                    const newCount      = newFiles.length;
+
+                    /* 필수 입력 검사 */
+                    if (col.required && existingCount + newCount === 0) {
                         toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
                         return false;
                     }
+                    /* 최대 첨부 개수 검사 (기존 + 신규 합산) */
+                    if (col.maxFileCount && existingCount + newCount > col.maxFileCount) {
+                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행에서 최대 ${col.maxFileCount}개까지 첨부 가능합니다.`);
+                        return false;
+                    }
+                    /* 파일 개당 최대 용량 검사 (신규 파일만) */
+                    if (col.maxFileSizeMB) {
+                        const over = newFiles.find(file => file.size > col.maxFileSizeMB! * 1024 * 1024);
+                        if (over) {
+                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 파일이 개당 최대 ${col.maxFileSizeMB}MB까지 허용됩니다.`);
+                            return false;
+                        }
+                    }
+                    /* 전체 파일 최대 용량 검사 (신규 파일 합산) */
+                    if (col.maxTotalSizeMB) {
+                        const total = newFiles.reduce((s, file) => s + file.size, 0);
+                        if (total > col.maxTotalSizeMB * 1024 * 1024) {
+                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 전체 파일 용량이 ${col.maxTotalSizeMB}MB를 초과합니다.`);
+                            return false;
+                        }
+                    }
                 } else {
                     const val = String(row[col.key] ?? '').trim();
-                    if (!val) {
+
+                    /* 필수 입력 검사 */
+                    if (col.required && !val) {
                         toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
                         return false;
+                    }
+                    /* 값이 있을 때만 길이·패턴 검사 (required 여부와 무관) */
+                    if (val) {
+                        if (col.minLength && val.length < col.minLength) {
+                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행에서 최소 ${col.minLength}자 이상 입력해야 합니다.`);
+                            return false;
+                        }
+                        if (col.maxLength && val.length > col.maxLength) {
+                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행에서 최대 ${col.maxLength}자까지 입력 가능합니다.`);
+                            return false;
+                        }
+                        if (col.pattern) {
+                            try {
+                                if (!new RegExp(col.pattern).test(val)) {
+                                    toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 형식이 올바르지 않습니다.${col.patternDesc ? ` (${col.patternDesc})` : ''}`);
+                                    return false;
+                                }
+                            } catch { /* 잘못된 패턴 무시 */ }
+                        }
                     }
                 }
             }
