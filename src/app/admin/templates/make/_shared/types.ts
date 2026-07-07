@@ -72,6 +72,7 @@ export interface SearchFieldConfig {
     multiSelect?: boolean;      // button 전용: 다중선택 여부
     /* ── textarea 전용 ── */
     content?: string;           // 표시할 텍스트 내용
+    contentMsgKey?: string;     // 다국어 내용 키 (textarea 전용)
     fontSize?: number;          // 글자 크기 (px)
     bold?: boolean;             // 굵게 여부
     textColor?: string;         // 텍스트 색상

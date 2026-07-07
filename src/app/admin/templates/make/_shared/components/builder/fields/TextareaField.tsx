@@ -15,6 +15,8 @@
 import React from 'react';
 import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS } from './_FieldBase';
+import { MessageKeySelector } from '@/components/i18n/message-key-selector';
+import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
 
 export function TextareaField({
     values,
@@ -25,10 +27,12 @@ export function TextareaField({
     autoFocus,
     onLabelKeyDown
 }: FieldEditProps) {
+    const { i18nMode } = useBuilderI18nMode();
     return (
         <FieldBase
             label={values.label}
             labelMsgKey={values.labelMsgKey}
+            description={values.description}
             descriptionMsgKey={values.descriptionMsgKey}
             fieldKey={values.fieldKey || ''}
             colSpan={values.colSpan}
@@ -46,16 +50,24 @@ export function TextareaField({
             onLabelKeyDown={onLabelKeyDown}
         >
             <div className="space-y-2.5">
-                {/* 텍스트 내용 입력 */}
+                {/* 텍스트 내용 입력 — 다국어 모드면 메시지 키 선택으로 전환 */}
                 <div>
                     <label className={LABEL_CLS}>내용</label>
-                    <textarea
-                        value={values.content ?? ''}
-                        onChange={e => onChange({ content: e.target.value })}
-                        placeholder="표시할 텍스트를 입력하세요"
-                        rows={3}
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-slate-900 leading-normal"
-                    />
+                    {i18nMode ? (
+                        <MessageKeySelector
+                            value={values.contentMsgKey ?? ''}
+                            onChange={key => onChange({ contentMsgKey: key || undefined })}
+                            size="sm"
+                        />
+                    ) : (
+                        <textarea
+                            value={values.content ?? ''}
+                            onChange={e => onChange({ content: e.target.value })}
+                            placeholder="표시할 텍스트를 입력하세요"
+                            rows={3}
+                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-slate-900 leading-normal"
+                        />
+                    )}
                 </div>
 
                 {/* 스타일 설정 (크기, 굵게, 색상) */}

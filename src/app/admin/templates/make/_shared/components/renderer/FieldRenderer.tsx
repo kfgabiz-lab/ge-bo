@@ -1135,9 +1135,9 @@ export function FieldRenderer({
                 };
                 return (
                     <div style={style} className="whitespace-pre-wrap leading-relaxed px-1">
-                        {field.content || value || (
+                        {field.contentMsgKey ? t(field.contentMsgKey) : (field.content || value || (
                             <span className="text-slate-300 italic">텍스트 없음</span>
-                        )}
+                        ))}
                     </div>
                 );
             }
