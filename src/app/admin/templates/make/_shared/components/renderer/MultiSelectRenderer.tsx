@@ -29,7 +29,7 @@ import { FieldRenderer } from './FieldRenderer';
 import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from './types';
 import type { SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
-import { flattenPageDataItem } from '../../utils';
+import { flattenPageDataItem, evalConditionExpr } from '../../utils';
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
 const PREVIEW_OPTIONS = [
@@ -124,13 +124,15 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
             .then(res => {
                 const rows = (res.data.content ?? []) as { dataJson: Record<string, unknown> }[];
                 /* flattenPageDataItem으로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */
-                setOptions(rows.map(r => {
-                    const row = flattenPageDataItem(r as Parameters<typeof flattenPageDataItem>[0]);
-                    return { ...row, id: Number(row._id ?? 0) };
-                }));
+                const flatRows = rows.map(r => flattenPageDataItem(r as Parameters<typeof flattenPageDataItem>[0]));
+                /* sourceFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용 */
+                const filteredRows = widget.sourceFilter
+                    ? flatRows.filter(row => evalConditionExpr(widget.sourceFilter!, (key) => (key in row) ? String(row[key] ?? '') : undefined))
+                    : flatRows;
+                setOptions(filteredRows.map(row => ({ ...row, id: Number(row._id ?? 0) })));
             })
             .catch(() => {});
-    }, [isPreview, widget.sourceSlug]);
+    }, [isPreview, widget.sourceSlug, widget.sourceFilter]);
 
     /* ── live: 외부 selectedIds 동기화 ── */
     useEffect(() => {

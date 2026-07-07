@@ -135,6 +135,8 @@ export interface FieldEditValues {
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];     // depth별 value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];      // depth별 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+    /** depth별 옵션 필터 조건식 — evalConditionExpr 문법 재사용, resolveAccessor(dataJson, key) 기준 raw item 단계에서 필터 */
+    depthFilters?: string[];
     /* ── time 전용 ── */
     defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
     timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
@@ -176,6 +178,8 @@ export interface FieldEditValues {
     optionOrderKey?: string;
     /** SLUG 데이터 정렬 방향 (ASC / DESC) */
     optionOrderDir?: 'ASC' | 'DESC';
+    /** SLUG 옵션 필터 조건식 — evalConditionExpr 문법 재사용, flattenPageDataItem 기준 flat key로 평가 */
+    optionFilter?: string;
 }
 
 /**

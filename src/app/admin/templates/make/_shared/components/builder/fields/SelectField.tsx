@@ -79,6 +79,7 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 optionTextKey={values.optionTextKey}
                 optionOrderKey={values.optionOrderKey}
                 optionOrderDir={values.optionOrderDir}
+                optionFilter={values.optionFilter}
                 codeGroups={codeGroups}
                 codeGroupsLoading={codeGroupsLoading}
                 onChange={updates => onChange(updates)}

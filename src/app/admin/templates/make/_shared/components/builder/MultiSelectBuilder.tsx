@@ -313,6 +313,18 @@ export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelec
                     slugOptions={slugOptions}
                 />
 
+                {/* 호출 Slug 옵션 필터 — evalConditionExpr 문법 재사용 (선택) */}
+                <div>
+                    <label className={LABEL_CLS}>옵션 필터 <span className="text-slate-300 font-normal">(선택)</span></label>
+                    <input
+                        type="text"
+                        value={widget.sourceFilter ?? ''}
+                        onChange={e => onChange({ ...widget, sourceFilter: e.target.value || undefined })}
+                        placeholder="예: status=1,type=Y"
+                        className={INPUT_CLS}
+                    />
+                </div>
+
                 {/* 표시 필드 */}
                 <div>
                     <label className={LABEL_CLS}>표시 필드 <span className="text-red-400">*</span></label>

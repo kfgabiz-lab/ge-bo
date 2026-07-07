@@ -48,6 +48,7 @@ export function CategoryField({
     const depthLabelMsgKeys = values.depthLabelMsgKeys ?? [];
     const depthValueFields  = values.depthValueFields  ?? [];
     const depthTextFields   = values.depthTextFields   ?? [];
+    const depthFilters      = values.depthFilters      ?? [];
 
     /** depth 수 변경 시 모든 배열을 함께 잘라냄 */
     const handleMaxDepthChange = (d: 1 | 2 | 3 | 4) => {
@@ -57,6 +58,7 @@ export function CategoryField({
             depthLabelMsgKeys: depthLabelMsgKeys.slice(0, d),
             depthValueFields:  depthValueFields.slice(0, d),
             depthTextFields:   depthTextFields.slice(0, d),
+            depthFilters:      depthFilters.slice(0, d),
         });
     };
 
@@ -138,47 +140,61 @@ export function CategoryField({
                 </div>
 
                 {Array.from({ length: maxDepth }, (_, i) => (
-                    <div key={i} className="grid grid-cols-[24px_1fr_72px_72px] gap-1 items-center">
-                        {/* depth 번호 */}
-                        <span className="text-[10px] text-slate-400 text-right pr-0.5 shrink-0">
-                            {i + 1}
-                        </span>
+                    <div key={i} className="space-y-0.5">
+                        <div className="grid grid-cols-[24px_1fr_72px_72px] gap-1 items-center">
+                            {/* depth 번호 */}
+                            <span className="text-[10px] text-slate-400 text-right pr-0.5 shrink-0">
+                                {i + 1}
+                            </span>
 
-                        {/* 라벨 — i18nMode: MessageKeySelector / 직접입력: input */}
-                        {i18nMode ? (
-                            <MessageKeySelector
-                                value={depthLabelMsgKeys[i] ?? ''}
-                                onChange={key => onChange({ depthLabelMsgKeys: updateDepthArray(depthLabelMsgKeys, i, key) })}
-                                resourceType="WORD"
-                                size="sm"
-                            />
-                        ) : (
+                            {/* 라벨 — i18nMode: MessageKeySelector / 직접입력: input */}
+                            {i18nMode ? (
+                                <MessageKeySelector
+                                    value={depthLabelMsgKeys[i] ?? ''}
+                                    onChange={key => onChange({ depthLabelMsgKeys: updateDepthArray(depthLabelMsgKeys, i, key) })}
+                                    resourceType="WORD"
+                                    size="sm"
+                                />
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={depthLabels[i] ?? ''}
+                                    onChange={e => onChange({ depthLabels: updateDepthArray(depthLabels, i, e.target.value) })}
+                                    placeholder={['대분류', '중분류', '소분류', '세분류'][i]}
+                                    className={INPUT_CLS}
+                                />
+                            )}
+
+                            {/* Value — selectbox option value로 사용할 dataJson 경로 */}
                             <input
                                 type="text"
-                                value={depthLabels[i] ?? ''}
-                                onChange={e => onChange({ depthLabels: updateDepthArray(depthLabels, i, e.target.value) })}
-                                placeholder={['대분류', '중분류', '소분류', '세분류'][i]}
+                                value={depthValueFields[i] ?? ''}
+                                onChange={e => onChange({ depthValueFields: updateDepthArray(depthValueFields, i, e.target.value) })}
+                                placeholder="key 입력"
                                 className={INPUT_CLS}
                             />
-                        )}
 
-                        {/* Value — selectbox option value로 사용할 dataJson 경로 */}
-                        <input
-                            type="text"
-                            value={depthValueFields[i] ?? ''}
-                            onChange={e => onChange({ depthValueFields: updateDepthArray(depthValueFields, i, e.target.value) })}
-                            placeholder="key 입력"
-                            className={INPUT_CLS}
-                        />
+                            {/* Text — selectbox option 표시 텍스트 경로 */}
+                            <input
+                                type="text"
+                                value={depthTextFields[i] ?? ''}
+                                onChange={e => onChange({ depthTextFields: updateDepthArray(depthTextFields, i, e.target.value) })}
+                                placeholder="key 입력"
+                                className={INPUT_CLS}
+                            />
+                        </div>
 
-                        {/* Text — selectbox option 표시 텍스트 경로 */}
-                        <input
-                            type="text"
-                            value={depthTextFields[i] ?? ''}
-                            onChange={e => onChange({ depthTextFields: updateDepthArray(depthTextFields, i, e.target.value) })}
-                            placeholder="key 입력"
-                            className={INPUT_CLS}
-                        />
+                        {/* depth별 옵션 필터 조건식 — evalConditionExpr 문법 재사용 (선택) */}
+                        <div className="grid grid-cols-[24px_1fr] gap-1 items-center">
+                            <span />
+                            <input
+                                type="text"
+                                value={depthFilters[i] ?? ''}
+                                onChange={e => onChange({ depthFilters: updateDepthArray(depthFilters, i, e.target.value) })}
+                                placeholder="옵션 필터 (선택, 예: status=1,type=Y)"
+                                className={INPUT_CLS}
+                            />
+                        </div>
                     </div>
                 ))}
 

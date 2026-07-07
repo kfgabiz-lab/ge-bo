@@ -332,6 +332,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 optionTextKey:      f.optionTextKey,
                 optionOrderKey:     f.optionOrderKey,
                 optionOrderDir:     f.optionOrderDir,
+                optionFilter:       f.optionFilter,
                 /* ── 연결 Slug (input/text 전용) ── */
                 relationSlugId:     f.relationSlugId,
                 /* ── Data 표현식 (input/text 전용) ── */

@@ -31,6 +31,8 @@ interface FieldOptionsProps {
     optionOrderKey?: string;
     /** SLUG 데이터 정렬 방향 (ASC / DESC) */
     optionOrderDir?: 'ASC' | 'DESC';
+    /** SLUG 옵션 필터 조건식 — evalConditionExpr 문법 재사용, 조건에 맞는 행만 옵션으로 추출 */
+    optionFilter?: string;
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
     onChange: (updates: {
@@ -41,6 +43,7 @@ interface FieldOptionsProps {
         optionTextKey?: string;
         optionOrderKey?: string;
         optionOrderDir?: 'ASC' | 'DESC';
+        optionFilter?: string;
     }) => void;
     /** 현재 기본값으로 선택된 option value */
     defaultOptionValue?: string;
@@ -64,6 +67,7 @@ export function FieldOptions({
     optionTextKey,
     optionOrderKey,
     optionOrderDir,
+    optionFilter,
     codeGroups,
     codeGroupsLoading,
     onChange,
@@ -86,10 +90,10 @@ export function FieldOptions({
         setMode(next);
         if (next === 'manual') {
             /* 수동 탭 선택 시: 공통코드·SLUG 초기화 */
-            onChange({ codeGroupCode: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined, optionOrderKey: undefined, optionOrderDir: undefined });
+            onChange({ codeGroupCode: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined, optionOrderKey: undefined, optionOrderDir: undefined, optionFilter: undefined });
         } else if (next === 'code') {
             /* 공통코드 탭 선택 시: 수동 옵션·SLUG 초기화 */
-            onChange({ options: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined, optionOrderKey: undefined, optionOrderDir: undefined });
+            onChange({ options: undefined, optionSlug: undefined, optionValueKey: undefined, optionTextKey: undefined, optionOrderKey: undefined, optionOrderDir: undefined, optionFilter: undefined });
         } else if (next === 'slug') {
             /* SLUG 탭 선택 시: 수동 옵션·공통코드 초기화 */
             onChange({ options: undefined, codeGroupCode: undefined });
@@ -174,6 +178,7 @@ export function FieldOptions({
                             optionTextKey: undefined,
                             optionOrderKey: undefined,
                             optionOrderDir: undefined,
+                            optionFilter: undefined,
                         })}
                         slugOptions={slugOptions}
                         emptyLabel="SLUG 선택"
@@ -201,6 +206,18 @@ export function FieldOptions({
                                 className={INPUT_CLS}
                             />
                         </div>
+                    </div>
+
+                    {/* 옵션 필터 조건식 — evalConditionExpr 문법 재사용, 조건에 맞는 행만 옵션으로 추출 */}
+                    <div>
+                        <label className={LABEL_CLS}>옵션 필터 <span className="text-slate-300 font-normal">(선택)</span></label>
+                        <input
+                            type="text"
+                            value={optionFilter ?? ''}
+                            onChange={(e) => onChange({ optionFilter: e.target.value || undefined })}
+                            placeholder="예: status=1,type=Y"
+                            className={INPUT_CLS}
+                        />
                     </div>
 
                     {/* 정렬key | orderby 한 줄 배치 */}
