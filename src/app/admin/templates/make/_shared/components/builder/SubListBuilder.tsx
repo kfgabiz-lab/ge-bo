@@ -17,7 +17,7 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
-import type { CodeGroupDef } from '../../types';
+import type { CodeGroupDef, TableColumnConfig } from '../../types';
 import { Plus, GripVertical, Pencil, X } from 'lucide-react';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
@@ -120,9 +120,11 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         defaultStartDateOffset: col.defaultStartDateOffset,
         defaultStartDate:       col.defaultStartDate,
         disableStartPast:       col.disableStartPast,
+        defaultStartToday:      col.defaultStartToday,
         defaultEndDateOffset:   col.defaultEndDateOffset,
         defaultEndDate:         col.defaultEndDate,
         disableEndPast:         col.disableEndPast,
+        defaultEndToday:        col.defaultEndToday,
         rangeSubType:           col.rangeSubType,
         /* action */
         actions: col.actions as FieldEditValues['actions'],
@@ -184,9 +186,11 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.defaultStartDateOffset !== undefined) patch.defaultStartDateOffset = updates.defaultStartDateOffset;
     if (updates.defaultStartDate       !== undefined) patch.defaultStartDate       = updates.defaultStartDate;
     if (updates.disableStartPast       !== undefined) patch.disableStartPast       = updates.disableStartPast;
+    if (updates.defaultStartToday      !== undefined) patch.defaultStartToday      = updates.defaultStartToday;
     if (updates.defaultEndDateOffset   !== undefined) patch.defaultEndDateOffset   = updates.defaultEndDateOffset;
     if (updates.defaultEndDate         !== undefined) patch.defaultEndDate         = updates.defaultEndDate;
     if (updates.disableEndPast         !== undefined) patch.disableEndPast         = updates.disableEndPast;
+    if (updates.defaultEndToday        !== undefined) patch.defaultEndToday        = updates.defaultEndToday;
     if (updates.rangeSubType           !== undefined) patch.rangeSubType           = updates.rangeSubType;
     /* action */
     if (updates.actions                !== undefined) patch.actions                = updates.actions as ('copy')[];
@@ -345,7 +349,9 @@ function ColumnEditPanel({
             {col.type === 'action'    && (
                 <ActionsField
                     values={{ actions: col.actions }}
-                    onChange={patch => onChange(fromFieldValues(patch))}
+                    /* TableColumnConfig.connType(버튼 필드컴포넌트 전용, STEP2 추가)와 FieldEditValues.connType(action-button 전용)
+                       이름이 겹쳐 구조적 타입이 달라지므로, 여기서는 실제로 actions/editPageRules만 오가는 patch임을 명시적으로 캐스팅한다. */
+                    onChange={(patch: Partial<TableColumnConfig>) => onChange(fromFieldValues(patch as Partial<FieldEditValues>))}
                     layerTemplates={[]}
                     onRequestLayerTemplates={() => {}}
                     disabledActions={['edit']}

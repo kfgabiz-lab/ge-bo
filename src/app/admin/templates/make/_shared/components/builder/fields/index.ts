@@ -46,6 +46,7 @@ export { TextCodeGroupField } from './TextCodeGroupField';
 export { MaskField } from './MaskField';
 export { BooleanTextField } from './BooleanTextField';
 export { ActionsField } from './ActionsField';
+export { TableButtonField } from './TableButtonField';
 export { DateRangeStatusColumnField } from './DateRangeStatusColumnField';
 export { InlineEditField } from './InlineEditField';
 export type { ColEditProps } from './col-types';

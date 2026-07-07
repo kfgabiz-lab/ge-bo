@@ -179,25 +179,20 @@ function ExtraFieldEditPanel({
         required:      field.required,
     };
 
-    /* input/date: ExtraSimpleInputField */
-    if (field.type === 'input' || field.type === 'date') {
-        return (
-            <ExtraSimpleInputField
-                values={inputValues}
-                onChange={updates => onChange({
-                    ...(updates.label             !== undefined && { label:             updates.label }),
-                    ...(updates.labelMsgKey       !== undefined && { labelMsgKey:       updates.labelMsgKey }),
-                    ...(updates.fieldKey          !== undefined && { key:               updates.fieldKey }),
-                    ...(updates.placeholder       !== undefined && { placeholder:       updates.placeholder }),
-                    ...(updates.placeholderMsgKey !== undefined && { placeholderMsgKey: updates.placeholderMsgKey }),
-                    ...(updates.required          !== undefined && { required:          updates.required }),
-                })}
-            />
-        );
-    }
-
-    /* select/radio/checkbox: ExtraSimpleSelectField */
-    return (
+    /* 타입별 편집 본문 — input/date: ExtraSimpleInputField, 그 외: ExtraSimpleSelectField */
+    const body = (field.type === 'input' || field.type === 'date') ? (
+        <ExtraSimpleInputField
+            values={inputValues}
+            onChange={updates => onChange({
+                ...(updates.label             !== undefined && { label:             updates.label }),
+                ...(updates.labelMsgKey       !== undefined && { labelMsgKey:       updates.labelMsgKey }),
+                ...(updates.fieldKey          !== undefined && { key:               updates.fieldKey }),
+                ...(updates.placeholder       !== undefined && { placeholder:       updates.placeholder }),
+                ...(updates.placeholderMsgKey !== undefined && { placeholderMsgKey: updates.placeholderMsgKey }),
+                ...(updates.required          !== undefined && { required:          updates.required }),
+            })}
+        />
+    ) : (
         <ExtraSimpleSelectField
             values={selectValues}
             onChange={updates => onChange({
@@ -212,6 +207,23 @@ function ExtraFieldEditPanel({
             codeGroupsLoading={codeGroupsLoading}
         />
     );
+
+    /* 표시 위치(좌/우) select — 타입 공통, 항목명 기준 좌/우 배치 */
+    const positionSelect = (
+        <div>
+            <label className={LABEL_CLS}>표시 위치</label>
+            <select
+                value={field.position ?? 'right'}
+                onChange={e => onChange({ position: e.target.value as 'left' | 'right' })}
+                className={INPUT_CLS}
+            >
+                <option value="right">오른쪽</option>
+                <option value="left">왼쪽</option>
+            </select>
+        </div>
+    );
+
+    return <>{body}{positionSelect}</>;
 }
 
 /* ══════════════════════════════════════════ */

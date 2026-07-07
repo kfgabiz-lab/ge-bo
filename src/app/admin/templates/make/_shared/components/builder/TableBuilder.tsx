@@ -31,6 +31,7 @@ import {
     MaskField,
     BooleanTextField,
     ActionsField,
+    TableButtonField,
     SlugSelectField,
     DateRangeStatusColumnField,
     InlineEditField,
@@ -79,6 +80,7 @@ const CELL_TYPES: { type: CellType; label: string; desc: string }[] = [
     { type: 'date',             label: 'Date',             desc: '날짜/시간 포맷 표시' },
     { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 (이전/포함/이후)' },
     { type: 'inlineEdit',       label: 'InlineEdit',       desc: '즉시 수정 (토글/체크박스/라디오)' },
+    { type: 'button',           label: '버튼',              desc: '클릭 버튼 — 페이지이동/팝업/윈도우팝업' },
 ];
 
 /* CUSTOM_ACTION_COLORS — 하위 호환 re-export (TableCellRenderer 등에서 참조 가능) */
@@ -132,6 +134,7 @@ function SortableColumnItem({
         col.cellType === 'date'             ? 'bg-violet-100 text-violet-600' :
         col.cellType === 'dateRangeStatus'  ? 'bg-teal-100 text-teal-600' :
         col.cellType === 'inlineEdit'       ? 'bg-indigo-100 text-indigo-600' :
+        col.cellType === 'button'           ? 'bg-cyan-100 text-cyan-600' :
         'bg-slate-200 text-slate-600';
 
     return (
@@ -260,16 +263,19 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
             falseText:      '비공개',
             width:          type === 'actions' ? 120 : 150,
             widthUnit:      'px',
-            align:          type === 'actions' ? 'center' : 'left',
-            sortable:       type !== 'actions',
+            align:          type === 'actions' || type === 'button' ? 'center' : 'left',
+            sortable:       type !== 'actions' && type !== 'button',
             badgeShape:     'round',
             showIcon:       false,
             displayAs:      'text',
             actions:        type === 'actions'    ? ['edit', 'detail', 'delete'] : undefined,
             cellOptions:    type === 'badge'      ? [{ text: '', value: '', color: 'slate' }] : undefined,
             inlineEditType: type === 'inlineEdit' ? 'toggle' : undefined,
+            /* button 전용 기본값 */
+            buttonColor:    type === 'button' ? 'slate' : undefined,
+            connType:       type === 'button' ? 'page'  : undefined,
         });
-        if (type === 'actions') loadLayerTemplates();
+        if (type === 'actions' || type === 'button') loadLayerTemplates();
     };
 
     /**
@@ -283,6 +289,8 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
         if (!p.accessor?.trim()) return false;
         /* inlineEdit: 저장 경로 필수 */
         if (p.cellType === 'inlineEdit' && !p.inlineEditFieldKey?.trim()) return false;
+        /* button: 버튼 라벨 필수 */
+        if (p.cellType === 'button' && !p.buttonLabel?.trim()) return false;
         return true;
     };
 
@@ -329,6 +337,14 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 inlineEditType:     p.cellType === 'inlineEdit' ? (p.inlineEditType ?? 'toggle') : undefined,
                 options:            p.cellType === 'inlineEdit' ? p.options : undefined,
                 inlineEditFieldKey: p.cellType === 'inlineEdit' ? p.inlineEditFieldKey?.trim() : undefined,
+                /* button 전용 */
+                buttonLabel:       p.cellType === 'button' ? p.buttonLabel?.trim() : undefined,
+                buttonColor:       p.cellType === 'button' ? (p.buttonColor ?? 'slate') : undefined,
+                connType:          p.cellType === 'button' ? (p.connType ?? 'page') : undefined,
+                targetSlug:        p.cellType === 'button' ? p.targetSlug : undefined,
+                conditionParam:    p.cellType === 'button' ? p.conditionParam : undefined,
+                passParam:         p.cellType === 'button' ? p.passParam : undefined,
+                windowPopupOption: p.cellType === 'button' && p.connType === 'windowPopup' ? p.windowPopupOption : undefined,
             }],
         });
         setPendingCol(null);
@@ -352,6 +368,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
                 {col.cellType === 'dateRangeStatus'  && <DateRangeStatusColumnField values={col} onChange={patch} />}
                 {col.cellType === 'inlineEdit'       && <InlineEditField            values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
+                {col.cellType === 'button'           && <TableButtonField           values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
             </div>
         );
     };
@@ -445,7 +462,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                 isEditing={editingColumnId === col.id}
                                 onToggleEdit={() => {
                                     setEditingColumnId(editingColumnId === col.id ? null : col.id);
-                                    if (col.cellType === 'actions') loadLayerTemplates();
+                                    if (col.cellType === 'actions' || col.cellType === 'button') loadLayerTemplates();
                                 }}
                                 onRemove={() => removeColumn(col.id)}
                             >
@@ -544,6 +561,14 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                         codeGroups={codeGroups}
                                         codeGroupsLoading={false}
+                                    />
+                                )}
+                                {pendingCol.cellType === 'button' && (
+                                    <TableButtonField
+                                        values={pendingCol}
+                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
+                                        layerTemplates={layerTemplates}
+                                        onRequestLayerTemplates={loadLayerTemplates}
                                     />
                                 )}
 

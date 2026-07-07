@@ -6,7 +6,7 @@
  * - preview: 샘플 데이터 표시 (rowIndex 기반 순환, 클릭 없음)
  * - live: 실 데이터 + 액션 핸들러 연결 ([slug]/page.tsx renderCell 대체)
  *
- * 지원 셀 타입: text | badge | boolean | actions | file
+ * 지원 셀 타입: text | badge | boolean | actions | file | date | dateRangeStatus | inlineEdit | button
  *
  * 사용법:
  *   // preview
@@ -22,6 +22,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
 import { evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel, applyMask } from '../../utils';
+import { CUSTOM_ACTION_COLORS } from '../builder/fields/col-types';
 
 /* ────────────────────────────────────────────────────────── */
 /*  색상 정적 맵 (Tailwind purge 방지 — 동적 문자열 사용 금지) */
@@ -148,6 +149,29 @@ export function TableCellRenderer({
                             <Trash2 className="w-3.5 h-3.5" />
                         </button>
                     )}
+                </div>
+            );
+        }
+
+        /* ── button ── */
+        case 'button': {
+            const justifyCls =
+                col.align === 'center' ? 'justify-center' :
+                col.align === 'right'  ? 'justify-end'    : 'justify-start';
+
+            /* 버튼은 클릭 시 이동 대상 유효성을 사전 검증하지 않는 것과 마찬가지로,
+               노출 여부도 조건으로 판단하지 않고 항상 노출한다 */
+            const colorDef = CUSTOM_ACTION_COLORS.find(c => c.value === (col.buttonColor ?? 'slate')) ?? CUSTOM_ACTION_COLORS[0];
+
+            return (
+                <div className={`flex ${justifyCls}`}>
+                    <button
+                        type="button"
+                        onClick={!isPreview ? () => handlers?.onButtonClick?.(col, row) : undefined}
+                        className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${colorDef.cls}`}
+                    >
+                        {col.buttonLabel || '버튼'}
+                    </button>
                 </div>
             );
         }

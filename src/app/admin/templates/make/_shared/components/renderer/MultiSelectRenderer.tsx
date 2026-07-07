@@ -99,6 +99,45 @@ function buildLabel(item: OptionItem, labelFields: string): string {
         .join(' > ');
 }
 
+/**
+ * 추가 입력 필드 그룹(좌/우 한쪽) 렌더링
+ * 그룹 내부에서만 idx>0일 때 필드 사이 구분선을 표시한다.
+ */
+function renderExtraFieldGroup(
+    fields: MultiSelectExtraField[],
+    itemVals: Record<string, string>,
+    optId: number,
+    isPreview: boolean,
+    onExtraFieldChange?: (itemId: number, fieldId: string, value: string) => void,
+) {
+    return fields.map((ef, idx) => (
+        <React.Fragment key={ef.id}>
+            {/* 필드 사이 구분선 */}
+            {idx > 0 && (
+                <div className="w-px h-4 bg-slate-200 shrink-0" />
+            )}
+            <div className={`shrink-0 ${
+                /* radio/checkbox는 auto, input/select/date는 고정 폭 */
+                ef.type === 'radio' || ef.type === 'checkbox'
+                    ? 'min-w-fit'
+                    : 'w-[120px]'
+            }`}>
+                {/* FieldRenderer — placeholder에 label 대체 */}
+                <FieldRenderer
+                    mode={isPreview ? 'preview' : 'live'}
+                    field={{
+                        ...toFieldConfig(ef),
+                        /* input/select/date는 placeholder로 label 표시 */
+                        placeholder: ef.placeholder ?? ef.label,
+                    }}
+                    value={isPreview ? '' : (itemVals[ef.key] ?? '')}
+                    onChange={v => onExtraFieldChange?.(optId, ef.key, v)}
+                />
+            </div>
+        </React.Fragment>
+    ));
+}
+
 export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, extraFieldValues = {}, onExtraFieldChange }: MultiSelectRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
@@ -260,11 +299,14 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
                     )}
                 </div>
 
-                {/* 선택된 항목 목록 — 항목명 + 추가 필드 1줄 배치 */}
+                {/* 선택된 항목 목록 — [좌측 필드][항목명][우측 필드][X버튼] 1줄 배치 */}
                 {selectedOptions.length > 0 && (
                     <div className="flex flex-col gap-1.5">
                         {selectedOptions.map(opt => {
-                            const hasExtra = (widget.extraFields?.length ?? 0) > 0;
+                            const extraFields = widget.extraFields ?? [];
+                            /* position='left'인 필드만 좌측 그룹, 그 외(right 및 미설정)는 우측 그룹 */
+                            const leftFields  = extraFields.filter(ef => ef.position === 'left');
+                            const rightFields = extraFields.filter(ef => ef.position !== 'left');
                             const itemVals = extraFieldValues[opt.id] ?? {};
 
                             return (
@@ -272,43 +314,26 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
                                     key={opt.id}
                                     className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
                                 >
+                                    {/* 좌측 추가 입력 필드 */}
+                                    {leftFields.length > 0 && renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
+
+                                    {/* 좌측 필드 ↔ 항목명 구분선 */}
+                                    {leftFields.length > 0 && (
+                                        <div className="w-px h-4 bg-slate-300 shrink-0" />
+                                    )}
+
                                     {/* 항목명 — 고정 너비로 잘림 방지 */}
                                     <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
                                         {buildLabel(opt, labelFields)}
                                     </span>
 
-                                    {/* 구분선 */}
-                                    {hasExtra && (
+                                    {/* 항목명 ↔ 우측 필드 구분선 */}
+                                    {rightFields.length > 0 && (
                                         <div className="w-px h-4 bg-slate-300 shrink-0" />
                                     )}
 
-                                    {/* 추가 입력 필드 — 1줄 인라인 배치 */}
-                                    {hasExtra && widget.extraFields!.map((ef, idx) => (
-                                        <React.Fragment key={ef.id}>
-                                            {/* 필드 사이 구분선 */}
-                                            {idx > 0 && (
-                                                <div className="w-px h-4 bg-slate-200 shrink-0" />
-                                            )}
-                                            <div className={`shrink-0 ${
-                                                /* radio/checkbox는 auto, input/select/date는 고정 폭 */
-                                                ef.type === 'radio' || ef.type === 'checkbox'
-                                                    ? 'min-w-fit'
-                                                    : 'w-[120px]'
-                                            }`}>
-                                                {/* FieldRenderer — placeholder에 label 대체 */}
-                                                <FieldRenderer
-                                                    mode={isPreview ? 'preview' : 'live'}
-                                                    field={{
-                                                        ...toFieldConfig(ef),
-                                                        /* input/select/date는 placeholder로 label 표시 */
-                                                        placeholder: ef.placeholder ?? ef.label,
-                                                    }}
-                                                    value={isPreview ? '' : (itemVals[ef.key] ?? '')}
-                                                    onChange={v => onExtraFieldChange?.(opt.id, ef.key, v)}
-                                                />
-                                            </div>
-                                        </React.Fragment>
-                                    ))}
+                                    {/* 우측 추가 입력 필드 */}
+                                    {rightFields.length > 0 && renderExtraFieldGroup(rightFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
 
                                     {/* X버튼 — 오른쪽 끝 고정 */}
                                     <button
