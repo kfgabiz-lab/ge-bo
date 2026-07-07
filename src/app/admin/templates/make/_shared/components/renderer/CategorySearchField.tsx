@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
-import { resolveAccessor } from '../../utils';
+import { resolveAccessor, evalConditionExpr } from '../../utils';
 import type { SearchFieldConfig } from '../../types';
 import type { RendererMode } from './types';
 
@@ -52,8 +52,10 @@ export function CategorySearchField({
     /* ── 배열 참조가 매 렌더마다 바뀌므로 ref로 최신값 유지 ── */
     const depthValueFieldsRef = useRef(field.depthValueFields ?? []);
     const depthTextFieldsRef  = useRef(field.depthTextFields  ?? []);
+    const depthFiltersRef     = useRef(field.depthFilters     ?? []);
     depthValueFieldsRef.current = field.depthValueFields ?? [];
     depthTextFieldsRef.current  = field.depthTextFields  ?? [];
+    depthFiltersRef.current     = field.depthFilters     ?? [];
 
     /* ── 각 depth별 선택된 값 ── */
     const [depthValues, setDepthValues] = useState<string[]>(Array(maxDepth).fill(''));
@@ -79,9 +81,22 @@ export function CategorySearchField({
             /* ref로 최신 경로값 참조 — 의존성 배열에 배열 객체를 넣지 않음 */
             const valueField = depthValueFieldsRef.current[depthIdx] || 'id';
             const textField  = depthTextFieldsRef.current[depthIdx]  || '';
+            const filterExpr = depthFiltersRef.current[depthIdx];
+
+            const rawItems = (res.data?.content ?? []) as unknown[];
+            /* depthFilters 지정 시 raw item(dataJson) 단계에서 먼저 필터 — evalConditionExpr 공통함수 재사용 */
+            const filteredItems = filterExpr
+                ? rawItems.filter((item) => {
+                    const dataJson = (item as { dataJson?: Record<string, unknown> }).dataJson ?? {};
+                    return evalConditionExpr(filterExpr, (key) => {
+                        const v = resolveAccessor(dataJson, key);
+                        return v != null ? String(v) : undefined;
+                    });
+                })
+                : rawItems;
 
             /* CategoryRenderer 동일 패턴: item.dataJson 기준으로 경로 접근 */
-            const items: CategoryItem[] = (res.data?.content ?? []).map((item: unknown) => {
+            const items: CategoryItem[] = filteredItems.map((item) => {
                 const raw      = item as { id: number; dataJson?: Record<string, unknown> };
                 const dataJson = raw.dataJson ?? {};
                 const resolved = resolveAccessor(dataJson, valueField);

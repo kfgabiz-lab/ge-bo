@@ -39,7 +39,7 @@ const fmtSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
         : `${Math.round(bytes / 1024)}KB`;
-import { parseOpt, flattenPageDataItem, evalColumnDataExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel } from '../../utils';
+import { parseOpt, flattenPageDataItem, evalColumnDataExpr, evalConditionExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel } from '../../utils';
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -511,21 +511,24 @@ function SlugOptionSelect({
 }) {
     const [slugOpts, setSlugOpts] = useState<{ value: string; text: string }[]>([]);
 
-    /* optionSlug / optionValueKey / optionTextKey / optionOrderKey / optionOrderDir 변경 시 API fetch */
+    /* optionSlug / optionValueKey / optionTextKey / optionOrderKey / optionOrderDir / optionFilter 변경 시 API fetch */
     useEffect(() => {
         if (!field.optionSlug) return;
         api.get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })
             .then((res) => {
                 const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
-                /* flattenPageDataItem으로 중첩 → flat key 변환 후 옵션 생성 */
-                let opts = rows.map((item) => {
-                    const row = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
-                    return {
-                        value: String(row[field.optionValueKey ?? ''] ?? ''),
-                        text:  String(row[field.optionTextKey ?? ''] ?? ''),
-                        _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
-                    };
-                });
+                /* flattenPageDataItem으로 중첩 → flat key 변환 */
+                const flatRows = rows.map((item) => flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]));
+                /* optionFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용 */
+                const filteredRows = field.optionFilter
+                    ? flatRows.filter((row) => evalConditionExpr(field.optionFilter!, (key) => (key in row) ? String(row[key] ?? '') : undefined))
+                    : flatRows;
+                /* 필터 통과한 행만 옵션 생성 */
+                let opts = filteredRows.map((row) => ({
+                    value: String(row[field.optionValueKey ?? ''] ?? ''),
+                    text:  String(row[field.optionTextKey ?? ''] ?? ''),
+                    _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
+                }));
                 /* optionOrderKey 지정 시 FE에서 정렬 — Value/Text 키와 동일한 flat key 기준 */
                 if (field.optionOrderKey) {
                     const dir = field.optionOrderDir === 'DESC' ? -1 : 1;
@@ -534,7 +537,7 @@ function SlugOptionSelect({
                 setSlugOpts(opts.map(({ value, text }) => ({ value, text })));
             })
             .catch(() => setSlugOpts([]));
-    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir]);
+    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir, field.optionFilter]);
 
     return (
         <div className="relative">
@@ -581,7 +584,7 @@ function SlugAutocompleteInput({
     /* SLUG API에서 fetch한 옵션 목록 ("텍스트:값" 형식) */
     const [slugOpts, setSlugOpts] = useState<string[]>([]);
 
-    /* optionSlug 변경 시 API fetch → 옵션 배열 구성 */
+    /* optionSlug / optionFilter 변경 시 API fetch → 옵션 배열 구성 */
     useEffect(() => {
         if (!field.optionSlug) return;
 
@@ -590,15 +593,19 @@ function SlugAutocompleteInput({
                 const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
 
                 /* flattenPageDataItem으로 중첩 dataJson → flat key 변환 */
-                let opts = rows.map((item) => {
-                    const row = flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]);
-                    return {
-                        value:    String(row[field.optionValueKey ?? ''] ?? ''),
-                        text:     String(row[field.optionTextKey  ?? ''] ?? ''),
-                        /* 정렬 기준 값 (optionOrderKey 지정 시 사용) */
-                        _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
-                    };
-                });
+                const flatRows = rows.map((item) => flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]));
+                /* optionFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용 */
+                const filteredRows = field.optionFilter
+                    ? flatRows.filter((row) => evalConditionExpr(field.optionFilter!, (key) => (key in row) ? String(row[key] ?? '') : undefined))
+                    : flatRows;
+
+                /* 필터 통과한 행만 옵션 생성 */
+                let opts = filteredRows.map((row) => ({
+                    value:    String(row[field.optionValueKey ?? ''] ?? ''),
+                    text:     String(row[field.optionTextKey  ?? ''] ?? ''),
+                    /* 정렬 기준 값 (optionOrderKey 지정 시 사용) */
+                    _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
+                }));
 
                 /* optionOrderKey 지정 시 FE 정렬 */
                 if (field.optionOrderKey) {
@@ -612,7 +619,7 @@ function SlugAutocompleteInput({
                 setSlugOpts(opts.map(({ value, text }) => `${text}:${value}`));
             })
             .catch(() => setSlugOpts([]));
-    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir]);
+    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir, field.optionFilter]);
 
     return (
         <AutocompleteInput

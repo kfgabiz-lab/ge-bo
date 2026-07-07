@@ -127,6 +127,9 @@ export interface SearchFieldConfig {
     depthLabelMsgKeys?: string[];   // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];    // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];     // depth별 selectbox 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+    /** depth별 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
+     *  raw item(dataJson) 단계에서 resolveAccessor 기준으로 평가, 없으면 필터 없이 전체 표시 */
+    depthFilters?: string[];
     /* ── time 전용 ── */
     defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
     timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
@@ -175,6 +178,9 @@ export interface SearchFieldConfig {
     optionOrderKey?: string;
     /** SLUG 데이터 정렬 방향 (ASC / DESC) */
     optionOrderDir?: 'ASC' | 'DESC';
+    /** SLUG 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
+     *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
+    optionFilter?: string;
 }
 
 /** 검색폼 행 설정 */

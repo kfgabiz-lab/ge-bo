@@ -230,10 +230,12 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                 depthLabelMsgKeys: [],
                 depthValueFields: [],
                 depthTextFields: [],
+                depthFilters: [],
                 dbSlug: '',
             }),
         });
     };
+
 
     /** 추가 버튼 비활성화 여부 */
     const isAddDisabled = (): boolean => {
@@ -266,14 +268,14 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultDateOffset, defaultDate, disablePast, defaultToday,
             defaultStartDateOffset, defaultStartDate, disableStartPast,
             defaultEndDateOffset, defaultEndDate, disableEndPast,
-            dbSlug, relationSlugId, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields,
+            dbSlug, relationSlugId, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields, depthFilters,
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
             rangeSubType, dateSubType, singleDateRange,
             /* select 표시 방식 */
             selectType,
             /* select SLUG 옵션 소스 */
-            optionSlug, optionValueKey, optionTextKey, optionOrderKey, optionOrderDir,
+            optionSlug, optionValueKey, optionTextKey, optionOrderKey, optionOrderDir, optionFilter,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -327,6 +329,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             depthLabelMsgKeys: pendingType === 'category' ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
             depthValueFields:  pendingType === 'category' ? (depthValueFields?.length ? depthValueFields : undefined) : undefined,
             depthTextFields:   pendingType === 'category' ? (depthTextFields?.length ? depthTextFields : undefined) : undefined,
+            depthFilters:      pendingType === 'category' ? (depthFilters?.length ? depthFilters : undefined) : undefined,
             /* dateRangeStatus 전용 */
             linkedDateRangeKey: pendingType === 'dateRangeStatus' ? (linkedDateRangeKey?.trim() || undefined) : undefined,
             beforeText:         pendingType === 'dateRangeStatus' ? (beforeText?.trim() || undefined) : undefined,
@@ -347,6 +350,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             optionTextKey:     pendingType === 'select' ? (optionTextKey || undefined) : undefined,
             optionOrderKey:    pendingType === 'select' ? (optionOrderKey || undefined) : undefined,
             optionOrderDir:    pendingType === 'select' ? (optionOrderDir || undefined) : undefined,
+            optionFilter:      pendingType === 'select' ? (optionFilter || undefined) : undefined,
         };
 
         onChange(rows.map(r =>
@@ -546,6 +550,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 depthLabelMsgKeys: field.depthLabelMsgKeys,
                                                                                 depthValueFields:  field.depthValueFields,
                                                                                 depthTextFields:   field.depthTextFields,
+                                                                                depthFilters:      field.depthFilters,
                                                                                 /* dateRangeStatus 전용 */
                                                                                 linkedDateRangeKey:  field.linkedDateRangeKey,
                                                                                 beforeText:          field.beforeText,
@@ -566,6 +571,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 optionTextKey:       field.optionTextKey,
                                                                                 optionOrderKey:      field.optionOrderKey,
                                                                                 optionOrderDir:      field.optionOrderDir,
+                                                                                optionFilter:        field.optionFilter,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

@@ -259,6 +259,9 @@ export interface MultiSelectWidget {
     contentKey: string;
     /** 드롭다운 옵션 목록을 가져올 slug (호출 slug) */
     sourceSlug: string;
+    /** sourceSlug 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
+     *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
+    sourceFilter?: string;
     /** 저장 시 연결되는 slug (연결 slug) */
     connectedSlug: string;
     /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
