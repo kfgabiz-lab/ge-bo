@@ -91,6 +91,8 @@ export interface SearchFieldConfig {
     goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
     dataSaveSlug?: string;                   // 데이터저장 연결 slug (connType='datasave' 전용)
     saveConfirm?: boolean;                   // 저장 컨펌 여부 — true 시 버튼 클릭 시 확인창 표시 (action-button 전용)
+    validationRuleIds?: number[];            // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
+    contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)
     isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
     readonly?: boolean;             // 읽기 전용 여부 (Form 전용)
     // ── 파일/이미지/비디오 전용 ──
@@ -403,4 +405,23 @@ export interface LayerButtonConfig {
     label: string;
     type: LayerButtonType;
     action: LayerButtonAction;
+}
+
+/* ── 데이터 검증 규칙 관련 타입 (widget 빌더 "규칙생성" 기능) ──
+   BE ValidationRule 엔티티/API와 1:1 연동 — slugRegistryId FK로 그룹 개념을 대체한다.
+   목록 조회: GET /validation-rules?slugRegistryId={id}
+   등록/수정/삭제: POST · PUT /validation-rules/{id} · DELETE /validation-rules/{id} */
+
+/**
+ * 검증 규칙 1건 — BE ValidationRuleResponse 기준
+ * - type='unique': 지정한 필드 조합이 중복되지 않도록 검사
+ * - type='maxCount': 조건에 맞는 데이터가 지정 건수를 넘지 않도록 검사
+ */
+export interface ValidationRule {
+    id: number;              // 서버 발급 PK
+    slugRegistryId: number;  // 연결 Slug 레지스트리 FK
+    type: 'unique' | 'maxCount';
+    fields?: string;         // type='unique'일 때 복합키 필드 목록 (콤마구분 문자열, 예: "email,userId")
+    condition?: string;      // 옵션 조건식 (콤마구분 key=value, 예: "status='active'")
+    maxCount?: number;       // type='maxCount'일 때 최대 건수
 }

@@ -1620,8 +1620,10 @@ export async function saveTableRows(opts: {
     dataSaveSlug: string;
     templateSlug?: string;
     paramSave?: string;
+    /** action-button 설정의 검증 규칙 ID 목록 — 행마다 동일하게 적용 */
+    validationRuleIds?: number[];
 }): Promise<number> {
-    const { contentKey, columns, rows, extras, dataSaveSlug, templateSlug, paramSave } = opts;
+    const { contentKey, columns, rows, extras, dataSaveSlug, templateSlug, paramSave, validationRuleIds } = opts;
     let savedCount = 0;
     for (const row of rows) {
         let rowData: Record<string, unknown>;
@@ -1654,6 +1656,7 @@ export async function saveTableRows(opts: {
         await api.post(`/page-data/${dataSaveSlug}`, {
             dataJson: contentKey ? { [contentKey]: rowData } : rowData,
             ...(templateSlug && { templateSlug }),
+            ...(validationRuleIds && validationRuleIds.length > 0 && { validationRuleIds }),
         });
         savedCount++;
     }

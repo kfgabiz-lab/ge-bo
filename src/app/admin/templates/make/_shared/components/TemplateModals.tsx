@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, Save, FolderOpen, Zap, Loader2, Pencil, ChevronDown } from 'lucide-react';
-import { TemplateItem } from '../types';
-import { btnSecondary } from '../styles';
+import { X, Save, FolderOpen, Zap, Loader2, Pencil, ChevronDown, ShieldCheck, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { TemplateItem, ValidationRule } from '../types';
+import { btnSecondary, inputCls, selectCls } from '../styles';
 import api from '@/lib/api';
 
 /* ══════════════════════════════════════════ */
@@ -452,6 +453,256 @@ export const GenerateModal = ({
                         {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
                         {isGenerating ? '생성 중...' : '생성'}
                     </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+/* ══════════════════════════════════════════ */
+/*  검증 규칙 생성 모달                        */
+/* ══════════════════════════════════════════ */
+
+interface RuleCreateModalProps {
+    show: boolean;
+    onClose: () => void;
+    /** 연결 Slug 드롭다운 옵션 */
+    slugOptions: { id: number; slug: string; name: string }[];
+}
+
+/**
+ * 검증 규칙 생성 모달 — BE ValidationRule API 직접 연동(자기완결형)
+ * - 연결 Slug 1개를 선택하면 해당 slug의 검증 규칙(unique/maxCount) 목록을 서버에서 조회
+ * - "규칙추가"로 저장 안 된 새 행을 만들고, 행별 저장 버튼으로 개별 등록/수정
+ * - 삭제 버튼은 저장된 규칙이면 즉시 API 호출, 저장 전 임시 행이면 로컬에서만 제거
+ * @example
+ * <RuleCreateModal show={showRuleModal} onClose={() => setShowRuleModal(false)} slugOptions={slugOptions} />
+ */
+export const RuleCreateModal = ({ show, onClose, slugOptions }: RuleCreateModalProps) => {
+    /* 선택된 연결 Slug — slug_registry PK */
+    const [slugRegistryId, setSlugRegistryId] = useState<number | null>(null);
+    /* 조회된 규칙 목록 — id=0인 행은 아직 저장 안 된 새 행 */
+    const [rules, setRules] = useState<ValidationRule[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    /* 저장 진행 중인 행의 배열 index (동시에 하나만 저장 가능) */
+    const [savingIndex, setSavingIndex] = useState<number | null>(null);
+
+    /* 모달이 열릴 때마다 선택값 초기화 */
+    useEffect(() => {
+        if (!show) return;
+        setSlugRegistryId(null);
+        setRules([]);
+    }, [show]);
+
+    /* 연결 Slug 변경 시 해당 slug의 검증 규칙 목록 재조회 */
+    useEffect(() => {
+        if (!slugRegistryId) { setRules([]); return; }
+        setIsLoading(true);
+        api.get('/validation-rules', { params: { slugRegistryId } })
+            .then(res => setRules(res.data ?? []))
+            .catch(() => setRules([]))
+            .finally(() => setIsLoading(false));
+    }, [slugRegistryId]);
+
+    if (!show) return null;
+
+    /* "규칙추가" — 저장 안 된 새 행을 로컬 목록 끝에 추가 (id=0으로 신규 표시) */
+    const addRule = () => {
+        if (!slugRegistryId) return;
+        setRules(prev => [...prev, { id: 0, slugRegistryId, type: 'unique', fields: '', condition: '' }]);
+    };
+
+    /* 특정 행 값 변경 (로컬 상태만 — 저장 버튼을 눌러야 서버에 반영) */
+    const updateRule = (idx: number, patch: Partial<ValidationRule>) => {
+        setRules(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
+    };
+
+    /* 특정 행 저장 — id=0(신규)이면 POST, 있으면 PUT */
+    const saveRule = async (idx: number) => {
+        if (!slugRegistryId) return;
+        const rule = rules[idx];
+
+        /* 필수값 검증 — 타입별 필수 입력 누락 시 저장 중단 */
+        if (rule.type === 'unique' && !rule.fields?.trim()) {
+            toast.error('중복방지 규칙은 필드 조합을 입력해주세요.');
+            return;
+        }
+        if (rule.type === 'maxCount' && !rule.maxCount) {
+            toast.error('최대건수 규칙은 최대 건수를 입력해주세요.');
+            return;
+        }
+
+        setSavingIndex(idx);
+        try {
+            const body = {
+                slugRegistryId,
+                type: rule.type,
+                fields: rule.type === 'unique' ? (rule.fields ?? '') : undefined,
+                condition: rule.condition || undefined,
+                maxCount: rule.type === 'maxCount' ? rule.maxCount : undefined,
+            };
+            if (rule.id) {
+                const res = await api.put(`/validation-rules/${rule.id}`, body);
+                setRules(prev => prev.map((r, i) => i === idx ? res.data : r));
+                toast.success('검증 규칙이 수정되었습니다.');
+            } else {
+                const res = await api.post('/validation-rules', body);
+                setRules(prev => prev.map((r, i) => i === idx ? res.data : r));
+                toast.success('검증 규칙이 등록되었습니다.');
+            }
+        } catch {
+            toast.error('검증 규칙 저장에 실패했습니다.');
+        } finally {
+            setSavingIndex(null);
+        }
+    };
+
+    /* 특정 행 삭제 — 저장된 행(id 있음)은 확인 후 API 호출, 신규 행은 로컬에서만 제거 */
+    const removeRule = async (idx: number) => {
+        const rule = rules[idx];
+        if (rule.id) {
+            if (!confirm('삭제하시겠습니까?')) return;
+            try {
+                await api.delete(`/validation-rules/${rule.id}`);
+                toast.success('삭제되었습니다.');
+            } catch {
+                toast.error('삭제에 실패했습니다.');
+                return;
+            }
+        }
+        setRules(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+                {/* 헤더 */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-slate-500" />검증 규칙 생성
+                    </h2>
+                    <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 transition-all">
+                        <X className="w-4 h-4 text-slate-500" />
+                    </button>
+                </div>
+
+                {/* 본문 */}
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+
+                    {/* 연결 Slug 선택 */}
+                    <div className="space-y-0.5">
+                        <label className="text-[11px] font-medium text-slate-500 block">연결 Slug</label>
+                        <select
+                            value={slugRegistryId ?? ''}
+                            onChange={e => setSlugRegistryId(e.target.value ? Number(e.target.value) : null)}
+                            className={selectCls}
+                        >
+                            <option value="">선택하세요</option>
+                            {slugOptions.map(s => (
+                                <option key={s.id} value={s.id}>{s.name} ({s.slug})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* 연결 Slug 선택 후에만 규칙 목록 노출 */}
+                    {slugRegistryId && (
+                        <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            {isLoading ? (
+                                <div className="flex items-center justify-center py-6">
+                                    <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                                </div>
+                            ) : rules.length === 0 ? (
+                                <p className="text-xs text-slate-400 text-center py-4">등록된 검증 규칙이 없습니다.</p>
+                            ) : null}
+
+                            {rules.map((rule, idx) => (
+                                <div key={rule.id || `new-${idx}`} className="border border-slate-200 rounded-md p-2 space-y-1.5 bg-slate-50/50">
+                                    <div className="flex items-center gap-1.5">
+                                        <select
+                                            value={rule.type}
+                                            onChange={e => updateRule(idx, { type: e.target.value as ValidationRule['type'] })}
+                                            className={`${selectCls} !py-1.5 !text-xs`}
+                                        >
+                                            <option value="unique">중복 방지(unique)</option>
+                                            <option value="maxCount">최대 건수 제한(maxCount)</option>
+                                        </select>
+                                        {/* 행 저장 */}
+                                        <button
+                                            onClick={() => saveRule(idx)}
+                                            disabled={savingIndex === idx}
+                                            title="저장"
+                                            className="p-1.5 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-all flex-shrink-0 disabled:opacity-50"
+                                        >
+                                            {savingIndex === idx ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                        </button>
+                                        {/* 행 삭제 */}
+                                        <button
+                                            onClick={() => removeRule(idx)}
+                                            title="삭제"
+                                            className="p-1.5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+
+                                    {/* type='unique' 전용 — 복합키 필드 조합 (콤마 구분) + 조건식(콤마 구분 key=value, 암묵적 AND) */}
+                                    {rule.type === 'unique' && (
+                                        <>
+                                            <input
+                                                type="text"
+                                                placeholder="필드 조합 (예: title 또는 form1.title — 컨텐츠 위젯 내부 필드는 contentKey.fieldKey)"
+                                                value={rule.fields ?? ''}
+                                                onChange={e => updateRule(idx, { fields: e.target.value })}
+                                                className={`${inputCls} !py-1.5 !text-xs`}
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="예: status='active' 또는 form1.status='active'"
+                                                value={rule.condition ?? ''}
+                                                onChange={e => updateRule(idx, { condition: e.target.value })}
+                                                className={`${inputCls} !py-1.5 !text-xs`}
+                                            />
+                                        </>
+                                    )}
+
+                                    {/* type='maxCount' 전용 — 조건식(콤마 구분 key=value, 암묵적 AND) + 최대 건수 */}
+                                    {rule.type === 'maxCount' && (
+                                        <>
+                                            <input
+                                                type="text"
+                                                placeholder="예: status='active' 또는 form1.status='active'"
+                                                value={rule.condition ?? ''}
+                                                onChange={e => updateRule(idx, { condition: e.target.value })}
+                                                className={`${inputCls} !py-1.5 !text-xs`}
+                                            />
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                placeholder="최대 건수"
+                                                value={rule.maxCount ?? ''}
+                                                onChange={e => updateRule(idx, { maxCount: Number(e.target.value) || undefined })}
+                                                className={`${inputCls} !py-1.5 !text-xs`}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+
+                            {/* 규칙 추가 버튼 */}
+                            <button
+                                onClick={addRule}
+                                className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
+                            >
+                                <Plus className="w-3 h-3" />규칙추가
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* 푸터 */}
+                <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200 bg-slate-50/50 rounded-b-xl">
+                    <button onClick={onClose} className={btnSecondary}>닫기</button>
                 </div>
             </div>
         </div>

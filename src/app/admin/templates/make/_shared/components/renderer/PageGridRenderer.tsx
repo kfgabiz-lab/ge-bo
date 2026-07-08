@@ -81,8 +81,8 @@ interface PageGridRendererProps {
     formValuesMap?: Record<string, Record<string, string>>;
     /** (widgetId, fieldId, value) 형태로 호출 */
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, resolvedFormValuesMap?: Record<string, Record<string, string>>) => void;
-    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string) => void;
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, resolvedFormValuesMap?: Record<string, Record<string, string>>, contentValidationRuleIds?: Record<string, number[]>) => void;
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;
@@ -386,7 +386,7 @@ export function PageGridRenderer({
                                         allFieldKeyToId={allFieldKeyToId}
                                         urlParams={urlParams}
                                         crossTabFormValues={crossTabFormValues}
-                                        onContentAction={(widgetIds, action, goBack) => onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap)}
+                                        onContentAction={(widgetIds, action, goBack, contentValidationRuleIds?: Record<string, number[]>) => onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap, contentValidationRuleIds)}
                                         onDataSave={onDataSave}
                                         onClose={onClose}
                                         /* SubList */

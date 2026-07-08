@@ -884,6 +884,8 @@ export function useWidgetPageState(
       action: "save" | "delete",
       goBackAfterAction?: boolean,
       resolvedFormValuesMap?: Record<string, Record<string, string>>,
+      /** action-button 설정의 위젯별 검증 규칙 ID 맵 (key=위젯ID) — connType='content' 전용 */
+      contentValidationRuleIds?: Record<string, number[]>,
     ) => {
       /* resolvedFormValuesMap: PageGridRenderer가 crossTab 값 병합 후 전달 — 없으면 내부 formValuesMap 사용 */
       const mapToUse = resolvedFormValuesMap ?? formValuesMap;
@@ -994,6 +996,13 @@ export function useWidgetPageState(
           const [connectedSlug, widgets] = slugGroups[groupIdx];
           const isFirstSlugGroup = groupIdx === 0;
           const newFileIdsByFieldId: Record<string, number[]> = {};
+
+          /* 이 slug 그룹에 속한 위젯들의 검증 규칙 ID를 모두 모아 중복 제거 — 위젯별로 각각 설정된 규칙이 있을 수 있음 */
+          const groupValidationRuleIds = contentValidationRuleIds
+            ? [...new Set(
+                widgets.flatMap((w) => contentValidationRuleIds[(w as { widgetId: string }).widgetId] ?? []),
+              )]
+            : [];
 
           /* 1. 파일 업로드 */
           for (const w of widgets) {
@@ -1132,6 +1141,7 @@ export function useWidgetPageState(
             await api.put(`/page-data/${connectedSlug}/${slugStoredId}`, {
               dataJson: finalDataJson,
               ...(pageSlug && { templateSlug: pageSlug }),
+              ...(groupValidationRuleIds.length > 0 && { validationRuleIds: groupValidationRuleIds }),
             });
             savedDataId = slugStoredId;
           } else {
@@ -1140,6 +1150,7 @@ export function useWidgetPageState(
               ...(pkKeys.length > 0 && { pkKeys }),
               ...(groupId && { groupId }),
               ...(pageSlug && { templateSlug: pageSlug }),
+              ...(groupValidationRuleIds.length > 0 && { validationRuleIds: groupValidationRuleIds }),
             });
             savedDataId = res.data.id;
             /* group_id가 새로 생성된 경우 상태에 저장 */
@@ -1240,9 +1251,9 @@ export function useWidgetPageState(
         markClean();
         if (goBackAfterAction) options?.onGoBack?.();
       } catch (err: unknown) {
-        const status = (err as { response?: { status?: number } })?.response?.status;
-        if (action === "save" && status === 409) {
-          toast.error("이미 동일한 키 값의 데이터가 존재합니다.");
+        const response = (err as { response?: { status?: number; data?: { message?: string } } })?.response;
+        if (action === "save" && response?.status === 409) {
+          toast.error(response.data?.message || "이미 동일한 키 값의 데이터가 존재합니다.");
         } else {
           toast.error(
             action === "save" ? "저장 중 오류가 발생했습니다." : "삭제 중 오류가 발생했습니다."
@@ -1278,6 +1289,8 @@ export function useWidgetPageState(
       dataSaveSlug: string,
       goBackAfterAction?: boolean,
       paramSave?: string,
+      /** action-button 설정의 검증 규칙 ID 목록 — connType='datasave' 전용, 요청 바디에 그대로 포함 */
+      validationRuleIds?: number[],
     ) => {
       if (!dataSaveSlug) return;
       const allFlat = flatWidgets(widgetItems);
@@ -1348,6 +1361,7 @@ export function useWidgetPageState(
             dataJson,
             ...(pkKeys.length > 0 && { pkKeys }),
             ...(pageSlug && { templateSlug: pageSlug }),
+            ...(validationRuleIds && validationRuleIds.length > 0 && { validationRuleIds }),
           });
 
           if (allNewIds.length > 0 && res.data.id) {
@@ -1377,6 +1391,7 @@ export function useWidgetPageState(
             dataSaveSlug,
             templateSlug: pageSlug,
             paramSave,
+            validationRuleIds,
           });
           if (saved > 0) anySaved = true;
         }

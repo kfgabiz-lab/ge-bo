@@ -20,6 +20,7 @@ import { SlugSelectField } from './fields';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
 import { ParamWithSaveField } from './ParamWithSaveField';
+import { useSlugRelations } from '../../hooks/useSlugRelations';
 import type { CategoryWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 
@@ -36,6 +37,8 @@ export interface CategoryBuilderProps {
 
 export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWidgets = [], pageTemplates = [] }: CategoryBuilderProps) {
     const { i18nMode } = useBuilderI18nMode();
+    /** slug-relation 전체 목록 — 연결 Slug(FETCH 방향) 후보로 사용 */
+    const slugRelationOptions = useSlugRelations();
     /** 상위로 연결 가능한 위젯 목록 — 자기 자신 제외, depth가 더 낮은 것만 */
     const parentCandidates = categoryWidgets.filter(
         w => w.widgetId !== widget.widgetId && w.depth < widget.depth
@@ -234,6 +237,27 @@ export function CategoryBuilder({ widget, onChange, slugOptions = [], categoryWi
                     />
                 )}
             </div>
+
+            {/* 연결 Slug — depth 2+ 전용. slug-relation(FETCH 방향) 관계 선택.
+                설정 시 등록 팝업에서 행선택 저장 성공 직후 { depth, parentId, refId } 를 이 위젯 dbSlug에 추가 저장한다. */}
+            {widget.depth > 1 && (
+                <div>
+                    <SlugSelectField
+                        label="연결 Slug"
+                        value={String(widget.relationSlugId ?? '')}
+                        onChange={slug => onChange({ ...widget, relationSlugId: slug ? Number(slug) : undefined })}
+                        slugOptions={slugRelationOptions
+                            .filter(r => r.relationDir === 'FETCH')   /* FETCH 방향만 후보로 노출 (FILTER 관계 제외) */
+                            .map(r => ({
+                                id: r.id,
+                                slug: String(r.id),
+                                name: r.description ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})` : `${r.masterSlug} → ${r.slaveSlug}`,
+                            }))}
+                        formatDisplay={opt => opt.name}
+                        emptyLabel="연동 없음"
+                    />
+                </div>
+            )}
 
             {/* 수정 연결 — 토글 ON 시 카드 hover에 수정 버튼 표시 */}
             <div>

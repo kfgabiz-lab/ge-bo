@@ -15,7 +15,7 @@ import {
     Plus, Trash2, X, Save, Wand2,
     Search as SearchIcon, Table2, FileText,
     AlignLeft, Layers, List, CheckSquare,
-    GripVertical, PanelTop,
+    GripVertical, PanelTop, ShieldCheck,
 } from 'lucide-react';
 
 import {
@@ -43,7 +43,7 @@ import { createIdGenerator, toSlug } from '../_shared/utils';
 import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
 import type { SearchFieldType } from '../_shared/types';
 import PageLayout from '@/components/layout/page-layout';
-import { SaveModal } from '../_shared/components/TemplateModals';
+import { SaveModal, RuleCreateModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
 import { TemplateItem } from '../_shared/types';
 import { toast } from 'sonner';
@@ -196,6 +196,13 @@ export default function PageBuilderPage() {
     /* ── 컨텐츠 추가 플로우 (타입 선택 → 생성, col/row는 생성 후 패널에서 수정) ── */
     const [addingContentToItemId, setAddingContentToItemId] = useState<string | null>(null);
 
+    /* ── 레거시 다중위젯 템플릿 여부 — 불러왔을 때 이미 위젯이 2개 이상이었던 템플릿만 true.
+       신규 템플릿(기본값 false)과 원래 1개였던 템플릿은 위젯 셀 1개 제한이 계속 적용된다. ── */
+    const [isLegacyMultiWidget, setIsLegacyMultiWidget] = useState(false);
+
+    /* ── 검증 규칙 생성 — BE ValidationRule API와 직접 연동하는 RuleCreateModal(자기완결형)을 여닫는 상태만 관리 ── */
+    const [showRuleModal, setShowRuleModal] = useState(false); // 검증 규칙 생성 모달 표시 여부
+
     /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
     const tm = useTemplateManagement('PAGE');
 
@@ -236,12 +243,16 @@ export default function PageBuilderPage() {
     const handleLoadSelect = (tpl: TemplateItem) => {
         try {
             const config = JSON.parse(tpl.configJson);
-            setWidgetItems(config.widgetItems || []);
+            const loadedWidgetItems = config.widgetItems || [];
+            setWidgetItems(loadedWidgetItems);
+            /* 불러왔을 때 이미 위젯이 2개 이상이었던 템플릿만 레거시로 인정 → 계속 자유롭게 추가/삭제 허용 */
+            setIsLegacyMultiWidget(loadedWidgetItems.length >= 2);
             om.restore(config);
             setEditingItemId(null);
             setEditingContentId(null);
             setShowAddWidget(false);
             setAddingContentToItemId(null);
+            setShowRuleModal(false);
             tm.onLoadSuccess(tpl); /* 공통: currentTemplateId/Name 업데이트 + 드롭다운 닫기 + toast */
         } catch {
             import('sonner').then(({ toast }) => toast.error('설정 파일 파싱에 실패했습니다.'));
@@ -708,6 +719,16 @@ export default function PageBuilderPage() {
                 {/* ════════════════════════════════ */}
                 <div className="bg-white border border-slate-200 rounded-xl sticky top-4">
 
+                    {/* 검증 규칙 생성 — 버튼 클릭 시 RuleCreateModal(자기완결형, BE API 직접 연동)이 열린다. */}
+                    <div className="px-3 pt-3 pb-1">
+                        <button
+                            onClick={() => setShowRuleModal(true)}
+                            className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-500 bg-white hover:border-slate-400 hover:text-slate-700 transition-all"
+                        >
+                            <ShieldCheck className="w-3.5 h-3.5" />규칙생성
+                        </button>
+                    </div>
+
                     {/* 불러오기 드롭다운 */}
                     <TemplateLoader
                         {...tm}
@@ -933,46 +954,51 @@ export default function PageBuilderPage() {
                             </SortableContext>
                         </DndContext>
 
-                        {/* ── 위젯 추가 플로우 (row/col 입력만) ── */}
-                        {showAddWidget ? (
-                            <div className="border border-slate-200 rounded-lg p-3 bg-white space-y-2.5">
-                                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">위젯 크기 설정</p>
-                                <div className="flex items-center gap-2">
-                                    <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Row 수</label>
-                                    <input
-                                        type="number" min={1} max={20} value={addRowSpan}
-                                        onChange={e => setAddRowSpan(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
-                                        autoFocus
-                                    />
+                        {/* ── 위젯 추가 플로우 (row/col 입력만) ──
+                             위젯이 하나도 없을 때는 항상 노출, 1개 이상 생긴 후에는
+                             레거시 다중위젯 템플릿(불러왔을 때 이미 2개 이상)일 때만 계속 노출 */}
+                        {(widgetItems.length === 0 || isLegacyMultiWidget) && (
+                            showAddWidget ? (
+                                <div className="border border-slate-200 rounded-lg p-3 bg-white space-y-2.5">
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">위젯 크기 설정</p>
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Row 수</label>
+                                        <input
+                                            type="number" min={1} max={20} value={addRowSpan}
+                                            onChange={e => setAddRowSpan(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Col 수</label>
+                                        <input
+                                            type="number" min={1} max={12} value={addColSpan}
+                                            onChange={e => setAddColSpan(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
+                                        />
+                                    </div>
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            onClick={() => { setShowAddWidget(false); setAddRowSpan(1); setAddColSpan(12); }}
+                                            className="flex-1 py-1.5 text-xs border border-slate-200 rounded text-slate-500 hover:bg-slate-50 transition-all"
+                                        >취소</button>
+                                        <button
+                                            onClick={confirmAddWidget}
+                                            className="flex-1 py-1.5 text-xs bg-slate-900 text-white rounded hover:bg-slate-700 transition-all font-medium"
+                                        >추가</button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Col 수</label>
-                                    <input
-                                        type="number" min={1} max={12} value={addColSpan}
-                                        onChange={e => setAddColSpan(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
-                                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
-                                    />
-                                </div>
-                                <div className="flex gap-1.5">
-                                    <button
-                                        onClick={() => { setShowAddWidget(false); setAddRowSpan(1); setAddColSpan(12); }}
-                                        className="flex-1 py-1.5 text-xs border border-slate-200 rounded text-slate-500 hover:bg-slate-50 transition-all"
-                                    >취소</button>
-                                    <button
-                                        onClick={confirmAddWidget}
-                                        className="flex-1 py-1.5 text-xs bg-slate-900 text-white rounded hover:bg-slate-700 transition-all font-medium"
-                                    >추가</button>
-                                </div>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => { setEditingItemId(null); setEditingContentId(null); setShowAddWidget(true); }}
-                                className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
-                            >
-                                <Plus className="w-3.5 h-3.5" />위젯 추가
-                            </button>
+                            ) : (
+                                <button
+                                    onClick={() => { setEditingItemId(null); setEditingContentId(null); setShowAddWidget(true); }}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />위젯 추가
+                                </button>
+                            )
                         )}
+
                     </div>
                 </div>
 
@@ -1052,6 +1078,13 @@ export default function PageBuilderPage() {
                 onDescChange={tm.setSaveModalDesc}
                 onConfirm={handleSaveConfirm}
                 toSlug={toSlug}
+            />
+
+            {/* ── 검증 규칙 생성 모달 ── */}
+            <RuleCreateModal
+                show={showRuleModal}
+                onClose={() => setShowRuleModal(false)}
+                slugOptions={slugOptions}
             />
         </div>
     );

@@ -408,6 +408,11 @@ export function WidgetRenderer({
     const [popupTableSelectedRowsMap, setPopupTableSelectedRowsMap] = useState<Record<string, number[]>>({});
     /* paramSave extras — 폼에 없는 파라미터 임시 보관 (저장 버튼 클릭 시 dataJson에 병합) */
     const [popupParamSaveExtras, setPopupParamSaveExtras] = useState<Record<string, unknown>>({});
+    /* 카테고리 등록(datasave) 팝업 컨텍스트 — relationSlugId 설정된 depth2+ 위젯의 등록 팝업일 때만 값 존재.
+     * 팝업 내 테이블 행선택 저장 성공 직후 { depth, parentId, refId } 경량 row를 카테고리 dbSlug에 추가 저장할 때 사용 */
+    const [popupCategoryLinkCtx, setPopupCategoryLinkCtx] = useState<{
+        relationSlugId: number; dbSlug: string; depth: number; parentId: number | null;
+    } | null>(null);
 
     /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 ──
      * 최신 상태를 ref로 유지하고 _hiddenLogCallbacks에 콜백 등록 */
@@ -540,6 +545,7 @@ export function WidgetRenderer({
         setPopupMultiSelectValuesMap({});
         setPopupTableSelectedRowsMap({});
         setPopupParamSaveExtras({});
+        setPopupCategoryLinkCtx(null);
     }, []);
 
     /**
@@ -549,6 +555,8 @@ export function WidgetRenderer({
      * @param _listSlug     미사용 (각자 slug 독립 정책 — 팝업 폼의 connectedSlug 직접 사용)
      * @param initialValues 초기값 맵 — fieldKey 기준으로 폼 필드에 매핑 (파라미터 전달용)
      * @param groupId       다중 slug 저장 그룹 ID — page 이동 시 ?group_id=uuid 파라미터로 전달
+     * @param categoryLinkCtx 카테고리 등록(datasave) 팝업 컨텍스트 — relationSlugId 설정된 depth2+ 카테고리 위젯의
+     *                        등록 팝업일 때만 전달. 팝업 내 테이블 저장 성공 직후 연결 row 추가 저장에 사용
      */
     const handleInternalPopupOpen = useCallback(async (
         slug: string,
@@ -557,6 +565,7 @@ export function WidgetRenderer({
         initialValues?: Record<string, string>,
         groupId?: string | null,
         paramSave?: boolean,
+        categoryLinkCtx?: { relationSlugId: number; dbSlug: string; depth: number; parentId: number | null } | null,
     ) => {
         if (mode !== 'live') return;
 
@@ -572,6 +581,7 @@ export function WidgetRenderer({
         setPopupSubListRowsMap({});
         setPopupSubListFileMap({});
         setPopupMultiSelectValuesMap({});
+        setPopupCategoryLinkCtx(categoryLinkCtx ?? null);
         setPopupTableSelectedRowsMap({});
         setPopupTableDataMap({});
         setPopupSortKeyMap({});
@@ -1111,7 +1121,32 @@ export function WidgetRenderer({
                     templateSlug: pageSlug,
                     paramSave,
                 });
-                if (saved > 0) anySaved = true;
+                if (saved > 0) {
+                    anySaved = true;
+                    /* 카테고리 연결 컨텍스트가 있으면 — 저장된(선택된) 행마다 원본 id(refId)만 뽑아
+                       { depth, parentId, refId } 경량 row를 카테고리 dbSlug에 추가 저장 (순차 처리 + 부분 실패 피드백) */
+                    if (popupCategoryLinkCtx) {
+                        let linkFailCount = 0;
+                        for (const row of rowsToSave) {
+                            const refId = Number(row['_id']);
+                            if (!refId) continue;
+                            try {
+                                await api.post(`/page-data/${popupCategoryLinkCtx.dbSlug}`, {
+                                    dataJson: {
+                                        depth: popupCategoryLinkCtx.depth,
+                                        parentId: popupCategoryLinkCtx.parentId,
+                                        refId,
+                                    },
+                                });
+                            } catch {
+                                linkFailCount++;
+                            }
+                        }
+                        if (linkFailCount > 0) {
+                            toast.warning(`${linkFailCount}건의 카테고리 연결 저장에 실패했습니다.`);
+                        }
+                    }
+                }
             }
 
             if (anySaved) {
@@ -1124,7 +1159,7 @@ export function WidgetRenderer({
         } finally {
             setPopupSaving(false);
         }
-    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, popupTableDataMap, popupParamSaveExtras, pageSlug, onRefresh, handlePopupClose]);
+    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, popupTableDataMap, popupParamSaveExtras, popupCategoryLinkCtx, pageSlug, onRefresh, handlePopupClose]);
 
     /* ══════════════════════════════════════════ */
     /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
@@ -1554,7 +1589,13 @@ export function WidgetRenderer({
                     selectedParentId={selectedParentId}
                     onSelect={onCategorySelect}
                     onPopupOpen={(slug, editId, listSlug, initialValues, paramSave) =>
-                        handleInternalPopupOpen(slug, editId ?? null, listSlug, initialValues, null, paramSave)
+                        handleInternalPopupOpen(
+                            slug, editId ?? null, listSlug, initialValues, null, paramSave,
+                            /* 등록(editId==null)이고 depth2+이고 relationSlugId 설정된 경우에만 연결 컨텍스트 전달 */
+                            (editId == null && widget.depth > 1 && widget.relationSlugId)
+                                ? { relationSlugId: widget.relationSlugId, dbSlug: widget.dbSlug, depth: widget.depth, parentId: selectedParentId }
+                                : null,
+                        )
                     }
                     refreshTick={categoryRefreshTick}
                 />

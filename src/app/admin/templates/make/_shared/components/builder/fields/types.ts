@@ -80,6 +80,8 @@ export interface FieldEditValues {
     params?: string;                      // popup·path 연결 시 전달 파라미터 (예: depth=1,type=create)
     dataSaveSlug?: string;                // 데이터저장 연결 slug (connType='datasave' 전용)
     saveConfirm?: boolean;                // 저장 컨펌 — true 시 live 모드 버튼 클릭 시 확인창 표시 (action-button 전용)
+    validationRuleIds?: number[];         // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
+    contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)
     /* ── Form 전용 ── */
     isPk?: boolean;          // PK(Primary Key) 여부
     readonly?: boolean;      // 읽기 전용 여부

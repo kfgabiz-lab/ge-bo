@@ -116,6 +116,10 @@ export interface CategoryWidget {
     detailParams?: string;
     /** 항목 삭제 허용 여부 (기본 true) */
     allowDelete?: boolean;
+    /** 연결 Slug — slug-relation(FETCH 방향) id. depth 2+ 전용. 설정 시 등록(datasave) 팝업에서
+     *  테이블 행선택 저장 성공 직후 { depth, parentId, refId } 경량 row를 이 위젯 dbSlug에 추가 저장한다.
+     *  카드 표시는 fieldTitle 등에 `_fetchedRel{id}.경로`를 입력해 BE applyFetch 결과를 그대로 조회. */
+    relationSlugId?: number;
 }
 
 /* ── SubList 위젯 타입 ── */

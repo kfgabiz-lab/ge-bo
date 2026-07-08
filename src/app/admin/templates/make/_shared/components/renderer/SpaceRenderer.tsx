@@ -37,16 +37,16 @@ interface SpaceRendererProps {
     showBorder?: boolean;
     /** 영역 바탕색 (기본 white) */
     bgColor?: string;
-    /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction + goBackAfterAction 전달 */
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
+    /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction + goBackAfterAction + 위젯별 검증 규칙 ID 전달 */
+    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, contentValidationRuleIds?: Record<string, number[]>) => void;
     /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
     onClose?: () => void;
     /** 페이지/팝업/경로 연결 요청 — connType='popup'·'path' 버튼 클릭 시 slug와 파라미터 문자열 전달 */
     onPopupOpen?: (slug: string, params?: string) => void;
     /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID + 개인정보 팝업 여부 전달 */
     onExcelDownload?: (tableWidgetId: string, privacyPopup?: boolean) => void;
-    /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave 전달 */
-    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string) => void;
+    /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave + 검증 규칙 ID 전달 */
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
 }
 
 export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave }: SpaceRendererProps) {
@@ -76,7 +76,7 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         if (field.saveConfirm && !window.confirm('저장 하시겠습니까?')) return;
         /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
         if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
-            onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction);
+            onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction, field.contentValidationRuleIds);
         } else if (field.connType === 'close') {
             /* 이탈체크 — 저장되지 않은 변경사항이 있으면 사용자 확인 후 취소 시 닫기 중단 */
             if (confirmLeave && !confirmLeave()) return;
@@ -94,7 +94,7 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
             onExcelDownload?.(field.excelTableWidgetId, field.excelPrivacyPopup);
         } else if (field.connType === 'datasave' && field.dataSaveSlug) {
             /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
-            onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params);
+            onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params, field.validationRuleIds);
         }
     };
 

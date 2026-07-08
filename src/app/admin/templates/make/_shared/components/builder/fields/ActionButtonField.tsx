@@ -18,12 +18,14 @@
  *     contentWidgets={contentWidgets} />
  */
 
+import { useEffect, useState } from 'react';
 import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import { SlugSelectField } from './SlugSelectField';
 import type { SlugOption } from './SlugSelectField';
-import type { TemplateItem } from '../../../types';
+import type { TemplateItem, ValidationRule } from '../../../types';
 import { getTemplateLabel } from '../../../utils';
+import api from '@/lib/api';
 
 /** 컨텐츠 위젯 정보 타입 (Form + SubList + MultiSelect + Table 공용) */
 export interface ContentWidgetOption {
@@ -58,6 +60,69 @@ export interface ActionButtonFieldProps extends FieldEditProps {
 /** 공통 select 스타일 */
 const SELECT_CLS = 'w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900';
 
+/** 검증 규칙 1건을 화면에 보여줄 짧은 라벨 구성 */
+const getRuleLabel = (rule: ValidationRule): string =>
+    rule.type === 'unique'
+        ? `중복방지: ${rule.fields || '-'}`
+        : `최대건수: ${rule.maxCount ?? '-'}건`;
+
+/**
+ * ValidationRuleMultiSelect — 특정 slugRegistryId에 등록된 검증 규칙 목록을 조회해
+ * 체크박스로 다중 선택하는 공통 서브컴포넌트.
+ * connType='datasave'(단일 slug)와 connType='content'(위젯별 slug)에서 함께 사용한다.
+ */
+function ValidationRuleMultiSelect({
+    slugRegistryId,
+    selectedIds,
+    onChange,
+}: {
+    /** 조회 대상 slug의 레지스트리 ID — 없으면 규칙 없음으로 처리 */
+    slugRegistryId: number | null | undefined;
+    /** 현재 선택된 검증 규칙 ID 목록 */
+    selectedIds: number[];
+    /** 선택 변경 콜백 */
+    onChange: (ids: number[]) => void;
+}) {
+    const [rules, setRules] = useState<ValidationRule[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    /* slugRegistryId 변경 시 해당 slug의 검증 규칙 목록 조회 */
+    useEffect(() => {
+        if (!slugRegistryId) { setRules([]); return; }
+        setIsLoading(true);
+        api.get('/validation-rules', { params: { slugRegistryId } })
+            .then(res => setRules(res.data ?? []))
+            .catch(() => setRules([]))
+            .finally(() => setIsLoading(false));
+    }, [slugRegistryId]);
+
+    if (!slugRegistryId) return null;
+    if (isLoading) return <p className="text-[10px] text-slate-400 px-1">검증 규칙 불러오는 중...</p>;
+    if (rules.length === 0) return <p className="text-[10px] text-slate-400 italic px-1">등록된 검증 규칙이 없습니다.</p>;
+
+    const toggle = (id: number) => {
+        onChange(selectedIds.includes(id) ? selectedIds.filter(x => x !== id) : [...selectedIds, id]);
+    };
+
+    return (
+        <div className="border border-slate-200 rounded overflow-hidden">
+            {rules.map(rule => (
+                <label
+                    key={rule.id}
+                    className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                >
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.includes(rule.id)}
+                        onChange={() => toggle(rule.id)}
+                        className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                    />
+                    <span className="text-xs text-slate-700 truncate">{getRuleLabel(rule)}</span>
+                </label>
+            ))}
+        </div>
+    );
+}
 
 export function ActionButtonField({
     values,
@@ -86,18 +151,27 @@ export function ActionButtonField({
             contentAction: undefined,
             excelTableWidgetId: undefined,
             dataSaveSlug: undefined,
+            validationRuleIds: undefined,
+            contentValidationRuleIds: undefined,
         });
     };
 
     /** 체크박스 토글 — 선택 배열에 추가/제거 */
     const handleContentWidgetToggle = (widgetId: string) => {
-        const next = selectedIds.includes(widgetId)
+        const wasSelected = selectedIds.includes(widgetId);
+        const next = wasSelected
             ? selectedIds.filter(id => id !== widgetId)
             : [...selectedIds, widgetId];
+
+        /* 선택 해제되는 위젯은 검증 규칙 선택값도 함께 제거 */
+        const nextContentRuleIds = { ...(values.contentValidationRuleIds ?? {}) };
+        if (wasSelected) delete nextContentRuleIds[widgetId];
+
         onChange({
             connectedContentWidgetIds: next.length > 0 ? next : undefined,
             /* 선택 해제 시 contentAction도 초기화 */
             contentAction: next.length > 0 ? values.contentAction : undefined,
+            contentValidationRuleIds: Object.keys(nextContentRuleIds).length > 0 ? nextContentRuleIds : undefined,
         });
     };
 
@@ -188,25 +262,39 @@ export function ActionButtonField({
                             ) : (
                                 <div className="border border-slate-200 rounded overflow-hidden">
                                     {contentWidgets.map(w => (
-                                        <label
-                                            key={w.widgetId}
-                                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(w.widgetId)}
-                                                onChange={() => handleContentWidgetToggle(w.widgetId)}
-                                                className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
-                                            />
-                                            <span className="text-xs text-slate-700 truncate">
-                                                {getContentLabel(w)}
-                                            </span>
-                                            {w.connectedSlug && (
-                                                <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
-                                                    {w.connectedSlug}
+                                        <div key={w.widgetId} className="border-b border-slate-100 last:border-b-0">
+                                            <label className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(w.widgetId)}
+                                                    onChange={() => handleContentWidgetToggle(w.widgetId)}
+                                                    className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                                />
+                                                <span className="text-xs text-slate-700 truncate">
+                                                    {getContentLabel(w)}
                                                 </span>
+                                                {w.connectedSlug && (
+                                                    <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
+                                                        {w.connectedSlug}
+                                                    </span>
+                                                )}
+                                            </label>
+                                            {/* 선택된 위젯 + 연결 slug가 있는 경우에만 해당 slug 기준 검증 규칙 다중선택 노출 */}
+                                            {selectedIds.includes(w.widgetId) && w.connectedSlug && (
+                                                <div className="px-2.5 pb-1.5 pl-8">
+                                                    <ValidationRuleMultiSelect
+                                                        slugRegistryId={slugOptions.find(s => s.slug === w.connectedSlug)?.id ?? null}
+                                                        selectedIds={values.contentValidationRuleIds?.[w.widgetId] ?? []}
+                                                        onChange={ids => {
+                                                            const next = { ...(values.contentValidationRuleIds ?? {}) };
+                                                            if (ids.length > 0) next[w.widgetId] = ids;
+                                                            else delete next[w.widgetId];
+                                                            onChange({ contentValidationRuleIds: Object.keys(next).length > 0 ? next : undefined });
+                                                        }}
+                                                    />
+                                                </div>
                                             )}
-                                        </label>
+                                        </div>
                                     ))}
                                 </div>
                             )}
@@ -283,7 +371,7 @@ export function ActionButtonField({
                             {/* 연결 slug — 저장 API 엔드포인트 */}
                             <SlugSelectField
                                 value={values.dataSaveSlug ?? ''}
-                                onChange={slug => onChange({ dataSaveSlug: slug || undefined })}
+                                onChange={slug => onChange({ dataSaveSlug: slug || undefined, validationRuleIds: undefined })}
                                 slugOptions={slugOptions}
                                 label="연결 Slug"
                                 emptyLabel="— Slug 선택 —"
@@ -299,6 +387,17 @@ export function ActionButtonField({
                                         className={INPUT_CLS}
                                     />
                                     <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값 · 없으면 행에서 추출</p>
+                                </div>
+                            )}
+                            {/* 연결 slug 기준 검증 규칙 다중선택 */}
+                            {values.dataSaveSlug && (
+                                <div className="space-y-0.5">
+                                    <label className={LABEL_CLS}>검증 규칙</label>
+                                    <ValidationRuleMultiSelect
+                                        slugRegistryId={slugOptions.find(s => s.slug === values.dataSaveSlug)?.id ?? null}
+                                        selectedIds={values.validationRuleIds ?? []}
+                                        onChange={ids => onChange({ validationRuleIds: ids.length > 0 ? ids : undefined })}
+                                    />
                                 </div>
                             )}
                             {/* 동작 완료 후 이전 페이지 이동 여부 */}
