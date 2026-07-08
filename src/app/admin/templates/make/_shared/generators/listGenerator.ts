@@ -330,16 +330,16 @@ export const buildListTsxFile = (
                     case 'date':
                         lines.push(`${ind(6)}<div className="relative">`);
                         lines.push(`${ind(7)}<Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />`);
-                        lines.push(`${ind(7)}<input type="date" value={${n}} onChange={e => ${setter}(e.target.value)} className="w-full pl-9 border border-slate-200 rounded-md py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all" />`);
+                        lines.push(`${ind(7)}<input type="date" value={${n}} onChange={e => ${setter}(e.target.value)} onClick={e => e.currentTarget.showPicker?.()} className="w-full pl-9 border border-slate-200 rounded-md py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all" />`);
                         lines.push(`${ind(6)}</div>`);
                         break;
                     case 'dateRange': {
                         const n2 = varName(f.label2 || '');
                         const setter2 = `set${cap(n2)}`;
                         lines.push(`${ind(6)}<div className="flex items-center gap-2">`);
-                        lines.push(`${ind(7)}<div className="relative flex-1"><Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="date" value={${n}} onChange={e => ${setter}(e.target.value)} className="w-full pl-9 border border-slate-200 rounded-md py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" /></div>`);
+                        lines.push(`${ind(7)}<div className="relative flex-1"><Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="date" value={${n}} onChange={e => ${setter}(e.target.value)} onClick={e => e.currentTarget.showPicker?.()} className="w-full pl-9 border border-slate-200 rounded-md py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" /></div>`);
                         lines.push(`${ind(7)}<span className="text-sm text-slate-400">~</span>`);
-                        lines.push(`${ind(7)}<div className="relative flex-1"><Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="date" value={${n2}} onChange={e => ${setter2}(e.target.value)} className="w-full pl-9 border border-slate-200 rounded-md py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" /></div>`);
+                        lines.push(`${ind(7)}<div className="relative flex-1"><Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="date" value={${n2}} onChange={e => ${setter2}(e.target.value)} onClick={e => e.currentTarget.showPicker?.()} className="w-full pl-9 border border-slate-200 rounded-md py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all" /></div>`);
                         lines.push(`${ind(6)}</div>`);
                         break;
                     }

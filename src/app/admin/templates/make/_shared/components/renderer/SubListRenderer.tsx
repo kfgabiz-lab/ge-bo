@@ -101,9 +101,11 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
         defaultStartDateOffset:  col.defaultStartDateOffset,
         defaultStartDate:        col.defaultStartDate,
         disableStartPast:        col.disableStartPast,
+        defaultStartToday:       col.defaultStartToday,
         defaultEndDateOffset:    col.defaultEndDateOffset,
         defaultEndDate:          col.defaultEndDate,
         disableEndPast:          col.disableEndPast,
+        defaultEndToday:         col.defaultEndToday,
         rangeSubType:            col.rangeSubType,
         /* select SLUG 옵션 소스 */
         optionSlug:              col.optionSlug,

@@ -516,8 +516,13 @@ export function useWidgetPageState(
             if (subType === 'timeSec')   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
             return iso.slice(0, 10);
           };
-          const start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcRangeDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
-          const end   = (f.defaultEndDateOffset   !== undefined && f.defaultEndDateOffset   !== 0) ? calcRangeDate(f.defaultEndDateOffset)   : (f.defaultEndDate   ?? '');
+          /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 오늘 날짜(offset 0)로 대체 */
+          const start = f.defaultStartToday
+            ? calcRangeDate(0)
+            : (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcRangeDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
+          const end = f.defaultEndToday
+            ? calcRangeDate(0)
+            : (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0) ? calcRangeDate(f.defaultEndDateOffset) : (f.defaultEndDate ?? '');
           /* dateRange/yearMonthRange: from/to 분리 저장 */
           if (start) initVals[f.id + '_from'] = start;
           if (end)   initVals[f.id + '_to']   = end;

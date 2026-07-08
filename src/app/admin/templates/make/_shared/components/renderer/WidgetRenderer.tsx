@@ -279,6 +279,11 @@ interface WidgetRendererProps {
     } | null;
 }
 
+/** 외부 URL 정규화 — 프로토콜(http/https)이 없으면 https:// 를 붙여준다 (버튼 셀 외부 URL 연결용) */
+function normalizeExternalUrl(url: string): string {
+    return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 /** dot notation으로 중첩 필드 값 업데이트 (inlineEdit 낙관적 업데이트용) */
 function applyDotField(obj: Record<string, unknown>, key: string, value: unknown): Record<string, unknown> {
     const idx = key.indexOf('.');
@@ -1348,6 +1353,67 @@ export function WidgetRenderer({
                     return;
                 }
                 handlers?.onFileClick?.(col, row);
+            },
+            /* button 셀 클릭 — connType(page/popup/windowPopup)에 따라 이동/오픈 방식 분기
+             * preview 모드에서는 아무 동작도 하지 않음 (버튼은 TableCellRenderer가 preview에서 클릭 불가 처리하지만 방어적으로 한 번 더 가드) */
+            onButtonClick: (col, row) => {
+                if (mode !== 'live') return;
+
+                const btnConnType = col.connType ?? 'page';
+
+                /* 레이어팝업 — 기존 handleInternalPopupOpen 재사용 (outputMode 자동 분기), 항상 내부 slug (외부 URL 미지원) */
+                if (btnConnType === 'popup') {
+                    if (!col.targetSlug) return;
+                    const initialValues = col.passParam ? parseActionParams(col.passParam, row) : undefined;
+                    handleInternalPopupOpen(col.targetSlug, row._id as number, dataSlug, initialValues, row._groupId as string | null);
+                    return;
+                }
+
+                /* 외부 URL 이동 — page/windowPopup 공통, targetType='url'일 때만 동작 */
+                if ((col.targetType ?? 'slug') === 'url' && col.externalUrl) {
+                    const normalizedUrl = normalizeExternalUrl(col.externalUrl);
+                    /* URL 객체로 파싱해 기존 쿼리스트링과 병합 (문자열 결합 시 '?' 중복 방지) */
+                    const urlObj = new URL(normalizedUrl);
+                    if (col.passParam) {
+                        Object.entries(parseActionParams(col.passParam, row)).forEach(([k, v]) => urlObj.searchParams.set(k, v));
+                    }
+                    const fullUrl = urlObj.toString();
+
+                    /* 윈도우팝업 — 새 창으로 오픈. noopener,noreferrer로 opener 참조 차단 */
+                    if (btnConnType === 'windowPopup') {
+                        const width  = col.windowPopupOption?.width  ?? 800;
+                        const height = col.windowPopupOption?.height ?? 600;
+                        window.open(fullUrl, '_blank', `width=${width},height=${height},noopener,noreferrer`);
+                        return;
+                    }
+
+                    /* page(기본) — 현재 탭에서 외부 URL로 이동 */
+                    window.location.href = fullUrl;
+                    return;
+                }
+
+                /* 내부 slug 기반 이동 — 기존 로직 그대로 */
+                if (!col.targetSlug) return;
+
+                /* page / windowPopup 공통 URL 구성 — id + passParam 파라미터 병합 (editPageRules 'page' 분기와 동일 방식) */
+                const params = new URLSearchParams();
+                if (row._id != null) params.set('id', String(row._id));
+                if (col.passParam) {
+                    Object.entries(parseActionParams(col.passParam, row)).forEach(([k, v]) => params.set(k, v));
+                }
+                const qs  = params.toString() ? `?${params.toString()}` : '';
+                const url = `/admin/widgetSub/${col.targetSlug}${qs}`;
+
+                /* 윈도우팝업 — 새 창으로 오픈 (신규 로직). noopener,noreferrer로 opener 참조 차단 */
+                if (btnConnType === 'windowPopup') {
+                    const width  = col.windowPopupOption?.width  ?? 800;
+                    const height = col.windowPopupOption?.height ?? 600;
+                    window.open(url, '_blank', `width=${width},height=${height},noopener,noreferrer`);
+                    return;
+                }
+
+                /* page(기본) — 직접 페이지 이동 */
+                router.push(url);
             },
             /* inlineEdit 셀 즉시 수정 — PATCH /{id}/field API 호출 */
             onInlineEdit: handlers?.onInlineEdit ?? (mode === 'live' && connectedSlug

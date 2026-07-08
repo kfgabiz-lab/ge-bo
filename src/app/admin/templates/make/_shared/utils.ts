@@ -1387,26 +1387,19 @@ export function initFormDefaultValues(
             } else if (f.type === 'dateRange') {
                 const subType = f.rangeSubType ?? 'date';
                 const isRangeTimeBased = subType === 'time' || subType === 'timeSec';
-                let start = '', end = '';
-                if (f.defaultToday) {
-                    /* 오늘날짜 ON: rangeSubType에 맞는 포맷으로 from/to 모두 오늘로 설정 */
-                    const iso = new Date().toISOString();
-                    const d = new Date();
-                    if (subType === 'yearMonth') { start = iso.slice(0, 7); end = iso.slice(0, 7); }
-                    else if (subType === 'datetime') { start = iso.slice(0, 16); end = iso.slice(0, 16); }
-                    else if (subType === 'time') { start = d.toTimeString().slice(0, 5); end = d.toTimeString().slice(0, 5); }
-                    else if (subType === 'timeSec') { start = d.toTimeString().slice(0, 8); end = d.toTimeString().slice(0, 8); }
-                    else { start = iso.slice(0, 10); end = iso.slice(0, 10); }
-                } else if (isRangeTimeBased) {
-                    /* 시간 계열: offset 무의미 — defaultStartDate/defaultEndDate 직접 사용 */
-                    start = f.defaultStartDate ?? '';
-                    end   = f.defaultEndDate   ?? '';
-                } else {
-                    start = (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0)
-                        ? calcDate(f.defaultStartDateOffset, subType) : (f.defaultStartDate ?? '');
-                    end = (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0)
-                        ? calcDate(f.defaultEndDateOffset, subType) : (f.defaultEndDate ?? '');
-                }
+                /* 오늘날짜는 시작·종료 각각 독립 토글 — formatNowBySubType 공통함수로 오늘 값 계산 */
+                const start = f.defaultStartToday
+                    ? formatNowBySubType(subType)
+                    : isRangeTimeBased
+                        ? (f.defaultStartDate ?? '')
+                        : (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0)
+                            ? calcDate(f.defaultStartDateOffset, subType) : (f.defaultStartDate ?? '');
+                const end = f.defaultEndToday
+                    ? formatNowBySubType(subType)
+                    : isRangeTimeBased
+                        ? (f.defaultEndDate ?? '')
+                        : (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0)
+                            ? calcDate(f.defaultEndDateOffset, subType) : (f.defaultEndDate ?? '');
                 /* dateRange: _from/_to 분리 키로 초기값 저장 */
                 if (start) vals[f.id + '_from'] = start;
                 if (end) vals[f.id + '_to'] = end;

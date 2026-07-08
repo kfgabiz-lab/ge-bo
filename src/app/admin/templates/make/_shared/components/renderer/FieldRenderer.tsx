@@ -971,6 +971,7 @@ export function FieldRenderer({
                     value={value}
                     min={dateMin}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
+                    onClick={isReadOnly ? undefined : e => e.currentTarget.showPicker?.()}
                 />
             );
         }
@@ -1024,6 +1025,7 @@ export function FieldRenderer({
                             value={from}
                             min={startMin}
                             onChange={isReadOnly ? undefined : e => onFromChange?.(e.target.value)}
+                            onClick={isReadOnly ? undefined : e => e.currentTarget.showPicker?.()}
                         />
                     </div>
                     <span className="text-sm text-slate-400 flex-shrink-0">~</span>
@@ -1038,6 +1040,7 @@ export function FieldRenderer({
                             value={to}
                             min={endMin}
                             onChange={isReadOnly ? undefined : e => onToChange?.(e.target.value)}
+                            onClick={isReadOnly ? undefined : e => e.currentTarget.showPicker?.()}
                         />
                     </div>
                 </div>
@@ -2058,6 +2061,7 @@ export function FieldRenderer({
                     value={value}
                     step={field.timeStep ? field.timeStep * 60 : undefined}
                     onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
+                    onClick={isReadOnly ? undefined : e => e.currentTarget.showPicker?.()}
                 />
             );
 

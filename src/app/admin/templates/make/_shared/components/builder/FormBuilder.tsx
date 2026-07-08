@@ -306,9 +306,11 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                 defaultStartDateOffset: f.defaultStartDateOffset,
                 defaultStartDate:       f.defaultStartDate,
                 disableStartPast:       f.disableStartPast,
+                defaultStartToday:      f.defaultStartToday,
                 defaultEndDateOffset:   f.defaultEndDateOffset,
                 defaultEndDate:         f.defaultEndDate,
                 disableEndPast:         f.disableEndPast,
+                defaultEndToday:        f.defaultEndToday,
                 /* date 서브타입 (yearMonth 기존 데이터 → yearMonth fallback) */
                 dateSubType:            f.dateSubType ?? (f.type === 'yearMonth' ? 'yearMonth' : undefined),
                 /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */

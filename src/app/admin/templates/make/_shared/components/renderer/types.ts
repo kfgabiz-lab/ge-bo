@@ -179,9 +179,11 @@ export interface SubListColumn {
     defaultStartDateOffset?: number;
     defaultStartDate?: string;
     disableStartPast?: boolean;
+    defaultStartToday?: boolean;   // 시작일 오늘 날짜 자동 적용 (종료일과 독립)
     defaultEndDateOffset?: number;
     defaultEndDate?: string;
     disableEndPast?: boolean;
+    defaultEndToday?: boolean;     // 종료일 오늘 날짜 자동 적용 (시작일과 독립)
     rangeSubType?: DateSubType; // 날짜 범위 서브타입 (기본: 'date')
     /* ── action 타입 전용 ── */
     actions?: ('copy' | 'delete')[];    // SubList action 컬럼: copy, delete 가능
@@ -241,6 +243,8 @@ export interface MultiSelectExtraField {
     required?: boolean;
     placeholder?: string;
     placeholderMsgKey?: string;       // placeholder 다국어 키
+    /** 표시 위치 — 항목명 기준 좌/우 (기본값은 렌더링 시점에 'right'로 처리) */
+    position?: 'left' | 'right';
 }
 
 /**
@@ -339,6 +343,8 @@ export interface TableActionHandlers {
     onDetail?: (row: Record<string, unknown>) => void;
     onDelete?: (id: number) => void;
     onFileClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
+    /** button 셀 클릭 — 연결 방식(connType)에 따라 페이지 이동/레이어팝업/윈도우팝업 분기 (live 모드 전용) */
+    onButtonClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
     /** 행 선택 변경 — 선택된 행 ID 배열 전달 (enableRowSelection=true 전용) */
     onRowsSelect?: (selectedIds: number[]) => void;
     /** inlineEdit 셀 즉시 수정 — row id, 필드 경로, 새 값 전달 */

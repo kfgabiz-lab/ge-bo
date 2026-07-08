@@ -266,8 +266,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             minLength, maxLength, pattern, patternDesc, minSelect, maxSelect,
             defaultValue, defaultValueMsgKey, defaultOptionValue,
             defaultDateOffset, defaultDate, disablePast, defaultToday,
-            defaultStartDateOffset, defaultStartDate, disableStartPast,
-            defaultEndDateOffset, defaultEndDate, disableEndPast,
+            defaultStartDateOffset, defaultStartDate, disableStartPast, defaultStartToday,
+            defaultEndDateOffset, defaultEndDate, disableEndPast, defaultEndToday,
             dbSlug, relationSlugId, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields, depthFilters,
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
@@ -312,9 +312,11 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultStartDateOffset: defaultStartDateOffset ?? undefined,
             defaultStartDate: defaultStartDate || undefined,
             disableStartPast: disableStartPast || undefined,
+            defaultStartToday: defaultStartToday || undefined,
             defaultEndDateOffset: defaultEndDateOffset ?? undefined,
             defaultEndDate: defaultEndDate || undefined,
             disableEndPast: disableEndPast || undefined,
+            defaultEndToday: defaultEndToday || undefined,
             /* date 서브타입 */
             dateSubType: pendingType === 'date' ? (dateSubType ?? 'date') : undefined,
             /* dateRange 서브타입 */
@@ -532,9 +534,11 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 defaultStartDateOffset: field.defaultStartDateOffset,
                                                                                 defaultStartDate:       field.defaultStartDate,
                                                                                 disableStartPast:       field.disableStartPast,
+                                                                                defaultStartToday:      field.defaultStartToday,
                                                                                 defaultEndDateOffset:   field.defaultEndDateOffset,
                                                                                 defaultEndDate:         field.defaultEndDate,
                                                                                 disableEndPast:         field.disableEndPast,
+                                                                                defaultEndToday:        field.defaultEndToday,
                                                                                 /* date 서브타입 (yearMonth 기존 데이터 → yearMonth fallback) */
                                                                                 dateSubType:            field.dateSubType ?? (field.type === 'yearMonth' ? 'yearMonth' : undefined),
                                                                                 /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */

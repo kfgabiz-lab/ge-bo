@@ -113,9 +113,11 @@ export interface FieldEditValues {
     defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
     defaultStartDate?: string;       // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
     disableStartPast?: boolean;      // dateRange: 시작일 이전 비활성화
+    defaultStartToday?: boolean;     // dateRange: 시작일 오늘 날짜 자동 적용 (종료일과 독립)
     defaultEndDateOffset?: number;   // dateRange: 종료일 오늘 기준 N일 전
     defaultEndDate?: string;         // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
     disableEndPast?: boolean;        // dateRange: 종료일 이전 비활성화
+    defaultEndToday?: boolean;       // dateRange: 종료일 오늘 날짜 자동 적용 (시작일과 독립)
     maxRangeValue?: number;          // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
     maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
     /** dateRange 통합 서브타입 — 날짜/년월/일시분초/시분/시분초 (기본: 'date') */

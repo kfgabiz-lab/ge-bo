@@ -114,9 +114,11 @@ export interface SearchFieldConfig {
     defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
     defaultStartDate?: string;      // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
     disableStartPast?: boolean;     // dateRange: 시작일 이전 비활성화
+    defaultStartToday?: boolean;    // dateRange: 시작일 오늘 날짜 자동 적용 (종료일과 독립)
     defaultEndDateOffset?: number;  // dateRange: 종료일 오늘 기준 N일 전
     defaultEndDate?: string;        // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
     disableEndPast?: boolean;       // dateRange: 종료일 이전 비활성화
+    defaultEndToday?: boolean;      // dateRange: 종료일 오늘 날짜 자동 적용 (시작일과 독립)
     maxRangeValue?: number;         // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
     maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
     /* ── category 전용 ── */
@@ -230,7 +232,7 @@ export interface CodeGroupDef {
 /* ── 테이블 컬럼 관련 타입 ── */
 
 /** 셀 렌더링 타입 */
-export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date' | 'dateRangeStatus' | 'inlineEdit';
+export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date' | 'dateRangeStatus' | 'inlineEdit' | 'button';
 
 /** 셀 옵션 (badge용) */
 export interface CellOption {
@@ -316,6 +318,28 @@ export interface TableColumnConfig {
     inlineEditType?: 'toggle' | 'checkbox' | 'radio'; // 즉시 수정 UI 타입
     options?: string[];             // 수동 입력 옵션 목록 ("텍스트|값" 형식, radio/checkbox 전용)
     inlineEditFieldKey?: string;    // 저장 경로 (dot notation, 예: form1.active) — 필수 입력
+    /* ── button 전용 (cellType: 'button') — 클릭 시 페이지이동/레이어팝업/윈도우팝업 실행 ── */
+    /** 버튼에 표시할 라벨 (예: '상세보기') */
+    buttonLabel?: string;
+    /** 버튼 색상 (col-types.ts CUSTOM_ACTION_COLORS 팔레트 값, 예: 'blue', 'green') */
+    buttonColor?: string;
+    /** 클릭 시 연결 방식 — page: 페이지 이동, popup: 레이어팝업(EditPageRule 패턴 재사용), windowPopup: 별도 창으로 열기(신규) */
+    connType?: 'page' | 'popup' | 'windowPopup';
+    /** 이동/오픈 대상 slug (페이지 slug 또는 팝업 slug 공통 사용, EditPageRule.pageSlug와 동일한 역할) */
+    targetSlug?: string;
+    /** 연결대상 방식 — slug: 내부 페이지(기본), url: 외부 URL. connType='page'/'windowPopup'에서만 의미 있음 (popup은 항상 slug) */
+    targetType?: 'slug' | 'url';
+    /** 연결대상 방식='url' 전용 — 이동/오픈할 외부 URL (예: 'www.naver.com', 프로토콜 미입력 시 https:// 자동 보정) */
+    externalUrl?: string;
+    /** (미사용) 과거 노출조건 필드 — 버튼은 항상 노출하는 정책으로 변경되어 현재 렌더링에 영향 없음 */
+    conditionParam?: string;
+    /** 이동/오픈 시 전달할 파라미터 (예: id,title=abc — =없으면 row 필드값, =있으면 고정값) */
+    passParam?: string;
+    /** connType='windowPopup' 전용 — 새 창 크기 옵션 */
+    windowPopupOption?: {
+        width?: number;   // 창 너비(px)
+        height?: number;  // 창 높이(px)
+    };
 }
 
 /** 불러오기 목록 아이템 */

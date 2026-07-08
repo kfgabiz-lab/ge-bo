@@ -252,6 +252,13 @@ const SAMPLE_TABLE: TableWidget = {
             maskType: 'custom', maskCustomRegex: '\\d{4}$', maskCustomReplacement: '****',
         },
         {
+            // 버튼 컬럼 — 퍼블리싱 샘플 (실제 설정 편집 UI·클릭 동작은 이후 개발 단계에서 구현 예정)
+            id: 'c14', header: '상세',   accessor: '_detailButton',
+            align: 'center', sortable: false, cellType: 'button',
+            buttonLabel: '상세보기', buttonColor: 'blue',
+            connType: 'page', targetSlug: '', conditionParam: '', passParam: 'id',
+        },
+        {
             id: 'c6', header: '관리',   accessor: '_actions',
             align: 'center', sortable: false, cellType: 'actions',
             actions: ['edit', 'delete'],

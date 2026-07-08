@@ -44,6 +44,9 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
     /* time 타입은 offset 개념 없음 */
     const isStartAuto = !isTime && startOffset !== 0;
     const isEndAuto   = !isTime && endOffset   !== 0;
+    /* 오늘날짜 토글은 시작/종료 각각 독립 — 켜진 쪽의 offset ±버튼·입력만 잠금 */
+    const isStartTodayLocked = values.defaultStartToday === true;
+    const isEndTodayLocked = values.defaultEndToday === true;
 
     /* 시작 offset 핸들러 */
     const handleStartMinus = () => {
@@ -99,11 +102,11 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
         : subType === 'datetime' ? '종료 일시 기본값'
         : '종료일 기본값';
 
-    const disableLabel = isTime ? '(토글 on - 이전 시간 비활성화)'
-        : subType === 'yearMonth' ? '(토글 on - 이전 년월 비활성화)'
-        : '(토글 on - 이전 날짜 비활성화)';
+    const disablePastLabel = isTime ? '이전 시간 비활성화'
+        : subType === 'yearMonth' ? '이전 년월 비활성화'
+        : '이전 날짜 비활성화';
 
-    /* 서브타입 변경 시 날짜 기본값 초기화 */
+    /* 서브타입 변경 시 날짜 기본값·오늘날짜(시작·종료 각각) 상태 초기화 */
     const handleSubTypeChange = (val: RangeSubType) => {
         onChange({
             rangeSubType: val,
@@ -111,6 +114,8 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
             defaultStartDate: undefined,
             defaultEndDateOffset: undefined,
             defaultEndDate: undefined,
+            defaultStartToday: undefined,
+            defaultEndToday: undefined,
         });
     };
 
@@ -164,76 +169,133 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
             />
 
             {/* 시작 기본값 */}
-            <div className="flex items-end gap-2">
-                <div className="flex-1">
-                    <label className={LABEL_CLS}>
-                        {startLabel}
-                        {!isTime && <span className="text-slate-300 font-normal"> {disableLabel}</span>}
-                    </label>
-                    {isTime ? (
-                        /* 시간 계열: 직접 시간 입력 (offset 없음), timeSec는 초 단위 step=1 */
+            <div>
+                <label className={LABEL_CLS}>{startLabel}</label>
+                {isTime ? (
+                    /* 시간 계열: 직접 시간 입력 (offset 없음), timeSec는 초 단위 step=1 */
+                    <input
+                        type="time"
+                        step={subType === 'timeSec' ? 1 : undefined}
+                        value={values.defaultStartDate ?? ''}
+                        onChange={e => onChange({ defaultStartDate: e.target.value || undefined })}
+                        className={INPUT_DATE_CLS}
+                    />
+                ) : (
+                    /* 나머지 타입: offset ±버튼 + 날짜 입력 — 시작 오늘날짜 ON 시 이 구간만 비활성화 */
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={handleStartMinus}
+                            disabled={isStartTodayLocked}
+                            className={`${BTN_CLS} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        >-</button>
                         <input
-                            type="time"
-                            step={subType === 'timeSec' ? 1 : undefined}
-                            value={values.defaultStartDate ?? ''}
-                            onChange={e => onChange({ defaultStartDate: e.target.value || undefined })}
-                            className={INPUT_DATE_CLS}
+                            type="number"
+                            value={startOffset}
+                            onChange={handleStartOffsetInput}
+                            disabled={isStartTodayLocked}
+                            className={`${INPUT_NUM_CLS} disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed`}
                         />
-                    ) : (
-                        /* 나머지 타입: offset ±버튼 + 날짜 입력 */
-                        <div className="flex items-center gap-1">
-                            <button type="button" onClick={handleStartMinus} className={BTN_CLS}>-</button>
-                            <input type="number" value={startOffset} onChange={handleStartOffsetInput} className={INPUT_NUM_CLS} />
-                            <button type="button" onClick={handleStartPlus} className={BTN_CLS}>+</button>
-                            <div className={DATE_WRAP_CLS}>
-                                {isStartAuto ? (
-                                    <input type={inputType} value={calcOffsetValue(startOffset, subType)} readOnly className={INPUT_DATE_READONLY_CLS} />
-                                ) : (
-                                    <input type={inputType} value={values.defaultStartDate ?? ''} onChange={e => onChange({ defaultStartDate: e.target.value || undefined })} className={INPUT_DATE_CLS} />
-                                )}
-                            </div>
+                        <button
+                            type="button"
+                            onClick={handleStartPlus}
+                            disabled={isStartTodayLocked}
+                            className={`${BTN_CLS} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        >+</button>
+                        <div className={DATE_WRAP_CLS}>
+                            {isStartTodayLocked ? (
+                                <input type={inputType} value={calcOffsetValue(0, subType)} readOnly disabled className={INPUT_DATE_READONLY_CLS} />
+                            ) : isStartAuto ? (
+                                <input type={inputType} value={calcOffsetValue(startOffset, subType)} readOnly className={INPUT_DATE_READONLY_CLS} />
+                            ) : (
+                                <input type={inputType} value={values.defaultStartDate ?? ''} onChange={e => onChange({ defaultStartDate: e.target.value || undefined })} className={INPUT_DATE_CLS} />
+                            )}
                         </div>
-                    )}
-                </div>
-                <div className="flex-shrink-0 pb-1">
-                    <ToggleRow label="" value={values.disableStartPast ?? false} onChange={v => onChange({ disableStartPast: v || undefined })} />
-                </div>
+                    </div>
+                )}
+                {/* 시작일 기본값 아래 줄 — 오늘날짜(시작 전용) · 이전날짜 비활성화(시작 전용) 나란히 배치 */}
+                {!isTime && (
+                    <div className="flex items-center gap-3 mt-1.5">
+                        <ToggleRow
+                            label="오늘날짜"
+                            value={values.defaultStartToday ?? false}
+                            onChange={v => {
+                                /* 오늘날짜 ON 시 시작 offset·수동날짜만 초기화 — 종료 쪽은 영향 없음 */
+                                onChange({
+                                    defaultStartToday: v || undefined,
+                                    defaultStartDateOffset: v ? undefined : values.defaultStartDateOffset,
+                                    defaultStartDate: v ? undefined : values.defaultStartDate,
+                                });
+                            }}
+                        />
+                        <ToggleRow label={disablePastLabel} value={values.disableStartPast ?? false} onChange={v => onChange({ disableStartPast: v || undefined })} />
+                    </div>
+                )}
             </div>
 
             {/* 종료 기본값 */}
-            <div className="flex items-end gap-2">
-                <div className="flex-1">
-                    <label className={LABEL_CLS}>
-                        {endLabel}
-                        {!isTime && <span className="text-slate-300 font-normal"> {disableLabel}</span>}
-                    </label>
-                    {isTime ? (
-                        /* 시간 계열: 직접 시간 입력 (offset 없음), timeSec는 초 단위 step=1 */
+            <div>
+                <label className={LABEL_CLS}>{endLabel}</label>
+                {isTime ? (
+                    /* 시간 계열: 직접 시간 입력 (offset 없음), timeSec는 초 단위 step=1 */
+                    <input
+                        type="time"
+                        step={subType === 'timeSec' ? 1 : undefined}
+                        value={values.defaultEndDate ?? ''}
+                        onChange={e => onChange({ defaultEndDate: e.target.value || undefined })}
+                        className={INPUT_DATE_CLS}
+                    />
+                ) : (
+                    /* 종료 오늘날짜 ON 시 이 구간만 비활성화 — 시작 구간과 독립 */
+                    <div className="flex items-center gap-1">
+                        <button
+                            type="button"
+                            onClick={handleEndMinus}
+                            disabled={isEndTodayLocked}
+                            className={`${BTN_CLS} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        >-</button>
                         <input
-                            type="time"
-                            step={subType === 'timeSec' ? 1 : undefined}
-                            value={values.defaultEndDate ?? ''}
-                            onChange={e => onChange({ defaultEndDate: e.target.value || undefined })}
-                            className={INPUT_DATE_CLS}
+                            type="number"
+                            value={endOffset}
+                            onChange={handleEndOffsetInput}
+                            disabled={isEndTodayLocked}
+                            className={`${INPUT_NUM_CLS} disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed`}
                         />
-                    ) : (
-                        <div className="flex items-center gap-1">
-                            <button type="button" onClick={handleEndMinus} className={BTN_CLS}>-</button>
-                            <input type="number" value={endOffset} onChange={handleEndOffsetInput} className={INPUT_NUM_CLS} />
-                            <button type="button" onClick={handleEndPlus} className={BTN_CLS}>+</button>
-                            <div className={DATE_WRAP_CLS}>
-                                {isEndAuto ? (
-                                    <input type={inputType} value={calcOffsetValue(endOffset, subType)} readOnly className={INPUT_DATE_READONLY_CLS} />
-                                ) : (
-                                    <input type={inputType} value={values.defaultEndDate ?? ''} onChange={e => onChange({ defaultEndDate: e.target.value || undefined })} className={INPUT_DATE_CLS} />
-                                )}
-                            </div>
+                        <button
+                            type="button"
+                            onClick={handleEndPlus}
+                            disabled={isEndTodayLocked}
+                            className={`${BTN_CLS} disabled:opacity-40 disabled:cursor-not-allowed`}
+                        >+</button>
+                        <div className={DATE_WRAP_CLS}>
+                            {isEndTodayLocked ? (
+                                <input type={inputType} value={calcOffsetValue(0, subType)} readOnly disabled className={INPUT_DATE_READONLY_CLS} />
+                            ) : isEndAuto ? (
+                                <input type={inputType} value={calcOffsetValue(endOffset, subType)} readOnly className={INPUT_DATE_READONLY_CLS} />
+                            ) : (
+                                <input type={inputType} value={values.defaultEndDate ?? ''} onChange={e => onChange({ defaultEndDate: e.target.value || undefined })} className={INPUT_DATE_CLS} />
+                            )}
                         </div>
-                    )}
-                </div>
-                <div className="flex-shrink-0 pb-1">
-                    <ToggleRow label="" value={values.disableEndPast ?? false} onChange={v => onChange({ disableEndPast: v || undefined })} />
-                </div>
+                    </div>
+                )}
+                {/* 종료일 기본값 아래 줄 — 오늘날짜(종료 전용) · 이전날짜 비활성화(종료 전용) 나란히 배치 */}
+                {!isTime && (
+                    <div className="flex items-center gap-3 mt-1.5">
+                        <ToggleRow
+                            label="오늘날짜"
+                            value={values.defaultEndToday ?? false}
+                            onChange={v => {
+                                /* 오늘날짜 ON 시 종료 offset·수동날짜만 초기화 — 시작 쪽은 영향 없음 */
+                                onChange({
+                                    defaultEndToday: v || undefined,
+                                    defaultEndDateOffset: v ? undefined : values.defaultEndDateOffset,
+                                    defaultEndDate: v ? undefined : values.defaultEndDate,
+                                });
+                            }}
+                        />
+                        <ToggleRow label={disablePastLabel} value={values.disableEndPast ?? false} onChange={v => onChange({ disableEndPast: v || undefined })} />
+                    </div>
+                )}
             </div>
 
             {/* 최대 조회 기간 — 검색 시 범위 초과 방지 (0 또는 미설정 시 제한 없음) */}
