@@ -17,7 +17,7 @@
  *   <FieldRenderer mode={mode} field={f} fileList={...} onFileChange={...} />
  */
 
-import React, { useRef, useId, useState, useEffect } from 'react';
+import React, { useRef, useId, useState, useEffect, useMemo } from 'react';
 import { useI18n } from '@/hooks/use-i18n';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { CategorySearchField } from './CategorySearchField';
@@ -487,10 +487,62 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
 }
 
 /**
+ * optionFilter 조건식의 필드 리졸버 — SlugOptionSelect / SlugAutocompleteInput 공용
+ *
+ * - "$fieldKey" 형식: 같은 Form/Search 위젯 내 **다른 필드의 현재 선택값**(rowData)만 참조한다.
+ *   rowData에 없으면 undefined를 반환한다 — SLUG row(같은 이름의 필드일 수 있음)로 대신 찾지 않는다.
+ *   (두 네임스페이스가 섞이면 어떤 값을 참조했는지 알 수 없게 되므로 의도적으로 분리)
+ * - 그 외(접두어 없음): 기존 동작 그대로 SLUG 데이터의 flat row 자체 필드 값을 참조한다.
+ * @param key     조건식에 등장한 토큰 (예: "trainingCourse", "$trnCourse")
+ * @param row     SLUG API에서 받아온 한 행(flatten 결과)
+ * @param rowData 현재 Form/Search 위젯의 fieldKey → 현재 값 맵
+ */
+function resolveOptionFilterField(
+    key: string,
+    row: Record<string, unknown>,
+    rowData?: Record<string, unknown>,
+): string | undefined {
+    if (key.startsWith('$')) {
+        const v = rowData?.[key.slice(1)];
+        return v !== undefined ? String(v) : undefined;
+    }
+    return (key in row) ? String(row[key] ?? '') : undefined;
+}
+
+/**
+ * SLUG 옵션 필터(optionFilter) 적용 + Value/Text 키 추출 + 정렬까지 한 번에 처리 — 공용 계산 로직
+ * SlugOptionSelect / SlugAutocompleteInput이 각각 다른 최종 포맷으로 감싸 사용한다.
+ */
+function buildSlugOptRows(
+    rawRows: Record<string, unknown>[],
+    field: SearchFieldConfig,
+    rowData: Record<string, unknown> | undefined,
+): { value: string; text: string }[] {
+    /* optionFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용
+       "$fieldKey" 토큰은 resolveOptionFilterField로 rowData만 조회 */
+    const filteredRows = field.optionFilter
+        ? rawRows.filter((row) => evalConditionExpr(field.optionFilter!, (key) => resolveOptionFilterField(key, row, rowData)))
+        : rawRows;
+    /* 필터 통과한 행만 옵션 생성 */
+    let opts = filteredRows.map((row) => ({
+        value: String(row[field.optionValueKey ?? ''] ?? ''),
+        text:  String(row[field.optionTextKey ?? ''] ?? ''),
+        _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
+    }));
+    /* optionOrderKey 지정 시 FE에서 정렬 — Value/Text 키와 동일한 flat key 기준 */
+    if (field.optionOrderKey) {
+        const dir = field.optionOrderDir === 'DESC' ? -1 : 1;
+        opts = opts.sort((a, b) => a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir);
+    }
+    return opts.map(({ value, text }) => ({ value, text }));
+}
+
+/**
  * SlugOptionSelect — SLUG 옵션 소스 select 컴포넌트 (live 모드 전용)
  *
  * field.optionSlug로 지정된 SLUG에서 데이터를 API fetch하여 select 옵션을 채운다.
  * optionValueKey / optionTextKey: dot notation으로 dataJson에서 값을 추출.
+ * optionFilter: "$fieldKey" 문법으로 같은 Form/Search 위젯 내 다른 필드의 현재값을 참조할 수 있다.
  */
 function SlugOptionSelect({
     field,
@@ -500,6 +552,7 @@ function SlugOptionSelect({
     isReadOnly,
     placeholder,
     readonlyCls,
+    rowData,
 }: {
     field: SearchFieldConfig;
     value: string;
@@ -508,36 +561,31 @@ function SlugOptionSelect({
     isReadOnly: boolean;
     placeholder: string;
     readonlyCls: string;
+    rowData?: Record<string, unknown>;
 }) {
-    const [slugOpts, setSlugOpts] = useState<{ value: string; text: string }[]>([]);
+    /* SLUG API에서 fetch한 원본 행(flatten 결과) — optionFilter 평가는 아래 useMemo에서 별도로 수행 */
+    const [rawRows, setRawRows] = useState<Record<string, unknown>[]>([]);
 
-    /* optionSlug / optionValueKey / optionTextKey / optionOrderKey / optionOrderDir / optionFilter 변경 시 API fetch */
+    /* optionSlug 변경 시에만 API 재조회 — optionFilter/rowData 변경은 재조회 없이 useMemo에서만 재계산 */
     useEffect(() => {
-        if (!field.optionSlug) return;
+        if (!field.optionSlug) { setRawRows([]); return; }
+        /* fetch 시작 시 먼저 비움 — 비동기 응답 대기 중 이전 slug의 데이터로 새 필터가 적용되는 stale 현상 방지 */
+        setRawRows([]);
         api.get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })
             .then((res) => {
                 const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
                 /* flattenPageDataItem으로 중첩 → flat key 변환 */
                 const flatRows = rows.map((item) => flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]));
-                /* optionFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용 */
-                const filteredRows = field.optionFilter
-                    ? flatRows.filter((row) => evalConditionExpr(field.optionFilter!, (key) => (key in row) ? String(row[key] ?? '') : undefined))
-                    : flatRows;
-                /* 필터 통과한 행만 옵션 생성 */
-                let opts = filteredRows.map((row) => ({
-                    value: String(row[field.optionValueKey ?? ''] ?? ''),
-                    text:  String(row[field.optionTextKey ?? ''] ?? ''),
-                    _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
-                }));
-                /* optionOrderKey 지정 시 FE에서 정렬 — Value/Text 키와 동일한 flat key 기준 */
-                if (field.optionOrderKey) {
-                    const dir = field.optionOrderDir === 'DESC' ? -1 : 1;
-                    opts = opts.sort((a, b) => a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir);
-                }
-                setSlugOpts(opts.map(({ value, text }) => ({ value, text })));
+                setRawRows(flatRows);
             })
-            .catch(() => setSlugOpts([]));
-    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir, field.optionFilter]);
+            .catch(() => setRawRows([]));
+    }, [field.optionSlug]);
+
+    /* optionFilter 평가(rowData의 $fieldKey 참조 포함) + Value/Text 추출 + 정렬 — 참조 필드 값이 바뀔 때마다 재계산 */
+    const slugOpts = useMemo(
+        () => buildSlugOptRows(rawRows, field, rowData),
+        [rawRows, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir, field.optionFilter, rowData],
+    );
 
     return (
         <div className="relative">
@@ -565,6 +613,7 @@ function SlugOptionSelect({
  * AutocompleteInput에 전달하여 자동완성 UI를 제공한다.
  *
  * optionOrderKey / optionOrderDir 지정 시 FE에서 정렬 적용.
+ * optionFilter: "$fieldKey" 문법으로 같은 Form/Search 위젯 내 다른 필드의 현재값을 참조할 수 있다.
  */
 function SlugAutocompleteInput({
     field,
@@ -573,6 +622,7 @@ function SlugAutocompleteInput({
     isDisabled,
     isReadOnly,
     placeholder,
+    rowData,
 }: {
     field: SearchFieldConfig;
     value: string;
@@ -580,46 +630,31 @@ function SlugAutocompleteInput({
     isDisabled: boolean;
     isReadOnly: boolean;
     placeholder: string;
+    rowData?: Record<string, unknown>;
 }) {
-    /* SLUG API에서 fetch한 옵션 목록 ("텍스트:값" 형식) */
-    const [slugOpts, setSlugOpts] = useState<string[]>([]);
+    /* SLUG API에서 fetch한 원본 행(flatten 결과) — optionFilter 평가는 아래 useMemo에서 별도로 수행 */
+    const [rawRows, setRawRows] = useState<Record<string, unknown>[]>([]);
 
-    /* optionSlug / optionFilter 변경 시 API fetch → 옵션 배열 구성 */
+    /* optionSlug 변경 시에만 API 재조회 — optionFilter/rowData 변경은 재조회 없이 useMemo에서만 재계산 */
     useEffect(() => {
-        if (!field.optionSlug) return;
-
+        if (!field.optionSlug) { setRawRows([]); return; }
+        /* fetch 시작 시 먼저 비움 — 비동기 응답 대기 중 이전 slug의 데이터로 새 필터가 적용되는 stale 현상 방지 */
+        setRawRows([]);
         api.get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })
             .then((res) => {
                 const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];
-
                 /* flattenPageDataItem으로 중첩 dataJson → flat key 변환 */
                 const flatRows = rows.map((item) => flattenPageDataItem(item as Parameters<typeof flattenPageDataItem>[0]));
-                /* optionFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용 */
-                const filteredRows = field.optionFilter
-                    ? flatRows.filter((row) => evalConditionExpr(field.optionFilter!, (key) => (key in row) ? String(row[key] ?? '') : undefined))
-                    : flatRows;
-
-                /* 필터 통과한 행만 옵션 생성 */
-                let opts = filteredRows.map((row) => ({
-                    value:    String(row[field.optionValueKey ?? ''] ?? ''),
-                    text:     String(row[field.optionTextKey  ?? ''] ?? ''),
-                    /* 정렬 기준 값 (optionOrderKey 지정 시 사용) */
-                    _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? '') : '',
-                }));
-
-                /* optionOrderKey 지정 시 FE 정렬 */
-                if (field.optionOrderKey) {
-                    const dir = field.optionOrderDir === 'DESC' ? -1 : 1;
-                    opts = opts.sort((a, b) =>
-                        a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir
-                    );
-                }
-
-                /* AutocompleteInput이 받는 "텍스트:값" 형식으로 변환 */
-                setSlugOpts(opts.map(({ value, text }) => `${text}:${value}`));
+                setRawRows(flatRows);
             })
-            .catch(() => setSlugOpts([]));
-    }, [field.optionSlug, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir, field.optionFilter]);
+            .catch(() => setRawRows([]));
+    }, [field.optionSlug]);
+
+    /* optionFilter 평가(rowData의 $fieldKey 참조 포함) + Value/Text 추출 + 정렬 — 참조 필드 값이 바뀔 때마다 재계산 */
+    const slugOpts = useMemo(
+        () => buildSlugOptRows(rawRows, field, rowData).map(({ value, text }) => `${text}:${value}`),
+        [rawRows, field.optionValueKey, field.optionTextKey, field.optionOrderKey, field.optionOrderDir, field.optionFilter, rowData],
+    );
 
     return (
         <AutocompleteInput
@@ -806,6 +841,7 @@ export function FieldRenderer({
                             isDisabled={isDisabled}
                             isReadOnly={isReadOnly}
                             placeholder={selectPlaceholder}
+                            rowData={rowData}
                         />
                     );
                 }
@@ -864,6 +900,7 @@ export function FieldRenderer({
                         isReadOnly={isReadOnly}
                         placeholder={selectPlaceholder}
                         readonlyCls={readonlyCls}
+                        rowData={rowData}
                     />
                 );
             }

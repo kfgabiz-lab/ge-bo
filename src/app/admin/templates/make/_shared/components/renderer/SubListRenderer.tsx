@@ -251,7 +251,29 @@ export function SubListRenderer({
         const updated = [...rows.slice(0, idx + 1), copied, ...rows.slice(idx + 1)];
         setRows(updated);
         onChange?.(updated);
-    }, [rows, onChange]);
+
+        /* 업로드 대기 중인 File 객체(internalFileMap)도 함께 복제한다.
+           File은 참조 타입이라 그대로 복사하면 원본 행과 복사 행이 같은 File 인스턴스를
+           공유하게 되어 이후 한쪽 행에서만 파일을 지워도 다른 행에 영향을 줄 수 있다.
+           new File()로 별도 인스턴스를 만들어 완전히 독립된 행으로 취급한다. */
+        const originalFiles = internalFileMap[rowId];
+        if (originalFiles) {
+            const clonedFiles: Record<string, File[]> = {};
+            Object.entries(originalFiles).forEach(([colId, files]) => {
+                clonedFiles[colId] = files.map(
+                    f => new File([f], f.name, { type: f.type, lastModified: f.lastModified })
+                );
+            });
+            setInternalFileMap(prev => ({ ...prev, [newId]: clonedFiles }));
+
+            /* 화면 표시용 internalFileMap뿐 아니라 상위(useWidgetPageState)의 subListFileMap까지
+               갱신해야 한다. 저장 시에는 subListFileMap[widgetId][rowId][colId]를 읽어 업로드하므로
+               이 호출이 빠지면 화면엔 파일이 보여도 저장 시 복사 행의 파일이 실제로는 올라가지 않는다. */
+            Object.entries(clonedFiles).forEach(([colId, files]) => {
+                externalOnFileChange?.(colId, files, newId);
+            });
+        }
+    }, [rows, onChange, internalFileMap, externalOnFileChange]);
 
     /** 기존 파일 제거 — existingMetaMap + row 데이터의 ID 배열 동시 갱신 */
     const handleRemoveExisting = useCallback((rowId: string, colId: string, fileId: number) => {
@@ -365,6 +387,8 @@ export function SubListRenderer({
                                         {/* 각 셀 — 항상 입력 필드, 파일 타입은 Form과 동일하게 props 전달 */}
                                         {visibleColumns.map(col => {
                                             const isFileType = (FILE_COL_TYPES as readonly string[]).includes(col.type);
+                                            /* dateRange 타입 — value 1개가 아니라 from/to 2개 슬롯을 사용 (FormRenderer/SearchRenderer와 동일 컨벤션) */
+                                            const isRangeType = col.type === 'dateRange';
 
                                             /* action 타입 컬럼 — 삭제/복사 버튼 통합 렌더링 */
                                             if (col.type === 'action') {
@@ -403,9 +427,14 @@ export function SubListRenderer({
                                                     <FieldRenderer
                                                         mode={mode}
                                                         field={toFieldConfig(col)}
-                                                        value={String(row[col.key] ?? '')}
+                                                        /* dateRange는 value/onChange 대신 valueFrom/valueTo/onFromChange/onToChange로 배선 */
+                                                        value={isRangeType ? undefined : String(row[col.key] ?? '')}
+                                                        onChange={isRangeType ? undefined : (v => handleRowChange(row._rowId, col.key, v))}
+                                                        valueFrom={isRangeType ? String(row[col.key + '_from'] ?? '') : undefined}
+                                                        valueTo={isRangeType ? String(row[col.key + '_to'] ?? '') : undefined}
+                                                        onFromChange={isRangeType ? (v => handleRowChange(row._rowId, col.key + '_from', v)) : undefined}
+                                                        onToChange={isRangeType ? (v => handleRowChange(row._rowId, col.key + '_to', v)) : undefined}
                                                         codeGroups={codeGroups}
-                                                        onChange={v => handleRowChange(row._rowId, col.key, v)}
                                                         fileList={isFileType ? (effectiveFileMap[row._rowId]?.[col.id] ?? []) : undefined}
                                                         existingFileMeta={isFileType ? (existingMetaMap[row._rowId]?.[col.id] ?? []) : undefined}
                                                         onFileChange={isFileType ? (files => handleFileChange(row._rowId, col.id, files)) : undefined}
