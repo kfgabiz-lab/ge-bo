@@ -30,7 +30,7 @@ import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { CodeGroupDef, SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
-import { applyDataGeneration, flattenPageDataItem, evalConditionExpr } from '../../utils';
+import { applyDataGeneration, flattenPageDataItem, evalConditionExpr, buildKeyToId } from '../../utils';
 
 /** flattenPageDataItem이 항상 붙이는 부가 키 — rowData 병합 시 제외 */
 const FLATTEN_META_KEYS = new Set(['_id', '_groupId', '_pathMap', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']);
@@ -114,12 +114,8 @@ export function FormRenderer({
     const isPreview = mode === 'preview';
     const { t } = useI18n();
 
-    /* fieldKey → fieldId 역매핑 테이블 — hideCondition 평가에 사용 */
-    const keyToId = useMemo(() => {
-        const map: Record<string, string> = {};
-        fields.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; });
-        return map;
-    }, [fields]);
+    /* fieldKey → fieldId 역매핑 테이블 — hideCondition 평가에 사용 (공통함수로 분리) */
+    const keyToId = useMemo(() => buildKeyToId(fields), [fields]);
 
     /* data 표현식 평가용 — fieldKey → 현재 값 맵 */
     const rowData = useMemo(() => {

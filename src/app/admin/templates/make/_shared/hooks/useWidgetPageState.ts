@@ -1459,6 +1459,8 @@ export function useWidgetPageState(
     Object.values(fieldsMap).flat().forEach(f => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
     const params: Record<string, string> = {};
     Object.values(fieldsMap).flat().forEach(f => {
+      /* 검색제외 필드는 엑셀다운로드 파라미터에서도 제외 */
+      if (f.excludeFromSearch) return;
       const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
       if (f.hideCondition && hideResult) return;
       /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */

@@ -31,7 +31,7 @@ import { useMemo } from 'react';
 import { Search, RotateCcw } from 'lucide-react';
 import { SearchForm, SearchRow, SearchField } from '@/components/search';
 import { SearchRowConfig, CodeGroupDef } from '../../types';
-import { evalFieldCondition } from '../../utils';
+import { evalFieldCondition, buildKeyToId } from '../../utils';
 import { FieldRenderer } from './FieldRenderer';
 import { RendererContainer } from './RendererContainer';
 import type { RendererMode } from './types';
@@ -65,14 +65,17 @@ export function SearchRenderer({
     const isPreview = mode === 'preview';
     const { t } = useI18n();
 
-    /* fieldKey → fieldId 역매핑 — hideCondition/disableCondition 평가용 */
-    const keyToId = useMemo(() => {
-        const map: Record<string, string> = {};
-        rows.forEach(row =>
-            row.fields.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; })
-        );
+    /* fieldKey → fieldId 역매핑 — hideCondition/disableCondition 평가용 (공통함수로 분리) */
+    const keyToId = useMemo(() => buildKeyToId(rows.flatMap(row => row.fields)), [rows]);
+
+    /* optionFilter의 "$fieldKey" 참조용 — fieldKey → 현재 선택값 맵 (SlugOptionSelect/SlugAutocompleteInput에 전달) */
+    const rowData = useMemo(() => {
+        const map: Record<string, unknown> = {};
+        rows.flatMap(row => row.fields).forEach(f => {
+            if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? '';
+        });
         return map;
-    }, [rows]);
+    }, [rows, values]);
 
     /* live 모드에서 hideCondition 충족 시 해당 필드 숨김 */
     const shouldHide = (fieldKey: string | undefined, hideCondition: string | undefined): boolean =>
@@ -116,6 +119,7 @@ export function SearchRenderer({
                                 onToChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? v => onChangeValues?.(field.id + '_to', v) : undefined}
                                 codeGroups={codeGroups}
                                 forceDisabled={shouldDisable(field.disableCondition)}
+                                rowData={rowData}
                             />
                         </div>
                         );
@@ -175,6 +179,7 @@ export function SearchRenderer({
                                     onToChange={(field.type === 'dateRange' || field.type === 'yearMonthRange') ? v => onChangeValues?.(field.id + '_to', v) : undefined}
                                     codeGroups={codeGroups}
                                     forceDisabled={shouldDisable(field.disableCondition)}
+                                    rowData={rowData}
                                 />
                             </SearchField>
                             );

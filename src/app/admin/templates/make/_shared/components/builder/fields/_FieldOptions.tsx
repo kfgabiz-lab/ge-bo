@@ -208,16 +208,20 @@ export function FieldOptions({
                         </div>
                     </div>
 
-                    {/* 옵션 필터 조건식 — evalConditionExpr 문법 재사용, 조건에 맞는 행만 옵션으로 추출 */}
+                    {/* 옵션 필터 조건식 — evalConditionExpr 문법 재사용, 조건에 맞는 행만 옵션으로 추출
+                        "$fieldKey" 문법으로 같은 Form/Search 위젯 내 다른 필드의 현재 선택값을 참조 가능 (Form/Search 위젯에서만 동작) */}
                     <div>
                         <label className={LABEL_CLS}>옵션 필터 <span className="text-slate-300 font-normal">(선택)</span></label>
                         <input
                             type="text"
                             value={optionFilter ?? ''}
                             onChange={(e) => onChange({ optionFilter: e.target.value || undefined })}
-                            placeholder="예: status=1,type=Y"
+                            placeholder="예: status=1,type=Y / 다른 필드 참조: trainingCourse=$trnCourse"
                             className={INPUT_CLS}
                         />
+                        <p className="mt-0.5 text-[10px] text-slate-400 leading-tight">
+                            $fieldKey로 같은 Form/Search 위젯 내 다른 필드의 현재 선택값을 참조할 수 있습니다. (Form·Search 위젯에서만 동작 — SubList 등 다른 곳에서는 무시됩니다)
+                        </p>
                     </div>
 
                     {/* 정렬key | orderby 한 줄 배치 */}

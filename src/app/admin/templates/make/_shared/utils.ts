@@ -229,6 +229,20 @@ export const evalFieldCondition = (
     });
 
 /**
+ * fieldKey → fieldId(id) 역매핑 테이블 생성 — hideCondition/disableCondition 평가 등에서 공용으로 사용
+ * FormRenderer·SearchRenderer가 각자 인라인으로 만들던 동일한 로직을 공통함수로 분리
+ * @param fields fieldKey를 가진 필드 배열 (Search/Form 필드 등)
+ * @example buildKeyToId([{ id: 'f1', fieldKey: 'status' }]) // { status: 'f1' }
+ */
+export const buildKeyToId = (
+    fields: { id: string; fieldKey?: string }[],
+): Record<string, string> => {
+    const map: Record<string, string> = {};
+    fields.forEach(f => { if (f.fieldKey) map[f.fieldKey] = f.id; });
+    return map;
+};
+
+/**
  * Form 위젯 필드 유효성 검사 (required / minLength / maxLength / pattern / 파일 개수·용량 / 날짜 범위)
  * - hidden 타입 / hideCondition 충족 필드는 건너뜀
  * - dateRange / yearMonthRange: 종료가 시작보다 이전이면 오류
@@ -400,6 +414,18 @@ export const validateSubListRows = (
                             return false;
                         }
                     }
+                } else if (col.type === 'dateRange') {
+                    /* dateRange 타입 — 값이 row[col.key]가 아니라 {key}_from / {key}_to에 저장됨
+                       (SearchRenderer/FormRenderer와 동일한 isRangeType 분리 키 컨벤션) */
+                    const valFrom = String(row[col.key + '_from'] ?? '').trim();
+                    const valTo   = String(row[col.key + '_to'] ?? '').trim();
+
+                    /* 필수 입력 검사 — 시작/종료 둘 다 채워져야 통과 */
+                    if (col.required && (!valFrom || !valTo)) {
+                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
+                        return false;
+                    }
+                    /* minLength/maxLength/pattern은 dateRange에 의미가 없으므로 검사하지 않음 */
                 } else {
                     const val = String(row[col.key] ?? '').trim();
 
