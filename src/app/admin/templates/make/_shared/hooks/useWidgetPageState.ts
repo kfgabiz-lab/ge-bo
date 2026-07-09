@@ -375,6 +375,16 @@ export function useWidgetPageState(
             params[`rel_${f.relationSlugId}`] = val;
             return;
           }
+          /* select + data(조건식 "cond?트루텍스트:펄스텍스트"): evalConditionExpr 문법 재사용 —
+             condexpr_{fieldKey}=조건식 원문 + condval_{fieldKey}=선택값 그대로 전송, 필드명 파싱은 서버가 담당 */
+          if (f.type === 'select' && f.data?.includes('?')) {
+            const paramKey = f.fieldKey || f.label;
+            if (paramKey) {
+              params[`condexpr_${paramKey}`] = f.data;
+              params[`condval_${paramKey}`] = val;
+            }
+            return;
+          }
           /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
           if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
             params[`drs_${f.linkedDateRangeKey}`] = val;

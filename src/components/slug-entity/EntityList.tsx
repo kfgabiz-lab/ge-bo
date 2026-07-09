@@ -39,6 +39,8 @@ export interface SlugEntityFieldItem {
     fieldType?: string | null;
     /** 공통코드 그룹 코드 — select/radio/checkbox 옵션 자동 연결용 */
     codeGroupCode?: string | null;
+    /** 기본값 */
+    defaultValue?: string | null;
     isNullable: boolean;
     description: string | null;
     sortOrder: number;
@@ -193,6 +195,14 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
                                         <span className={`text-[10px] truncate w-full ${isSelected ? 'text-white/60' : 'text-slate-400'}`}>
                                             {entity.name}
                                         </span>
+                                        {entity.description && (
+                                            <span
+                                                className={`text-[10px] truncate w-full ${isSelected ? 'text-white/40' : 'text-slate-300'}`}
+                                                title={entity.description}
+                                            >
+                                                {entity.description}
+                                            </span>
+                                        )}
                                     </div>
                                     <span className={`text-[10px] shrink-0 ml-2 ${isSelected ? 'text-white/60' : 'text-slate-400'}`}>
                                         {entity.fieldCount}

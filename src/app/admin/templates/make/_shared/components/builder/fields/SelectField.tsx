@@ -88,6 +88,16 @@ export function SelectField({ values, onChange, colSpanMode, rowSpanConfig, code
                 showSlugTab={true}
                 slugOptions={slugOptions}
             />
+            <div>
+                <label className={LABEL_CLS}>조건식 검색 <span className="text-slate-300 font-normal">(선택)</span></label>
+                <input
+                    type="text"
+                    value={values.data ?? ''}
+                    onChange={e => onChange({ data: e.target.value || undefined })}
+                    placeholder="예: isVisible=001,postDate_from<today(),postDate_to>today()?게시:미게시"
+                    className={`${INPUT_CLS} font-mono`}
+                />
+            </div>
             {/* 필수 항목 */}
         </div>
     );

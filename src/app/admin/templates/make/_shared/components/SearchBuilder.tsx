@@ -276,6 +276,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             selectType,
             /* select SLUG 옵션 소스 */
             optionSlug, optionValueKey, optionTextKey, optionOrderKey, optionOrderDir, optionFilter,
+            /* 조건식 검색 연동 (select 전용, data 재사용) */
+            data,
         } = pendingValues;
 
         const newField: SearchFieldConfig = {
@@ -353,6 +355,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             optionOrderKey:    pendingType === 'select' ? (optionOrderKey || undefined) : undefined,
             optionOrderDir:    pendingType === 'select' ? (optionOrderDir || undefined) : undefined,
             optionFilter:      pendingType === 'select' ? (optionFilter || undefined) : undefined,
+            data:              pendingType === 'select' ? (data?.trim() || undefined) : undefined,
         };
 
         onChange(rows.map(r =>
@@ -576,6 +579,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 optionOrderKey:      field.optionOrderKey,
                                                                                 optionOrderDir:      field.optionOrderDir,
                                                                                 optionFilter:        field.optionFilter,
+                                                                                /* 조건식 검색 연동 (select 전용, data 재사용) */
+                                                                                data:                field.data,
                                                                             },
                                                                             updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                                                         )}

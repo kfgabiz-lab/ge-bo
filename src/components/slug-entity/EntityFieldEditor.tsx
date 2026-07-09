@@ -46,6 +46,7 @@ const mapDbTypeToFieldType = (dbType: string): string => {
 const emptyField = (): SlugEntityFieldItem => ({
     key: null, label: '', columnType: 'VARCHAR',
     columnLength: null, fieldType: 'input', codeGroupCode: null,
+    defaultValue: null,
     isNullable: true, description: null, sortOrder: 0,
 });
 
@@ -116,6 +117,7 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                 columnLength:  f.columnLength || null,
                 fieldType:     f.fieldType || null,
                 codeGroupCode: f.codeGroupCode || null,
+                defaultValue:  f.defaultValue?.trim() || null,
                 isNullable:    f.isNullable,
                 description:   f.description || null,
                 sortOrder:     i,
@@ -172,6 +174,11 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                         {entity.active ? '사용' : '미사용'}
                     </span>
                 </div>
+                {entity.description && (
+                    <span className="text-xs text-slate-500 truncate max-w-[320px]" title={entity.description}>
+                        {entity.description}
+                    </span>
+                )}
                 <span className="text-xs text-slate-400 ml-auto">필드 {fields.length}개</span>
             </div>
 
@@ -188,6 +195,7 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[140px]">공통코드</th>
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[70px]">길이</th>
                             <th className="text-center px-2 py-2.5 font-semibold text-slate-600 w-14">NULL</th>
+                            <th className="text-left px-2 py-2.5 font-semibold text-slate-600 w-[100px]">기본값</th>
                             <th className="text-left px-2 py-2.5 font-semibold text-slate-600 min-w-[100px]">설명</th>
                             <th className="text-center px-2 py-2.5 font-semibold text-slate-600 w-[55px]">순서</th>
                             <th className="text-center px-2 py-2.5 font-semibold text-slate-600 w-8">삭제</th>
@@ -196,7 +204,7 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                     <tbody>
                         {fields.length === 0 ? (
                             <tr>
-                                <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
+                                <td colSpan={12} className="py-12 text-center text-slate-400 text-xs">
                                     필드가 없습니다. 아래 [+ 필드 추가]를 클릭하세요.
                                 </td>
                             </tr>
@@ -291,6 +299,17 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                                             checked={f.isNullable}
                                             onChange={e => updateField(idx, 'isNullable', e.target.checked)}
                                             className="w-3.5 h-3.5 cursor-pointer"
+                                        />
+                                    </td>
+
+                                    {/* 기본값 */}
+                                    <td className="px-1 py-1">
+                                        <input
+                                            type="text"
+                                            value={f.defaultValue ?? ''}
+                                            onChange={e => updateField(idx, 'defaultValue', e.target.value || null)}
+                                            placeholder="기본값"
+                                            className={INPUT_SM}
                                         />
                                     </td>
 
