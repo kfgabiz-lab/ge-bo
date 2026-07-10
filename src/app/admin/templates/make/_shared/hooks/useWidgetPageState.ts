@@ -39,6 +39,32 @@ export function flatWidgets(items: PageWidgetItem[]): AnyWidget[] {
   return items.flatMap((item) => item.contents.map((c) => c.widget));
 }
 
+/**
+ * Form(옵션: SubList) 위젯의 connectedSlug 일괄 stamp
+ * - 위젯 빌더(widget/page.tsx)의 "Slug Entity 연결" / "메인 연결 slug" 변경·저장·빌드 시점에서 공용 사용
+ * - live 렌더링(이 파일의 useWidgetPageState 훅)은 Form 위젯에 connectedSlug가 없으면
+ *   데이터 저장/조회를 조용히 스킵하므로, 빌더 쪽에서 반드시 이 함수로 stamp 되어야 함
+ * - item.contents 2단 구조로 순회(flatWidgets와 동일 구조, 탭 내부 재귀는 하지 않음 — 기존 동작 유지)
+ * @param widgetItems    원본 위젯 목록 (불변 — 새 배열을 반환)
+ * @param connectedSlug  적용할 data slug. undefined/빈 문자열이면 대상 위젯의 connectedSlug를 제거
+ * @param includeSublist true면 SubList 위젯도 함께 stamp (메인 연결 slug 모드 전용 — 기존 동작 유지용, 기본값 false)
+ * @example stampFormConnectedSlug(widgetItems, 'banner-list') // Form 위젯만 connectedSlug='banner-list'로 교체
+ */
+export function stampFormConnectedSlug<
+  W extends { type: string; connectedSlug?: string },
+  C extends { widget: W },
+  T extends { contents: C[] },
+>(widgetItems: T[], connectedSlug: string | undefined, includeSublist = false): T[] {
+  return widgetItems.map((item) => ({
+    ...item,
+    contents: item.contents.map((c) => {
+      const isTarget = c.widget.type === "form" || (includeSublist && c.widget.type === "sublist");
+      if (!isTarget) return c;
+      return { ...c, widget: { ...c.widget, connectedSlug: connectedSlug || undefined } };
+    }),
+  })) as T[];
+}
+
 /** Search 위젯 widgetId → 필드 목록 맵 */
 function buildSearchFieldsMap(items: PageWidgetItem[]): Record<string, SearchFieldConfig[]> {
   const map: Record<string, SearchFieldConfig[]> = {};

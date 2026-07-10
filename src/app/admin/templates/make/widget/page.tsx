@@ -39,7 +39,8 @@ import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
 import type { SearchWidget, SpaceWidget, CategoryWidget, SubListWidget, MultiSelectWidget, TabWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
 import type { FormWidget, FormFieldItem } from '../_shared/components/builder/FormBuilder';
-import { createIdGenerator, toSlug } from '../_shared/utils';
+import { createIdGenerator, toSlug, resolveConnectedSlug } from '../_shared/utils';
+import { stampFormConnectedSlug } from '../_shared/hooks/useWidgetPageState';
 import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
 import type { SearchFieldType } from '../_shared/types';
 import PageLayout from '@/components/layout/page-layout';
@@ -418,28 +419,16 @@ export default function PageBuilderPage() {
     /* ── 메인 연결 slug 변경 — form/sublist connectedSlug 자동 동기화 ── */
     const handleMainConnectedSlugChange = (slug: string) => {
         om.setMainConnectedSlug(slug);
-        setWidgetItems(prev => prev.map(item => ({
-            ...item,
-            contents: item.contents.map(c => {
-                if (c.widget.type === 'form' || c.widget.type === 'sublist') {
-                    return { ...c, widget: { ...c.widget, connectedSlug: slug || undefined } };
-                }
-                return c;
-            }),
-        })));
+        /* slug 모드는 form+sublist 모두 stamp (기존 동작 유지 — includeSublist=true) */
+        setWidgetItems(prev => stampFormConnectedSlug(prev, slug || undefined, true));
     };
 
     /* ── Slug Entity 변경 — entity와 연결된 data slug를 form connectedSlug에 자동 설정 ── */
     const handleSlugEntityIdChange = (id: number | undefined) => {
         om.setSlugEntityId(id);
-        const connectedSlug = slugOptions.find(s => s.entityId === id)?.slug;
-        setWidgetItems(prev => prev.map(item => ({
-            ...item,
-            contents: item.contents.map(c => {
-                if (c.widget.type !== 'form') return c;
-                return { ...c, widget: { ...c.widget, connectedSlug: connectedSlug || undefined } };
-            }),
-        })));
+        const connectedSlug = resolveConnectedSlug(id, slugOptions);
+        /* entity 모드는 form만 stamp (기본값 includeSublist=false) */
+        setWidgetItems(prev => stampFormConnectedSlug(prev, connectedSlug));
     };
 
     /* snake_case → camelCase 변환 */
@@ -512,41 +501,49 @@ export default function PageBuilderPage() {
 
         if (hasFormContent) {
             /* ── 케이스 1: form 위젯이 이미 있는 경우 ── */
-            setWidgetItems(prev => prev.map(item => ({
-                ...item,
-                contents: item.contents.map(c => {
-                    if (c.widget.type !== 'form') return c;
-                    const formWidget = c.widget as FormWidget;
+            setWidgetItems(prev => {
+                /* 1단계: entity field 기준 라벨/required 갱신 + 누락 필드 추가 */
+                const fieldMerged = prev.map(item => ({
+                    ...item,
+                    contents: item.contents.map(c => {
+                        if (c.widget.type !== 'form') return c;
+                        const formWidget = c.widget as FormWidget;
 
-                    /* 1-1. key가 같은 기존 필드 → 라벨/required 업데이트만 */
-                    const updatedFields = formWidget.fields.map(f => {
-                        const entityField = f.fieldKey ? entityFieldMap.get(f.fieldKey) : undefined;
-                        if (!entityField) return f;
-                        return {
-                            ...f,
-                            /* 라벨이 없는 경우에만 entity 라벨 적용 */
-                            label: f.label || entityField.label,
-                            /* entity not null → required 반영 */
-                            required: entityField.isNullable === false ? true : f.required,
-                        };
-                    });
+                        /* 1-1. key가 같은 기존 필드 → 라벨/required 업데이트만 */
+                        const updatedFields = formWidget.fields.map(f => {
+                            const entityField = f.fieldKey ? entityFieldMap.get(f.fieldKey) : undefined;
+                            if (!entityField) return f;
+                            return {
+                                ...f,
+                                /* 라벨이 없는 경우에만 entity 라벨 적용 */
+                                label: f.label || entityField.label,
+                                /* entity not null → required 반영 */
+                                required: entityField.isNullable === false ? true : f.required,
+                            };
+                        });
 
-                    /* 1-2. 기존 form에 없는 entity field → 하단에 추가
-                       원본·camelCase·_from/_to suffix 제거 등 모든 변형이 existingKeys에 없는 경우에만 추가 */
-                    const existingKeys = new Set(
-                        formWidget.fields.map(f => f.fieldKey).filter(Boolean) as string[]
-                    );
-                    const appendFields = slugEntityFields
-                        .filter(f => f.key && getKeyVariants(f.key!).every(v => !existingKeys.has(v)))
-                        .map(buildFieldItem);
+                        /* 1-2. 기존 form에 없는 entity field → 하단에 추가
+                           원본·camelCase·_from/_to suffix 제거 등 모든 변형이 existingKeys에 없는 경우에만 추가 */
+                        const existingKeys = new Set(
+                            formWidget.fields.map(f => f.fieldKey).filter(Boolean) as string[]
+                        );
+                        const appendFields = slugEntityFields
+                            .filter(f => f.key && getKeyVariants(f.key!).every(v => !existingKeys.has(v)))
+                            .map(buildFieldItem);
 
-                    return { ...c, widget: { ...formWidget, fields: [...updatedFields, ...appendFields] } };
-                }),
-            })));
+                        return { ...c, widget: { ...formWidget, fields: [...updatedFields, ...appendFields] } };
+                    }),
+                }));
+
+                /* 2단계: 이미 존재하는 form을 entity로 재빌드할 때도 connectedSlug가 비어있을 수 있으므로 재확인 stamp
+                 * — resolveConnectedSlug가 undefined면(레지스트리 미로딩 등) 기존 connectedSlug를 덮어쓰지 않고 스킵 */
+                const resolvedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
+                return resolvedSlug !== undefined ? stampFormConnectedSlug(fieldMerged, resolvedSlug) : fieldMerged;
+            });
         } else {
             /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ── */
             const newFields = slugEntityFields.filter(f => f.key).map(buildFieldItem);
-            const connectedSlug = slugOptions.find(s => s.entityId === om.slugEntityId)?.slug;
+            const connectedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
 
             const newFormWidget: FormWidget = {
                 type: 'form',
@@ -669,8 +666,20 @@ export default function PageBuilderPage() {
     const handleSaveConfirm = async () => {
         if (!tm.saveModalName.trim() || !tm.saveModalSlug.trim()) return;
         if (!validateBeforeSave()) return;
+
+        /* entity 연결 모드(connectedType==='entity')일 때 Form 위젯 connectedSlug를 저장 직전 재확인 stamp
+         * — entity 모드에서는 slugEntityId가 우선이므로 slug 모드 값(mainConnectedSlug)은 이 분기에서 건드리지 않음
+         * — resolveConnectedSlug가 undefined면(레지스트리 미로딩 등) 기존 connectedSlug를 덮어쓰지 않고 스킵 */
+        let itemsToSave = widgetItems;
+        if (om.connectedType === 'entity') {
+            const resolvedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
+            if (resolvedSlug !== undefined) {
+                itemsToSave = stampFormConnectedSlug(widgetItems, resolvedSlug);
+            }
+        }
+
         await tm.handleSaveConfirm(
-            widgetItems as unknown as import('../_shared/templateApi').PageWidgetItem[],
+            itemsToSave as unknown as import('../_shared/templateApi').PageWidgetItem[],
             {
                 outputMode:          om.outputMode,
                 pageTitle:           om.pageTitle,

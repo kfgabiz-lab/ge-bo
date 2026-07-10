@@ -969,6 +969,19 @@ export const findDuplicateKeys = (keys: string[]): string[] => {
 };
 
 /**
+ * Slug Entity ID → 연결된 data slug 조회 (entity 목록에서 entityId가 일치하는 항목의 slug)
+ * - widget 빌더에서 "Slug Entity 선택" 시 실제 저장/조회에 쓰이는 data slug로 변환할 때 공용 사용
+ * - 일치하는 항목이 없으면(레지스트리 미로딩·entity에 연결된 slug 없음 등) undefined 반환
+ * @param slugEntityId 선택된 Slug Entity의 ID (미선택 시 undefined)
+ * @param slugOptions  entityId ↔ slug 매핑 목록
+ * @example resolveConnectedSlug(3, [{ entityId: 3, slug: 'banner-list' }]) // → 'banner-list'
+ */
+export const resolveConnectedSlug = (
+    slugEntityId: number | undefined,
+    slugOptions: { entityId?: number; slug: string }[],
+): string | undefined => slugOptions.find(s => s.entityId === slugEntityId)?.slug;
+
+/**
  * SpaceWidget의 align 설정에 따라 외부 그리드 컬럼 위치(gridColumn) 계산
  * - left  : span N (자동 배치, 기본)
  * - center: 중앙 시작 위치 / span N
