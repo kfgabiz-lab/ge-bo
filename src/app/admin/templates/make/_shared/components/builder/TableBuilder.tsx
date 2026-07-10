@@ -364,7 +364,7 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                 {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
                 {col.cellType === 'text'             && <MaskField                  values={col} onChange={patch} />}
                 {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
-                {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} disabledActions={['copy']} />}
+                {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
                 {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
                 {col.cellType === 'dateRangeStatus'  && <DateRangeStatusColumnField values={col} onChange={patch} />}
                 {col.cellType === 'inlineEdit'       && <InlineEditField            values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
@@ -540,7 +540,6 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
                                         onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
                                         layerTemplates={layerTemplates}
                                         onRequestLayerTemplates={loadLayerTemplates}
-                                        disabledActions={['copy']}
                                     />
                                 )}
                                 {pendingCol.cellType === 'date' && (

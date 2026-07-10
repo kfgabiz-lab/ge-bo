@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 
 /* ── 타입 정의 ── */
 
@@ -122,8 +122,7 @@ export const useMessageResourceStore = create<MessageResourceState>((set) => ({
             toast.success('항목이 등록되었습니다.');
             set({ isDrawerOpen: false, selectedItem: null });
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '등록 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '등록 중 오류가 발생했습니다.'));
             throw e;
         }
     },
@@ -135,8 +134,7 @@ export const useMessageResourceStore = create<MessageResourceState>((set) => ({
             toast.success('항목이 수정되었습니다.');
             set({ isDrawerOpen: false, selectedItem: null });
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '수정 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '수정 중 오류가 발생했습니다.'));
             throw e;
         }
     },
@@ -147,8 +145,7 @@ export const useMessageResourceStore = create<MessageResourceState>((set) => ({
             await api.delete(`/message-resources/${id}`);
             toast.success('항목이 삭제되었습니다.');
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '삭제 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '삭제 중 오류가 발생했습니다.'));
             throw e;
         }
     },

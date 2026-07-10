@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import api from "@/lib/api";
+import api, { getApiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import OtpInput from "./otp-input";
 
@@ -32,8 +32,7 @@ export default function TotpVerifyForm({ tempToken }: TotpVerifyFormProps) {
             router.push("/admin/dashboard");
         } catch (error: any) {
             setTotpCode("");
-            const msg = error.response?.data?.message || "인증에 실패했습니다. 다시 시도해주세요.";
-            toast.error(msg);
+            toast.error(getApiErrorMessage(error, "인증에 실패했습니다. 다시 시도해주세요."));
         } finally {
             setIsLoading(false);
         }

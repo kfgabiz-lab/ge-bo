@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import QRCode from "react-qr-code";
 import { Copy, Check } from "lucide-react";
-import api from "@/lib/api";
+import api, { getApiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
 import OtpInput from "./otp-input";
 
@@ -59,8 +59,7 @@ export default function TotpSetupForm({ tempToken }: TotpSetupFormProps) {
             router.push("/admin/dashboard");
         } catch (error: any) {
             setTotpCode("");
-            const msg = error.response?.data?.message || "코드 인증에 실패했습니다. 앱의 최신 코드를 입력해주세요.";
-            toast.error(msg);
+            toast.error(getApiErrorMessage(error, "코드 인증에 실패했습니다. 앱의 최신 코드를 입력해주세요."));
         } finally {
             setIsLoading(false);
         }

@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 
 /* ── 타입 정의 ── */
 export interface MenuItem {
@@ -141,8 +141,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
             get().fetchMenus();
             return res.data as MenuItem;
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '메뉴 추가 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '메뉴 추가 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -175,8 +174,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
             const sel = get().selectedMenu;
             if (sel?.id === id) set({ selectedMenu: { ...sel, ...updates } });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '메뉴 수정 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '메뉴 수정 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -191,8 +189,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
             set({ selectedMenu: null });
             get().fetchMenus();
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '메뉴 삭제 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '메뉴 삭제 중 오류가 발생했습니다.'));
             throw err;
         }
     },

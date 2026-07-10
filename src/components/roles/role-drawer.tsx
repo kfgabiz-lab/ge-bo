@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { X, AlertCircle, Lock, Shield } from 'lucide-react';
 import { useRoleStore } from '@/store/use-role-store';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/api';
 
 const PRESET_COLORS = [
   '#4361ee', '#10b981', '#f59e0b', '#ef4444',
@@ -72,8 +73,7 @@ export const RoleDrawer = () => {
         toast.success('역할이 등록되었습니다.');
       }
     } catch (error: unknown) {
-      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || '작업 중 오류가 발생했습니다.');
+      toast.error(getApiErrorMessage(error, '작업 중 오류가 발생했습니다.'));
     }
   };
 

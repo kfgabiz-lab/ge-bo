@@ -77,4 +77,15 @@ api.interceptors.response.use(
     }
 );
 
+/**
+ * axios 에러 응답에서 BE가 내려준 구체적 에러 메시지를 추출.
+ * BE(GlobalExceptionHandler)는 에러 시 { status, error, message, timestamp } 형태로 응답한다.
+ * message가 없으면 fallback 문구를 반환한다 — catch 블록에서
+ * toast.error(getApiErrorMessage(err, '기본 문구')) 형태로 사용.
+ */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+    const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+    return message || fallback;
+}
+
 export default api;

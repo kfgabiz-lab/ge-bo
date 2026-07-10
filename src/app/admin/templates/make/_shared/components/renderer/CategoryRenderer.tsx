@@ -121,11 +121,15 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 params.eq_parentId = String(selectedParentId);
             }
             const res = await api.get(`/page-data/${widget.dbSlug}`, { params });
-            /* 설정된 필드 키 — 미설정 시 기본값 사용 */
+            /* 연결 Slug(relationSlugId) 설정 시 — BE가 내려주는 _fetchedRel{id}.필드명 형태로 자동 접두사 결합.
+               관리자는 카드 필드 키에 연결된 레코드의 순수 필드명만 입력하면 된다(예: prdNm). */
+            const fetchPrefix = widget.relationSlugId ? `_fetchedRel${widget.relationSlugId}.` : '';
+            /* ID는 카테고리 자기 자신의 식별자이므로 연결 Slug 접두사를 절대 적용하지 않는다 —
+               fieldId="id"(기본값)면 자기 자신의 id, "refId"면 자기 자신의 refId 필드를 flat 데이터에서 직접 조회 */
             const idKey    = widget.fieldId    || 'id';
-            const codeKey  = widget.fieldCode  || 'code';
-            const titleKey = widget.fieldTitle || 'name';
-            const descKey  = widget.fieldDesc  || 'description';
+            const codeKey  = fetchPrefix + (widget.fieldCode  || 'code');
+            const titleKey = fetchPrefix + (widget.fieldTitle || 'name');
+            const descKey  = fetchPrefix + (widget.fieldDesc  || 'description');
 
             const rows = (res.data.content as { id: number; dataJson: Record<string, unknown> }[])
                 .map(item => {
@@ -194,7 +198,9 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             return;
         }
         if (widget.detailConnType === 'path' && widget.detailPath) {
-            const qs = widget.detailParams ? `&${widget.detailParams}` : '';
+            /* parseActionParams로 파싱 후 URLSearchParams로 올바른 쿼리스트링 생성 */
+            const parsed = parseActionParams(widget.detailParams, item._flatJson ?? {});
+            const qs = Object.keys(parsed).length > 0 ? `&${new URLSearchParams(parsed).toString()}` : '';
             router.push(`${widget.detailPath}?id=${item.id}${qs}`);
         }
     };

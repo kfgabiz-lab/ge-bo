@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 
 /* ── 타입 정의 ── */
 export interface CodeDetail {
@@ -89,8 +89,7 @@ export const useCodeStore = create<CodeStore>((set, get) => ({
             await api.post(API_PATH, data);
             await get().fetchGroups();
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '그룹 추가 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '그룹 추가 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -102,8 +101,7 @@ export const useCodeStore = create<CodeStore>((set, get) => ({
             const sel = get().selectedGroup;
             if (sel?.id === id) set({ selectedGroup: res.data });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '그룹 수정 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '그룹 수정 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -114,8 +112,7 @@ export const useCodeStore = create<CodeStore>((set, get) => ({
             set({ selectedGroup: null });
             await get().fetchGroups();
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '그룹 삭제 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '그룹 삭제 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -128,8 +125,7 @@ export const useCodeStore = create<CodeStore>((set, get) => ({
             const updated = get().groups.find(g => g.id === groupId);
             if (updated) set({ selectedGroup: updated });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '코드 추가 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '코드 추가 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -141,8 +137,7 @@ export const useCodeStore = create<CodeStore>((set, get) => ({
             const updated = get().groups.find(g => g.id === groupId);
             if (updated) set({ selectedGroup: updated });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '코드 수정 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '코드 수정 중 오류가 발생했습니다.'));
             throw err;
         }
     },
@@ -154,8 +149,7 @@ export const useCodeStore = create<CodeStore>((set, get) => ({
             const updated = get().groups.find(g => g.id === groupId);
             if (updated) set({ selectedGroup: updated });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '코드 삭제 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '코드 삭제 중 오류가 발생했습니다.'));
             throw err;
         }
     },

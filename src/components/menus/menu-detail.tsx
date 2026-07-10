@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { URL_REGEX, XSS_CHARS } from './constants';
 import { IconPicker } from './icon-picker';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useI18n } from '@/hooks/use-i18n';
 
 /* ── 페이지 템플릿 연동 버튼 ── */
@@ -803,8 +803,7 @@ export function MenuDetail() {
             await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
             await queryClient.invalidateQueries({ queryKey: ['menus', 'nav'] });
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || t('menu.save_error'));
+            toast.error(getApiErrorMessage(err, t('menu.save_error')));
         } finally {
             setIsSubmitting(false);
         }
@@ -824,8 +823,7 @@ export function MenuDetail() {
             await queryClient.invalidateQueries({ queryKey: ['menus', activeTab] });
             await queryClient.invalidateQueries({ queryKey: ['menus', 'nav'] });
         } catch (err: unknown) {
-            const msg2 = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg2 || t('menu.delete_error'));
+            toast.error(getApiErrorMessage(err, t('menu.delete_error')));
         } finally {
             setIsSubmitting(false);
         }

@@ -8,7 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Search, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { SlugSelector, type SlugOption } from '@/components/slug/slug-selector';
 
 /* ══════════════════════════════════════════ */
@@ -213,8 +213,7 @@ export default function SlugRelationPage() {
             setModalOpen(false);
             fetchList(currentPage);
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally {
             setSaving(false);
         }

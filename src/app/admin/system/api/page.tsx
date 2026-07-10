@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Search, X, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useCodeStore } from '@/store/use-code-store';
 import { useEntityStore } from '@/store/use-entity-store';
 import { EntityInfoPopup } from '@/components/database/entity-info-popup';
@@ -192,8 +192,7 @@ export default function ApiInfoPage() {
             setModalOpen(false);
             fetchList(currentPage);
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally {
             setSaving(false);
         }

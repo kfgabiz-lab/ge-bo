@@ -160,10 +160,16 @@ function splitTopLevelComma(str: string): string[] {
     return out;
 }
 
+/** 작은따옴표 리터럴 판별 — "'text'" 형태면 안쪽 text, 아니면 null (강제 고정 텍스트 지원) */
+function stripQuotedLiteral(token: string): string | null {
+    return token.startsWith("'") && token.endsWith("'") ? token.slice(1, -1) : null;
+}
+
 /** 함수토큰 아닌 피연산자의 원시값 — 함수토큰의 sibling 포맷 추론용 (함수토큰이면 '' 반환해 재귀 차단) */
 function rawOperandValue(token: string, resolveField: (k: string) => string | undefined): string {
     if (token in FUNCTION_TOKENS) return '';
-    if (token.startsWith("'") && token.endsWith("'")) return token.slice(1, -1);
+    const literal = stripQuotedLiteral(token);
+    if (literal !== null) return literal;
     const fv = resolveField(token);
     return fv !== undefined ? fv : token;
 }
@@ -174,7 +180,8 @@ function resolveOperand(token: string, sibling: string, resolveField: (k: string
         const subType = inferDateSubType(rawOperandValue(sibling, resolveField)) ?? 'date';
         return FUNCTION_TOKENS[token](subType);
     }
-    if (token.startsWith("'") && token.endsWith("'")) return token.slice(1, -1);
+    const literal = stripQuotedLiteral(token);
+    if (literal !== null) return literal;
     const fv = resolveField(token);
     return fv !== undefined ? fv : token;
 }
@@ -585,7 +592,8 @@ function parseConcatTokens(expr: string, row: Record<string, unknown>): string {
 
     return tokens
         .map(token => {
-            if (token.startsWith("'") && token.endsWith("'")) return token.slice(1, -1);
+            const literal = stripQuotedLiteral(token);
+            if (literal !== null) return literal;
             return String(row[token] ?? '');
         })
         .join('');
@@ -1191,6 +1199,31 @@ export function buildDataJson(
 }
 
 /**
+ * 데이터저장(datasave) POST 바디 조립 — page 모드(useWidgetPageState)와
+ * popup 모드(WidgetRenderer) 양쪽에서 공통 사용.
+ * validationRuleIds를 named 필드로 강제해서 한쪽 호출부가 빠뜨리는 실수를 막는다.
+ * (과거 popup 쪽에서 validationRuleIds를 빠뜨려 unique 등 검증 규칙이 동작하지 않던 버그가 있었음)
+ *
+ * @example
+ * const body = buildDataSavePayload({ dataJson, pkKeys, templateSlug: pageSlug, validationRuleIds });
+ * await api.post(`/page-data/${dataSaveSlug}`, body);
+ */
+export function buildDataSavePayload(params: {
+    dataJson: Record<string, unknown>;
+    pkKeys: string[];
+    templateSlug?: string;
+    validationRuleIds?: number[];
+}): Record<string, unknown> {
+    const { dataJson, pkKeys, templateSlug, validationRuleIds } = params;
+    return {
+        dataJson,
+        ...(pkKeys.length > 0 && { pkKeys }),
+        ...(templateSlug && { templateSlug }),
+        ...(validationRuleIds && validationRuleIds.length > 0 && { validationRuleIds }),
+    };
+}
+
+/**
  * 생성KEY dot notation 경로에 값을 기록 — buildDataJson / FormRenderer 공용
  * 1단계: "fieldKey"       → dataJson.fieldKey
  * 2단계: "ck.fieldKey"    → dataJson.ck.fieldKey
@@ -1430,12 +1463,17 @@ export function initFormDefaultValues(
 }
 
 /**
- * 파라미터 문자열 파싱 — 쉼표 구분 + row 동적 주입
+ * 파라미터 문자열 파싱 — 쉼표 구분 + row 동적 주입 + 작은따옴표 강제 고정 텍스트 지원
  *
  * 규칙:
- *   - "key=value"  → 고정값
- *   - "key"        → row[key] 조회 → 없으면 skip
+ *   - "key=value"        → 고정값 (value가 row 필드명과 같으면 row 값으로 동적 치환)
+ *   - "key='value'"      → 작은따옴표로 감싼 값은 무조건 고정 텍스트(리터럴)로 사용
+ *                           — row 필드명과 우연히 같아도 절대 동적 치환하지 않음
+ *   - "key"              → row[key] 조회 → 없으면 skip
  *   - dot notation "content1.field2" → dot 이후 fieldKey(field2)로 row 조회 → 없으면 skip
+ *   - 값 내부에 콤마가 있어도 작은따옴표로 감싸면 구분자로 보지 않음 (splitTopLevelComma)
+ *   - 작은따옴표 개수가 홀수(짝이 안 맞음)면 splitTopLevelComma가 뒤쪽 콤마까지 전부 "따옴표 안"으로
+ *     잘못 인식하므로, 이 경우에는 안전하게 단순 콤마 분리(split(','))로 자동 폴백함
  *
  * 사용법:
  *   parseActionParams('depth=4,name', { name: '홍길동' })
@@ -1443,6 +1481,15 @@ export function initFormDefaultValues(
  *
  *   parseActionParams('content1.field1=aaa,content1.field2', { field2: '테스트' })
  *   // → { 'content1.field1': 'aaa', 'content1.field2': '테스트' }
+ *
+ *   parseActionParams("title='타이틀'", {})
+ *   // → { title: '타이틀' } (row에 title이 있어도 무조건 리터럴)
+ *
+ *   parseActionParams("title='서울,경기'", {})
+ *   // → { title: '서울,경기' } (작은따옴표 안쪽 콤마는 구분자로 취급하지 않음)
+ *
+ *   parseActionParams("name=O'Brien,type=001", {})
+ *   // → { name: "O'Brien", type: '001' } (작은따옴표가 홀수개라 단순 콤마 분리로 폴백)
  */
 export function parseActionParams(
     paramStr: string | undefined,
@@ -1450,13 +1497,22 @@ export function parseActionParams(
 ): Record<string, string> {
     if (!paramStr) return {};
     const result: Record<string, string> = {};
-    paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {
+    /* 작은따옴표 개수가 홀수면(짝이 안 맞으면) splitTopLevelComma가 뒤 콤마까지 따옴표 안으로 오인식하므로
+       단순 콤마 분리로 폴백 — 정상적으로 짝이 맞을 때만 따옴표 인식 분리 사용 */
+    const quoteCount = (paramStr.match(/'/g) ?? []).length;
+    const parts = quoteCount % 2 === 0
+        ? splitTopLevelComma(paramStr)
+        : paramStr.split(',').map(p => p.trim());
+    parts.filter(Boolean).forEach(part => {
         if (part.includes('=')) {
-            /* key=value 형태 — val이 row 필드명이면 row 값으로 치환, 없으면 고정값 */
-            const eqIdx      = part.indexOf('=');
-            const key        = part.slice(0, eqIdx).trim();
-            const val        = part.slice(eqIdx + 1).trim();
-            const resolvedVal = val in row ? String(row[val] ?? '') : val;
+            /* key=value 형태 — 작은따옴표 리터럴이면 무조건 고정값, 아니면 row 필드명 일치 시 row 값으로 치환 */
+            const eqIdx  = part.indexOf('=');
+            const key    = part.slice(0, eqIdx).trim();
+            const val    = part.slice(eqIdx + 1).trim();
+            const literal = stripQuotedLiteral(val);
+            const resolvedVal = literal !== null
+                ? literal
+                : (val in row ? String(row[val] ?? '') : val);
             if (key) result[key] = resolvedVal;
         } else {
             /* 동적 주입 — dot notation이면 마지막 세그먼트로 row 조회 */

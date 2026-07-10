@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import { Pencil, Trash2, Paperclip } from 'lucide-react';
+import { Pencil, Trash2, Paperclip, CopyPlus } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 import { TableColumnConfig, CodeGroupDef } from '../../types';
 import type { RendererMode, TableActionHandlers } from './types';
@@ -130,11 +130,13 @@ export function TableCellRenderer({
                 col.align === 'right'  ? 'justify-end'    : 'justify-start';
             return (
                 <div className={`flex items-center gap-1 flex-wrap ${justifyCls}`}>
-                    {/* 프리셋 버튼 — edit → delete 고정 순서 */}
+                    {/* 프리셋 버튼 — edit → delete 고정 순서. preview 모드에서는 SubList 3버튼과 동일하게 모두 비활성화 처리 */}
                     {(col.actions || []).includes('edit') && (
                         <button
+                            type="button"
+                            disabled={isPreview}
                             onClick={!isPreview ? () => handlers?.onEdit?.(row) : undefined}
-                            className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-all"
+                            className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                             title="수정"
                         >
                             <Pencil className="w-3.5 h-3.5" />
@@ -142,11 +144,25 @@ export function TableCellRenderer({
                     )}
                     {(col.actions || []).includes('delete') && (
                         <button
+                            type="button"
+                            disabled={isPreview}
                             onClick={!isPreview ? () => handlers?.onDelete?.(row._id as number) : undefined}
-                            className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                            className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                             title="삭제"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    {/* 복사 — SubList 행 복사 버튼과 동일한 아이콘·톤 재사용. preview 모드에서는 비활성화 처리 */}
+                    {(col.actions || []).includes('copy') && (
+                        <button
+                            type="button"
+                            disabled={isPreview}
+                            onClick={!isPreview ? () => handlers?.onCopy?.(row) : undefined}
+                            className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                            title="복사"
+                        >
+                            <CopyPlus className="w-3.5 h-3.5" />
                         </button>
                     )}
                 </div>

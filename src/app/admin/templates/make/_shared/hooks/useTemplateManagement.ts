@@ -1,7 +1,7 @@
 'use client';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { saveTemplate, PageWidgetItem } from '../templateApi';
 import { TemplateItem } from '../types';
 
@@ -100,8 +100,7 @@ export function useTemplateManagement(templateType: string) {
             setTemplateList(prev => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
             toast.success(`"${newName}" 으로 복사되었습니다.`);
         } catch (err: unknown) {
-            const axiosError = err as { response?: { data?: { message?: string } } };
-            toast.error(axiosError.response?.data?.message || '복사 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '복사 중 오류가 발생했습니다.'));
         } finally { setIsDuplicatingId(null); }
     }, [templateType]);
 
@@ -144,8 +143,7 @@ export function useTemplateManagement(templateType: string) {
             setShowSaveModal(false);
             toast.success(currentTemplateId ? '템플릿이 수정되었습니다.' : '템플릿이 저장되었습니다.');
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally { setIsSaving(false); }
     }, [currentTemplateId, saveModalName, saveModalSlug, saveModalDesc, templateType]);
 
