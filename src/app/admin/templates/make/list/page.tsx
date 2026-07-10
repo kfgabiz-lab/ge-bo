@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner';
 import { SearchForm, SearchRow, SearchField } from '@/components/search';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 /* ── 공통 모듈 ── */
 import { inputCls, selectCls } from '../_shared/styles';
 import {
@@ -829,8 +829,7 @@ export default function MakeListPage() {
             }
             setShowSaveModal(false);
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally {
             setIsSaving(false);
         }
@@ -935,8 +934,7 @@ export default function MakeListPage() {
             setTemplateList(prev => [...prev, res.data]);
             toast.success(`"${newName}" 으로 복사되었습니다.`);
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '복사 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '복사 중 오류가 발생했습니다.'));
         } finally {
             setIsDuplicatingId(null);
         }
@@ -959,8 +957,7 @@ export default function MakeListPage() {
             setEditingTemplateId(null);
             toast.success('수정되었습니다.');
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '수정 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '수정 중 오류가 발생했습니다.'));
         }
     };
 
@@ -1025,8 +1022,7 @@ export default function MakeListPage() {
             toast.success(`TSX 파일 생성 완료! → ${fileRes.data.pageUrl}`);
             setShowGenerateModal(false);
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || 'TSX 파일 생성 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, 'TSX 파일 생성 중 오류가 발생했습니다.'));
         } finally {
             setIsGenerating(false);
         }

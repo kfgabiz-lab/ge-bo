@@ -261,7 +261,7 @@ const SAMPLE_TABLE: TableWidget = {
         {
             id: 'c6', header: '관리',   accessor: '_actions',
             align: 'center', sortable: false, cellType: 'actions',
-            actions: ['edit', 'delete'],
+            actions: ['edit', 'delete', 'copy'],
         },
     ],
 };

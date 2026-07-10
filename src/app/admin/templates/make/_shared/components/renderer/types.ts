@@ -346,6 +346,8 @@ export interface TableActionHandlers {
     onEdit?: (row: Record<string, unknown>) => void;
     onDetail?: (row: Record<string, unknown>) => void;
     onDelete?: (id: number) => void;
+    /** 행 복사 — 원본 dataJson을 복제해 신규 레코드로 등록 (live 모드 전용) */
+    onCopy?: (row: Record<string, unknown>) => void;
     onFileClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
     /** button 셀 클릭 — 연결 방식(connType)에 따라 페이지 이동/레이어팝업/윈도우팝업 분기 (live 모드 전용) */
     onButtonClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;

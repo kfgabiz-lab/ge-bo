@@ -20,8 +20,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import api from "@/lib/api";
-import { buildDataJson, validateFormFields, validateSubListRows, uploadFiles, flattenPageDataItem, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition, validateSearchDateRange } from "../utils";
+import api, { getApiErrorMessage } from "@/lib/api";
+import { buildDataJson, buildDataSavePayload, validateFormFields, validateSubListRows, uploadFiles, flattenPageDataItem, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition, validateSearchDateRange } from "../utils";
 import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
@@ -1393,12 +1393,10 @@ export function useWidgetPageState(
             dataSaveAllFormValues,
           );
 
-          const res = await api.post(`/page-data/${dataSaveSlug}`, {
-            dataJson,
-            ...(pkKeys.length > 0 && { pkKeys }),
-            ...(pageSlug && { templateSlug: pageSlug }),
-            ...(validationRuleIds && validationRuleIds.length > 0 && { validationRuleIds }),
-          });
+          const res = await api.post(
+            `/page-data/${dataSaveSlug}`,
+            buildDataSavePayload({ dataJson, pkKeys, templateSlug: pageSlug, validationRuleIds }),
+          );
 
           if (allNewIds.length > 0 && res.data.id) {
             await api.patch("/page-files/link", { fileIds: allNewIds, dataId: res.data.id });
@@ -1437,8 +1435,8 @@ export function useWidgetPageState(
           markClean();
           if (goBackAfterAction) options?.onGoBack?.();
         }
-      } catch {
-        toast.error("저장 중 오류가 발생했습니다.");
+      } catch (err) {
+        toast.error(getApiErrorMessage(err, "저장 중 오류가 발생했습니다."));
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -89,22 +89,49 @@ export const buildListTsxFile = (
     if (hasActionsParams) {
         lines.push('/**');
         lines.push(' * Actions 컬럼 파라미터 문자열 → 초기값 맵 변환');
-        lines.push(' * 형식: "title,temp1=1,temp2=abc"');
-        lines.push(' *   - title   → { title: row[\'title\'] }  (=없음: row 필드값 사용)');
-        lines.push(' *   - temp1=1 → { temp1: \'1\' }           (=있음: 고정값)');
+        lines.push(' * 형식: "title,temp1=1,temp2=\'고정텍스트\',content1.field2"');
+        lines.push(' *   - title             → { title: row[\'title\'] }        (=없음: row 필드값 사용, 없으면 skip)');
+        lines.push(' *   - temp1=1           → { temp1: \'1\' }                  (=있음, row 필드명과 일치 시 row 값으로 치환)');
+        lines.push(' *   - temp2=\'고정텍스트\' → { temp2: \'고정텍스트\' }         (작은따옴표로 감싸면 무조건 고정 텍스트)');
+        lines.push(' *   - content1.field2   → dot 이후 fieldKey(field2)로 row 조회 (없으면 skip)');
+        lines.push(' * ⚠️ 작은따옴표 개수가 홀수(짝이 안 맞음)면 아래 콤마보호 파서가 뒤쪽 콤마까지 따옴표 안으로');
+        lines.push(' *   잘못 인식하므로, 이 경우에는 단순 콤마 분리(split(\',\'))로 자동 폴백함');
+        lines.push(' * ⚠️ utils.ts의 parseActionParams와 반드시 동일하게 유지 — 한쪽만 변경 금지');
         lines.push(' */');
         lines.push('function parseActionParams(paramStr: string, row: Record<string, unknown>): Record<string, string> {');
         lines.push(`${ind(1)}if (!paramStr) return {};`);
         lines.push(`${ind(1)}const result: Record<string, string> = {};`);
-        lines.push(`${ind(1)}paramStr.split(',').map(p => p.trim()).filter(Boolean).forEach(part => {`);
+        lines.push(`${ind(1)}/* 작은따옴표 개수가 홀수면 짝이 안 맞으므로 단순 콤마 분리로 폴백 */`);
+        lines.push(`${ind(1)}const quoteCount = (paramStr.match(/'/g) ?? []).length;`);
+        lines.push(`${ind(1)}let parts: string[];`);
+        lines.push(`${ind(1)}if (quoteCount % 2 !== 0) {`);
+        lines.push(`${ind(2)}parts = paramStr.split(',').map(p => p.trim());`);
+        lines.push(`${ind(1)}} else {`);
+        lines.push(`${ind(2)}/* 작은따옴표 내부의 콤마는 구분자로 보지 않는 간단한 인라인 파서 */`);
+        lines.push(`${ind(2)}const rawParts: string[] = [];`);
+        lines.push(`${ind(2)}let cur = '';`);
+        lines.push(`${ind(2)}let inQuote = false;`);
+        lines.push(`${ind(2)}for (const ch of paramStr) {`);
+        lines.push(`${ind(3)}if (ch === "'") { inQuote = !inQuote; cur += ch; }`);
+        lines.push(`${ind(3)}else if (ch === ',' && !inQuote) { if (cur.trim()) rawParts.push(cur.trim()); cur = ''; }`);
+        lines.push(`${ind(3)}else cur += ch;`);
+        lines.push(`${ind(2)}}`);
+        lines.push(`${ind(2)}if (cur.trim()) rawParts.push(cur.trim());`);
+        lines.push(`${ind(2)}parts = rawParts;`);
+        lines.push(`${ind(1)}}`);
+        lines.push(`${ind(1)}parts.forEach(part => {`);
         lines.push(`${ind(2)}if (part.includes('=')) {`);
         lines.push(`${ind(3)}const eqIdx = part.indexOf('=');`);
         lines.push(`${ind(3)}const key = part.slice(0, eqIdx).trim();`);
         lines.push(`${ind(3)}const val = part.slice(eqIdx + 1).trim();`);
-        lines.push(`${ind(3)}const resolvedVal = val in row ? String(row[val] ?? '') : val;`);
+        lines.push(`${ind(3)}/* 작은따옴표로 감싼 값은 무조건 고정 텍스트(리터럴)로 사용 */`);
+        lines.push(`${ind(3)}const lit = val.startsWith("'") && val.endsWith("'") ? val.slice(1, -1) : null;`);
+        lines.push(`${ind(3)}const resolvedVal = lit !== null ? lit : (val in row ? String(row[val] ?? '') : val);`);
         lines.push(`${ind(3)}if (key) result[key] = resolvedVal;`);
         lines.push(`${ind(2)}} else {`);
-        lines.push(`${ind(3)}result[part] = String(row[part] ?? '');`);
+        lines.push(`${ind(3)}/* 동적 주입 — dot notation이면 마지막 세그먼트로 row 조회 */`);
+        lines.push(`${ind(3)}const fieldKey = part.includes('.') ? part.slice(part.lastIndexOf('.') + 1) : part;`);
+        lines.push(`${ind(3)}if (fieldKey in row) result[part] = String(row[fieldKey] ?? '');`);
         lines.push(`${ind(2)}}`);
         lines.push(`${ind(1)}});`);
         lines.push(`${ind(1)}return result;`);
@@ -461,7 +488,7 @@ export const buildListTsxFile = (
                         if (action === 'edit') {
                             /* editParams 있으면 parseActionParams 호출 코드 포함 */
                             const editInitVal = col.editParams
-                                ? `, initialValues: parseActionParams('${col.editParams}', row)`
+                                ? `, initialValues: parseActionParams(${JSON.stringify(col.editParams)}, row)`
                                 : '';
                             const handler = col.editPopupSlug
                                 ? `{ setTablePopup({ type: 'slug', value: '${col.editPopupSlug}', editId: row.id as number${editInitVal} }); }`
@@ -472,7 +499,7 @@ export const buildListTsxFile = (
                         } else if (action === 'detail') {
                             /* detailParams 있으면 parseActionParams 호출 코드 포함 */
                             const detailInitVal = col.detailParams
-                                ? `, initialValues: parseActionParams('${col.detailParams}', row)`
+                                ? `, initialValues: parseActionParams(${JSON.stringify(col.detailParams)}, row)`
                                 : '';
                             const handler = col.detailPopupSlug
                                 ? `{ setTablePopup({ type: 'slug', value: '${col.detailPopupSlug}'${detailInitVal} }); }`

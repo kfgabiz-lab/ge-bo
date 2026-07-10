@@ -51,7 +51,7 @@ if (typeof document !== 'undefined') {
         }
     }, { capture: true });
 }
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { PageGridContainer } from '@/components/layout/page-grid-container';
 import { CodeGroupDef } from '../../types';
 import { SearchRenderer } from './SearchRenderer';
@@ -72,7 +72,7 @@ import type { TemplatePopupConfig } from '../../templateApi';
 import { PageGridRenderer } from './PageGridRenderer';
 import type { PageTableData } from './PageGridRenderer';
 import { PrivacyReasonModal } from '@/components/ui/privacy-reason-modal';
-import { validateFormFields, validateSubListRows, buildDataJson, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList, codeDetailToLabel } from '../../utils';
+import { validateFormFields, validateSubListRows, buildDataJson, buildDataSavePayload, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList, codeDetailToLabel, resolveAccessor } from '../../utils';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
@@ -170,7 +170,7 @@ interface WidgetRendererProps {
     /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 버튼 클릭 시 데이터저장 동작 — connType='datasave' 전용 */
-    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean) => void;
+    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
     onClose?: () => void;
 
@@ -408,11 +408,6 @@ export function WidgetRenderer({
     const [popupTableSelectedRowsMap, setPopupTableSelectedRowsMap] = useState<Record<string, number[]>>({});
     /* paramSave extras — 폼에 없는 파라미터 임시 보관 (저장 버튼 클릭 시 dataJson에 병합) */
     const [popupParamSaveExtras, setPopupParamSaveExtras] = useState<Record<string, unknown>>({});
-    /* 카테고리 등록(datasave) 팝업 컨텍스트 — relationSlugId 설정된 depth2+ 위젯의 등록 팝업일 때만 값 존재.
-     * 팝업 내 테이블 행선택 저장 성공 직후 { depth, parentId, refId } 경량 row를 카테고리 dbSlug에 추가 저장할 때 사용 */
-    const [popupCategoryLinkCtx, setPopupCategoryLinkCtx] = useState<{
-        relationSlugId: number; dbSlug: string; depth: number; parentId: number | null;
-    } | null>(null);
 
     /* ── Ctrl+` 단축키: hidden 필드 콘솔 출력 ──
      * 최신 상태를 ref로 유지하고 _hiddenLogCallbacks에 콜백 등록 */
@@ -545,7 +540,6 @@ export function WidgetRenderer({
         setPopupMultiSelectValuesMap({});
         setPopupTableSelectedRowsMap({});
         setPopupParamSaveExtras({});
-        setPopupCategoryLinkCtx(null);
     }, []);
 
     /**
@@ -555,8 +549,6 @@ export function WidgetRenderer({
      * @param _listSlug     미사용 (각자 slug 독립 정책 — 팝업 폼의 connectedSlug 직접 사용)
      * @param initialValues 초기값 맵 — fieldKey 기준으로 폼 필드에 매핑 (파라미터 전달용)
      * @param groupId       다중 slug 저장 그룹 ID — page 이동 시 ?group_id=uuid 파라미터로 전달
-     * @param categoryLinkCtx 카테고리 등록(datasave) 팝업 컨텍스트 — relationSlugId 설정된 depth2+ 카테고리 위젯의
-     *                        등록 팝업일 때만 전달. 팝업 내 테이블 저장 성공 직후 연결 row 추가 저장에 사용
      */
     const handleInternalPopupOpen = useCallback(async (
         slug: string,
@@ -565,7 +557,6 @@ export function WidgetRenderer({
         initialValues?: Record<string, string>,
         groupId?: string | null,
         paramSave?: boolean,
-        categoryLinkCtx?: { relationSlugId: number; dbSlug: string; depth: number; parentId: number | null } | null,
     ) => {
         if (mode !== 'live') return;
 
@@ -581,7 +572,6 @@ export function WidgetRenderer({
         setPopupSubListRowsMap({});
         setPopupSubListFileMap({});
         setPopupMultiSelectValuesMap({});
-        setPopupCategoryLinkCtx(categoryLinkCtx ?? null);
         setPopupTableSelectedRowsMap({});
         setPopupTableDataMap({});
         setPopupSortKeyMap({});
@@ -985,7 +975,7 @@ export function WidgetRenderer({
             handlePopupClose();
         } catch (err) {
             console.error('[WidgetRenderer] 팝업 저장 실패:', err);
-            toast.error('저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally {
             setPopupSaving(false);
         }
@@ -1001,6 +991,8 @@ export function WidgetRenderer({
         dataSaveSlug: string,
         goBackAfterAction?: boolean,
         paramSave?: string,
+        /** action-button 설정의 검증 규칙 ID 목록 — connType='datasave' 전용, 요청 바디에 그대로 포함 */
+        validationRuleIds?: number[],
     ) => {
         if (!dataSaveSlug || !popupCfg) return;
 
@@ -1083,11 +1075,10 @@ export function WidgetRenderer({
                     datasaveAllFormValues,
                 );
 
-                const saveRes = await api.post(`/page-data/${dataSaveSlug}`, {
-                    dataJson,
-                    ...(pkKeys.length > 0 && { pkKeys }),
-                    ...(pageSlug && { templateSlug: pageSlug }),
-                });
+                const saveRes = await api.post(
+                    `/page-data/${dataSaveSlug}`,
+                    buildDataSavePayload({ dataJson, pkKeys, templateSlug: pageSlug, validationRuleIds }),
+                );
 
                 if (allNewIds.length > 0 && saveRes.data.id) {
                     await api.patch('/page-files/link', { fileIds: allNewIds, dataId: saveRes.data.id });
@@ -1120,33 +1111,9 @@ export function WidgetRenderer({
                     dataSaveSlug,
                     templateSlug: pageSlug,
                     paramSave,
+                    validationRuleIds,
                 });
-                if (saved > 0) {
-                    anySaved = true;
-                    /* 카테고리 연결 컨텍스트가 있으면 — 저장된(선택된) 행마다 원본 id(refId)만 뽑아
-                       { depth, parentId, refId } 경량 row를 카테고리 dbSlug에 추가 저장 (순차 처리 + 부분 실패 피드백) */
-                    if (popupCategoryLinkCtx) {
-                        let linkFailCount = 0;
-                        for (const row of rowsToSave) {
-                            const refId = Number(row['_id']);
-                            if (!refId) continue;
-                            try {
-                                await api.post(`/page-data/${popupCategoryLinkCtx.dbSlug}`, {
-                                    dataJson: {
-                                        depth: popupCategoryLinkCtx.depth,
-                                        parentId: popupCategoryLinkCtx.parentId,
-                                        refId,
-                                    },
-                                });
-                            } catch {
-                                linkFailCount++;
-                            }
-                        }
-                        if (linkFailCount > 0) {
-                            toast.warning(`${linkFailCount}건의 카테고리 연결 저장에 실패했습니다.`);
-                        }
-                    }
-                }
+                if (saved > 0) anySaved = true;
             }
 
             if (anySaved) {
@@ -1154,12 +1121,12 @@ export function WidgetRenderer({
                 onRefresh?.();
                 handlePopupClose();
             }
-        } catch {
-            toast.error('저장 중 오류가 발생했습니다.');
+        } catch (err) {
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally {
             setPopupSaving(false);
         }
-    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, popupTableDataMap, popupParamSaveExtras, popupCategoryLinkCtx, pageSlug, onRefresh, handlePopupClose]);
+    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, popupTableDataMap, popupParamSaveExtras, pageSlug, onRefresh, handlePopupClose]);
 
     /* ══════════════════════════════════════════ */
     /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
@@ -1382,6 +1349,65 @@ export function WidgetRenderer({
                 }
                 : undefined
             ),
+            /* 행 복사 — 외부 핸들러 우선, 없으면 connectedSlug로 직접 복사 등록
+             * row는 flattenPageDataItem으로 평탄화된 표시용 데이터라 원본 dataJson 구조와 다르므로
+             * GET 단건조회(기존 API)로 원본 dataJson을 다시 조회한 뒤 신규 등록(POST, 기존 API)한다 */
+            onCopy: handlers?.onCopy ?? (mode === 'live' && connectedSlug
+                ? async (row: Record<string, unknown>) => {
+                    if (!confirm('복사하시겠습니까?')) return;
+                    const id = row._id as number;
+                    if (!id) return;
+                    try {
+                        const detailRes = await api.get(`/page-data/${connectedSlug}/${id}`);
+                        const originalDataJson = (detailRes.data.dataJson ?? {}) as Record<string, unknown>;
+
+                        /* 첨부파일 컬럼(cellType='file')의 accessor 경로는 복사 대상에서 제외
+                         * — 키는 유지하고 값만 빈 배열([])로 세팅 (파일 필드는 프로젝트 전반에서
+                         * number[] 형태로 저장되며 빈 상태는 [] — buildDataJson의 file 필드 처리와 동일 규칙) */
+                        let copyDataJson = originalDataJson;
+                        widget.columns
+                            .filter(c => c.cellType === 'file')
+                            .forEach(c => {
+                                if (resolveAccessor(originalDataJson, c.accessor) !== undefined) {
+                                    copyDataJson = applyDotField(copyDataJson, c.accessor, []);
+                                }
+                            });
+
+                        /* 복사 시 고정값 세팅 — actions 컬럼의 copyFixedParams("key=value,..")를
+                         * 평탄화된 row(flattenPageDataItem)를 컨텍스트로 넘겨 파싱함. originalDataJson은
+                         * form1.title처럼 섹션에 중첩된 원본 구조 그대로라 동적 참조("content=title")로는
+                         * 중첩 필드를 찾지 못한다. flattenPageDataItem은 다른 모든 parseActionParams 호출부
+                         * (editParams/detailParams/passParam/createParams)와 동일하게, 섹션 간 중복이 없는
+                         * fieldKey는 root로 병합해주므로 form1.title도 title 하나로 단순 참조가 가능해진다.
+                         * 따옴표 없이 값이 실제 필드명과 일치하면 원본 값으로 동적 치환되고(예: content=title
+                         * → 원본 title 값), 그 외(필드명과 무관한 값)는 리터럴로 유지된다.
+                         * 따옴표로 감싼 값(예: title='타이틀')은 parseActionParams가 무조건 고정 텍스트로
+                         * 처리한다 — 필드명과 우연히 같아도 동적 치환되지 않는다.
+                         * ※ copyDataJson(실제 POST 바디)은 originalDataJson 기반 중첩 구조를 그대로 유지 —
+                         *   여기서 바뀌는 건 parseActionParams가 값을 "찾을 때" 참조하는 컨텍스트뿐이다.
+                         * file 필드 빈 배열 세팅보다 나중에 실행되어 최종 우선순위를 가짐 */
+                        const copyActionsCol = widget.columns.find(c => c.cellType === 'actions');
+                        if (copyActionsCol?.copyFixedParams) {
+                            const flatOriginal = flattenPageDataItem(detailRes.data);
+                            Object.entries(parseActionParams(copyActionsCol.copyFixedParams, flatOriginal)).forEach(([key, value]) => {
+                                copyDataJson = applyDotField(copyDataJson, key, value);
+                            });
+                        }
+
+                        await api.post(`/page-data/${connectedSlug}`, { dataJson: copyDataJson });
+                        toast.success('복사되었습니다.');
+                        onRefresh?.();
+                    } catch (e: unknown) {
+                        const response = (e as { response?: { status?: number; data?: { message?: string } } })?.response;
+                        if (response?.status === 409) {
+                            toast.error(response.data?.message || '이미 동일한 키 값의 데이터가 존재합니다.');
+                        } else {
+                            toast.error('복사 중 오류가 발생했습니다.');
+                        }
+                    }
+                }
+                : undefined
+            ),
             onFileClick: (col, row) => {
                 if (col.fileLayerSlug) {
                     handleInternalPopupOpen(col.fileLayerSlug, row._id as number, dataSlug);
@@ -1589,13 +1615,7 @@ export function WidgetRenderer({
                     selectedParentId={selectedParentId}
                     onSelect={onCategorySelect}
                     onPopupOpen={(slug, editId, listSlug, initialValues, paramSave) =>
-                        handleInternalPopupOpen(
-                            slug, editId ?? null, listSlug, initialValues, null, paramSave,
-                            /* 등록(editId==null)이고 depth2+이고 relationSlugId 설정된 경우에만 연결 컨텍스트 전달 */
-                            (editId == null && widget.depth > 1 && widget.relationSlugId)
-                                ? { relationSlugId: widget.relationSlugId, dbSlug: widget.dbSlug, depth: widget.depth, parentId: selectedParentId }
-                                : null,
-                        )
+                        handleInternalPopupOpen(slug, editId ?? null, listSlug, initialValues, null, paramSave)
                     }
                     refreshTick={categoryRefreshTick}
                 />

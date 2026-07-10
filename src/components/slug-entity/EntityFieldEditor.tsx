@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import type { SlugEntityItem, SlugEntityFieldItem } from './EntityList';
 
 /* ── 공통코드 그룹 타입 ── */
@@ -126,8 +126,7 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
             toast.success('저장되었습니다.');
             onUpdated(res.data);
         } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg || '저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
         } finally {
             setSaving(false);
         }

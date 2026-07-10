@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import PageLayout from '@/components/layout/page-layout';
 import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
@@ -230,8 +230,7 @@ export default function RolesSystemPage() {
                 toast.success(t('role.deleted'));
                 setAllRoles(prev => prev.filter(r => r.id !== id));
             } catch (e: unknown) {
-                const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-                toast.error(msg ?? t('role.error.delete'));
+                toast.error(getApiErrorMessage(e, t('role.error.delete')));
             }
         },
     }), [router, t]);

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import PageLayout from '@/components/layout/page-layout';
 import { GridCell } from '@/components/layout/grid-cell';
 import { WidgetRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
@@ -193,8 +193,7 @@ export default function RolesDetailPage() {
             }
             router.push('/admin/system/roles');
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '저장 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '저장 중 오류가 발생했습니다.'));
         } finally {
             setSaving(false);
         }

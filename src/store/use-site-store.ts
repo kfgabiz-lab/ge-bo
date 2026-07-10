@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 
 export interface Site {
     id: number;
@@ -66,8 +66,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
             set(state => ({ sites: [...state.sites, res.data] }));
             return res.data;
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '홈페이지 등록 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '홈페이지 등록 중 오류가 발생했습니다.'));
             throw e;
         }
     },
@@ -78,8 +77,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
             set(state => ({ sites: state.sites.map(s => s.id === id ? res.data : s) }));
             return res.data;
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '홈페이지 수정 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '홈페이지 수정 중 오류가 발생했습니다.'));
             throw e;
         }
     },
@@ -93,8 +91,7 @@ export const useSiteStore = create<SiteState>((set, get) => ({
                 get().setActiveSiteId(null);
             }
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? '홈페이지 삭제 중 오류가 발생했습니다.');
+            toast.error(getApiErrorMessage(e, '홈페이지 삭제 중 오류가 발생했습니다.'));
             throw e;
         }
     },

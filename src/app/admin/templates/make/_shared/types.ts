@@ -290,6 +290,7 @@ export interface TableColumnConfig {
     detailFileLayerSlug?: string;       // 상세 버튼 연결 로컬 컴포넌트명 (개발자방식)
     editParams?: string;                // 수정 버튼 파라미터 (예: title,temp1=1,temp2=abc) — editPopupSlug/editFileLayerSlug 공통
     detailParams?: string;              // 상세 버튼 파라미터 — detailPopupSlug/detailFileLayerSlug 공통
+    copyFixedParams?: string;           // 복사 시 고정값 세팅 (예: title=타이틀,type=001) — 원본 값 대신 지정값으로 덮어써서 저장
     fileLayerSlug?: string;             // file 타입 — 파일 뷰어 LAYER slug
     /** 공통코드 연동 — text 셀에서 코드값을 이름으로 변환 */
     codeGroupCode?: string;

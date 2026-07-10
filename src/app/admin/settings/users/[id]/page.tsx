@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import api from '@/lib/api';
+import api, { getApiErrorMessage } from '@/lib/api';
 import { useSiteStore } from '@/store/use-site-store';
 import PageLayout from '@/components/layout/page-layout';
 import { GridCell } from '@/components/layout/grid-cell';
@@ -332,8 +332,7 @@ export default function AdminDetailPage() {
 
             router.push('/admin/settings/users');
         } catch (e: unknown) {
-            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            toast.error(msg ?? t('admin.error.save'));
+            toast.error(getApiErrorMessage(e, t('admin.error.save')));
         } finally {
             setSaving(false);
         }

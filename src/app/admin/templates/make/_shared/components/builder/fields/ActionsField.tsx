@@ -159,6 +159,19 @@ export function ActionsField({ values, onChange, layerTemplates, onRequestLayerT
                                 </div>
                             </div>
                         ))}
+                    {/* 복사 체크 시 고정값 세팅 입력창 — 전달파라미터(passParam) 입력 UI와 동일 스타일 재사용 */}
+                    {action === 'copy' && presetActions.includes('copy') && (
+                        <div className="ml-5">
+                            <label className="text-[10px] font-medium text-slate-500 mb-0.5 block">복사 시 고정값</label>
+                            <input
+                                type="text"
+                                value={values.copyFixedParams ?? ''}
+                                onChange={e => onChange({ copyFixedParams: e.target.value })}
+                                placeholder="예: title=타이틀,type=001"
+                                className="w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:outline-none focus:border-slate-900"
+                            />
+                        </div>
+                    )}
                     </div>
             ); })}
 
