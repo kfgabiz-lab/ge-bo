@@ -38,11 +38,11 @@ import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
 import type { SearchWidget, SpaceWidget, CategoryWidget, SubListWidget, MultiSelectWidget, TabWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
-import type { FormWidget, FormFieldItem } from '../_shared/components/builder/FormBuilder';
+import type { FormWidget } from '../_shared/components/builder/FormBuilder';
 import { createIdGenerator, toSlug, resolveConnectedSlug } from '../_shared/utils';
+import { buildFormFromEntity } from '../_shared/utils/entityBuild';
 import { stampFormConnectedSlug } from '../_shared/hooks/useWidgetPageState';
 import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
-import type { SearchFieldType } from '../_shared/types';
 import PageLayout from '@/components/layout/page-layout';
 import { SaveModal, RuleCreateModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
@@ -431,127 +431,43 @@ export default function PageBuilderPage() {
         setWidgetItems(prev => stampFormConnectedSlug(prev, connectedSlug));
     };
 
-    /* snake_case → camelCase 변환 */
-    const toCamelCase = (str: string): string =>
-        str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-
-    /* dateRange suffix 제거 — 빌더는 fieldKey만 저장하므로 entity key(_from/_to)와 비교 시 suffix 제거 */
-    const stripRangeSuffix = (key: string): string | null => {
-        if (key.endsWith('_from')) return key.slice(0, -5);
-        if (key.endsWith('_to'))   return key.slice(0, -3);
-        return null;
-    };
-
-    /* entity key → 비교 가능한 모든 변형 반환 (원본·camelCase·suffix제거·suffix제거+camelCase) */
-    const getKeyVariants = (key: string): string[] => {
-        const variants = new Set<string>();
-        variants.add(key);
-        variants.add(toCamelCase(key));
-        const base = stripRangeSuffix(key);
-        if (base) {
-            variants.add(base);
-            variants.add(toCamelCase(base));
-        }
-        return [...variants];
-    };
-
-    /** columnType → Form 필드 타입 매핑 (widget 빌더 전용) */
-    const mapColumnTypeToFieldType = (columnType: string): SearchFieldType => {
-        switch (columnType.toUpperCase()) {
-            case 'VARCHAR':                  return 'input';
-            case 'BIGINT': case 'INT':       return 'input';
-            case 'DATE': case 'TIMESTAMPTZ': return 'date';
-            case 'BOOLEAN':                  return 'checkbox';
-            default:                         return 'textarea';
-        }
-    };
-
-    /* ── entity field → FormFieldItem 생성 헬퍼 ──
-       1순위: entity에 직접 지정된 fieldType 사용
-       2순위: fieldType 없으면 DB 타입(columnType)으로 자동 매핑 */
-    const buildFieldItem = (f: SlugEntityFieldItem): FormFieldItem => {
-        const type = (f.fieldType as SearchFieldType | undefined) ?? mapColumnTypeToFieldType(f.columnType);
-        const wideTypes = ['textarea', 'dateRange', 'yearMonthRange'];
-        return {
-            id: uid(),
-            type,
-            label: f.label,
-            fieldKey: f.key!,
-            colSpan: wideTypes.includes(type) ? 2 : 1,
-            rowSpan: 1,
-            required: f.isNullable === false,
-            ...(type === 'date' && { dateSubType: 'date' as const }),
-            ...(f.codeGroupCode ? { codeGroupCode: f.codeGroupCode } : {}),
-        } as FormFieldItem;
-    };
-
-    /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 ── */
+    /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 (공통 로직은 entityBuild.ts의 buildFormFromEntity) ── */
     const handleBuildFromEntity = () => {
         if (!om.slugEntityId || slugEntityFields.length === 0) return;
-
-        /* entity field를 key 기준으로 맵 생성 — 원본·camelCase·_from/_to suffix 제거 등 모든 변형 등록 */
-        const entityFieldMap = new Map<string, SlugEntityFieldItem>();
-        slugEntityFields.filter(f => f.key).forEach(f => {
-            getKeyVariants(f.key!).forEach(v => entityFieldMap.set(v, f));
-        });
 
         const hasFormContent = widgetItems.some(item =>
             item.contents.some(c => c.widget.type === 'form')
         );
 
         if (hasFormContent) {
-            /* ── 케이스 1: form 위젯이 이미 있는 경우 ── */
+            /* ── 케이스 1: form 위젯이 이미 있는 경우 — 페이지 내 모든 form 위젯에 동일하게 빌드 적용 ── */
             setWidgetItems(prev => {
-                /* 1단계: entity field 기준 라벨/required 갱신 + 누락 필드 추가 */
                 const fieldMerged = prev.map(item => ({
                     ...item,
-                    contents: item.contents.map(c => {
-                        if (c.widget.type !== 'form') return c;
-                        const formWidget = c.widget as FormWidget;
-
-                        /* 1-1. key가 같은 기존 필드 → 라벨/required 업데이트만 */
-                        const updatedFields = formWidget.fields.map(f => {
-                            const entityField = f.fieldKey ? entityFieldMap.get(f.fieldKey) : undefined;
-                            if (!entityField) return f;
-                            return {
-                                ...f,
-                                /* 라벨이 없는 경우에만 entity 라벨 적용 */
-                                label: f.label || entityField.label,
-                                /* entity not null → required 반영 */
-                                required: entityField.isNullable === false ? true : f.required,
-                            };
-                        });
-
-                        /* 1-2. 기존 form에 없는 entity field → 하단에 추가
-                           원본·camelCase·_from/_to suffix 제거 등 모든 변형이 existingKeys에 없는 경우에만 추가 */
-                        const existingKeys = new Set(
-                            formWidget.fields.map(f => f.fieldKey).filter(Boolean) as string[]
-                        );
-                        const appendFields = slugEntityFields
-                            .filter(f => f.key && getKeyVariants(f.key!).every(v => !existingKeys.has(v)))
-                            .map(buildFieldItem);
-
-                        return { ...c, widget: { ...formWidget, fields: [...updatedFields, ...appendFields] } };
-                    }),
+                    contents: item.contents.map(c =>
+                        c.widget.type !== 'form'
+                            ? c
+                            : { ...c, widget: buildFormFromEntity(c.widget as FormWidget, slugEntityFields) }
+                    ),
                 }));
 
-                /* 2단계: 이미 존재하는 form을 entity로 재빌드할 때도 connectedSlug가 비어있을 수 있으므로 재확인 stamp
+                /* 이미 존재하는 form을 entity로 재빌드할 때도 connectedSlug가 비어있을 수 있으므로 재확인 stamp
                  * — resolveConnectedSlug가 undefined면(레지스트리 미로딩 등) 기존 connectedSlug를 덮어쓰지 않고 스킵 */
                 const resolvedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
                 return resolvedSlug !== undefined ? stampFormConnectedSlug(fieldMerged, resolvedSlug) : fieldMerged;
             });
         } else {
-            /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ── */
-            const newFields = slugEntityFields.filter(f => f.key).map(buildFieldItem);
+            /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ──
+               빈 fields로 시작한 Form에 buildFormFromEntity를 적용하면 entity 필드 전체가 그대로 추가된다 */
             const connectedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
-
-            const newFormWidget: FormWidget = {
+            const emptyFormWidget: FormWidget = {
                 type: 'form',
                 widgetId: wuid(),
                 contentKey: '',
-                fields: newFields,
+                fields: [],
                 ...(connectedSlug ? { connectedSlug } : {}),
             };
+            const newFormWidget = buildFormFromEntity(emptyFormWidget, slugEntityFields);
 
             const newContent: PageContentItem = {
                 id: uid(),

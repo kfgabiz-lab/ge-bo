@@ -31,6 +31,9 @@ import { CodeGroupDef } from '../../types';
 import { SearchFieldType, SearchFieldConfig } from '../SearchBuilder';
 import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
 import { createIdGenerator } from '../../utils';
+import { buildFormFromEntity } from '../../utils/entityBuild';
+import { EntityBuildButton } from './EntityBuildButton';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
 import {
     InputField, TextField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
@@ -183,8 +186,8 @@ interface FormBuilderProps {
     slugOptions: { id: number; slug: string; name: string }[];
     /** 필드 ColSpan 최대값 (기본 12, 우측 드로어 등 좁은 공간에서 2로 제한) */
     maxColSpan?: number;
-    /** Slug Entity 필드 목록 — fieldKey selectbox 전환용 (widget 빌더 전용) */
-    slugEntityFields?: { key: string | null; label: string }[];
+    /** Slug Entity 필드 목록 — fieldKey selectbox 전환 + "이 위젯만 빌드" 버튼용 (widget 빌더 전용) */
+    slugEntityFields?: SlugEntityFieldItem[];
 }
 
 /** Form 위젯 필드 설정 빌더 */
@@ -489,6 +492,16 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                         ))}
                     </select>
                 </div>
+            </div>
+
+            {/* 필드 구성 헤더 — "이 위젯만 빌드" 버튼 */}
+            <div className="flex items-center justify-between pt-1">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">필드 구성</p>
+                <EntityBuildButton
+                    onClick={() => onChange(buildFormFromEntity(widget, slugEntityFields ?? []))}
+                    disabled={!slugEntityFields?.length}
+                    title="Slug Entity 필드로 폼 필드 자동 구성"
+                />
             </div>
 
             {/* 필드 목록 (드래그 재정렬) — accordion 구조 */}

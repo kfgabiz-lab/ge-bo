@@ -24,6 +24,9 @@ import api from '@/lib/api';
 import { ToggleRow } from './fields/_ToggleRow';
 import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from '../../types';
 import { createIdGenerator } from '../../utils';
+import { buildTableFromEntity } from '../../utils/entityBuild';
+import { EntityBuildButton } from './EntityBuildButton';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
 import {
     ColumnBaseField,
     BadgeOptionsField,
@@ -99,6 +102,8 @@ interface TableBuilderProps {
     searchWidgets: Array<{ widgetId: string; contentKey: string }>;
     /** Slug 레지스트리 옵션 — DB Slug 드롭다운에서 사용 */
     slugOptions: { id: number; slug: string; name: string }[];
+    /** Slug Entity 필드 목록 — "이 위젯만 빌드" 버튼용 (widget 빌더 전용) */
+    slugEntityFields?: SlugEntityFieldItem[];
 }
 
 /* ══════════════════════════════════════════════════════════════ */
@@ -187,7 +192,7 @@ function SortableColumnItem({
 /* ══════════════════════════════════════════ */
 
 /** 테이블 위젯 컬럼 설정 빌더 */
-export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: TableBuilderProps) {
+export function TableBuilder({ widget, onChange, searchWidgets, slugOptions, slugEntityFields }: TableBuilderProps) {
     const { t } = useI18n();
     /* 컬럼 편집 아코디언 상태 */
     const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
@@ -444,7 +449,14 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions }: T
 
             {/* 테이블 컬럼 목록 (드래그 정렬 + 아코디언) */}
             <div className="space-y-1">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">테이블 컬럼</p>
+                <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">테이블 컬럼</p>
+                    <EntityBuildButton
+                        onClick={() => onChange(buildTableFromEntity(widget, slugEntityFields ?? []))}
+                        disabled={!slugEntityFields?.length}
+                        title="Slug Entity 필드로 테이블 컬럼 자동 구성"
+                    />
+                </div>
 
                 <DndContext
                     sensors={sensors}

@@ -11,6 +11,7 @@ import { TabBuilder } from './TabBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 import type { ContentWidgetOption } from './fields/ActionButtonField';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
 
 /**
  * CommonBuilderDispatcher — 위젯 타입별 설정 빌더 통합 디스패처
@@ -37,8 +38,8 @@ interface CommonBuilderDispatcherProps {
         categoryWidgets?: { widgetId: string; label?: string; depth: number }[];
         /** Space 위젯에서 ActionButton만 추가 가능하도록 제한 (quick-list, quick-detail 전용) */
         actionButtonOnly?: boolean;
-        /** Slug Entity 필드 목록 — FormBuilder fieldKey selectbox 전환용 (widget 빌더 전용) */
-        slugEntityFields?: { key: string | null; label: string }[];
+        /** Slug Entity 필드 목록 — FormBuilder fieldKey selectbox 전환 + Search/Table/Form "이 위젯만 빌드" 버튼 공용 (widget 빌더 전용) */
+        slugEntityFields?: SlugEntityFieldItem[];
     };
 }
 
@@ -51,6 +52,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                 <SearchWidgetBuilder
                     widget={widget}
                     onChange={w => onChange(w)}
+                    slugEntityFields={slugEntityFields}
                 />
             );
 
@@ -61,6 +63,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     onChange={w => onChange(w)}
                     searchWidgets={searchWidgets}
                     slugOptions={slugOptions}
+                    slugEntityFields={slugEntityFields}
                 />
             );
 

@@ -28,6 +28,7 @@ import { inputCls, selectCls } from '../../styles';
 import { SelectArrow } from '../SelectArrow';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
 import { SlugSelectField } from './fields/SlugSelectField';
+import { EntityBuildButton } from './EntityBuildButton';
 
 const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
     { value: 'sm', label: 'Small — 380px' },
@@ -242,18 +243,11 @@ export function OutputModePanel({
                                 </div>
                                 {/* 빌드 버튼 — slugEntityId 선택 시 활성화 */}
                                 {onBuildFromEntity && (
-                                    <button
+                                    <EntityBuildButton
                                         onClick={onBuildFromEntity}
                                         disabled={!slugEntityId}
-                                        className={`shrink-0 px-2 py-1.5 text-[11px] font-semibold rounded border transition-all ${
-                                            slugEntityId
-                                                ? 'bg-slate-900 text-white border-slate-900 hover:bg-slate-700'
-                                                : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
-                                        }`}
                                         title="Slug Entity 필드로 Form 자동 생성"
-                                    >
-                                        빌드
-                                    </button>
+                                    />
                                 )}
                             </div>
                         )}
