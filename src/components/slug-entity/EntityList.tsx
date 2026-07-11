@@ -47,7 +47,7 @@ export interface SlugEntityFieldItem {
 }
 
 /* ── 빈 등록 폼 초기값 ── */
-const EMPTY_FORM = { slug: '', name: '', description: '', active: true };
+const EMPTY_FORM = { slug: '', name: '', tableName: '', description: '', active: true };
 
 /* ── 스타일 상수 ── */
 const ITEM_SELECTED = 'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all bg-slate-900 text-white';
@@ -115,6 +115,7 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
             const res = await api.post<SlugEntityItem>('/slug-entity', {
                 slug:        form.slug.trim(),
                 name:        form.name.trim(),
+                tableName:   form.tableName.trim() || null,
                 description: form.description.trim() || null,
                 active:      form.active,
             });
@@ -251,6 +252,21 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
                                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                                     placeholder="예: 회원"
                                     className={INPUT_CLS}
+                                />
+                            </div>
+
+                            {/* DB 테이블명 (선택) */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                                    DB 테이블명
+                                    <span className="ml-2 text-[10px] font-normal text-slate-400">(선택, entity 생성 기능에 사용)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={form.tableName}
+                                    onChange={e => setForm(f => ({ ...f, tableName: e.target.value }))}
+                                    placeholder="예: tbl_member"
+                                    className={`${INPUT_CLS} font-mono`}
                                 />
                             </div>
 

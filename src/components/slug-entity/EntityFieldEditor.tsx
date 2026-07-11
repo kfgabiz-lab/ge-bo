@@ -5,14 +5,18 @@
  * - 선택된 entity의 필드 목록 인라인 편집
  * - 행 추가 / 삭제 / 순서 이동 (▲▼)
  * - 저장 버튼 → PUT /api/v1/slug-entity/{id}/fields
+ * - table_name 저장 버튼 → PUT /api/v1/slug-entity/{id} (Entity 자체 정보 수정)
  * - Entity 삭제 버튼 → DELETE /api/v1/slug-entity/{id}
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, FileCode2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { getApiErrorMessage } from '@/lib/api';
 import type { SlugEntityItem, SlugEntityFieldItem } from './EntityList';
+import { CodeGenerateModal } from './CodeGenerateModal';
+import type { SlugEntityCodePreviewResponse, SlugEntityCodeSaveResponse } from './CodeGenerateModal';
+import { CodeSaveResultModal } from './CodeSaveResultModal';
 
 /* ── 공통코드 그룹 타입 ── */
 interface CodeGroupDef {
@@ -68,6 +72,15 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
     const [deleting, setDeleting]     = useState(false);
     const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
 
+    /* table_name 헤더 편집 상태 (Entity 자체 정보 수정 — 필드 저장과 별개 API) */
+    const [tableName, setTableName]   = useState('');
+    const [savingInfo, setSavingInfo] = useState(false);
+
+    /* Java 코드 자동생성 — 미리보기 로딩 / 미리보기 데이터 / 저장 결과 */
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewData, setPreviewData]       = useState<SlugEntityCodePreviewResponse | null>(null);
+    const [saveResult, setSaveResult]         = useState<SlugEntityCodeSaveResponse | null>(null);
+
     /* 마운트 시 공통코드 목록 로드 */
     useEffect(() => {
         api.get<CodeGroupDef[]>('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
@@ -77,8 +90,10 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
     useEffect(() => {
         if (entity) {
             setFields(entity.fields.map(f => ({ ...f })));
+            setTableName(entity.tableName ?? '');
         } else {
             setFields([]);
+            setTableName('');
         }
     }, [entity]);
 
@@ -132,6 +147,50 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
         }
     };
 
+    /* table_name 저장 — Entity 자체 정보 수정 API (PUT /slug-entity/{id}) 신규 연결 */
+    const handleSaveTableName = async () => {
+        if (!entity) return;
+
+        setSavingInfo(true);
+        try {
+            const res = await api.put<SlugEntityItem>(`/slug-entity/${entity.id}`, {
+                slug:        entity.slug,
+                name:        entity.name,
+                tableName:   tableName.trim() || null,
+                description: entity.description,
+                active:      entity.active,
+            });
+            toast.success('테이블명이 저장되었습니다.');
+            onUpdated(res.data);
+        } catch (err: unknown) {
+            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
+        } finally {
+            setSavingInfo(false);
+        }
+    };
+
+    /* Java 코드 자동생성 — 미리보기 요청 (파일시스템에는 아무것도 쓰지 않음) */
+    const handleGenerateClick = async () => {
+        if (!entity) return;
+
+        setPreviewLoading(true);
+        try {
+            const res = await api.post<SlugEntityCodePreviewResponse>(`/slug-entity/${entity.id}/generate-preview`);
+            setPreviewData(res.data);
+        } catch (err: unknown) {
+            toast.error(getApiErrorMessage(err, '코드 생성 미리보기 중 오류가 발생했습니다.'));
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
+    /* 미리보기 모달에서 저장 성공 시 — 미리보기 모달을 닫고 결과 모달을 연다 */
+    const handleCodeSaved = (result: SlugEntityCodeSaveResponse) => {
+        setPreviewData(null);
+        setSaveResult(result);
+        toast.success('파일이 생성되었습니다.');
+    };
+
     /* Entity 삭제 */
     const handleDelete = async () => {
         if (!entity) return;
@@ -158,6 +217,9 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
         );
     }
 
+    /* 파일생성은 실제 저장된 table_name(entity.tableName)이 있어야 가능 — 헤더 입력값(tableName)은 아직 저장 전일 수 있음 */
+    const tableNameMissing = !entity.tableName?.trim();
+
     return (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden h-full min-h-0 flex flex-col">
 
@@ -178,6 +240,29 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                         {entity.description}
                     </span>
                 )}
+
+                {/* table_name — 표시 + 수정 (Entity 자체 정보 수정 API 별도 저장) */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">table_name</span>
+                    <div className="w-36">
+                        <input
+                            type="text"
+                            value={tableName}
+                            onChange={e => setTableName(e.target.value)}
+                            placeholder="예: tbl_member"
+                            className={INPUT_SM}
+                        />
+                    </div>
+                    <button
+                        onClick={handleSaveTableName}
+                        disabled={savingInfo}
+                        className="flex items-center gap-1 px-2 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded transition-all disabled:opacity-60"
+                    >
+                        {savingInfo && <Loader2 className="w-3 h-3 animate-spin" />}
+                        저장
+                    </button>
+                </div>
+
                 <span className="text-xs text-slate-400 ml-auto">필드 {fields.length}개</span>
             </div>
 
@@ -368,6 +453,24 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                         {deleting && <Loader2 className="w-3 h-3 animate-spin" />}
                         Entity 삭제
                     </button>
+
+                    {/* 파일생성 — table_name이 저장되어 있어야 활성화 (헤더의 table_name 입력 후 저장 필요) */}
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={handleGenerateClick}
+                            disabled={tableNameMissing || previewLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            {previewLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCode2 className="w-3.5 h-3.5" />}
+                            파일생성
+                        </button>
+                        {tableNameMissing && (
+                            <span className="text-[10px] text-amber-600 max-w-[170px] leading-tight">
+                                위 헤더에서 table_name을 입력 후 저장해주세요.
+                            </span>
+                        )}
+                    </div>
+
                     <button
                         onClick={handleSave}
                         disabled={saving}
@@ -378,6 +481,24 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                     </button>
                 </div>
             </div>
+
+            {/* Java 코드 자동생성 — 미리보기 모달 */}
+            {previewData && (
+                <CodeGenerateModal
+                    entityId={entity.id}
+                    preview={previewData}
+                    onClose={() => setPreviewData(null)}
+                    onSaved={handleCodeSaved}
+                />
+            )}
+
+            {/* Java 코드 자동생성 — 저장 결과 알림 모달 */}
+            {saveResult && (
+                <CodeSaveResultModal
+                    result={saveResult}
+                    onClose={() => setSaveResult(null)}
+                />
+            )}
         </div>
     );
 }
