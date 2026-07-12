@@ -83,6 +83,8 @@ interface PageGridRendererProps {
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, resolvedFormValuesMap?: Record<string, Record<string, string>>, contentValidationRuleIds?: Record<string, number[]>) => void;
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
+    /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId, params, connectedContentWidgetIds) */
+    onApiCall?: (apiInfoId: number, params?: string, connectedContentWidgetIds?: string[]) => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;
@@ -159,6 +161,9 @@ interface PageGridRendererProps {
     leaveCheck?: boolean;
     /** widgetId → _fetchedRel{id} 원본 데이터 맵 — FormRenderer rowData 확장용 */
     formFetchRelMap?: Record<string, Record<string, unknown>>;
+    /** entity 연결 페이지 여부 — useWidgetPageState의 gridProps가 그대로 노출하는 값.
+     * WidgetRenderer 이하로는 isEntity 이름으로 전달(파일 다운로드 경로 분기용, FieldRenderer까지) */
+    pageIsEntity?: boolean;
 }
 
 /**
@@ -179,6 +184,7 @@ export function PageGridRenderer({
     onFormValuesChange,
     onContentAction,
     onDataSave,
+    onApiCall,
     tableDataMap,
     sortKeyMap,
     sortDirMap,
@@ -211,6 +217,7 @@ export function PageGridRenderer({
     mainConnectedSlug,
     leaveCheck,
     formFetchRelMap,
+    pageIsEntity,
 }: PageGridRendererProps) {
     /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
      * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
@@ -388,6 +395,7 @@ export function PageGridRenderer({
                                         crossTabFormValues={crossTabFormValues}
                                         onContentAction={(widgetIds, action, goBack, contentValidationRuleIds?: Record<string, number[]>) => onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap, contentValidationRuleIds)}
                                         onDataSave={onDataSave}
+                                        onApiCall={onApiCall}
                                         onClose={onClose}
                                         /* SubList */
                                         subListRowsMap={subListRowsMap}
@@ -432,6 +440,8 @@ export function PageGridRenderer({
                                         currentSearchParams={currentSearchParams}
                                         /* _fetchedRel{id} 데이터 — Form 위젯 relationSlugId 연결 데이터 표시용 */
                                         fetchRelData={formFetchRelMap?.[wid]}
+                                        /* entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
+                                        isEntity={pageIsEntity}
                                     />
                                 </div>
                             );

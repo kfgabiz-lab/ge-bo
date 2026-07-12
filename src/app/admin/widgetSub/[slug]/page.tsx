@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMenuPageSlug } from '@/hooks/use-menu-page-slug';
 import PageLayout from '@/components/layout/page-layout';
 import { useWidgetPageState, flatWidgets } from '@/app/admin/templates/make/_shared/hooks/useWidgetPageState';
+import type { ConnectedType } from '@/app/admin/templates/make/_shared/hooks/useOutputMode';
 
 /* ══════════════════════════════════════════ */
 /*  메인 페이지 — /admin/widgetSub/{slug}     */
@@ -32,6 +33,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
     const [error,              setError]              = useState<string | null>(null);
     const [widgetItems,        setWidgetItems]        = useState<PageWidgetItem[]>([]);
     const [mainConnectedSlug,  setMainConnectedSlug]  = useState<string | undefined>(undefined);
+    const [connectedType,      setConnectedType]      = useState<ConnectedType | undefined>(undefined);
     const [leaveCheck,         setLeaveCheck]         = useState(false);
 
     /* 공통 훅 — 검색·테이블·폼·파일·SubList·MultiSelect 상태 및 핸들러 전체 */
@@ -39,6 +41,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         enableUrlEditMode: true,
         onGoBack: () => router.back(),
         mainConnectedSlug,
+        connectedType,
         leaveCheck,
     });
 
@@ -51,12 +54,13 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
                 const items: PageWidgetItem[] = raw.widgetItems ? raw.widgetItems as PageWidgetItem[] : [];
                 setWidgetItems(items);
                 setMainConnectedSlug((raw.mainConnectedSlug as string) || undefined);
+                setConnectedType((raw.connectedType as ConnectedType) || undefined);
                 setLeaveCheck((raw.leaveCheck as boolean) ?? false);
                 /* pageTitleMsgKey 우선 → 없으면 pageTitle 직접 텍스트 사용 */
                 const msgKey = (raw.pageTitleMsgKey as string) || '';
                 setPageTitle(msgKey ? t(msgKey) : ((raw.pageTitle as string) || ''));
             })
-            .catch(() => setError('페이지를 불러오는 중 오류가 발생했습니다.'))
+            .catch(() => setError(t('common.error.page_load')))
             .finally(() => setLoading(false));
     }, [slug, fetchGroups]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -79,7 +83,7 @@ export default function GeneratedPage({ params }: { params: Promise<{ slug: stri
         return (
             <div className="flex items-center justify-center h-64 gap-2 text-slate-400">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="text-sm">페이지 로딩 중...</span>
+                <span className="text-sm">{t('common.loading')}</span>
             </div>
         );
     }

@@ -26,6 +26,7 @@ import { RendererContainer } from './RendererContainer';
 import type { SearchFieldConfig } from '../../types';
 import type { RendererMode } from './types';
 import { useLeaveCheckStore } from '@/store/use-leave-check-store';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface SpaceRendererProps {
     mode: RendererMode;
@@ -47,10 +48,13 @@ interface SpaceRendererProps {
     onExcelDownload?: (tableWidgetId: string, privacyPopup?: boolean) => void;
     /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave + 검증 규칙 ID 전달 */
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
+    /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id + params 문자열 + 연결 컨텐츠 위젯 ID 배열 전달 (live 전용) */
+    onApiCall?: (apiInfoId: number, params?: string, connectedContentWidgetIds?: string[]) => void;
 }
 
-export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave }: SpaceRendererProps) {
+export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave, onApiCall }: SpaceRendererProps) {
     const router = useRouter();
+    const { t } = useI18n();
     /* 이탈체크 가드 — leaveCheck 옵션이 켜져 있고 폼이 dirty 상태일 때만 함수가 등록됨 */
     const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
     if (!items.length) {
@@ -73,7 +77,7 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
             return;
         }
         /* 저장 컨펌 토글 활성화 시 — 사용자 확인 후 취소 시 중단 */
-        if (field.saveConfirm && !window.confirm('저장 하시겠습니까?')) return;
+        if (field.saveConfirm && !window.confirm(t('common.confirm.save'))) return;
         /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
         if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
             onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction, field.contentValidationRuleIds);
@@ -95,6 +99,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         } else if (field.connType === 'datasave' && field.dataSaveSlug) {
             /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
             onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params, field.validationRuleIds);
+        } else if (field.connType === 'api' && field.apiInfoId) {
+            onApiCall?.(field.apiInfoId, field.params, field.connectedContentWidgetIds);
         }
     };
 

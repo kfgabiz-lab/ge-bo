@@ -30,6 +30,7 @@ import type { PageWidgetItem } from "./PageGridRenderer";
 import type { TabWidget, TabItem, RendererMode } from "./types";
 import type { TableWidget } from "../builder/TableBuilder";
 import { useWidgetPageState, flatWidgets } from "../../hooks/useWidgetPageState";
+import type { ConnectedType } from "../../hooks/useOutputMode";
 import { useCodeStore } from "@/store/use-code-store";
 
 interface TabRendererProps {
@@ -105,8 +106,8 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
     if (idx > 0) {
       const firstTab = tabs[0];
       if (firstTab?.required && !savedTabSet.has(0)) {
-        const tabLabel = firstTab.labelMsgKey ? t(firstTab.labelMsgKey) : (firstTab.label || '탭 1');
-        toast.warning(`'${tabLabel}' 탭을 먼저 저장해주세요.`);
+        const tabLabel = firstTab.labelMsgKey ? t(firstTab.labelMsgKey) : (firstTab.label || t('common.tab.default_label', { n: '1' }));
+        toast.warning(t('common.tab.save_required', { tab: tabLabel }));
         return;
       }
     }
@@ -146,7 +147,7 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            {tab.labelMsgKey ? t(tab.labelMsgKey) : (tab.label || `탭 ${idx + 1}`)}
+            {tab.labelMsgKey ? t(tab.labelMsgKey) : (tab.label || t('common.tab.default_label', { n: String(idx + 1) }))}
           </button>
         ))}
       </div>
@@ -258,8 +259,11 @@ interface LiveTabPanelProps {
  */
 function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange, leaveCheck, onRegisterConfirmLeave, urlParams }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
+  const { t } = useI18n();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
   const [subPageMainConnectedSlug, setSubPageMainConnectedSlug] = useState<string | undefined>(undefined);
+  /* 탭 서브페이지 자체의 connectedType — 이 탭 안의 Table 위젯이 entity API를 조회해야 하는지 판단 기준 */
+  const [subPageConnectedType, setSubPageConnectedType] = useState<ConnectedType | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -294,6 +298,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
     onDataIdCreated,
     onSaved: () => onSaved(tabIdx),
     mainConnectedSlug: resolvedMainConnectedSlug,
+    connectedType: subPageConnectedType,
     leaveCheck,
   });
 
@@ -319,6 +324,8 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
         setWidgetItems(cfg.widgetItems as unknown as PageWidgetItem[]);
         /* 서브페이지 mainConnectedSlug 저장 — parentMainConnectedSlug 없을 때 폴백으로 사용 */
         setSubPageMainConnectedSlug(cfg.mainConnectedSlug || undefined);
+        /* 서브페이지 connectedType 저장 — 이 탭 안 Table 위젯의 entity API 조회 여부 판단 기준 */
+        setSubPageConnectedType(cfg.connectedType || undefined);
       })
       .catch(() => setFailed(true))
       .finally(() => setLoading(false));
@@ -327,7 +334,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
   /* pageSlug 없는 탭 */
   if (!tab.pageSlug) {
     return (
-      <div className="h-full flex items-center justify-center text-sm text-slate-400">연결된 페이지가 없습니다</div>
+      <div className="h-full flex items-center justify-center text-sm text-slate-400">{t('common.tab.no_page')}</div>
     );
   }
 
@@ -341,7 +348,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
 
   if (failed) {
     return (
-      <div className="h-full flex items-center justify-center text-sm text-red-400">페이지를 불러올 수 없습니다</div>
+      <div className="h-full flex items-center justify-center text-sm text-red-400">{t('common.error.load')}</div>
     );
   }
 

@@ -16,7 +16,7 @@ import type { LayerType, LayerWidth } from '../types';
 
 export type OutputMode = 'page' | 'layerpopup';
 
-export type ConnectedType = 'none' | 'slug' | 'entity';
+export type ConnectedType = 'none' | 'slug' | 'entity' | 'data';
 
 export interface OutputModeValue {
     outputMode: OutputMode;
@@ -27,15 +27,14 @@ export interface OutputModeValue {
     layerTitle: string;
     layerTitleMsgKey: string;      // 팝업 제목 다국어 키
     layerWidth: LayerWidth;
-    /** 저장 시 메인 data_slug (선택) */
+    /** 저장 시 메인 data_slug (선택) — connectedType에 따라 네임스페이스가 달라진다.
+     * slug: SlugRegistry slug / entity: SlugRegistry 중 entity가 연결된 slug / data: SlugEntity 고유 slug */
     mainConnectedSlug: string;
     /** 운영페이지 이탈 시 변경사항 확인 여부 */
     leaveCheck: boolean;
     /** 단일페이지 여부 — true 시 /widgetSub/{slug}?id=N URL 사용 안내 */
     singlePage: boolean;
-    /** 메인 연결 Slug Entity ID */
-    slugEntityId: number | undefined;
-    /** 연결 타입 — mainConnectedSlug·slugEntityId 기반, restore 시 함께 복원 */
+    /** 연결 타입 — mainConnectedSlug 기반, restore 시 함께 복원 */
     connectedType: ConnectedType;
     /** 우측 드로어 여부 — layerpopup + right 조합일 때 true */
     isRightDrawer: boolean;
@@ -49,7 +48,6 @@ export interface OutputModeValue {
     setMainConnectedSlug: (v: string) => void;
     setLeaveCheck: (v: boolean) => void;
     setSinglePage: (v: boolean) => void;
-    setSlugEntityId: (v: number | undefined) => void;
     setConnectedType: (v: ConnectedType) => void;
     /**
      * 저장된 configJson에서 outputMode 관련 값 일괄 복원
@@ -69,7 +67,6 @@ export function useOutputMode(): OutputModeValue {
     const [mainConnectedSlug, setMainConnectedSlug] = useState('');
     const [leaveCheck, setLeaveCheck]               = useState(false);
     const [singlePage, setSinglePage]               = useState(false);
-    const [slugEntityId, setSlugEntityId]           = useState<number | undefined>(undefined);
     const [connectedType, setConnectedType]         = useState<ConnectedType>('none');
 
     const isRightDrawer = outputMode === 'layerpopup' && layerType === 'right';
@@ -85,19 +82,23 @@ export function useOutputMode(): OutputModeValue {
         setMainConnectedSlug ((cfg.mainConnectedSlug  as string)      || '');
         setLeaveCheck        ((cfg.leaveCheck         as boolean)     ?? false);
         setSinglePage        ((cfg.singlePage         as boolean)     ?? false);
-        setSlugEntityId      ((cfg.slugEntityId       as number)      || undefined);
-        /* connectedType — mainConnectedSlug·slugEntityId 기반으로 파생 복원 */
+        /* connectedType — 신규 저장분은 configJson에 명시된 값을 그대로 사용.
+         * 레거시 데이터(connectedType 미저장)는 기존처럼 mainConnectedSlug·slugEntityId 기반으로 파생 복원.
+         * — 옛 템플릿에 slugEntityId만 저장되어 있고 mainConnectedSlug가 없는 경우, 값을 역산하지 않고
+         *   connectedType만 'entity'로 추정 복원하며 mainConnectedSlug는 빈 값으로 둔다(사용자가 다시 선택해야 함). */
         setConnectedType(
-            (cfg.slugEntityId as number)     ? 'entity' :
-            (cfg.mainConnectedSlug as string) ? 'slug'   : 'none'
+            (cfg.connectedType as ConnectedType) ?? (
+                (cfg.slugEntityId as number)      ? 'entity' :
+                (cfg.mainConnectedSlug as string) ? 'slug'   : 'none'
+            )
         );
     };
 
     return {
         outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
-        mainConnectedSlug, leaveCheck, singlePage, slugEntityId, connectedType, isRightDrawer,
+        mainConnectedSlug, leaveCheck, singlePage, connectedType, isRightDrawer,
         setOutputMode, setPageTitle, setPageTitleMsgKey, setLayerType, setLayerTitle, setLayerTitleMsgKey, setLayerWidth,
-        setMainConnectedSlug, setLeaveCheck, setSinglePage, setSlugEntityId, setConnectedType,
+        setMainConnectedSlug, setLeaveCheck, setSinglePage, setConnectedType,
         restore,
     };
 }

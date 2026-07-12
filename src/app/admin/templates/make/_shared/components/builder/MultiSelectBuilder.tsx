@@ -38,11 +38,15 @@ import { SlugSelectField } from './fields';
 import { ExtraSimpleInputField, ExtraSimpleSelectField } from './fields';
 import type { ExtraSimpleInputFieldValues } from './fields';
 import type { ExtraSimpleSelectFieldValues } from './fields';
+import type { SlugOption } from './fields';
 import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
 import { BG_COLOR_OPTIONS } from './SpaceBuilder';
 import { createIdGenerator } from '../../utils';
 import type { CodeGroupDef } from '../../types';
 import type { MultiSelectWidget, MultiSelectExtraField, MultiSelectExtraFieldType } from '../renderer/types';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
+import { getConnFieldOptions, resolveEntityId, type ConnMode } from './connFieldOptions';
+import { useEntityFields } from '../../hooks/useEntityFields';
 
 const uid = createIdGenerator('ef');
 
@@ -152,12 +156,14 @@ function SortableExtraFieldItem({
 /* ══════════════════════════════════════════════════════════ */
 
 function ExtraFieldEditPanel({
-    field, onChange, codeGroups, codeGroupsLoading,
+    field, onChange, codeGroups, codeGroupsLoading, slugEntityFields,
 }: {
     field: MultiSelectExtraField;
     onChange: (patch: Partial<MultiSelectExtraField>) => void;
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
+    /** Slug Entity 필드 목록 — 있으면 추가 필드 Key 입력이 selectbox로 전환됨 (widget 빌더 전용) */
+    slugEntityFields?: SlugEntityFieldItem[];
 }) {
     /* ExtraSimpleInputField용 values 변환 */
     const inputValues: ExtraSimpleInputFieldValues = {
@@ -191,6 +197,7 @@ function ExtraFieldEditPanel({
                 ...(updates.placeholderMsgKey !== undefined && { placeholderMsgKey: updates.placeholderMsgKey }),
                 ...(updates.required          !== undefined && { required:          updates.required }),
             })}
+            slugEntityFields={slugEntityFields}
         />
     ) : (
         <ExtraSimpleSelectField
@@ -205,6 +212,7 @@ function ExtraFieldEditPanel({
             })}
             codeGroups={codeGroups}
             codeGroupsLoading={codeGroupsLoading}
+            slugEntityFields={slugEntityFields}
         />
     );
 
@@ -233,10 +241,31 @@ function ExtraFieldEditPanel({
 interface MultiSelectBuilderProps {
     widget: MultiSelectWidget;
     onChange: (w: MultiSelectWidget) => void;
-    slugOptions: { id: number; slug: string; name: string }[];
+    slugOptions: SlugOption[];
+    /** @deprecated 더 이상 MultiSelectBuilder 내부에서 직접 사용하지 않음 — widget.connectedSlug(이 MultiSelect의 연결 Entity) 기준으로
+     *  useEntityFields 훅을 통해 자체적으로 재조회한다(contentEntityFields). CommonBuilderDispatcher 호환을 위해 타입만 유지. */
+    slugEntityFields?: SlugEntityFieldItem[];
+    /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
+    connLabel?: string;
+    /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
+    connDefaultSlug?: string;
+    /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
+    connMode?: ConnMode;
+    /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
+    dataEntityOptions?: SlugOption[];
 }
 
-export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelectBuilderProps) {
+export function MultiSelectBuilder({ widget, onChange, slugOptions, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] }: MultiSelectBuilderProps) {
+    /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
+    const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
+
+    /* ── 이 컨텐츠(MultiSelect)가 실제로 연결된 Entity 기준 필드 목록 ──
+       widget.connectedSlug(이 MultiSelect 자체의 연결 Entity)가 없으면 위젯 최상위 연결 Entity(connDefaultSlug)로 자연 폴백한다.
+       추가 입력 필드 Key selectbox 옵션은 위젯 최상위가 아니라 이 값을 기준으로 구성해야 한다. */
+    const effectiveSlug = widget.connectedSlug || connDefaultSlug;
+    const entityId = resolveEntityId(effectiveSlug, connMode, slugOptions, dataEntityOptions);
+    const contentEntityFields = useEntityFields(entityId);
+
     const { i18nMode } = useBuilderI18nMode();
     const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
     const [showPicker, setShowPicker]         = useState(false);
@@ -310,10 +339,11 @@ export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelec
                         />
                     </div>
                     <SlugSelectField
-                        label="연결 Slug"
-                        value={widget.connectedSlug ?? ''}
+                        label={connLabel}
+                        value={widget.connectedSlug ?? connDefaultSlug ?? ''}
                         onChange={slug => onChange({ ...widget, connectedSlug: slug })}
-                        slugOptions={slugOptions}
+                        slugOptions={connFieldOptions.options}
+                        formatDisplay={connFieldOptions.formatDisplay}
                     />
                 </div>
 
@@ -460,6 +490,7 @@ export function MultiSelectBuilder({ widget, onChange, slugOptions }: MultiSelec
                                         onChange={patch => updateExtraField(field.id, patch)}
                                         codeGroups={codeGroups}
                                         codeGroupsLoading={codeGroupsLoading}
+                                        slugEntityFields={contentEntityFields}
                                     />
                                 </SortableExtraFieldItem>
                             ))}

@@ -26,9 +26,11 @@ export interface ExtraSimpleInputFieldValues {
 interface ExtraSimpleInputFieldProps {
     values: ExtraSimpleInputFieldValues;
     onChange: (updates: Partial<ExtraSimpleInputFieldValues>) => void;
+    /** Slug Entity 필드 목록 — 있으면 Key 입력이 selectbox로 전환됨 (widget 빌더 전용) */
+    slugEntityFields?: { key: string | null; label: string }[];
 }
 
-export function ExtraSimpleInputField({ values, onChange }: ExtraSimpleInputFieldProps) {
+export function ExtraSimpleInputField({ values, onChange, slugEntityFields }: ExtraSimpleInputFieldProps) {
     const { i18nMode } = useBuilderI18nMode();
 
     return (
@@ -43,6 +45,7 @@ export function ExtraSimpleInputField({ values, onChange }: ExtraSimpleInputFiel
                 hideColSpan={true}
                 hideConditionFields={true}
                 required={values.required}
+                slugEntityFields={slugEntityFields}
                 onChange={updates => onChange({
                     ...(updates.label       !== undefined && { label:       updates.label }),
                     ...(updates.labelMsgKey !== undefined && { labelMsgKey: updates.labelMsgKey }),

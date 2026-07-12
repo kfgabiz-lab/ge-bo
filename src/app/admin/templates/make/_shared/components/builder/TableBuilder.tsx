@@ -39,6 +39,8 @@ import {
     DateRangeStatusColumnField,
     InlineEditField,
 } from './fields';
+import type { SlugOption } from './fields';
+import { getConnFieldOptions, type ConnMode } from './connFieldOptions';
 import type { SlugRelationOption } from '../SearchBuilder';
 import { DateFormatField } from './fields/DateFormatField';
 import {
@@ -101,9 +103,17 @@ interface TableBuilderProps {
     /** 연결 가능한 Search 위젯 목록 (widget/page.tsx에서 collectWidgets로 추출 후 전달) */
     searchWidgets: Array<{ widgetId: string; contentKey: string }>;
     /** Slug 레지스트리 옵션 — DB Slug 드롭다운에서 사용 */
-    slugOptions: { id: number; slug: string; name: string }[];
+    slugOptions: SlugOption[];
     /** Slug Entity 필드 목록 — "이 위젯만 빌드" 버튼용 (widget 빌더 전용) */
     slugEntityFields?: SlugEntityFieldItem[];
+    /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
+    connLabel?: string;
+    /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
+    connDefaultSlug?: string;
+    /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
+    connMode?: ConnMode;
+    /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
+    dataEntityOptions?: SlugOption[];
 }
 
 /* ══════════════════════════════════════════════════════════════ */
@@ -192,7 +202,9 @@ function SortableColumnItem({
 /* ══════════════════════════════════════════ */
 
 /** 테이블 위젯 컬럼 설정 빌더 */
-export function TableBuilder({ widget, onChange, searchWidgets, slugOptions, slugEntityFields }: TableBuilderProps) {
+export function TableBuilder({ widget, onChange, searchWidgets, slugOptions, slugEntityFields, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] }: TableBuilderProps) {
+    /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
+    const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
     const { t } = useI18n();
     /* 컬럼 편집 아코디언 상태 */
     const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
@@ -403,9 +415,11 @@ export function TableBuilder({ widget, onChange, searchWidgets, slugOptions, slu
                         className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
                 </div>
                 <SlugSelectField
-                    value={widget.connectedSlug ?? ''}
+                    value={widget.connectedSlug ?? connDefaultSlug ?? ''}
                     onChange={slug => onChange({ ...widget, connectedSlug: slug })}
-                    slugOptions={slugOptions}
+                    slugOptions={connFieldOptions.options}
+                    formatDisplay={connFieldOptions.formatDisplay}
+                    label={connLabel}
                 />
             </div>
 

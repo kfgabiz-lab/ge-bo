@@ -27,7 +27,7 @@ import type { OutputMode, ConnectedType } from '../../hooks/useOutputMode';
 import { inputCls, selectCls } from '../../styles';
 import { SelectArrow } from '../SelectArrow';
 import { MessageKeySelector } from '@/components/i18n/message-key-selector';
-import { SlugSelectField } from './fields/SlugSelectField';
+import { SlugSelectField, type SlugOption } from './fields/SlugSelectField';
 import { EntityBuildButton } from './EntityBuildButton';
 
 const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
@@ -46,18 +46,19 @@ interface OutputModePanelProps {
     layerTitle: string;
     layerTitleMsgKey: string;
     layerWidth: LayerWidth;
-    /** 페이지 레벨 메인 연결 slug (선택) */
+    /** 페이지 레벨 메인 연결 slug (선택) — slug/entity/data 연결 타입 모두 이 값 하나를 공용으로 사용한다 */
     mainConnectedSlug?: string;
-    /** 메인 연결 slug 변경 핸들러 */
+    /** 메인 연결 slug 변경 핸들러 — connectedType==='slug'일 때 사용. 즉시 stamp는 하지 않으며,
+     * 저장 시점에 stampConnectedSlug가 이 값을 defaultSlug로 사용해 connectedSlug가 비어있는
+     * 대상 위젯(form/table/sublist/multiselect)만 채운다(fill-if-empty, 이미 값이 있으면 유지) */
     onMainConnectedSlugChange?: (v: string) => void;
-    /** slug 목록 — 드롭다운 옵션 */
-    slugOptions?: { id: number; slug: string; name: string }[];
-    /** slug entity 목록 — 드롭다운 옵션 */
-    slugEntityOptions?: { id: number; slug: string; name: string }[];
-    /** 연결된 slug entity ID */
-    slugEntityId?: number;
-    /** slug entity ID 변경 핸들러 */
-    onSlugEntityIdChange?: (v: number | undefined) => void;
+    /** 연결 slug 변경 핸들러 — connectedType==='entity'|'data'일 때 사용
+     * (entity: entity 연결된 slug 선택 / data: SlugEntity 고유 slug 선택 — 서로 다른 네임스페이스) */
+    onConnectedSlugChange?: (v: string) => void;
+    /** slug 목록 — 드롭다운 옵션. entityId/entityName이 있으면 "연결 Entity" 선택 시 entity 연결 slug만 필터링해 사용 */
+    slugOptions?: SlugOption[];
+    /** Data Entity 타입 전용 — SlugEntity 전체 목록(/slug-entity/active), SlugRegistry 연결 여부 무관 */
+    dataEntityOptions?: SlugOption[];
     /** 운영페이지 이탈 시 변경사항 확인 여부 */
     leaveCheck?: boolean;
     /** 이탈체크 변경 핸들러 */
@@ -70,7 +71,7 @@ interface OutputModePanelProps {
     connectedType?: ConnectedType;
     /** 연결 타입 변경 핸들러 */
     onConnectedTypeChange?: (v: ConnectedType) => void;
-    /** entity 타입 선택 + slugEntityId 선택 시 빌드 버튼 클릭 핸들러 (widget 빌더 전용) */
+    /** entity/data 타입 + 연결 Entity(slug) 선택 시 빌드 버튼 클릭 핸들러 (widget 빌더 전용) */
     onBuildFromEntity?: () => void;
     onOutputModeChange: (v: OutputMode) => void;
     onPageTitleChange: (v: string) => void;
@@ -87,8 +88,7 @@ interface OutputModePanelProps {
  */
 export function OutputModePanel({
     outputMode, pageTitle, pageTitleMsgKey, layerType, layerTitle, layerTitleMsgKey, layerWidth,
-    mainConnectedSlug = '', onMainConnectedSlugChange, slugOptions = [],
-    slugEntityOptions = [], slugEntityId, onSlugEntityIdChange,
+    mainConnectedSlug = '', onMainConnectedSlugChange, onConnectedSlugChange, slugOptions = [], dataEntityOptions = [],
     leaveCheck = false, onLeaveCheckChange,
     singlePage = false, onSinglePageChange,
     connectedType: connectedTypeProp, onConnectedTypeChange, onBuildFromEntity,
@@ -101,11 +101,11 @@ export function OutputModePanel({
     /* 연결 타입 — useOutputMode 훅에서 restore 시 함께 복원되므로 prop으로 수신 */
     const connectedType: ConnectedType = connectedTypeProp ?? 'none';
 
-    /* 타입 변경 시 반대쪽 값 초기화 */
+    /* 타입 변경 시 값 초기화 — entity(SlugRegistry 중 entity 연결된 slug)와 data(SlugEntity 고유 slug)는
+     * 서로 다른 네임스페이스를 사용하므로, 타입이 실제로 바뀌면 항상 초기화한다(같은 타입으로 되돌아올 때만 유지). */
     const handleTypeChange = (type: ConnectedType) => {
         onConnectedTypeChange?.(type);
-        if (type !== 'slug') onMainConnectedSlugChange?.('');
-        if (type !== 'entity') onSlugEntityIdChange?.(undefined);
+        if (type !== connectedType) onMainConnectedSlugChange?.('');
     };
 
     return (
@@ -193,7 +193,7 @@ export function OutputModePanel({
             )}
 
             {/* 연결 타입 + 대상 선택 — outputMode 관계없이 항상 표시 */}
-            {(onMainConnectedSlugChange || onSlugEntityIdChange) && (
+            {(onMainConnectedSlugChange || onConnectedSlugChange) && (
                 <div className="border-b border-slate-100 bg-slate-50/30 px-3 py-3">
                     <div className={`flex gap-2 ${connectedType === 'none' ? '' : 'items-end'}`}>
                         {/* 타입 selectbox */}
@@ -202,12 +202,13 @@ export function OutputModePanel({
                             <div className="relative">
                                 <select
                                     value={connectedType}
-                                    onChange={e => handleTypeChange(e.target.value as 'none' | 'slug' | 'entity')}
+                                    onChange={e => handleTypeChange(e.target.value as ConnectedType)}
                                     className={selectCls}
                                 >
                                     <option value="none">없음</option>
                                     <option value="slug">메인 연결 Slug</option>
                                     <option value="entity">Slug Entity</option>
+                                    <option value="data">Data Entity</option>
                                 </select>
                                 <SelectArrow />
                             </div>
@@ -226,26 +227,49 @@ export function OutputModePanel({
                             </div>
                         )}
 
-                        {/* Slug Entity 자동완성 — id↔slug 변환 후 SlugSelectField 재사용 */}
-                        {connectedType === 'entity' && onSlugEntityIdChange && (
+                        {/* 연결 Entity 자동완성 — entity가 연결된 slug를 직접 선택. 선택한 slug 문자열을 그대로 connectedSlug로 사용한다 */}
+                        {connectedType === 'entity' && onConnectedSlugChange && (
                             <div className="flex-1 flex items-end gap-1">
                                 <div className="flex-1">
                                     <SlugSelectField
                                         label="Slug Entity"
-                                        value={slugEntityOptions.find(o => o.id === slugEntityId)?.slug ?? ''}
-                                        onChange={slug => {
-                                            const opt = slugEntityOptions.find(o => o.slug === slug);
-                                            onSlugEntityIdChange(opt?.id);
-                                        }}
-                                        slugOptions={slugEntityOptions}
+                                        value={mainConnectedSlug}
+                                        onChange={onConnectedSlugChange}
+                                        slugOptions={slugOptions.filter(o => o.entityId != null)}
+                                        formatDisplay={o => `${o.slug} (${o.entityName})`}
                                         emptyLabel="— 없음 —"
                                     />
                                 </div>
-                                {/* 빌드 버튼 — slugEntityId 선택 시 활성화 */}
+                                {/* 빌드 버튼 — entity 연결된 slug 선택 시 활성화 */}
                                 {onBuildFromEntity && (
                                     <EntityBuildButton
                                         onClick={onBuildFromEntity}
-                                        disabled={!slugEntityId}
+                                        disabled={!mainConnectedSlug}
+                                        title="Slug Entity 필드로 Form 자동 생성"
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        {/* Data Entity 자동완성 — SlugEntity 전체 목록(/slug-entity/active)에서 직접 선택.
+                            SlugRegistry 연결 여부와 무관하며, 선택한 slug는 SlugEntity 고유 slug 네임스페이스다 */}
+                        {connectedType === 'data' && onConnectedSlugChange && (
+                            <div className="flex-1 flex items-end gap-1">
+                                <div className="flex-1">
+                                    <SlugSelectField
+                                        label="Data Entity"
+                                        value={mainConnectedSlug}
+                                        onChange={onConnectedSlugChange}
+                                        slugOptions={dataEntityOptions}
+                                        formatDisplay={o => `${o.slug} (${o.name})`}
+                                        emptyLabel="— 없음 —"
+                                    />
+                                </div>
+                                {/* 빌드 버튼 — Data Entity 선택 시 활성화 */}
+                                {onBuildFromEntity && (
+                                    <EntityBuildButton
+                                        onClick={onBuildFromEntity}
+                                        disabled={!mainConnectedSlug}
                                         title="Slug Entity 필드로 Form 자동 생성"
                                     />
                                 )}

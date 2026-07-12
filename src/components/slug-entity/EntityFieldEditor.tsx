@@ -17,6 +17,7 @@ import type { SlugEntityItem, SlugEntityFieldItem } from './EntityList';
 import { CodeGenerateModal } from './CodeGenerateModal';
 import type { SlugEntityCodePreviewResponse, SlugEntityCodeSaveResponse } from './CodeGenerateModal';
 import { CodeSaveResultModal } from './CodeSaveResultModal';
+import { AutocompleteSelectField } from '@/app/admin/templates/make/_shared/components/builder/fields';
 
 /* ── 공통코드 그룹 타입 ── */
 interface CodeGroupDef {
@@ -24,8 +25,10 @@ interface CodeGroupDef {
     groupName: string;
 }
 
-/* ── DB 타입 선택 옵션 ── */
-const DB_TYPES = ['VARCHAR', 'TEXT', 'BIGINT', 'INT', 'BOOLEAN', 'TIMESTAMPTZ', 'DATE', 'JSONB'];
+/* ── DB 타입 선택 옵션 ──
+ * ENTITY_REF: 다른 Slug Entity를 연동(참조)하는 필드 타입. 선택 시 아래 "빌더필드타입" 셀이
+ *             연동 Entity autocomplete selectbox로 전환된다. */
+const DB_TYPES = ['VARCHAR', 'TEXT', 'BIGINT', 'INT', 'BOOLEAN', 'TIMESTAMPTZ', 'DATE', 'JSONB', 'FILE', 'ENTITY_REF'];
 
 /* ── 빌더 필드 타입 선택 옵션 ── */
 const BUILDER_FIELD_TYPES = [
@@ -42,15 +45,22 @@ const mapDbTypeToFieldType = (dbType: string): string => {
         case 'BIGINT': case 'INT':       return 'input';
         case 'BOOLEAN':                  return 'checkbox';
         case 'DATE': case 'TIMESTAMPTZ': return 'date';
+        case 'FILE':                     return 'file';
+        /* ENTITY_REF에 대응하는 빌더 위젯 필드타입이 아직 확정되지 않음
+           → 임의 매핑 금지. 미매핑('')으로 두고 추후 결정 필요 */
+        case 'ENTITY_REF':               return '';
         default:                         return 'textarea';
     }
 };
+
+/** 마스터 Entity slug → 참조 필드 key 변환 (하이픈 → 언더스코어 + _id) */
+const toParentRefKey = (parentSlug: string): string => `${parentSlug.replace(/-/g, '_')}_id`;
 
 /* ── 빈 필드 행 생성 ── */
 const emptyField = (): SlugEntityFieldItem => ({
     key: null, label: '', columnType: 'VARCHAR',
     columnLength: null, fieldType: 'input', codeGroupCode: null,
-    defaultValue: null,
+    defaultValue: null, connectedEntityId: null,
     isNullable: true, description: null, sortOrder: 0,
 });
 
@@ -72,9 +82,18 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
     const [deleting, setDeleting]     = useState(false);
     const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
 
-    /* table_name 헤더 편집 상태 (Entity 자체 정보 수정 — 필드 저장과 별개 API) */
-    const [tableName, setTableName]   = useState('');
-    const [savingInfo, setSavingInfo] = useState(false);
+    /* table_name / 마스터 Entity 헤더 편집 상태 (Entity 자체 정보 수정 — 필드 저장과 별개 API) */
+    const [tableName, setTableName]           = useState('');
+    const [parentEntityId, setParentEntityId] = useState<number | null>(null);
+    const [savingInfo, setSavingInfo]         = useState(false);
+
+    /* 마스터 Entity 선택 옵션 — entity 전환 시마다 재조회(같은 세션에서 방금 생성한 entity도 즉시 반영) */
+    const [entityOptions, setEntityOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
+    useEffect(() => {
+        api.get<{ id: number; slug: string; name: string }[]>('/slug-entity/active')
+            .then(res => setEntityOptions(res.data || []))
+            .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
+    }, [entity?.id]);
 
     /* Java 코드 자동생성 — 미리보기 로딩 / 미리보기 데이터 / 저장 결과 */
     const [previewLoading, setPreviewLoading] = useState(false);
@@ -86,16 +105,52 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
         api.get<CodeGroupDef[]>('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
     }, []);
 
-    /* entity 선택 시 fields 로컬 복사 */
+    /** 마스터 Entity 참조 필드({parentSlug}_id)가 없으면 추가한 새 배열을 반환 (이미 있으면 원본 그대로) */
+    const withParentRefField = (
+        baseFields: SlugEntityFieldItem[],
+        parentId: number | null,
+        options: { id: number; slug: string; name: string }[],
+    ): SlugEntityFieldItem[] => {
+        if (!parentId) return baseFields;
+        const parent = options.find(o => o.id === parentId);
+        if (!parent) return baseFields;
+        const refKey = toParentRefKey(parent.slug);
+        if (baseFields.some(f => f.key === refKey)) return baseFields;
+        return [...baseFields, {
+            key: refKey,
+            label: `${parent.name} ID`,
+            columnType: 'BIGINT',
+            columnLength: null,
+            fieldType: 'input',
+            codeGroupCode: null,
+            defaultValue: null,
+            connectedEntityId: null,
+            isNullable: false,
+            description: null,
+            sortOrder: baseFields.length,
+        }];
+    };
+
+    /* entity 선택 시 fields/헤더 상태 로컬 복사 — 저장된 마스터 Entity가 있으면 참조 필드도 함께 반영
+     * (fields/parentEntityId를 별개 effect로 나누면, entity 전환 시 두 effect가 서로 다른 시점의 값을
+     *  참조하는 경쟁 상태가 발생해 직전 entity의 참조 필드가 새 entity에 잘못 남는 문제가 있었음 — 단일 effect로 원자적 처리) */
     useEffect(() => {
         if (entity) {
-            setFields(entity.fields.map(f => ({ ...f })));
             setTableName(entity.tableName ?? '');
+            setParentEntityId(entity.parentEntityId ?? null);
+            setFields(withParentRefField(entity.fields.map(f => ({ ...f })), entity.parentEntityId ?? null, entityOptions));
         } else {
             setFields([]);
             setTableName('');
+            setParentEntityId(null);
         }
-    }, [entity]);
+    }, [entity, entityOptions]);
+
+    /* 헤더 select에서 마스터 Entity를 직접 변경할 때 — 참조 필드 즉시 추가 (부모 해제 시 기존 필드는 유지) */
+    const handleParentEntityChange = (newParentId: number | null) => {
+        setParentEntityId(newParentId);
+        setFields(prev => withParentRefField(prev, newParentId, entityOptions));
+    };
 
     /* 행 필드값 변경 */
     const updateField = (idx: number, key: keyof SlugEntityFieldItem, value: unknown) => {
@@ -133,6 +188,8 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                 fieldType:     f.fieldType || null,
                 codeGroupCode: f.codeGroupCode || null,
                 defaultValue:  f.defaultValue?.trim() || null,
+                /* 연동 대상 Slug Entity ID — columnType === 'ENTITY_REF'일 때만 의미 있음 */
+                connectedEntityId: f.columnType === 'ENTITY_REF' ? (f.connectedEntityId ?? null) : null,
                 isNullable:    f.isNullable,
                 description:   f.description || null,
                 sortOrder:     i,
@@ -147,20 +204,21 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
         }
     };
 
-    /* table_name 저장 — Entity 자체 정보 수정 API (PUT /slug-entity/{id}) 신규 연결 */
+    /* table_name / 마스터 Entity 저장 — Entity 자체 정보 수정 API (PUT /slug-entity/{id}) */
     const handleSaveTableName = async () => {
         if (!entity) return;
 
         setSavingInfo(true);
         try {
             const res = await api.put<SlugEntityItem>(`/slug-entity/${entity.id}`, {
-                slug:        entity.slug,
-                name:        entity.name,
-                tableName:   tableName.trim() || null,
-                description: entity.description,
-                active:      entity.active,
+                slug:           entity.slug,
+                name:           entity.name,
+                tableName:      tableName.trim() || null,
+                description:    entity.description,
+                active:         entity.active,
+                parentEntityId: parentEntityId,
             });
-            toast.success('테이블명이 저장되었습니다.');
+            toast.success('저장되었습니다.');
             onUpdated(res.data);
         } catch (err: unknown) {
             toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
@@ -201,8 +259,8 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
             await api.delete(`/slug-entity/${entity.id}`);
             toast.success('삭제되었습니다.');
             onDeleted();
-        } catch {
-            toast.error('삭제 중 오류가 발생했습니다.');
+        } catch (err: unknown) {
+            toast.error(getApiErrorMessage(err, '삭제 중 오류가 발생했습니다.'));
         } finally {
             setDeleting(false);
         }
@@ -252,6 +310,23 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                             placeholder="예: tbl_member"
                             className={INPUT_SM}
                         />
+                    </div>
+                </div>
+
+                {/* 마스터 Entity — 선택 시 자식 필드 목록에 참조 필드 자동 추가 (자기 자신 제외) */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">마스터 Entity</span>
+                    <div className="w-40">
+                        <select
+                            value={parentEntityId ?? ''}
+                            onChange={e => handleParentEntityChange(e.target.value ? Number(e.target.value) : null)}
+                            className={`${SELECT_SM} font-normal`}
+                        >
+                            <option value="">— 없음 —</option>
+                            {entityOptions.filter(o => o.id !== entity.id).map(o => (
+                                <option key={o.id} value={o.id}>{o.slug} ({o.name})</option>
+                            ))}
+                        </select>
                     </div>
                     <button
                         onClick={handleSaveTableName}
@@ -337,16 +412,34 @@ export function EntityFieldEditor({ entity, onDeleted, onUpdated }: Props) {
                                         </select>
                                     </td>
 
-                                    {/* 빌더필드타입 — DB 타입 자동 매핑, 직접 변경 가능 */}
+                                    {/* 빌더필드타입 — DB 타입 자동 매핑, 직접 변경 가능
+                                        단, ENTITY_REF일 땐 이 셀을 "연동 Entity" autocomplete selectbox로 전환 */}
                                     <td className="px-1 py-1">
-                                        <select
-                                            value={f.fieldType ?? ''}
-                                            onChange={e => updateField(idx, 'fieldType', e.target.value || null)}
-                                            className={SELECT_SM}
-                                        >
-                                            <option value="">— 없음 —</option>
-                                            {BUILDER_FIELD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                        </select>
+                                        {f.columnType === 'ENTITY_REF' ? (
+                                            <AutocompleteSelectField<{ id: number; slug: string; name: string }, number | null>
+                                                value={f.connectedEntityId ?? null}
+                                                onChange={id => updateField(idx, 'connectedEntityId', id)}
+                                                options={entityOptions}
+                                                emptyValue={null}
+                                                getOptionValue={o => o.id}
+                                                getOptionKey={o => o.id}
+                                                getDisplayText={o => `${o.slug} (${o.name})`}
+                                                filterOption={(o, q) =>
+                                                    o.slug.toLowerCase().includes(q) || o.name.toLowerCase().includes(q)
+                                                }
+                                                emptyLabel="— Entity 선택 —"
+                                                hideLabel
+                                            />
+                                        ) : (
+                                            <select
+                                                value={f.fieldType ?? ''}
+                                                onChange={e => updateField(idx, 'fieldType', e.target.value || null)}
+                                                className={SELECT_SM}
+                                            >
+                                                <option value="">— 없음 —</option>
+                                                {BUILDER_FIELD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        )}
                                     </td>
 
                                     {/* 공통코드 — 선택 시 빌더 select/radio/checkbox 옵션 자동 연결 */}

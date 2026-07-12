@@ -27,9 +27,25 @@ const uid = createIdGenerator('eb');
 /*  내부 헬퍼 — 외부에서 직접 사용하지 않음        */
 /* ══════════════════════════════════════════ */
 
-/** snake_case → camelCase 변환 (예: user_name → userName) */
-function toCamelCase(str: string): string {
+/**
+ * snake_case → camelCase 변환 (예: user_name → userName)
+ * - entityApi.ts의 쓰기 전용 함수(toEntityFieldName)가 codegen과 동일한 단일 결정키를 만들 때 재사용하므로 export한다.
+ */
+export function toCamelCase(str: string): string {
     return str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/** camelCase → snake_case 변환 (예: userName → user_name) */
+function toSnakeCase(str: string): string {
+    return str.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+/**
+ * entity API row 케이싱 매칭 전용 — key의 camelCase/snake_case 양쪽 변형을 모두 반환한다.
+ * getKeyVariants(빌드타임 entity-field key 매칭용, suffix 제거 포함)와는 목적이 달라 별도 함수로 둔다.
+ */
+export function getCasingAliases(key: string): string[] {
+    return [...new Set([key, toCamelCase(key), toSnakeCase(key)])];
 }
 
 /** dateRange suffix 제거 — 빌더는 fieldKey만 저장하므로 entity key(_from/_to)와 비교 시 suffix 제거 */
@@ -164,6 +180,9 @@ export function resolveCellType(f: SlugEntityFieldItem): CellType {
 export function buildFormFieldItem(f: SlugEntityFieldItem): FormFieldItem {
     const type = (f.fieldType as SearchFieldType | undefined) ?? mapColumnTypeToFormType(f.columnType);
     const wideTypes = ['textarea', 'dateRange', 'yearMonthRange'];
+    /* DATE 컬럼은 날짜만(dateSubType='date'), TIMESTAMPTZ 컬럼은 날짜+시간(dateSubType='datetime') —
+     * columnType 기준으로 구분해야 entity 저장/조회 시 값 변환(entityApi.ts)이 컬럼 타입과 어긋나지 않는다 */
+    const dateSubType = f.columnType.toUpperCase() === 'TIMESTAMPTZ' ? 'datetime' as const : 'date' as const;
     return {
         id: uid(),
         type,
@@ -172,7 +191,7 @@ export function buildFormFieldItem(f: SlugEntityFieldItem): FormFieldItem {
         colSpan: wideTypes.includes(type) ? 2 : 1,
         rowSpan: 1,
         required: f.isNullable === false,
-        ...(type === 'date' && { dateSubType: 'date' as const }),
+        ...(type === 'date' && { dateSubType }),
         ...(f.codeGroupCode ? { codeGroupCode: f.codeGroupCode } : {}),
     } as FormFieldItem;
 }
@@ -219,7 +238,7 @@ export function buildTableColumn(f: SlugEntityFieldItem): TableColumnConfig {
  * - 기존 필드는 key가 일치하면 라벨(비어있을 때만)·required(entity not null 반영)만 갱신
  * - 기존 필드에 없는 entity 필드는 하단에 신규 추가
  * - fields가 비어있으면(신규 Form) 전체 entity 필드가 그대로 추가됨
- * - connectedSlug stamp는 페이지 레벨 정보(slugEntityId·slugOptions)가 필요해 이 함수 밖(호출부)에서 처리한다
+ * - connectedSlug stamp는 페이지 레벨 정보(선택된 연결 Entity slug)가 필요해 이 함수 밖(호출부)에서 처리한다
  */
 export function buildFormFromEntity(w: FormWidget, fields: SlugEntityFieldItem[]): FormWidget {
     const entityFieldMap = buildEntityFieldMap(fields);

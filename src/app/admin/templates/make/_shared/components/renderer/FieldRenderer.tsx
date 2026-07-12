@@ -46,12 +46,19 @@ import { toast } from 'sonner';
 
 /**
  * 서버에 저장된 파일 다운로드
- * @param fileId  page_file.id
+ * @param fileId  page_file.id (또는 entity 모드에서는 file_meta.id)
  * @param origName 저장 시 사용할 파일명
+ * @param errorMessage 다운로드 실패 시 표시할 메시지 — t()는 React 컴포넌트 내부에서만
+ *                      호출 가능하므로, 호출부(컴포넌트)에서 번역된 문자열을 전달받는다
+ * @param isEntity entity 연결 페이지 여부 — true면 file_meta 시스템(/file-meta/{id}/download),
+ *                 아니면 기존 page_file 시스템(/page-files/{id})으로 조회한다
  */
-async function downloadFile(fileId: number, origName: string) {
+async function downloadFile(fileId: number, origName: string, errorMessage: string, isEntity?: boolean) {
     try {
-        const res = await api.get(`/page-files/${fileId}`, { responseType: 'blob' });
+        const res = await api.get(
+            isEntity ? `/file-meta/${fileId}/download` : `/page-files/${fileId}`,
+            { responseType: 'blob' }
+        );
         const url = URL.createObjectURL(res.data);
         const a = document.createElement('a');
         a.href = url;
@@ -59,7 +66,7 @@ async function downloadFile(fileId: number, origName: string) {
         a.click();
         URL.revokeObjectURL(url);
     } catch {
-        toast.error('파일 다운로드에 실패했습니다.');
+        toast.error(errorMessage);
     }
 }
 
@@ -154,6 +161,9 @@ interface FieldRendererProps {
     forceDisabled?: boolean;
     /** data 표현식 평가용 — 현재 폼의 fieldKey→value 맵 */
     rowData?: Record<string, unknown>;
+    /** entity 연결 페이지 여부 — true면 파일 다운로드를 file_meta 시스템
+     * (/file-meta/{id}/download)으로, 아니면 기존 page_file 시스템(/page-files/{id})으로 수행 */
+    isEntity?: boolean;
 }
 
 /**
@@ -288,11 +298,12 @@ const FILE_INFO_BAR_HEIGHT = 26;
  * case 'image' / 'video' / 'media' 3곳에서 재사용
  */
 function FileInfoBar({ name, size, onDownload }: { name: string; size: number; onDownload: () => void }) {
+    const { t } = useI18n();
     return (
         <div className="flex-shrink-0 px-1.5 py-1 bg-slate-50/80 border-t border-slate-100">
             <button
                 type="button"
-                title="클릭하여 다운로드"
+                title={t('common.field.download_hint')}
                 onClick={onDownload}
                 className="block w-full text-left text-xs font-medium truncate hover:text-blue-600 hover:underline transition-colors"
             >
@@ -315,6 +326,8 @@ interface ColorPresetSelectorProps {
  * live: 클릭으로 색상 선택, outline으로 선택 표시
  */
 function ColorPresetSelector({ colors, selectedColor, disabled, onChange }: ColorPresetSelectorProps) {
+    // 다국어 메시지 조회 훅 (색상 옵션 없음 메시지 등)
+    const { t } = useI18n();
     return (
         <div className="flex items-center gap-2 flex-wrap p-1">
             {colors.map(color => {
@@ -342,7 +355,7 @@ function ColorPresetSelector({ colors, selectedColor, disabled, onChange }: Colo
                 );
             })}
             {colors.length === 0 && (
-                <span className="text-xs text-slate-400 italic">색상 옵션 없음</span>
+                <span className="text-xs text-slate-400 italic">{t('common.field.no_color_options')}</span>
             )}
         </div>
     );
@@ -454,7 +467,7 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     tabIndex={-1}
-                    aria-label="선택 초기화"
+                    aria-label={t('common.input.clear')}
                 >
                     <X className="w-3.5 h-3.5" />
                 </button>
@@ -477,7 +490,7 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
                                 </li>
                             ))
                         ) : (
-                            <li className="px-3 py-2 text-sm text-slate-400 italic">일치하는 항목 없음</li>
+                            <li className="px-3 py-2 text-sm text-slate-400 italic">{t('common.input.no_match')}</li>
                         )}
                     </ul>
                 </div>
@@ -686,6 +699,7 @@ export function FieldRenderer({
     onRemoveExisting,
     forceDisabled = false,
     rowData,
+    isEntity,
 }: FieldRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
@@ -773,7 +787,7 @@ export function FieldRenderer({
                     placeholder={
                         field.placeholderMsgKey
                             ? t(field.placeholderMsgKey)
-                            : (field.placeholder || '입력하세요')
+                            : (field.placeholder || t('common.input.placeholder'))
                     }
                     maxLength={field.showCharCount && field.maxLength ? field.maxLength : undefined}
                     className={`${inputCls}${readonlyCls}`}
@@ -1183,7 +1197,7 @@ export function FieldRenderer({
                 return (
                     <div style={style} className="whitespace-pre-wrap leading-relaxed px-1">
                         {field.contentMsgKey ? t(field.contentMsgKey) : (field.content || value || (
-                            <span className="text-slate-300 italic">텍스트 없음</span>
+                            <span className="text-slate-300 italic">{t('common.field.no_content')}</span>
                         ))}
                     </div>
                 );
@@ -1199,7 +1213,7 @@ export function FieldRenderer({
                             className={`${inputCls} resize-none flex-1 min-h-0${readonlyCls}`}
                             value={value}
                             maxLength={field.maxLength}
-                            placeholder={isReadOnly ? '' : (field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요'))}
+                            placeholder={isReadOnly ? '' : (field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || t('common.input.textarea_placeholder')))}
                             onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
                         />
                         <div className="text-right text-[10px] text-slate-400 mt-0.5">
@@ -1214,7 +1228,7 @@ export function FieldRenderer({
                     readOnly={isReadOnly}
                     className={`${inputCls} resize-none h-full${readonlyCls}`}
                     value={value}
-                    placeholder={isReadOnly ? '' : (field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || '텍스트를 입력하세요'))}
+                    placeholder={isReadOnly ? '' : (field.placeholderMsgKey ? t(field.placeholderMsgKey) : (field.placeholder || t('common.input.textarea_placeholder')))}
                     onChange={isReadOnly ? undefined : e => onChange(e.target.value)}
                 />
             );
@@ -1258,7 +1272,7 @@ export function FieldRenderer({
                     onClick={onButtonClick}
                     className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] min-w-[72px] w-full whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
                 >
-                    {field.labelMsgKey ? t(field.labelMsgKey) : (field.label || '버튼')}
+                    {field.labelMsgKey ? t(field.labelMsgKey) : (field.label || t('common.btn.default'))}
                 </button>
             );
         }
@@ -1273,15 +1287,26 @@ export function FieldRenderer({
             const maxCount = field.maxFileCount ?? 1;
             const maxSizeMB = (field as unknown as { maxFileSizeMB?: number }).maxFileSizeMB ?? 10;
             const maxTotalMB = (field as unknown as { maxTotalSizeMB?: number }).maxTotalSizeMB ?? 20;
-            const fileTypeLabelMap: Record<string, string> = { '': '전체', doc: '문서', image: '이미지', video: '동영상', custom: '커스텀' };
-            const fileTypeLabel = fileTypeLabelMap[field.fileTypeMode ?? ''] ?? '전체';
-            const validationInfo = `최대 ${maxCount}개 · 개당 ${maxSizeMB}MB · 전체 ${maxTotalMB}MB · 허용: ${fileTypeLabel}`;
+            const fileTypeLabelMap: Record<string, string> = {
+                '':      t('common.label.all'),
+                doc:     t('common.label.doc'),
+                image:   t('common.label.image'),
+                video:   t('common.label.video'),
+                custom:  t('common.label.custom'),
+            };
+            const fileTypeLabel = fileTypeLabelMap[field.fileTypeMode ?? ''] ?? t('common.label.all');
+            const validationInfo = t('common.field.file_info', {
+                count: String(maxCount),
+                mb: String(maxSizeMB),
+                total: String(maxTotalMB),
+                type: fileTypeLabel,
+            });
 
             /* preview / live 빈 상태 공통 UI — 중앙 정렬 + validation 정보 */
             const filePlaceholder = (
                 <>
                     <Paperclip className="w-5 h-5" />
-                    <span className="text-xs font-medium">파일 업로드</span>
+                    <span className="text-xs font-medium">{t('common.field.file_upload')}</span>
                     <span className="text-[10px] text-center leading-relaxed">{validationInfo}</span>
                 </>
             );
@@ -1295,7 +1320,7 @@ export function FieldRenderer({
             /* 파일 선택 후 공통 처리 — 형식 검증 + 목록 병합 */
             const handleFileSelect = (selected: File[]) => {
                 const { valid, rejected } = filterByAccept(selected, fileAcceptStr);
-                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (rejected.length > 0) alert(`${t('common.field.invalid_file_type')}\n${rejected.join('\n')}`);
                 if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
             };
 
@@ -1346,8 +1371,8 @@ export function FieldRenderer({
                                 <Paperclip className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                                 <button
                                     type="button"
-                                    title="클릭하여 다운로드"
-                                    onClick={() => downloadFile(meta.id, meta.origName)}
+                                    title={t('common.field.download_hint')}
+                                    onClick={() => downloadFile(meta.id, meta.origName, t('common.error.file_download'), isEntity)}
                                     className="text-slate-700 truncate flex-1 text-left hover:text-blue-600 hover:underline transition-colors"
                                 >
                                     {meta.origName}
@@ -1365,7 +1390,7 @@ export function FieldRenderer({
                                 <Paperclip className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
                                 <button
                                     type="button"
-                                    title="클릭하여 다운로드"
+                                    title={t('common.field.download_hint')}
                                     onClick={() => downloadLocalFile(file)}
                                     className="text-slate-700 truncate flex-1 text-left hover:text-blue-600 hover:underline transition-colors"
                                 >
@@ -1397,7 +1422,7 @@ export function FieldRenderer({
                                         className="flex items-center justify-center gap-1.5 cursor-pointer px-3 py-1.5 border border-dashed border-slate-300 rounded-md text-xs text-slate-500 hover:border-slate-500 hover:text-slate-700 transition-all"
                                     >
                                         <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
-                                        파일 추가 ({currentCount}/{maxCount})
+                                        {t('common.field.file_add', { current: String(currentCount), max: String(maxCount) })}
                                     </div>
                                 )}
                             />
@@ -1414,13 +1439,13 @@ export function FieldRenderer({
             const imgHeight = `${imgRowSpan * ROW_HEIGHT - (field.label ? 44 : 24)}px`;
 
             const imgMaxCount = field.maxFileCount ?? 1;
-            const imgFormatInfo = `최대 ${imgMaxCount}개 · jpg, png, gif, webp`;
+            const imgFormatInfo = t('common.field.image_format_info', { count: String(imgMaxCount) });
 
             /* preview / live 빈 상태 공통 UI */
             const imgPlaceholder = (
                 <>
                     <ImageIcon className="w-6 h-6" />
-                    <span className="text-xs font-medium">이미지 추가</span>
+                    <span className="text-xs font-medium">{t('common.field.image_add')}</span>
                     <span className="text-[10px] text-center leading-relaxed">{imgFormatInfo}</span>
                 </>
             );
@@ -1433,7 +1458,7 @@ export function FieldRenderer({
             /* 이미지 파일 선택 후 공통 처리 */
             const handleImgSelect = (selected: File[]) => {
                 const { valid, rejected } = filterByAccept(selected, FILE_TYPE_PRESETS.image);
-                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (rejected.length > 0) alert(`${t('common.field.invalid_file_type')}\n${rejected.join('\n')}`);
                 if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
             };
 
@@ -1514,7 +1539,7 @@ export function FieldRenderer({
                                                             </button>
                                                         )}
                                                     </div>
-                                                    <FileInfoBar name={item.meta.origName} size={item.meta.fileSize} onDownload={() => downloadFile(item.meta.id, item.meta.origName)} />
+                                                    <FileInfoBar name={item.meta.origName} size={item.meta.fileSize} onDownload={() => downloadFile(item.meta.id, item.meta.origName, t('common.error.file_download'), isEntity)} />
                                                 </div>
                                             );
                                         }
@@ -1549,7 +1574,7 @@ export function FieldRenderer({
                                                         className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
                                                     >
                                                         <Plus className="w-4 h-4" />
-                                                        <span className="text-[10px] mt-0.5">추가</span>
+                                                        <span className="text-[10px] mt-0.5">{t('common.btn.add')}</span>
                                                     </div>
                                                 )}
                                             />
@@ -1582,7 +1607,7 @@ export function FieldRenderer({
                                 readOnly={isReadOnly}
                                 className={`${inputCls}${readonlyCls} w-full`}
                                 value={value}
-                                placeholder="YouTube / Vimeo URL을 입력하세요"
+                                placeholder={t('common.field.video_url_placeholder')}
                                 onChange={isReadOnly ? undefined : e => onChange?.(e.target.value)}
                             />
                         </div>
@@ -1594,7 +1619,7 @@ export function FieldRenderer({
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-300 pointer-events-none">
                                 <Film className="w-6 h-6" />
-                                <span className="text-[11px]">URL 입력 시 미리보기가 표시됩니다</span>
+                                <span className="text-[11px]">{t('common.field.video_preview_hint')}</span>
                             </div>
                         )}
                     </div>
@@ -1611,7 +1636,7 @@ export function FieldRenderer({
             /* 비디오 파일 선택 후 공통 처리 */
             const handleVidSelect = (selected: File[]) => {
                 const { valid, rejected } = filterByAccept(selected, vidAcceptStr);
-                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (rejected.length > 0) alert(`${t('common.field.invalid_file_type')}\n${rejected.join('\n')}`);
                 if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
             };
 
@@ -1636,14 +1661,14 @@ export function FieldRenderer({
                                         className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
                                     >
                                         <Film className="w-5 h-5" />
-                                        <span className="text-xs font-medium">동영상 업로드</span>
+                                        <span className="text-xs font-medium">{t('common.field.video_upload')}</span>
                                     </div>
                                 )}
                             />
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
                                 <Film className="w-5 h-5" />
-                                <span className="text-xs font-medium">동영상 업로드</span>
+                                <span className="text-xs font-medium">{t('common.field.video_upload')}</span>
                             </div>
                         )}
                     </div>
@@ -1704,7 +1729,7 @@ export function FieldRenderer({
                                                 ) : (
                                                     <div className="w-full flex flex-col items-center justify-center gap-1 bg-slate-50" style={{ height: `${videoAreaH}px` }}>
                                                         <Film className="w-6 h-6 text-slate-300" />
-                                                        <span className="text-[10px] text-slate-400">로딩 중...</span>
+                                                        <span className="text-[10px] text-slate-400">{t('common.loading')}</span>
                                                     </div>
                                                 )}
                                                 {!isReadOnly && (
@@ -1713,7 +1738,7 @@ export function FieldRenderer({
                                                     </button>
                                                 )}
                                             </div>
-                                            <FileInfoBar name={item.meta.origName} size={item.meta.fileSize} onDownload={() => downloadFile(item.meta.id, item.meta.origName)} />
+                                            <FileInfoBar name={item.meta.origName} size={item.meta.fileSize} onDownload={() => downloadFile(item.meta.id, item.meta.origName, t('common.error.file_download'), isEntity)} />
                                         </div>
                                     );
                                 }
@@ -1752,7 +1777,7 @@ export function FieldRenderer({
                                                 className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
                                             >
                                                 <Plus className="w-4 h-4" />
-                                                <span className="text-[10px] mt-0.5">추가</span>
+                                                <span className="text-[10px] mt-0.5">{t('common.btn.add')}</span>
                                             </div>
                                         )}
                                     />
@@ -1814,11 +1839,11 @@ export function FieldRenderer({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
                         </svg>
                     </div>
-                    <span className="text-xs font-medium">미디어 업로드</span>
+                    <span className="text-xs font-medium">{t('common.field.media_upload')}</span>
                     {/* 형식·용량 안내 텍스트 */}
                     <div className="text-[10px] text-center leading-relaxed">
-                        <p>이미지 — {imgLabel} · 최대 {imgMaxMB}MB</p>
-                        <p>동영상 — {vidLabel} · 최대 {vidMaxMB}MB</p>
+                        <p>{t('common.field.media_image_info', { label: imgLabel, mb: String(imgMaxMB) })}</p>
+                        <p>{t('common.field.media_video_info', { label: vidLabel, mb: String(vidMaxMB) })}</p>
                     </div>
                 </div>
             );
@@ -1883,14 +1908,17 @@ export function FieldRenderer({
             /* 파일 선택 처리 — 확장자 체크 + 이미지/동영상 크기 개별 검증 */
             const handleMediaSelect = (selected: File[]) => {
                 const { valid, rejected } = filterByAccept(selected, mediaAccept);
-                if (rejected.length > 0) alert(`허용되지 않는 파일 형식입니다.\n${rejected.join('\n')}`);
+                if (rejected.length > 0) alert(`${t('common.field.invalid_file_type')}\n${rejected.join('\n')}`);
                 if (valid.length === 0) return;
 
                 const file = valid[0];
                 const isImg = isImageFile(file.name, imgExts);
                 const maxMB = isImg ? imgMaxMB : vidMaxMB;
                 if (file.size > maxMB * 1024 * 1024) {
-                    toast.warning(`${isImg ? '이미지' : '동영상'} 파일은 최대 ${maxMB}MB까지 업로드 가능합니다.`);
+                    toast.warning(t('common.field.file_size_limit', {
+                        type: isImg ? t('common.label.image') : t('common.label.video'),
+                        mb: String(maxMB),
+                    }));
                     return;
                 }
                 onFileChange?.([file]);
@@ -1955,7 +1983,7 @@ export function FieldRenderer({
                                     : /* 동영상 blob URL 로딩 중: 아이콘 표시 */
                                       <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
                                           <Film className="w-6 h-6 text-slate-300" />
-                                          <span className="text-[10px] text-slate-400">로딩 중...</span>
+                                          <span className="text-[10px] text-slate-400">{t('common.loading')}</span>
                                       </div>
                             )}
                             {/* 기존 파일 제거 버튼 */}
@@ -1969,7 +1997,7 @@ export function FieldRenderer({
                                 </button>
                             )}
                         </div>
-                        <FileInfoBar name={existingMedia.origName} size={existingMedia.fileSize} onDownload={() => downloadFile(existingMedia.id, existingMedia.origName)} />
+                        <FileInfoBar name={existingMedia.origName} size={existingMedia.fileSize} onDownload={() => downloadFile(existingMedia.id, existingMedia.origName, t('common.error.file_download'), isEntity)} />
                     </div>
                 );
             }
@@ -2094,9 +2122,9 @@ export function FieldRenderer({
         /* ── dateRangeStatus ── 날짜 범위 상태 필터 (이전/포함/이후 선택) */
         case 'dateRangeStatus': {
             /* 다국어 키 우선, 없으면 직접 텍스트, 없으면 기본값 */
-            const beforeLabel  = field.beforeTextMsgKey  ? t(field.beforeTextMsgKey)  : (field.beforeText  || '예정');
-            const inRangeLabel = field.inRangeTextMsgKey ? t(field.inRangeTextMsgKey) : (field.inRangeText || '진행중');
-            const afterLabel   = field.afterTextMsgKey   ? t(field.afterTextMsgKey)   : (field.afterText   || '종료');
+            const beforeLabel  = field.beforeTextMsgKey  ? t(field.beforeTextMsgKey)  : (field.beforeText  || t('common.status.before'));
+            const inRangeLabel = field.inRangeTextMsgKey ? t(field.inRangeTextMsgKey) : (field.inRangeText || t('common.status.inrange'));
+            const afterLabel   = field.afterTextMsgKey   ? t(field.afterTextMsgKey)   : (field.afterText   || t('common.status.after'));
             /* select 방식 */
             if (!field.statusDisplayStyle || field.statusDisplayStyle === 'select') {
                 return (
@@ -2107,7 +2135,7 @@ export function FieldRenderer({
                             value={isPreview ? '' : value}
                             onChange={isPreview ? undefined : e => onChange?.(e.target.value)}
                         >
-                            <option value="">전체</option>
+                            <option value="">{t('common.label.all')}</option>
                             <option value="before">{beforeLabel}</option>
                             <option value="in_range">{inRangeLabel}</option>
                             <option value="after">{afterLabel}</option>
@@ -2118,7 +2146,7 @@ export function FieldRenderer({
             }
             /* radio 방식 */
             const statusOpts: { label: string; val: string }[] = [
-                { label: '전체',       val: '' },
+                { label: t('common.label.all'), val: '' },
                 { label: beforeLabel,  val: 'before' },
                 { label: inRangeLabel, val: 'in_range' },
                 { label: afterLabel,   val: 'after' },

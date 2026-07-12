@@ -268,12 +268,12 @@ export function TableRenderer({
                                             } : undefined}
                                             className={`flex items-center justify-center gap-1 w-full transition-colors ${isPreview ? 'cursor-default' : 'hover:text-slate-900'}`}
                                         >
-                                            {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
+                                            {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? t('common.label.action') : '—'))}
                                             <SortIcon sorted={isPreview ? false : (sortKey === col.accessor ? sortDir : false)} />
                                         </button>
                                     ) : (
                                         <span className="flex items-center justify-center gap-1">
-                                            {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
+                                            {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? t('common.label.action') : '—'))}
                                         </span>
                                     )}
                                 </th>
@@ -317,7 +317,7 @@ export function TableRenderer({
                                 <td colSpan={columns.length} className="py-16 text-center">
                                     <span className="inline-flex items-center gap-2 text-sm text-slate-400">
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        데이터 로딩 중...
+                                        {t('common.table.loading')}
                                     </span>
                                 </td>
                             </tr>
@@ -325,7 +325,7 @@ export function TableRenderer({
                             /* live: 데이터 없음 */
                             <tr>
                                 <td colSpan={columns.length} className="py-16 text-center text-sm text-slate-400">
-                                    데이터가 없습니다.
+                                    {t('common.table.no_data')}
                                 </td>
                             </tr>
                         ) : (

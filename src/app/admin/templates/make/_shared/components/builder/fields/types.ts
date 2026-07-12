@@ -69,7 +69,7 @@ export interface FieldEditValues {
     /* ── action-button 전용 ── */
     color?: string;          // 버튼 색상 프리셋
     bgColor?: string;        // 커스텀 배경색
-    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave'; // 클릭 시 연결 방식
+    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave' | 'api'; // 클릭 시 연결 방식
     popupSlug?: string;              // 관리자방식 팝업 slug
     fileLayerSlug?: string;          // 개발자방식 로컬 컴포넌트명
     connectedContentWidgetIds?: string[];  // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중)
@@ -79,6 +79,7 @@ export interface FieldEditValues {
     excelPrivacyPopup?: boolean;          // 개인정보 다운로드 사유 입력 팝업 사용 여부 (connType='excel' 전용)
     params?: string;                      // popup·path 연결 시 전달 파라미터 (예: depth=1,type=create)
     dataSaveSlug?: string;                // 데이터저장 연결 slug (connType='datasave' 전용)
+    apiInfoId?: number;                   // API 연동 연결 api_info.id (connType='api' 전용)
     saveConfirm?: boolean;                // 저장 컨펌 — true 시 live 모드 버튼 클릭 시 확인창 표시 (action-button 전용)
     validationRuleIds?: number[];         // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
     contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)

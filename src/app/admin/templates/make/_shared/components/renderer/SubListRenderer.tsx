@@ -223,7 +223,7 @@ export function SubListRenderer({
 
     /** 삭제 — 기존 파일 API 삭제 후 행 제거 */
     const handleDelete = useCallback((rowId: string) => {
-        if (!confirm('삭제하시겠습니까?')) return;
+        if (!confirm(t('common.confirm.delete'))) return;
         /* 해당 row의 기존 파일 즉시 삭제 */
         const fileMeta = existingMetaMap[rowId] ?? {};
         Object.values(fileMeta).flatMap(metas => metas.map(m => m.id)).forEach(fileId => {
@@ -235,7 +235,7 @@ export function SubListRenderer({
         /* 내부 파일 state 정리 */
         setInternalFileMap(prev => { const next = { ...prev }; delete next[rowId]; return next; });
         setExistingMetaMap(prev => { const next = { ...prev }; delete next[rowId]; return next; });
-    }, [rows, onChange, existingMetaMap]);
+    }, [rows, onChange, existingMetaMap, t]);
 
     /** 행 값 변경 */
     const handleRowChange = useCallback((rowId: string, key: string, value: string) => {
@@ -300,7 +300,7 @@ export function SubListRenderer({
     /* addButtonLabel — MsgKey 우선, 없으면 직접 텍스트, 없으면 기본값 */
     const addLabel = widget.addButtonLabelMsgKey
         ? t(widget.addButtonLabelMsgKey)
-        : (widget.addButtonLabel ?? '추가');
+        : (widget.addButtonLabel ?? t('common.btn.add'));
 
     /* preview 모드 — 빈 샘플 행 1개 표시 */
     const previewRows: SubListRow[] = [{ _rowId: 'preview-1' }];
@@ -321,7 +321,7 @@ export function SubListRenderer({
                             </span>
                         )}
                         <span className="text-xs text-slate-400 font-medium whitespace-nowrap">
-                            {mode === 'preview' ? '-' : `${rows.length}개`}
+                            {mode === 'preview' ? '-' : t('common.unit.count', { count: String(rows.length) })}
                         </span>
                     </div>
 
@@ -352,7 +352,7 @@ export function SubListRenderer({
                                     >
                                         {/* action 컬럼 헤더 — label 없으면 "관리"로 표시 */}
                                         {col.type === 'action'
-                                            ? (col.labelMsgKey ? t(col.labelMsgKey) : (col.label || '관리'))
+                                            ? (col.labelMsgKey ? t(col.labelMsgKey) : (col.label || t('common.label.manage')))
                                             : (col.labelMsgKey ? t(col.labelMsgKey) : col.label)
                                         }
                                         {col.required && (
@@ -363,7 +363,7 @@ export function SubListRenderer({
                                 {/* 고정 삭제 열 — action 컬럼에 삭제가 없을 때만 표시 */}
                                 {!hasActionDelete && (
                                     <th className="px-3 py-2 text-center font-semibold text-slate-600 w-16 whitespace-nowrap">
-                                        삭제
+                                        {t('common.btn.delete')}
                                     </th>
                                 )}
                             </tr>
@@ -377,7 +377,7 @@ export function SubListRenderer({
                                         colSpan={visibleColumns.length + 1}
                                         className="px-3 py-8 text-center text-xs text-slate-400"
                                     >
-                                        등록된 항목이 없습니다.
+                                        {t('common.table.no_data')}
                                     </td>
                                 </tr>
                             ) : (
@@ -403,7 +403,7 @@ export function SubListRenderer({
                                                                     disabled={mode === 'preview'}
                                                                     onClick={() => handleDelete(row._rowId)}
                                                                     className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                                                    title="삭제"
+                                                                    title={t('common.btn.delete')}
                                                                 >
                                                                     <Trash2 className="w-3.5 h-3.5" />
                                                                 </button>
@@ -414,7 +414,7 @@ export function SubListRenderer({
                                                                     disabled={mode === 'preview'}
                                                                     onClick={() => handleCopy(row._rowId)}
                                                                     className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                                                    title="복사"
+                                                                    title={t('common.btn.copy')}
                                                                 >
                                                                     <CopyPlus className="w-3.5 h-3.5" />
                                                                 </button>
@@ -452,7 +452,7 @@ export function SubListRenderer({
                                                 <button
                                                     type="button"
                                                     disabled={mode === 'preview'}
-                                                    title="삭제"
+                                                    title={t('common.btn.delete')}
                                                     onClick={() => handleDelete(row._rowId)}
                                                     className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                                                 >

@@ -5,6 +5,7 @@
  */
 import api from '@/lib/api';
 import { TemplateItem } from './types';
+import type { ConnectedType } from './hooks/useOutputMode';
 
 /** 위젯 컨텐츠 아이템 (그리드 셀 내부 배치 단위) */
 export interface PageContentItem {
@@ -31,6 +32,8 @@ export interface TemplatePopupConfig {
     layerWidth?:      'sm' | 'md' | 'lg' | 'xl';
     /** 페이지 레벨 메인 연결 slug — 탭 서브페이지 저장 시 우선순위 판단에 사용 */
     mainConnectedSlug?: string;
+    /** 페이지 레벨 메인 연결 타입 — 'entity' | 'data'면 mainConnectedSlug가 Slug Entity REST API를 가리킨다 */
+    connectedType?: ConnectedType;
     /** 운영페이지 이탈 시 변경사항 확인 여부 */
     leaveCheck?: boolean;
     /** 페이지 레벨 연결 Slug Entity ID */
@@ -92,6 +95,7 @@ export async function fetchTemplateConfig(slug: string): Promise<TemplatePopupCo
         layerTitleMsgKey:  raw.layerTitleMsgKey  || '',
         layerWidth:        raw.layerWidth        || 'md',
         mainConnectedSlug: (raw.mainConnectedSlug as string) || undefined,
+        connectedType:     (raw.connectedType as ConnectedType) || undefined,
         leaveCheck:        (raw.leaveCheck as boolean)       ?? false,
         slugEntityId:      (raw.slugEntityId as number)      || undefined,
         widgetItems,

@@ -106,6 +106,14 @@ export default function QuickListBuilderPage() {
             .catch(() => { });
     }, []);
 
+    /* ── API 정보 — Space ActionButton API 연동 연결용 ── */
+    const [apiInfoOptions, setApiInfoOptions] = useState<{ id: number; name: string; method: string; urlPattern: string }[]>([]);
+    useEffect(() => {
+        api.get('/api-infos/active')
+            .then(res => setApiInfoOptions(res.data || []))
+            .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
+    }, []);
+
     /* ── 전체 페이지 템플릿 목록 — Space ActionButton 페이지 연결용 ── */
     const [pageTemplates, setPageTemplates] = useState<TemplateItem[]>([]);
     useEffect(() => {
@@ -282,7 +290,7 @@ export default function QuickListBuilderPage() {
                                                 <CommonBuilderDispatcher
                                                     widget={spaceContent.widget}
                                                     onChange={w => setSpaceContent(prev => ({ ...prev, widget: w as typeof spaceContent.widget }))}
-                                                    context={{ slugOptions, pageTemplates, actionButtonOnly: true }}
+                                                    context={{ slugOptions, apiInfoOptions, pageTemplates, actionButtonOnly: true }}
                                                 />
                                             </div>
                                         </div>

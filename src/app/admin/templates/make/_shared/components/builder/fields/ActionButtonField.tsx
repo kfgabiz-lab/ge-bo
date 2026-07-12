@@ -23,6 +23,8 @@ import { FieldEditProps } from './types';
 import { FieldBase, LABEL_CLS, INPUT_CLS } from './_FieldBase';
 import { SlugSelectField } from './SlugSelectField';
 import type { SlugOption } from './SlugSelectField';
+import { ApiInfoSelectField } from './ApiInfoSelectField';
+import type { ApiInfoOption } from './ApiInfoSelectField';
 import type { TemplateItem, ValidationRule } from '../../../types';
 import { getTemplateLabel } from '../../../utils';
 import api from '@/lib/api';
@@ -55,6 +57,8 @@ export interface ActionButtonFieldProps extends FieldEditProps {
     contentWidgets?: ContentWidgetOption[];
     /** slug 레지스트리 목록 — 데이터저장 연결slug 선택용 */
     slugOptions?: SlugOption[];
+    /** API 정보 목록 — API 연동 연결(connType='api') 선택용 */
+    apiInfoOptions?: ApiInfoOption[];
 }
 
 /** 공통 select 스타일 */
@@ -135,6 +139,7 @@ export function ActionButtonField({
     pageTemplates,
     contentWidgets = [],
     slugOptions = [],
+    apiInfoOptions = [],
 }: ActionButtonFieldProps) {
     const connType = values.connType ?? '';
 
@@ -144,7 +149,7 @@ export function ActionButtonField({
     /** 연결 타입 변경 시 연결 관련 값 초기화 */
     const handleConnTypeChange = (newType: string) => {
         onChange({
-            connType: newType as '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave',
+            connType: newType as '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave' | 'api',
             popupSlug: undefined,
             fileLayerSlug: undefined,
             connectedContentWidgetIds: undefined,
@@ -153,6 +158,7 @@ export function ActionButtonField({
             dataSaveSlug: undefined,
             validationRuleIds: undefined,
             contentValidationRuleIds: undefined,
+            apiInfoId: undefined,
         });
     };
 
@@ -246,6 +252,7 @@ export function ActionButtonField({
                         <option value="content">컨텐츠</option>
                         <option value="datasave">데이터저장</option>
                         <option value="excel">엑셀 다운로드</option>
+                        <option value="api">API 연동</option>
                         <option value="popup">페이지 (관리자)</option>
                         <option value="path">경로 (개발자)</option>
                         <option value="close">닫기</option>
@@ -451,6 +458,75 @@ export function ActionButtonField({
                             </label>
                         </div>
                     )}
+
+                    {/* API 연동 — 활성 API 정보 목록에서 1건 선택 */}
+                    {connType === 'api' && (() => {
+                        /* 선택된 API의 method 확인 — POST/PUT/PATCH일 때만 컨텐츠 데이터 수집 UI 노출 */
+                        const selectedApi = apiInfoOptions.find(a => a.id === values.apiInfoId);
+                        const apiMethod = (selectedApi?.method ?? '').toUpperCase();
+                        const supportsContentData = apiMethod === 'POST' || apiMethod === 'PUT' || apiMethod === 'PATCH';
+                        /* Table은 제외 — Form/SubList/MultiSelect 데이터만 요청 바디에 포함 가능 */
+                        const apiContentWidgets = contentWidgets.filter(w => w.type !== 'table');
+
+                        return (
+                            <div className="space-y-1">
+                                <ApiInfoSelectField
+                                    hideLabel
+                                    value={values.apiInfoId}
+                                    onChange={id => onChange({ apiInfoId: id, connectedContentWidgetIds: undefined })}
+                                    apiInfoOptions={apiInfoOptions}
+                                    emptyLabel="— API 선택 —"
+                                />
+                                {/* 연결 API가 선택된 경우에만 파라미터 입력란 노출 */}
+                                {values.apiInfoId && (
+                                    <div className="space-y-1.5">
+                                        {/* POST/PUT/PATCH — Form/SubList/MultiSelect 위젯 체크박스로 선택해 실제 데이터를 요청 바디에 포함 */}
+                                        {supportsContentData && (
+                                            apiContentWidgets.length === 0 ? (
+                                                <p className="text-[10px] text-slate-400 italic px-1">
+                                                    연결 가능한 Form/SubList/MultiSelect 위젯이 없습니다.
+                                                </p>
+                                            ) : (
+                                                <div className="border border-slate-200 rounded overflow-hidden">
+                                                    {apiContentWidgets.map(w => (
+                                                        <label
+                                                            key={w.widgetId}
+                                                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedIds.includes(w.widgetId)}
+                                                                onChange={() => handleContentWidgetToggle(w.widgetId)}
+                                                                className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                                            />
+                                                            <span className="text-xs text-slate-700 truncate">
+                                                                {getContentLabel(w)}
+                                                            </span>
+                                                            {w.connectedSlug && (
+                                                                <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
+                                                                    {w.connectedSlug}
+                                                                </span>
+                                                            )}
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            )
+                                        )}
+                                        <div className="space-y-0.5">
+                                            <input
+                                                type="text"
+                                                value={values.params ?? ''}
+                                                onChange={e => onChange({ params: e.target.value || undefined })}
+                                                placeholder="파라미터 (예: id='1',status='use')"
+                                                className={INPUT_CLS}
+                                            />
+                                            <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값 · urlPattern의 {'{'}key{'}'} 치환에도 사용</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* 페이지 — Quick-Detail 템플릿 선택 (팝업/상세 구분 표시) */}
                     {connType === 'popup' && (
