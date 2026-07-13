@@ -43,6 +43,7 @@ import { parseOpt, flattenPageDataItem, evalColumnDataExpr, evalConditionExpr, f
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { PortalDropdown } from '@/components/ui/portal-dropdown';
 
 /**
  * 서버에 저장된 파일 다운로드
@@ -383,22 +384,13 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
     const [filterText, setFilterText] = useState('');
     /* 드롭다운 열림/닫힘 상태 */
     const [isOpen, setIsOpen] = useState(false);
-    /* 외부 클릭 감지용 래퍼 ref */
+    /* 래퍼(선택 초기화 버튼 위치 기준) ref */
     const wrapperRef = useRef<HTMLDivElement>(null);
+    /* 드롭다운 위치 기준(anchor) — 입력창 */
+    const inputRef = useRef<HTMLInputElement>(null);
 
     /* input에 표시할 텍스트 — 열려있을 때는 필터 텍스트, 닫혔을 때는 displayText */
     const shownText = isOpen ? filterText : displayText;
-
-    /* 외부 클릭 시 드롭다운 닫기 */
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     /* filterText 기준 옵션 필터링 (대소문자 무관 부분 일치) — isOpen일 때만 의미 있음 */
     const filteredOpts = parsedOpts.filter(opt =>
@@ -425,6 +417,7 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
     return (
         <div className="relative" ref={wrapperRef}>
             <input
+                ref={inputRef}
                 type="text"
                 disabled={isDisabled}
                 readOnly={isReadOnly}
@@ -459,29 +452,32 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
                     <X className="w-3.5 h-3.5" />
                 </button>
             )}
-            {/* 드롭다운 옵션 목록 — 열린 상태이고 읽기전용이 아닐 때만 표시 */}
-            {isOpen && !isReadOnly && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
-                    <ul className="max-h-48 overflow-y-auto py-1">
-                        {filteredOpts.length > 0 ? (
-                            filteredOpts.map(opt => (
-                                <li key={opt.value}>
-                                    <button
-                                        type="button"
-                                        /* mousedown: input의 blur보다 먼저 발화하여 클릭 누락 방지 */
-                                        onMouseDown={() => handleSelect(opt)}
-                                        className="w-full px-3 py-2 text-sm text-slate-700 text-left hover:bg-slate-50 cursor-pointer"
-                                    >
-                                        {t(opt.text)}
-                                    </button>
-                                </li>
-                            ))
-                        ) : (
-                            <li className="px-3 py-2 text-sm text-slate-400 italic">일치하는 항목 없음</li>
-                        )}
-                    </ul>
-                </div>
-            )}
+            {/* 드롭다운 옵션 목록 — Portal(body)로 렌더링하여 부모 overflow에 잘리지 않음 */}
+            <PortalDropdown
+                open={isOpen && !isReadOnly}
+                anchorRef={inputRef}
+                onOutsideClick={() => setIsOpen(false)}
+                className="bg-white border border-slate-200 rounded-md shadow-lg"
+            >
+                <ul className="max-h-48 overflow-y-auto py-1">
+                    {filteredOpts.length > 0 ? (
+                        filteredOpts.map(opt => (
+                            <li key={opt.value}>
+                                <button
+                                    type="button"
+                                    /* mousedown: input의 blur보다 먼저 발화하여 클릭 누락 방지 */
+                                    onMouseDown={() => handleSelect(opt)}
+                                    className="w-full px-3 py-2 text-sm text-slate-700 text-left hover:bg-slate-50 cursor-pointer"
+                                >
+                                    {t(opt.text)}
+                                </button>
+                            </li>
+                        ))
+                    ) : (
+                        <li className="px-3 py-2 text-sm text-slate-400 italic">일치하는 항목 없음</li>
+                    )}
+                </ul>
+            </PortalDropdown>
         </div>
     );
 }

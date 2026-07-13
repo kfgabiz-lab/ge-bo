@@ -30,6 +30,7 @@ import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from './t
 import type { SearchFieldConfig } from '../../types';
 import { useI18n } from '@/hooks/use-i18n';
 import { flattenPageDataItem, evalConditionExpr } from '../../utils';
+import { PortalDropdown } from '@/components/ui/portal-dropdown';
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
 const PREVIEW_OPTIONS = [
@@ -150,6 +151,8 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
     const [isOpen,   setIsOpen]   = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
+    /* 드롭다운 위치 기준(anchor) — 토글 버튼 */
+    const buttonRef = useRef<HTMLButtonElement>(null);
 
     /* ── 옵션 로드 ── */
     useEffect(() => {
@@ -177,17 +180,6 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
     useEffect(() => {
         if (!isPreview) setSelected(selectedIds);
     }, [isPreview, selectedIds]);
-
-    /* ── 바깥 클릭 시 드롭다운 닫기 ── */
-    useEffect(() => {
-        function handleOutsideClick(e: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        }
-        document.addEventListener('mousedown', handleOutsideClick);
-        return () => document.removeEventListener('mousedown', handleOutsideClick);
-    }, []);
 
     /* ── 체크 토글 ── */
     const toggleItem = useCallback((id: number) => {
@@ -235,6 +227,7 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
 
                     {/* 토글 버튼 */}
                     <button
+                        ref={buttonRef}
                         type="button"
                         disabled={isPreview}
                         onClick={() => setIsOpen(prev => !prev)}
@@ -248,55 +241,57 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
                         <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* 드롭다운 패널 — live: 클릭 시 절대 위치로 표시, preview: 닫힌 상태 유지 */}
-                    {isOpen && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
-
-                            {/* 검색 입력 */}
-                            <div className="p-2 border-b border-slate-100">
-                                <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded border border-slate-200">
-                                    <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <input
-                                        type="text"
-                                        disabled={isPreview}
-                                        value={search}
-                                        onChange={e => setSearch(e.target.value)}
-                                        placeholder="검색..."
-                                        className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
-                                    />
-                                </div>
+                    {/* 드롭다운 패널 — Portal(body)로 렌더링하여 부모 overflow에 잘리지 않음. preview는 버튼 disabled라 열리지 않음 */}
+                    <PortalDropdown
+                        open={isOpen}
+                        anchorRef={buttonRef}
+                        onOutsideClick={() => setIsOpen(false)}
+                        className="bg-white border border-slate-200 rounded-md shadow-lg"
+                    >
+                        {/* 검색 입력 */}
+                        <div className="p-2 border-b border-slate-100">
+                            <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded border border-slate-200">
+                                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <input
+                                    type="text"
+                                    disabled={isPreview}
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="검색..."
+                                    className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
+                                />
                             </div>
-
-                            {/* 옵션 목록 */}
-                            <ul className="max-h-48 overflow-y-auto py-1">
-                                {filteredOptions.length === 0 ? (
-                                    <li className="px-3 py-2 text-xs text-slate-400 text-center">
-                                        항목이 없습니다
-                                    </li>
-                                ) : (
-                                    filteredOptions.map(opt => {
-                                        const isChecked = selected.includes(opt.id);
-                                        return (
-                                            <li key={opt.id}>
-                                                <label className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        disabled={isPreview}
-                                                        onChange={() => !isPreview && toggleItem(opt.id)}
-                                                        className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
-                                                    />
-                                                    <span className="text-sm text-slate-700">
-                                                        {buildLabel(opt, labelFields)}
-                                                    </span>
-                                                </label>
-                                            </li>
-                                        );
-                                    })
-                                )}
-                            </ul>
                         </div>
-                    )}
+
+                        {/* 옵션 목록 */}
+                        <ul className="max-h-48 overflow-y-auto py-1">
+                            {filteredOptions.length === 0 ? (
+                                <li className="px-3 py-2 text-xs text-slate-400 text-center">
+                                    항목이 없습니다
+                                </li>
+                            ) : (
+                                filteredOptions.map(opt => {
+                                    const isChecked = selected.includes(opt.id);
+                                    return (
+                                        <li key={opt.id}>
+                                            <label className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? 'cursor-default' : 'cursor-pointer'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    disabled={isPreview}
+                                                    onChange={() => !isPreview && toggleItem(opt.id)}
+                                                    className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
+                                                />
+                                                <span className="text-sm text-slate-700">
+                                                    {buildLabel(opt, labelFields)}
+                                                </span>
+                                            </label>
+                                        </li>
+                                    );
+                                })
+                            )}
+                        </ul>
+                    </PortalDropdown>
                 </div>
 
                 {/* 선택된 항목 목록 — [좌측 필드][항목명][우측 필드][X버튼] 1줄 배치 */}
