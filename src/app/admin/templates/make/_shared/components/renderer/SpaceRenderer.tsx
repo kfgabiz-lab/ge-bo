@@ -48,8 +48,8 @@ interface SpaceRendererProps {
     onExcelDownload?: (tableWidgetId: string, privacyPopup?: boolean) => void;
     /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave + 검증 규칙 ID 전달 */
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
-    /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id + params 문자열 + 연결 컨텐츠 위젯 ID 배열 전달 (live 전용) */
-    onApiCall?: (apiInfoId: number, params?: string, connectedContentWidgetIds?: string[]) => void;
+    /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id(mode2) 또는 undefined(mode1: id 유무 자동 CRUD) + params + 연결 컨텐츠 위젯 ID 배열 전달 (live 전용) */
+    onApiCall?: (apiInfoId: number | undefined, params?: string, connectedContentWidgetIds?: string[]) => void;
 }
 
 export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave, onApiCall }: SpaceRendererProps) {
@@ -99,7 +99,8 @@ export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = tr
         } else if (field.connType === 'datasave' && field.dataSaveSlug) {
             /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
             onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params, field.validationRuleIds);
-        } else if (field.connType === 'api' && field.apiInfoId) {
+        } else if (field.connType === 'api') {
+            /* apiInfoId 미선택(mode1)이면 undefined 그대로 전달 — handleApiCall이 id 유무로 CRUD 직접 처리 */
             onApiCall?.(field.apiInfoId, field.params, field.connectedContentWidgetIds);
         }
     };

@@ -423,10 +423,13 @@ export const validateSubListRows = (
                         }
                     }
                 } else if (col.type === 'dateRange') {
-                    /* dateRange 타입 — 값이 row[col.key]가 아니라 {key}_from / {key}_to에 저장됨
-                       (SearchRenderer/FormRenderer와 동일한 isRangeType 분리 키 컨벤션) */
-                    const valFrom = String(row[col.key + '_from'] ?? '').trim();
-                    const valTo   = String(row[col.key + '_to'] ?? '').trim();
+                    /* dateRange 타입 — 값이 row[col.key]가 아니라 시작/종료 분리 키에 저장됨
+                       (SearchRenderer/FormRenderer와 동일한 isRangeType 분리 키 컨벤션)
+                       col.key2 지정 시 시작=col.key/종료=col.key2 그대로 사용, 미지정 시 기존 _from/_to 자동유도 */
+                    const rangeStartKey = col.key2 ? col.key : `${col.key}_from`;
+                    const rangeEndKey   = col.key2 ? col.key2 : `${col.key}_to`;
+                    const valFrom = String(row[rangeStartKey] ?? '').trim();
+                    const valTo   = String(row[rangeEndKey] ?? '').trim();
 
                     /* 필수 입력 검사 — 시작/종료 둘 다 채워져야 통과 */
                     if (col.required && (!valFrom || !valTo)) {
@@ -1103,9 +1106,16 @@ export function buildDataJson(
                 if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
                     section[key] = fileIds[f.id] ?? [];
                 } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-                    /* dateRange/yearMonthRange: _from/_to 분리 키로 저장 */
-                    section[key + '_from'] = rawValues[f.id + '_from'] ?? '';
-                    section[key + '_to'] = rawValues[f.id + '_to'] ?? '';
+                    /* dateRange/yearMonthRange 저장 키 — fieldKey2 지정 시 시작=key/종료=fieldKey2를 그대로 사용,
+                       미지정 시 기존처럼 key+'_from'/'_to' 자동유도 (entity 연결 시 시작·종료가 완전히 독립된
+                       두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함) */
+                    if (f.fieldKey2) {
+                        section[key] = rawValues[f.id + '_from'] ?? '';
+                        section[f.fieldKey2] = rawValues[f.id + '_to'] ?? '';
+                    } else {
+                        section[key + '_from'] = rawValues[f.id + '_from'] ?? '';
+                        section[key + '_to'] = rawValues[f.id + '_to'] ?? '';
+                    }
                 } else {
                     section[key] = rawValues[f.id] ?? '';
                 }

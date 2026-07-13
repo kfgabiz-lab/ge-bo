@@ -459,14 +459,19 @@ export function ActionButtonField({
                         </div>
                     )}
 
-                    {/* API 연동 — 활성 API 정보 목록에서 1건 선택 */}
+                    {/* API 연동 — 활성 API 정보 목록에서 1건 선택 (mode2) 또는 미선택 상태로 직접 CRUD (mode1) */}
                     {connType === 'api' && (() => {
                         /* 선택된 API의 method 확인 — POST/PUT/PATCH일 때만 컨텐츠 데이터 수집 UI 노출 */
                         const selectedApi = apiInfoOptions.find(a => a.id === values.apiInfoId);
                         const apiMethod = (selectedApi?.method ?? '').toUpperCase();
                         const supportsContentData = apiMethod === 'POST' || apiMethod === 'PUT' || apiMethod === 'PATCH';
-                        /* Table은 제외 — Form/SubList/MultiSelect 데이터만 요청 바디에 포함 가능 */
-                        const apiContentWidgets = contentWidgets.filter(w => w.type !== 'table');
+                        /* mode2(API 선택): Table 제외 — Form/SubList/MultiSelect 데이터만 요청 바디에 포함 가능
+                           mode1(API 미선택): id 유무로 자동 생성/수정 처리하는 entity CRUD 대상만 — Form/SubList만 포함, MultiSelect는 대상 아님(mode1 설계상 미지원) */
+                        const apiContentWidgets = values.apiInfoId
+                            ? contentWidgets.filter(w => w.type !== 'table')
+                            : contentWidgets.filter(w => w.type === 'form' || w.type === 'sublist');
+                        /* mode1(API 미선택)은 항상 컨텐츠위젯 선택 UI 노출, mode2(API 선택)는 POST/PUT/PATCH일 때만 노출 */
+                        const showContentWidgets = !values.apiInfoId || supportsContentData;
 
                         return (
                             <div className="space-y-1">
@@ -477,51 +482,59 @@ export function ActionButtonField({
                                     apiInfoOptions={apiInfoOptions}
                                     emptyLabel="— API 선택 —"
                                 />
-                                {/* 연결 API가 선택된 경우에만 파라미터 입력란 노출 */}
-                                {values.apiInfoId && (
+                                {showContentWidgets && (
                                     <div className="space-y-1.5">
-                                        {/* POST/PUT/PATCH — Form/SubList/MultiSelect 위젯 체크박스로 선택해 실제 데이터를 요청 바디에 포함 */}
-                                        {supportsContentData && (
-                                            apiContentWidgets.length === 0 ? (
-                                                <p className="text-[10px] text-slate-400 italic px-1">
-                                                    연결 가능한 Form/SubList/MultiSelect 위젯이 없습니다.
-                                                </p>
-                                            ) : (
-                                                <div className="border border-slate-200 rounded overflow-hidden">
-                                                    {apiContentWidgets.map(w => (
-                                                        <label
-                                                            key={w.widgetId}
-                                                            className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
-                                                        >
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedIds.includes(w.widgetId)}
-                                                                onChange={() => handleContentWidgetToggle(w.widgetId)}
-                                                                className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
-                                                            />
-                                                            <span className="text-xs text-slate-700 truncate">
-                                                                {getContentLabel(w)}
-                                                            </span>
-                                                            {w.connectedSlug && (
-                                                                <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
-                                                                    {w.connectedSlug}
-                                                                </span>
-                                                            )}
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            )
+                                        {/* mode1 안내 — API 미선택 시 선택한 Form/SubList를 id 유무로 자동 생성/수정 처리 */}
+                                        {!values.apiInfoId && (
+                                            <p className="text-[10px] text-slate-400 italic px-1">
+                                                자동 모드: 선택한 Form/SubList를 id 유무로 생성/수정 처리합니다.
+                                            </p>
                                         )}
-                                        <div className="space-y-0.5">
-                                            <input
-                                                type="text"
-                                                value={values.params ?? ''}
-                                                onChange={e => onChange({ params: e.target.value || undefined })}
-                                                placeholder="파라미터 (예: id='1',status='use')"
-                                                className={INPUT_CLS}
-                                            />
-                                            <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값 · urlPattern의 {'{'}key{'}'} 치환에도 사용</p>
-                                        </div>
+                                        {/* mode2: Form/SubList/MultiSelect / mode1: Form/SubList만 체크박스로 선택해 실제 데이터를 요청 바디에 포함 */}
+                                        {apiContentWidgets.length === 0 ? (
+                                            <p className="text-[10px] text-slate-400 italic px-1">
+                                                {values.apiInfoId
+                                                    ? '연결 가능한 Form/SubList/MultiSelect 위젯이 없습니다.'
+                                                    : '연결 가능한 Form/SubList 위젯이 없습니다.'}
+                                            </p>
+                                        ) : (
+                                            <div className="border border-slate-200 rounded overflow-hidden">
+                                                {apiContentWidgets.map(w => (
+                                                    <label
+                                                        key={w.widgetId}
+                                                        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.includes(w.widgetId)}
+                                                            onChange={() => handleContentWidgetToggle(w.widgetId)}
+                                                            className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                                                        />
+                                                        <span className="text-xs text-slate-700 truncate">
+                                                            {getContentLabel(w)}
+                                                        </span>
+                                                        {w.connectedSlug && (
+                                                            <span className="ml-auto text-[9px] text-slate-400 font-mono flex-shrink-0">
+                                                                {w.connectedSlug}
+                                                            </span>
+                                                        )}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {/* 파라미터 — mode2(API 선택) 전용. mode1은 api_info 없이 위젯 데이터만 사용하므로 의미 없음 */}
+                                        {values.apiInfoId && (
+                                            <div className="space-y-0.5">
+                                                <input
+                                                    type="text"
+                                                    value={values.params ?? ''}
+                                                    onChange={e => onChange({ params: e.target.value || undefined })}
+                                                    placeholder="파라미터 (예: id='1',status='use')"
+                                                    className={INPUT_CLS}
+                                                />
+                                                <p className="text-[9px] text-slate-400 px-0.5">쉼표 구분 · =있으면 고정값 · urlPattern의 {'{'}key{'}'} 치환에도 사용</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

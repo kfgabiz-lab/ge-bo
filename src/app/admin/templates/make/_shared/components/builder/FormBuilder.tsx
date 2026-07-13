@@ -290,6 +290,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, co
                 label2:             f.label2,
                 label2MsgKey:       f.label2MsgKey,
                 fieldKey:           f.fieldKey || '',
+                fieldKey2:          f.fieldKey2,
                 colSpan:            f.colSpan,
                 rowSpan:            f.rowSpan,
                 placeholder:        f.placeholder,

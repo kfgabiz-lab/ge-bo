@@ -98,6 +98,7 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
         label2:           col.label2,
         label2MsgKey:     col.label2MsgKey,
         fieldKey:         col.key,
+        fieldKey2:        col.key2,
         colSpan:          1,
         rowSpan:          1,
         placeholder:      col.placeholder,
@@ -166,6 +167,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
     if (updates.label2            !== undefined) patch.label2            = updates.label2;
     if (updates.label2MsgKey      !== undefined) patch.label2MsgKey      = updates.label2MsgKey;
     if (updates.fieldKey          !== undefined) patch.key               = updates.fieldKey;
+    if (updates.fieldKey2         !== undefined) patch.key2              = updates.fieldKey2;
     if (updates.placeholder       !== undefined) patch.placeholder       = updates.placeholder;
     if (updates.placeholderMsgKey !== undefined) patch.placeholderMsgKey = updates.placeholderMsgKey;
     if (updates.description       !== undefined) patch.description       = updates.description;

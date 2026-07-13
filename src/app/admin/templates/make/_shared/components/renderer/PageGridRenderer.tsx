@@ -83,8 +83,8 @@ interface PageGridRendererProps {
     onFormValuesChange?: (widgetId: string, fieldId: string, value: string) => void;
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, resolvedFormValuesMap?: Record<string, Record<string, string>>, contentValidationRuleIds?: Record<string, number[]>) => void;
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
-    /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId, params, connectedContentWidgetIds) */
-    onApiCall?: (apiInfoId: number, params?: string, connectedContentWidgetIds?: string[]) => void;
+    /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds) */
+    onApiCall?: (apiInfoId: number | undefined, params?: string, connectedContentWidgetIds?: string[]) => void;
 
     /* live 모드 전용 — 테이블 */
     tableDataMap?: Record<string, PageTableData>;

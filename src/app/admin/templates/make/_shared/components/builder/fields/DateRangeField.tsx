@@ -151,6 +151,7 @@ export function DateRangeField({ values, onChange, colSpanMode, rowSpanConfig, a
                 label={values.label} labelMsgKey={values.labelMsgKey}
                 label2={values.label2} label2MsgKey={values.label2MsgKey} showLabel2
                 fieldKey={values.fieldKey}
+                key2={values.fieldKey2}
                 colSpan={values.colSpan} colSpanMode={colSpanMode}
                 rowSpan={values.rowSpan} rowSpanConfig={rowSpanConfig}
                 autoFocus={autoFocus} onLabelKeyDown={onLabelKeyDown}

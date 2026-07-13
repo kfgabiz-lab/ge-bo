@@ -180,6 +180,9 @@ export interface SubListColumn {
     /* ── dateRange 전용 ── */
     label2?: string;               // 종료일 라벨
     label2MsgKey?: string;         // 종료일 라벨 다국어 키
+    /** 종료일 저장 Key — 미설정 시 key+'_from'/'_to'로 자동유도.
+     *  entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */
+    key2?: string;
     defaultStartDateOffset?: number;
     defaultStartDate?: string;
     disableStartPast?: boolean;

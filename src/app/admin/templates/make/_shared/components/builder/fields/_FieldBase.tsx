@@ -25,6 +25,8 @@ interface FieldBaseProps {
     label2?: string;
     /** dateRange 두 번째 라벨 다국어 키 */
     label2MsgKey?: string;
+    /** dateRange 종료일 저장 Key — 미설정 시 시작일 Key + '_from'/'_to'로 자동유도 */
+    key2?: string;
     /** true 시 라벨 텍스트가 "라벨 1"로 표시되고 라벨2 입력 영역 노출 */
     showLabel2?: boolean;
     rowSpan?: number;
@@ -66,7 +68,7 @@ interface FieldBaseProps {
     keySideSlot?: React.ReactNode;
     /** Key 아래 전체 폭 슬롯 — keySideSlot 대신 사용, Key를 단독 row로 분리하고 그 아래 전체 폭으로 표시 (TextField의 출력방식+Data용) */
     keySideSlotFullWidth?: React.ReactNode;
-    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; saveConfirm: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
+    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; fieldKey2: string | undefined; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; saveConfirm: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
     onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     children?: React.ReactNode;
 }
@@ -74,7 +76,7 @@ interface FieldBaseProps {
 /** 라벨|Key 한 줄 + ColSpan + (RowSpan) — 모든 필드 컴포넌트 공통 베이스 */
 export function FieldBase(props: FieldBaseProps) {
     const {
-        label, labelMsgKey, label2, showLabel2, fieldKey,
+        label, labelMsgKey, label2, key2, showLabel2, fieldKey,
         colSpan, colSpanMode,
         rowSpan, rowSpanConfig,
         autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, labelSideSlot, keySideSlot, keySideSlotFullWidth, onChange, onLabelKeyDown,
@@ -218,6 +220,21 @@ export function FieldBase(props: FieldBaseProps) {
                             className={INPUT_CLS}
                         />
                     )}
+                </div>
+            )}
+
+            {/* 종료일 Key (dateRange 전용) — 미설정 시 시작일 Key + '_from'/'_to'로 자동유도.
+                entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */}
+            {showLabel2 && (
+                <div>
+                    <label className={LABEL_CLS}>종료일 Key <span className="text-slate-300 font-normal">(선택)</span></label>
+                    <input
+                        type="text"
+                        value={key2 ?? ''}
+                        onChange={e => onChange({ fieldKey2: e.target.value || undefined })}
+                        placeholder="미입력 시 시작일 Key 기준 자동유도"
+                        className={`${INPUT_CLS} font-mono`}
+                    />
                 </div>
             )}
 

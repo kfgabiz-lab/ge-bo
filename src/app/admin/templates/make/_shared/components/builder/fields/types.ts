@@ -39,6 +39,8 @@ export interface FieldEditValues {
     label2?: string;         // dateRange 전용 두 번째 라벨
     label2MsgKey?: string;   // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
+    /** dateRange 종료일 저장 Key — 미설정 시 fieldKey+'_from'/'_to'로 자동유도 */
+    fieldKey2?: string;
     colSpan: number;
     rowSpan?: number;        // form/layer 전용 행 높이
     placeholder?: string;   // input/select 전용

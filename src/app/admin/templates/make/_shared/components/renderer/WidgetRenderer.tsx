@@ -73,6 +73,7 @@ import { PageGridRenderer } from './PageGridRenderer';
 import type { PageTableData } from './PageGridRenderer';
 import { PrivacyReasonModal } from '@/components/ui/privacy-reason-modal';
 import { validateFormFields, validateSubListRows, buildDataJson, buildDataSavePayload, uploadFiles, flattenPageDataItem, parseActionParams, saveTableRows, validateDataSaveWidgets, processFormFilesAndSubList, codeDetailToLabel, resolveAccessor } from '../../utils';
+import { entityApiPath } from '../../utils/entityApi';
 
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
@@ -171,8 +172,8 @@ interface WidgetRendererProps {
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 버튼 클릭 시 데이터저장 동작 — connType='datasave' 전용 */
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
-    /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId, params, connectedContentWidgetIds), live 모드에서만 호출됨 */
-    onApiCall?: (apiInfoId: number, params?: string, connectedContentWidgetIds?: string[]) => void;
+    /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds), live 모드에서만 호출됨 */
+    onApiCall?: (apiInfoId: number | undefined, params?: string, connectedContentWidgetIds?: string[]) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
     onClose?: () => void;
 
@@ -489,9 +490,15 @@ export function WidgetRenderer({
             delete searchQuery['page'];
             delete searchQuery['size'];
 
-            const res = await api.get(`/page-data/${tableWidget.connectedSlug}/export`, {
+            /* entity 연결 페이지면 page-data export 대신 entity 전용 CSV export로 분기
+               (entity는 page-data와 달리 xlsx 없이 CSV만 지원 — format/URL/확장자만 다르고
+                headers/keys/dateFormats/codeMaps/searchQuery 조립·다운로드 트리거는 완전히 동일하게 재사용) */
+            const exportUrl    = isEntity ? `${entityApiPath(tableWidget.connectedSlug)}/export` : `/page-data/${tableWidget.connectedSlug}/export`;
+            const exportFormat = isEntity ? 'csv' : 'xlsx';
+
+            const res = await api.get(exportUrl, {
                 params: {
-                    format: 'xlsx', headers, keys, dateFormats,
+                    format: exportFormat, headers, keys, dateFormats,
                     ...(reason ? { reason } : {}),
                     /* 공통코드 매핑이 있는 컬럼이 하나도 없으면 파라미터 자체를 생략 */
                     ...(Object.keys(codeMaps).length ? { codeMaps: JSON.stringify(codeMaps) } : {}),
@@ -504,7 +511,7 @@ export function WidgetRenderer({
             const url = URL.createObjectURL(res.data);
             const a   = document.createElement('a');
             a.href    = url;
-            a.download = `${tableWidget.connectedSlug}_export.xlsx`;
+            a.download = `${tableWidget.connectedSlug}_export.${exportFormat}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -512,7 +519,7 @@ export function WidgetRenderer({
         } catch {
             toast.error(t('common.error.excel'));
         }
-    }, [tableWidgetsMap, currentSearchParams, codeGroups, t]);
+    }, [tableWidgetsMap, currentSearchParams, codeGroups, t, isEntity]);
 
     /**
      * 엑셀 다운로드 핸들러 (live 모드 전용)

@@ -38,6 +38,9 @@ export interface SearchFieldConfig {
     label2?: string;        // dateRange 두 번째 라벨
     label2MsgKey?: string;  // dateRange 두 번째 라벨 다국어 키
     fieldKey?: string;
+    /** dateRange 종료일 저장 Key — 미설정 시 fieldKey+'_from'/'_to'로 자동유도.
+     *  entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */
+    fieldKey2?: string;
     /** dateRange 통합 서브타입 — 범위 입력 방식 (기본: 'date') */
     rangeSubType?: DateSubType;
     /** date 통합 서브타입 — 단독 날짜 입력 방식 (기본: 'date') */

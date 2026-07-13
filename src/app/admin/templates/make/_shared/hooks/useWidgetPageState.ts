@@ -177,9 +177,10 @@ async function restoreFormDataFromJson(
     fw.fields.forEach(f => {
       if (!f.fieldKey) return;
       if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-        /* dateRange/yearMonthRange: dataJson에서 _from/_to 분리 키로 복원 */
-        const fromVal = section[f.fieldKey + '_from'];
-        const toVal = section[f.fieldKey + '_to'];
+        /* dateRange/yearMonthRange 복원 키 — fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키로 복원,
+           미지정 시 기존처럼 dataJson에서 _from/_to 분리 키로 복원(buildDataJson과 대칭) */
+        const fromVal = f.fieldKey2 ? section[f.fieldKey] : section[f.fieldKey + '_from'];
+        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[f.fieldKey + '_to'];
         if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
         if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
       } else if (section[f.fieldKey] !== undefined) {
@@ -437,6 +438,10 @@ export function useWidgetPageState(
                 if (f.singleDateRange) {
                   if (from?.trim()) params[`${paramKey}_gte`] = from;
                   if (to?.trim())   params[`${paramKey}_lte`] = to;
+                } else if (f.fieldKey2) {
+                  /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
+                  if (from?.trim()) params[paramKey] = from;
+                  if (to?.trim())   params[f.fieldKey2] = to;
                 } else {
                   if (from?.trim()) params[`${paramKey}_from`] = from;
                   if (to?.trim())   params[`${paramKey}_to`]   = to;
@@ -1599,20 +1604,170 @@ export function useWidgetPageState(
   /**
    * API 연동 실행 핸들러 — connType='api' 전용 (live 모드 전용, preview에서는 절대 호출 금지)
    *
-   * apiInfoId로 캐싱된 API 정보(apiInfoOptions)를 찾아 실제 요청을 실행한다.
-   * - urlPattern의 "/api/v1" 접두사는 axios baseURL과 중복되므로 제거
-   * - urlPattern에 "{key}" 형태 path 변수가 있으면 파라미터 값으로 치환(사용된 키는 나머지 파라미터에서 제거)
-   * - method가 GET/DELETE면 나머지 파라미터를 쿼리스트링으로, POST/PUT/PATCH면 요청 바디로 전송
-   * - method가 POST/PUT/PATCH이고 connectedContentWidgetIds(Form/SubList/MultiSelect)가 선택된 경우,
-   *   handleDataSave와 동일하게 파일 업로드+SubList 가공 → dataJson 구성 후 요청 바디에 함께 실어 보낸다
-   *   (선택 위젯 데이터가 base, 고정 params가 오버레이 — 동일 key는 params가 우선)
+   * [이중 모드]
+   * - mode1 (apiInfoId 미선택 = undefined): api_info 조회 없이, 선택한 Form(main)/SubList(sub)을
+   *   id 유무로 판단해 entity 엔드포인트에 직접 생성(POST)/수정(PUT)한다.
+   * - mode2 (apiInfoId 선택): 선택한 api_info 한 건만 호출한다. 자식 SubList 자동 체이닝은 없음 —
+   *   POST/PUT/PATCH이고 컨텐츠 위젯이 선택된 경우 선택 위젯 전체를 하나의 flat 바디로 합쳐 보낸다.
+   *   (구 버전에서 apiInfo.connectedEntity + Form 선택 시 자동으로 자식 SubList를 체이닝 저장하던
+   *   동작은 제거됨 — 그 용도는 이제 mode1로 대체한다.)
    *
-   * @param apiInfoId  action-button 설정에서 선택한 api_info.id
-   * @param paramsStr  action-button 설정의 params 문자열 (예: "id='1',status='use'") — row 컨텍스트 없이 고정값만 유효
-   * @param connectedContentWidgetIds  action-button 설정에서 선택한 Form/SubList/MultiSelect widgetId 배열 (Table 제외)
+   * @param apiInfoId  action-button 설정에서 선택한 api_info.id. 미선택(undefined)이면 mode1으로 동작.
+   * @param paramsStr  action-button 설정의 params 문자열 — mode2 전용 (예: "id='1',status='use'")
+   * @param connectedContentWidgetIds  action-button 설정에서 선택한 위젯 widgetId 배열 (Table 제외).
+   *   mode2는 Form/SubList/MultiSelect가 대상이지만, mode1은 Form/SubList만 대상으로 삼고
+   *   MultiSelect는 그대로 무시한다(§ActionButtonField.tsx apiContentWidgets가 mode1일 때
+   *   미리 MultiSelect를 목록에서 제외하므로 선택 자체가 불가능하다).
    */
   const handleApiCall = useCallback(
-    async (apiInfoId: number, paramsStr?: string, connectedContentWidgetIds?: string[]) => {
+    async (apiInfoId: number | undefined, paramsStr?: string, connectedContentWidgetIds?: string[]) => {
+      /* ── mode1: apiInfoId 미선택 — 선택한 Form(main)/SubList(sub)을 id 유무로 직접 entity CRUD ── */
+      if (apiInfoId == null) {
+        if (!connectedContentWidgetIds || connectedContentWidgetIds.length === 0) {
+          toast.warning(t("common.widget.no_content"));
+          return;
+        }
+
+        const allFlat = flatWidgets(widgetItems);
+        const targetWidgets = connectedContentWidgetIds
+          .map((wid) =>
+            allFlat.find(
+              (w) =>
+                (w.type === "form" || w.type === "sublist") &&
+                (w as FormWidget | SubListWidget).widgetId === wid
+            )
+          )
+          .filter(Boolean) as (FormWidget | SubListWidget)[];
+
+        if (targetWidgets.length === 0) return;
+
+        /* 유효성 검사 — handleDataSave와 동일 공통함수 재사용 */
+        if (!validateDataSaveWidgets({
+          targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]['targetWidgets'],
+          formValuesMap,
+          fileValuesMap,
+          existingFileMetaMap,
+          subListRowsMap,
+          subListFileMap,
+          multiSelectValuesMap,
+          t,
+        })) return;
+
+        /* main = 선택된 Form 중 첫 번째, sub = main과 다른 connectedSlug를 쓰는 SubList
+         * — mode2에서 쓰던 부모/자식 분류 기준(§02.builder_data_process.md)과 동일 */
+        const formWidgets = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
+        const mainWidget = formWidgets[0];
+        if (!mainWidget?.connectedSlug) {
+          toast.warning("저장할 Form 위젯을 선택해 주세요.");
+          return;
+        }
+        const subListWidgets = targetWidgets.filter(
+          (w) =>
+            w.type === "sublist" &&
+            (w as SubListWidget).connectedSlug &&
+            (w as SubListWidget).connectedSlug !== mainWidget.connectedSlug,
+        ) as SubListWidget[];
+
+        /* 페이지가 이미 들고 있는 현재 레코드 식별자 — handleContentAction(1047~1051행)과 동일 판별 기준.
+         * URL ?id / ?group_id 우선, 없으면 탭 공유 sharedDataId 확인 */
+        const storedGroupId = searchParams.get("group_id") ?? currentGroupId;
+        const storedId = searchParams.get("id")
+          ? Number(searchParams.get("id"))
+          : (options?.sharedDataId ?? null);
+        const existingParentId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
+
+        try {
+          /* 파일 업로드 + SubList 행 가공 — main/sub 전체를 한 번에 처리(최신 fileIds 반영) */
+          const { formFileIdsMap, processedSubListRowsMap } = await processFormFilesAndSubList({
+            targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]['targetWidgets'],
+            fileValuesMap,
+            existingFileMetaMap,
+            subListRowsMap,
+            subListFileMap,
+            dataSaveSlug: mainWidget.connectedSlug,
+          });
+
+          /* 부모(main Form) 저장 바디 — entity 저장은 flat 바디만 지원(isEntity=true) */
+          const { dataJson } = buildDataJson(
+            formWidgets as Parameters<typeof buildDataJson>[0],
+            formValuesMap,
+            formFileIdsMap,
+            processedSubListRowsMap,
+            {},
+            multiSelectExtraFieldValuesMap,
+            undefined,
+            undefined,
+            true,
+          );
+          const entityBody = buildEntityRequestBody(
+            dataJson,
+            buildEntityDateFieldMeta(formWidgets.flatMap((fw) => fw.fields)),
+          );
+
+          /* id 유무로 생성(POST)/수정(PUT) 자동 판단 */
+          let parentId: number;
+          if (existingParentId) {
+            await api.put(entityItemPath(mainWidget.connectedSlug, existingParentId), entityBody);
+            parentId = existingParentId;
+          } else {
+            const res = await api.post(entityApiPath(mainWidget.connectedSlug), entityBody);
+            parentId = res.data.id;
+          }
+
+          /* 자식(sub SubList) 각 행 — 기존행(id가 number)은 PUT, 신규행(id가 UUID 문자열)은 POST.
+           * (SubListRenderer가 새 행에는 crypto.randomUUID() 문자열을, 서버에서 복원한 기존 행에는
+           * number id를 채워 넣는 규칙을 그대로 이용해 생성/수정을 구분한다.) */
+          const warnings: string[] = [];
+          let childOkCount = 0;
+          let childFailCount = 0;
+
+          for (const sw of subListWidgets) {
+            const swLabel = sw.title || sw.contentKey || sw.widgetId;
+            if (!sw.connectedSlug || !sw.parentIdField) {
+              warnings.push(`"${swLabel}" 항목은 연결 slug 또는 부모 연결 필드가 설정되지 않아 저장되지 않았습니다.`);
+              continue;
+            }
+            const rows = processedSubListRowsMap[sw.widgetId] ?? [];
+            const dateFieldMeta = buildSubListEntityDateFieldMeta(sw.columns ?? []);
+            for (const row of rows) {
+              /* row에는 SubList 내부 관리용 id 필드가 섞여 있다(신규=UUID 문자열, 기존=number).
+               * 자식 entity 요청 DTO에는 id 필드가 없어 그대로 보내면 거부되므로 제거 후 전송한다. */
+              const { id: rowId, ...rowData } = row;
+              const rowBody = buildEntityRequestBody({ ...rowData, [sw.parentIdField]: parentId }, dateFieldMeta);
+              try {
+                if (typeof rowId === "number") {
+                  await api.put(entityItemPath(sw.connectedSlug, rowId), rowBody);
+                } else {
+                  await api.post(entityApiPath(sw.connectedSlug), rowBody);
+                }
+                childOkCount++;
+              } catch {
+                childFailCount++;
+              }
+            }
+          }
+
+          if (childFailCount > 0) {
+            toast.error(`저장은 완료됐지만 하위 항목 ${childFailCount}건 저장에 실패했습니다.`);
+          } else if (warnings.length > 0) {
+            toast.warning(warnings.join(" "));
+          } else {
+            toast.success(childOkCount > 0 ? `${t("common.saved")} (하위 ${childOkCount}건 저장)` : t("common.saved"));
+          }
+          markClean();
+        } catch (err) {
+          toast.error(getApiErrorMessage(err, t("common.error.save")));
+        }
+        return;
+      }
+
+      /* ── mode2: apiInfoId 선택 — 캐싱된 API 정보(apiInfoOptions)를 찾아 그 한 건만 호출 ──
+       * - urlPattern의 "/api/v1" 접두사는 axios baseURL과 중복되므로 제거
+       * - urlPattern에 "{key}" 형태 path 변수가 있으면 파라미터 값으로 치환(사용된 키는 나머지 파라미터에서 제거)
+       * - method가 GET/DELETE면 나머지 파라미터를 쿼리스트링으로, POST/PUT/PATCH면 요청 바디로 전송
+       * - method가 POST/PUT/PATCH이고 connectedContentWidgetIds(Form/SubList/MultiSelect)가 선택된 경우,
+       *   handleDataSave와 동일하게 파일 업로드+SubList 가공 → dataJson 구성 후 요청 바디에 함께 실어 보낸다
+       *   (선택 위젯 데이터가 base, 고정 params가 오버레이 — 동일 key는 params가 우선) */
       const apiInfo = apiInfoOptions.find((a) => a.id === apiInfoId);
       if (!apiInfo) {
         console.warn(`[handleApiCall] 연결된 API 정보를 찾을 수 없습니다. apiInfoId=${apiInfoId}`);
@@ -1640,14 +1795,9 @@ export function useWidgetPageState(
       const method = (apiInfo.method || "GET").toUpperCase();
       const isBodyMethod = method === "POST" || method === "PUT" || method === "PATCH";
 
-      /* 연결된 컨텐츠 위젯(Form/SubList/MultiSelect) 데이터 수집 — POST/PUT/PATCH에서만 적용 */
+      /* 연결된 컨텐츠 위젯(Form/SubList/MultiSelect) 데이터 수집 — POST/PUT/PATCH에서만 적용.
+       * mode2는 자식 SubList 자동 체이닝 없이 항상 선택 위젯 전체를 하나의 flat 바디로 합쳐 보낸다. */
       let contentBody: Record<string, unknown> = {};
-      /* 부모(Form)와 다른 Entity(connectedSlug)에 연결된 자식 SubList 목록 — connectedEntity가 있고
-       * 부모 Form이 선택돼 있을 때만 채워진다. 부모 body에 함께 보내면 부모 entity DTO에 없는
-       * 필드라 저장이 실패/무시되므로 부모 저장 성공 후 별도 엔드포인트로 개별 저장한다. */
-      let childSubListWidgets: SubListWidget[] = [];
-      /* 자식 SubList widgetId → 파일 업로드까지 완료된 행 목록 (processFormFilesAndSubList 결과) */
-      let childSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
 
       if (isBodyMethod && connectedContentWidgetIds && connectedContentWidgetIds.length > 0) {
         const allFlat = flatWidgets(widgetItems);
@@ -1674,27 +1824,9 @@ export function useWidgetPageState(
             t,
           })) return;
 
-          /* 부모 Form(들) 및 그 connectedSlug — 부모와 다른 connectedSlug를 쓰는 SubList만 자식으로 분류.
-           * 부모 Form이 아예 선택돼 있지 않으면(=단일 SubList API연동 등) 체이닝 대상이 없으므로
-           * 기존과 동일하게 전부 하나의 body로 합쳐 보낸다. */
           const formWidgetsForParent = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
-          const parentConnectedSlug = formWidgetsForParent[0]?.connectedSlug;
-          childSubListWidgets = (apiInfo.connectedEntity && formWidgetsForParent.length > 0)
-            ? (targetWidgets.filter(
-                (w) =>
-                  w.type === "sublist" &&
-                  (w as SubListWidget).connectedSlug &&
-                  (w as SubListWidget).connectedSlug !== parentConnectedSlug,
-              ) as SubListWidget[])
-            : [];
-          const childWidgetIds = new Set(childSubListWidgets.map((w) => w.widgetId));
-          /* 부모 body 조립 대상 — 자식으로 분류된 SubList만 제외(나머지는 기존과 동일하게 합쳐 보냄) */
-          const parentBodyWidgets = targetWidgets.filter(
-            (w) => !(w.type === "sublist" && childWidgetIds.has((w as SubListWidget).widgetId)),
-          );
 
-          /* 파일 업로드 + SubList 행 가공 — buildDataJson 이전에 반드시 먼저 실행 (최신 fileIds 반영)
-           * 자식 SubList의 파일 컬럼도 이 단계에서 함께 처리되므로 targetWidgets 전체를 넘긴다 */
+          /* 파일 업로드 + SubList 행 가공 — buildDataJson 이전에 반드시 먼저 실행 (최신 fileIds 반영) */
           const { formFileIdsMap, processedSubListRowsMap } = await processFormFilesAndSubList({
             targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]['targetWidgets'],
             fileValuesMap,
@@ -1704,7 +1836,6 @@ export function useWidgetPageState(
             /* 임의 API 엔드포인트라 저장 대상 slug가 없음 — 업로드 파일 메타 구분용으로 현재 페이지 slug 사용 */
             dataSaveSlug: pageSlug ?? "",
           });
-          childSubListRowsMap = processedSubListRowsMap;
 
           const multiSelectMap: Record<string, number[]> = {};
           for (const w of targetWidgets) {
@@ -1722,7 +1853,7 @@ export function useWidgetPageState(
            * 전달하면 buildDataJson의 _rel 분기(utils.ts)가 선택 위젯의 connectedSlug를 페이지의
            * mainConnectedSlug와 비교해 엉뚱하게 _rel로 감싸버릴 수 있음. */
           const { dataJson } = buildDataJson(
-            parentBodyWidgets as Parameters<typeof buildDataJson>[0],
+            targetWidgets as Parameters<typeof buildDataJson>[0],
             formValuesMap,
             formFileIdsMap,
             processedSubListRowsMap,
@@ -1747,57 +1878,6 @@ export function useWidgetPageState(
         if (method === "GET" || method === "DELETE") {
           await api.request({ method, url, params: restParams });
           toast.success(`${apiInfo.name} 요청이 완료되었습니다.`);
-        } else if (childSubListWidgets.length > 0) {
-          /* 부모(Form) + 자식(SubList, 다른 Entity) 체이닝 저장
-           * 1) 부모를 먼저 저장(POST/PUT)해 생성/수정된 id를 응답에서 확보
-           * 2) parentIdField가 설정된 자식 SubList만 각 행에 그 id를 주입해 자식 entity 엔드포인트로 개별 POST
-           * 3) parentIdField 미설정 자식은 저장하지 않고 경고로 알린다(결함을 조용한 스킵으로 덮지 않는다) */
-          const parentRes = await api.request({ method, url, data: { ...contentBody, ...restParams } });
-          const parentId = (parentRes.data as { id?: number } | undefined)?.id;
-
-          const warnings: string[] = [];
-          let childOkCount = 0;
-          let childFailCount = 0;
-
-          for (const sw of childSubListWidgets) {
-            const swLabel = sw.title || sw.contentKey || sw.widgetId;
-            if (!sw.parentIdField) {
-              warnings.push(`"${swLabel}" 항목은 부모 연결 필드가 설정되지 않아 저장되지 않았습니다.`);
-              continue;
-            }
-            if (parentId == null) {
-              warnings.push(`"${swLabel}" 항목은 부모 저장 응답에 id가 없어 저장되지 않았습니다.`);
-              continue;
-            }
-            const rows = childSubListRowsMap[sw.widgetId] ?? [];
-            const dateFieldMeta = buildSubListEntityDateFieldMeta(sw.columns ?? []);
-            const childUrl = entityApiPath(sw.connectedSlug!);
-            for (const row of rows) {
-              /* row에는 SubList 내부 관리용 UUID인 id 필드가 섞여 있다(SubListRenderer의 행 추가/복사 시
-               * _rowId와 함께 영속 저장됨). 자식 entity 요청 DTO에는 id 필드가 없어 그대로 보내면
-               * MALFORMED_JSON(Unrecognized field "id")으로 거부되므로 제거 후 전송한다. */
-              const { id: _rowId, ...rowData } = row;
-              const rowBody = buildEntityRequestBody({ ...rowData, [sw.parentIdField]: parentId }, dateFieldMeta);
-              try {
-                await api.post(childUrl, rowBody);
-                childOkCount++;
-              } catch {
-                childFailCount++;
-              }
-            }
-          }
-
-          if (childFailCount > 0) {
-            toast.error(`${apiInfo.name} 요청은 완료됐지만 하위 항목 ${childFailCount}건 저장에 실패했습니다.`);
-          } else if (warnings.length > 0) {
-            toast.warning(warnings.join(" "));
-          } else {
-            toast.success(
-              childOkCount > 0
-                ? `${apiInfo.name} 요청이 완료되었습니다. (하위 ${childOkCount}건 저장)`
-                : `${apiInfo.name} 요청이 완료되었습니다.`,
-            );
-          }
         } else {
           /* 위젯 데이터(contentBody)가 base, 고정 params(restParams)가 오버레이 */
           await api.request({ method, url, data: { ...contentBody, ...restParams } });
@@ -1819,6 +1899,9 @@ export function useWidgetPageState(
       multiSelectExtraFieldValuesMap,
       pageSlug,
       options,
+      searchParams,
+      currentGroupId,
+      markClean,
       t,
     ]
   );
@@ -1887,6 +1970,10 @@ export function useWidgetPageState(
           if (f.singleDateRange) {
             if (from?.trim()) params[`${paramKey}_gte`] = from;
             if (to?.trim())   params[`${paramKey}_lte`] = to;
+          } else if (f.fieldKey2) {
+            /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
+            if (from?.trim()) params[paramKey] = from;
+            if (to?.trim())   params[f.fieldKey2] = to;
           } else {
             if (from?.trim()) params[`${paramKey}_from`] = from;
             if (to?.trim())   params[`${paramKey}_to`]   = to;

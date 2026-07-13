@@ -391,6 +391,11 @@ export function SubListRenderer({
                                             const isFileType = (FILE_COL_TYPES as readonly string[]).includes(col.type);
                                             /* dateRange 타입 — value 1개가 아니라 from/to 2개 슬롯을 사용 (FormRenderer/SearchRenderer와 동일 컨벤션) */
                                             const isRangeType = col.type === 'dateRange';
+                                            /* 종료일 Key(col.key2) 지정 시 시작=col.key/종료=col.key2를 행 데이터 키로 그대로 사용,
+                                               미지정 시 기존처럼 col.key+'_from'/'_to' 자동유도
+                                               (entity 연결 시 시작·종료가 완전히 독립된 두 필드일 수 있어 개별 지정 가능하게 함) */
+                                            const rangeStartKey = col.key2 ? col.key : `${col.key}_from`;
+                                            const rangeEndKey   = col.key2 ? col.key2 : `${col.key}_to`;
 
                                             /* action 타입 컬럼 — 삭제/복사 버튼 통합 렌더링 */
                                             if (col.type === 'action') {
@@ -432,10 +437,10 @@ export function SubListRenderer({
                                                         /* dateRange는 value/onChange 대신 valueFrom/valueTo/onFromChange/onToChange로 배선 */
                                                         value={isRangeType ? undefined : String(row[col.key] ?? '')}
                                                         onChange={isRangeType ? undefined : (v => handleRowChange(row._rowId, col.key, v))}
-                                                        valueFrom={isRangeType ? String(row[col.key + '_from'] ?? '') : undefined}
-                                                        valueTo={isRangeType ? String(row[col.key + '_to'] ?? '') : undefined}
-                                                        onFromChange={isRangeType ? (v => handleRowChange(row._rowId, col.key + '_from', v)) : undefined}
-                                                        onToChange={isRangeType ? (v => handleRowChange(row._rowId, col.key + '_to', v)) : undefined}
+                                                        valueFrom={isRangeType ? String(row[rangeStartKey] ?? '') : undefined}
+                                                        valueTo={isRangeType ? String(row[rangeEndKey] ?? '') : undefined}
+                                                        onFromChange={isRangeType ? (v => handleRowChange(row._rowId, rangeStartKey, v)) : undefined}
+                                                        onToChange={isRangeType ? (v => handleRowChange(row._rowId, rangeEndKey, v)) : undefined}
                                                         codeGroups={codeGroups}
                                                         fileList={isFileType ? (effectiveFileMap[row._rowId]?.[col.id] ?? []) : undefined}
                                                         existingFileMeta={isFileType ? (existingMetaMap[row._rowId]?.[col.id] ?? []) : undefined}

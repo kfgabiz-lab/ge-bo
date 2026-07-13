@@ -158,8 +158,16 @@ export function buildEntityDateFieldMeta(fields: FormFieldItem[]): Map<string, E
             });
         } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
             const subType = f.rangeSubType ?? (f.type === 'yearMonthRange' ? 'yearMonth' : 'date');
-            map.set(`${f.fieldKey}_from`, { isRange: true, subType });
-            map.set(`${f.fieldKey}_to`, { isRange: true, subType });
+            /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키 그대로 등록(buildDataJson과 동일 규칙),
+               미지정 시 기존처럼 `${fieldKey}_from`/`_to` 키로 등록 — entity 컬럼이 dispFrom/dispTo처럼
+               완전히 독립된 이름일 때 `${fieldKey}_from` 같은 존재하지 않는 필드명을 만들지 않기 위함 */
+            if (f.fieldKey2) {
+                map.set(f.fieldKey, { isRange: true, subType });
+                map.set(f.fieldKey2, { isRange: true, subType });
+            } else {
+                map.set(`${f.fieldKey}_from`, { isRange: true, subType });
+                map.set(`${f.fieldKey}_to`, { isRange: true, subType });
+            }
         }
     });
     return map;
@@ -175,6 +183,8 @@ export function buildEntityDateFieldMeta(fields: FormFieldItem[]): Map<string, E
  * - type이 'date'인 컬럼은 key를 그대로 키로 등록한다(단일 컬럼)
  * - type이 'dateRange'인 컬럼은 `${key}_from`/`${key}_to` 두 키로 각각 등록한다
  *   (SubListRenderer가 dateRange 컬럼 값을 row[`${key}_from`]/row[`${key}_to`]로 저장하는 것과 동일한 규칙)
+ * - key2(종료일 Key)가 지정된 경우에는 `${key}_from`/`_to` 자동유도 대신 key(시작)/key2(종료)를
+ *   그대로 필드명으로 등록한다(entity 컬럼명이 완전히 독립된 이름일 때 대응)
  *
  * 사용법:
  *   const dateFieldMeta = buildSubListEntityDateFieldMeta(subListWidget.columns);
@@ -188,8 +198,18 @@ export function buildSubListEntityDateFieldMeta(columns: SubListColumn[]): Map<s
             map.set(col.key, { isRange: false, subType: col.dateSubType ?? 'date' });
         } else if (col.type === 'dateRange') {
             const subType = col.rangeSubType ?? 'date';
-            map.set(`${col.key}_from`, { isRange: true, subType });
-            map.set(`${col.key}_to`, { isRange: true, subType });
+            /* key2 지정 시 시작=col.key/종료=col.key2 키 그대로 등록(SubListRenderer의 rangeStartKey/rangeEndKey와
+               동일 규칙), 미지정 시 기존처럼 `${col.key}_from`/`_to` 키로 등록 — entity 컬럼이 dispFrom/dispTo처럼
+               완전히 독립된 이름일 때 `${col.key}_from` 같은 존재하지 않는 필드명을 만들지 않기 위함
+               (실사례: SubList 컬럼 key='dispFrom'일 때 자동유도된 'dispFrom_from'이 camelCase 변환되어
+               'dispFromFrom'이라는 존재하지 않는 entity 필드명이 되어 400 오류가 났던 문제) */
+            if (col.key2) {
+                map.set(col.key, { isRange: true, subType });
+                map.set(col.key2, { isRange: true, subType });
+            } else {
+                map.set(`${col.key}_from`, { isRange: true, subType });
+                map.set(`${col.key}_to`, { isRange: true, subType });
+            }
         }
     });
     return map;

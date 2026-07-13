@@ -260,7 +260,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
 
         const {
             label, labelMsgKey, label2, label2MsgKey,
-            fieldKey, placeholder, placeholderMsgKey,
+            fieldKey, fieldKey2, placeholder, placeholderMsgKey,
             description, descriptionMsgKey,
             colSpan, required, excludeFromSearch, options, codeGroupCode, multiSelect,
             minLength, maxLength, pattern, patternDesc, minSelect, maxSelect,
@@ -288,6 +288,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             label2: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? label2?.trim() : undefined,
             label2MsgKey: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (label2MsgKey?.trim() || undefined) : undefined,
             fieldKey: fieldKey?.trim() || undefined,
+            /* 종료일 저장 Key — dateRange/yearMonthRange 전용, 미입력 시 undefined(자동유도 폴백) */
+            fieldKey2: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (fieldKey2?.trim() || undefined) : undefined,
             placeholder: placeholder?.trim() || (pendingType === 'input' ? '입력하세요' : pendingType === 'select' ? '전체' : ''),
             placeholderMsgKey: placeholderMsgKey?.trim() || undefined,
             description: description?.trim() || undefined,
@@ -511,6 +513,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 label2:             field.label2,
                                                                                 label2MsgKey:       field.label2MsgKey,
                                                                                 fieldKey:           field.fieldKey || '',
+                                                                                fieldKey2:          field.fieldKey2,
                                                                                 colSpan:            field.colSpan,
                                                                                 placeholder:        field.placeholder,
                                                                                 placeholderMsgKey:  field.placeholderMsgKey,
