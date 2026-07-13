@@ -13,6 +13,7 @@ import api, { getApiErrorMessage } from '@/lib/api';
 import { useCodeStore } from '@/store/use-code-store';
 import { useEntityStore } from '@/store/use-entity-store';
 import { EntityInfoPopup } from '@/components/database/entity-info-popup';
+import { ToggleSwitch } from '@/components/ui/toggle-switch';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                       */
@@ -92,6 +93,7 @@ export default function ApiInfoPage() {
     /* 필터 상태 */
     const [filterCategory, setFilterCategory] = useState('');
     const [filterMethod, setFilterMethod] = useState('');
+    const [filterActive, setFilterActive] = useState('');
     const [filterKeyword, setFilterKeyword] = useState('');
 
     /* 모달 상태 */
@@ -108,12 +110,13 @@ export default function ApiInfoPage() {
     const [popupEntity, setPopupEntity] = useState<string | null>(null);
 
     /* ── 목록 조회 ── */
-    const fetchList = useCallback(async (page = 0, cat = filterCategory, mth = filterMethod, kw = filterKeyword) => {
+    const fetchList = useCallback(async (page = 0, cat = filterCategory, mth = filterMethod, act = filterActive, kw = filterKeyword) => {
         setLoading(true);
         try {
             const params: Record<string, string> = { page: String(page), size: '20', sort: 'name,asc' };
             if (cat) params.category = cat;
             if (mth) params.method = mth;
+            if (act) params.active = act;
             if (kw) params.keyword = kw;
             const res = await api.get<PageResponse>('/api-infos', { params });
             setItems(res.data.content);
@@ -125,7 +128,7 @@ export default function ApiInfoPage() {
         } finally {
             setLoading(false);
         }
-    }, [filterCategory, filterMethod, filterKeyword]);
+    }, [filterCategory, filterMethod, filterActive, filterKeyword]);
 
     useEffect(() => {
         fetchGroups();
@@ -134,14 +137,15 @@ export default function ApiInfoPage() {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     /* ── 검색 ── */
-    const handleSearch = () => fetchList(0, filterCategory, filterMethod, filterKeyword);
+    const handleSearch = () => fetchList(0, filterCategory, filterMethod, filterActive, filterKeyword);
 
     /* ── 필터 초기화 ── */
     const handleReset = () => {
         setFilterCategory('');
         setFilterMethod('');
+        setFilterActive('');
         setFilterKeyword('');
-        fetchList(0, '', '', '');
+        fetchList(0, '', '', '', '');
     };
 
     /* ── 등록 모달 열기 ── */
@@ -207,6 +211,29 @@ export default function ApiInfoPage() {
             fetchList(currentPage);
         } catch {
             toast.error('삭제 중 오류가 발생했습니다.');
+        }
+    };
+
+    /* ── 사용여부 토글 (낙관적 갱신) ── */
+    const handleToggleActive = async (item: ApiInfo, nextActive: boolean) => {
+        /* 화면에 즉시 반영 */
+        setItems(prev => prev.map(i => (i.id === item.id ? { ...i, active: nextActive } : i)));
+        try {
+            const body = {
+                category: item.category,
+                name: item.name,
+                method: item.method,
+                urlPattern: item.urlPattern,
+                description: item.description,
+                connectedEntity: item.connectedEntity,
+                active: nextActive,
+            };
+            await api.put(`/api-infos/${item.id}`, body);
+            toast.success(nextActive ? '사용으로 변경되었습니다.' : '미사용으로 변경되었습니다.');
+        } catch (err: unknown) {
+            /* 실패 시 원래 상태로 원복 */
+            setItems(prev => prev.map(i => (i.id === item.id ? { ...i, active: item.active } : i)));
+            toast.error(getApiErrorMessage(err, '사용여부 변경 중 오류가 발생했습니다.'));
         }
     };
 
@@ -324,6 +351,20 @@ export default function ApiInfoPage() {
                     <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
                 </div>
 
+                {/* 사용여부 */}
+                <div className="relative">
+                    <select
+                        value={filterActive}
+                        onChange={e => setFilterActive(e.target.value)}
+                        className="appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 bg-white cursor-pointer min-w-[110px]"
+                    >
+                        <option value="">전체</option>
+                        <option value="true">사용</option>
+                        <option value="false">미사용</option>
+                    </select>
+                    <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
+                </div>
+
                 {/* 키워드 */}
                 <div className="relative flex-1 min-w-[200px] max-w-[320px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -412,9 +453,12 @@ export default function ApiInfoPage() {
                                             {item.description || '-'}
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <span className={`text-xs font-medium ${item.active ? 'text-emerald-600' : 'text-slate-400'}`}>
-                                                {item.active ? 'Y' : 'N'}
-                                            </span>
+                                            <div className="flex items-center justify-center">
+                                                <ToggleSwitch
+                                                    checked={item.active}
+                                                    onChange={next => handleToggleActive(item, next)}
+                                                />
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex items-center justify-center gap-1">

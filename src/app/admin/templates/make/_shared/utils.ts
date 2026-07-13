@@ -270,7 +270,7 @@ export const validateFormFields = (
     existingFileMeta: Record<string, unknown[]>,
     allValues?: Record<string, string>,
     allKeyToId?: Record<string, string>,
-    t?: (key: string) => string,
+    t?: (key: string, vars?: Record<string, string>) => string,
 ): boolean => {
     /* fieldKey → fieldId 역매핑 (이 Form 내 필드) */
     const keyToId: Record<string, string> = {};
@@ -298,35 +298,35 @@ export const validateFormFields = (
             const empty = FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])
                 ? fileCount === 0
                 : (isRangeType ? (!val || !valTo) : !val);
-            if (empty) { toast.warning(`'${label}' 항목은 필수 입력입니다.`); return false; }
+            if (empty) { toast.warning(t ? t('common.validation.field_required', { label: String(label) }) : `'${label}' 항목은 필수 입력입니다.`); return false; }
         }
         if (val && !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) {
             if (f.minLength && val.length < f.minLength) {
-                toast.warning(`'${label}' 항목은 최소 ${f.minLength}자 이상 입력해야 합니다.`); return false;
+                toast.warning(t ? t('common.validation.min_length', { label: String(label), min: String(f.minLength) }) : `'${label}' 항목은 최소 ${f.minLength}자 이상 입력해야 합니다.`); return false;
             }
             if (f.maxLength && val.length > f.maxLength) {
-                toast.warning(`'${label}' 항목은 최대 ${f.maxLength}자까지 입력 가능합니다.`); return false;
+                toast.warning(t ? t('common.validation.max_length', { label: String(label), max: String(f.maxLength) }) : `'${label}' 항목은 최대 ${f.maxLength}자까지 입력 가능합니다.`); return false;
             }
         }
         if (val && f.pattern) {
             try {
                 if (!new RegExp(f.pattern).test(val)) {
-                    toast.warning(`'${label}' 형식이 올바르지 않습니다.${f.patternDesc ? ` (${f.patternDesc})` : ''}`);
+                    toast.warning((t ? t('common.validation.pattern_mismatch', { label: String(label) }) : `'${label}' 형식이 올바르지 않습니다.`) + (f.patternDesc ? ` (${f.patternDesc})` : ''));
                     return false;
                 }
             } catch { /* 잘못된 패턴 무시 */ }
         }
         if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) && f.maxFileCount && fileCount > f.maxFileCount) {
-            toast.warning(`'${label}' 항목은 최대 ${f.maxFileCount}개까지 첨부 가능합니다.`); return false;
+            toast.warning(t ? t('common.validation.max_file_count', { label: String(label), count: String(f.maxFileCount) }) : `'${label}' 항목은 최대 ${f.maxFileCount}개까지 첨부 가능합니다.`); return false;
         }
         if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) && f.maxFileSizeMB) {
             const over = (fileValues[f.id] || []).find(file => file.size > f.maxFileSizeMB! * 1024 * 1024);
-            if (over) { toast.warning(`'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`); return false; }
+            if (over) { toast.warning(t ? t('common.validation.max_file_size', { label: String(label), size: String(f.maxFileSizeMB) }) : `'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`); return false; }
         }
         if (FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]) && f.maxTotalSizeMB) {
             const total = (fileValues[f.id] || []).reduce((s, file) => s + file.size, 0);
             if (total > f.maxTotalSizeMB * 1024 * 1024) {
-                toast.warning(`'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
+                toast.warning(t ? t('common.validation.max_total_size', { label: String(label), size: String(f.maxTotalSizeMB) }) : `'${label}' 전체 파일 용량이 ${f.maxTotalSizeMB}MB를 초과합니다.`); return false;
             }
         }
         /* dateRange: _from/_to 분리 키로 검증 */
@@ -334,7 +334,7 @@ export const validateFormFields = (
             const from = values[f.id + '_from'] || '';
             const to = values[f.id + '_to'] || '';
             if (from && to && from > to) {
-                toast.warning(`'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
+                toast.warning(t ? t('common.validation.date_range_invalid', { label: String(label) }) : `'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
                 return false;
             }
         }
@@ -343,7 +343,7 @@ export const validateFormFields = (
             const from = values[f.id + '_from'] || '';
             const to   = values[f.id + '_to'] || '';
             if (from && to && from > to) {
-                toast.warning(`'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
+                toast.warning(t ? t('common.validation.date_range_invalid', { label: String(label) }) : `'${label}' 종료일이 시작일보다 이전일 수 없습니다.`);
                 return false;
             }
         }
@@ -372,7 +372,7 @@ export const validateSubListRows = (
     }>,
     rowsMap: Record<string, { _rowId: string; [key: string]: unknown }[]>,
     fileMap: Record<string, Record<string, Record<string, File[]>>>,
-    t?: (key: string) => string,
+    t?: (key: string, vars?: Record<string, string>) => string,
 ): boolean => {
     for (const w of widgets) {
         if (w.type !== 'sublist') continue;
@@ -382,7 +382,8 @@ export const validateSubListRows = (
 
         /* 위젯 레벨 required — 행이 1개도 없으면 차단 */
         if (w.required && rows.length === 0) {
-            toast.warning(`'${w.title || '서브리스트'}' 항목은 최소 1개 이상 입력해야 합니다.`);
+            const title = w.title || '서브리스트';
+            toast.warning(t ? t('common.validation.sublist_min_rows', { title }) : `'${title}' 항목은 최소 1개 이상 입력해야 합니다.`);
             return false;
         }
         for (let i = 0; i < rows.length; i++) {
@@ -397,19 +398,19 @@ export const validateSubListRows = (
 
                     /* 필수 입력 검사 */
                     if (col.required && existingCount + newCount === 0) {
-                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
+                        toast.warning(t ? t('common.validation.row_required', { label: String(label), row: String(i + 1) }) : `'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
                         return false;
                     }
                     /* 최대 첨부 개수 검사 (기존 + 신규 합산) */
                     if (col.maxFileCount && existingCount + newCount > col.maxFileCount) {
-                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행에서 최대 ${col.maxFileCount}개까지 첨부 가능합니다.`);
+                        toast.warning(t ? t('common.validation.row_max_file_count', { label: String(label), row: String(i + 1), count: String(col.maxFileCount) }) : `'${label}' 항목은 ${i + 1}번째 행에서 최대 ${col.maxFileCount}개까지 첨부 가능합니다.`);
                         return false;
                     }
                     /* 파일 개당 최대 용량 검사 (신규 파일만) */
                     if (col.maxFileSizeMB) {
                         const over = newFiles.find(file => file.size > col.maxFileSizeMB! * 1024 * 1024);
                         if (over) {
-                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 파일이 개당 최대 ${col.maxFileSizeMB}MB까지 허용됩니다.`);
+                            toast.warning(t ? t('common.validation.row_max_file_size', { label: String(label), row: String(i + 1), size: String(col.maxFileSizeMB) }) : `'${label}' 항목은 ${i + 1}번째 행의 파일이 개당 최대 ${col.maxFileSizeMB}MB까지 허용됩니다.`);
                             return false;
                         }
                     }
@@ -417,7 +418,7 @@ export const validateSubListRows = (
                     if (col.maxTotalSizeMB) {
                         const total = newFiles.reduce((s, file) => s + file.size, 0);
                         if (total > col.maxTotalSizeMB * 1024 * 1024) {
-                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 전체 파일 용량이 ${col.maxTotalSizeMB}MB를 초과합니다.`);
+                            toast.warning(t ? t('common.validation.row_max_total_size', { label: String(label), row: String(i + 1), size: String(col.maxTotalSizeMB) }) : `'${label}' 항목은 ${i + 1}번째 행의 전체 파일 용량이 ${col.maxTotalSizeMB}MB를 초과합니다.`);
                             return false;
                         }
                     }
@@ -429,7 +430,7 @@ export const validateSubListRows = (
 
                     /* 필수 입력 검사 — 시작/종료 둘 다 채워져야 통과 */
                     if (col.required && (!valFrom || !valTo)) {
-                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
+                        toast.warning(t ? t('common.validation.row_required', { label: String(label), row: String(i + 1) }) : `'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
                         return false;
                     }
                     /* minLength/maxLength/pattern은 dateRange에 의미가 없으므로 검사하지 않음 */
@@ -438,23 +439,23 @@ export const validateSubListRows = (
 
                     /* 필수 입력 검사 */
                     if (col.required && !val) {
-                        toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
+                        toast.warning(t ? t('common.validation.row_required', { label: String(label), row: String(i + 1) }) : `'${label}' 항목은 ${i + 1}번째 행의 필수 입력입니다.`);
                         return false;
                     }
                     /* 값이 있을 때만 길이·패턴 검사 (required 여부와 무관) */
                     if (val) {
                         if (col.minLength && val.length < col.minLength) {
-                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행에서 최소 ${col.minLength}자 이상 입력해야 합니다.`);
+                            toast.warning(t ? t('common.validation.row_min_length', { label: String(label), row: String(i + 1), min: String(col.minLength) }) : `'${label}' 항목은 ${i + 1}번째 행에서 최소 ${col.minLength}자 이상 입력해야 합니다.`);
                             return false;
                         }
                         if (col.maxLength && val.length > col.maxLength) {
-                            toast.warning(`'${label}' 항목은 ${i + 1}번째 행에서 최대 ${col.maxLength}자까지 입력 가능합니다.`);
+                            toast.warning(t ? t('common.validation.row_max_length', { label: String(label), row: String(i + 1), max: String(col.maxLength) }) : `'${label}' 항목은 ${i + 1}번째 행에서 최대 ${col.maxLength}자까지 입력 가능합니다.`);
                             return false;
                         }
                         if (col.pattern) {
                             try {
                                 if (!new RegExp(col.pattern).test(val)) {
-                                    toast.warning(`'${label}' 항목은 ${i + 1}번째 행의 형식이 올바르지 않습니다.${col.patternDesc ? ` (${col.patternDesc})` : ''}`);
+                                    toast.warning((t ? t('common.validation.row_pattern_mismatch', { label: String(label), row: String(i + 1) }) : `'${label}' 항목은 ${i + 1}번째 행의 형식이 올바르지 않습니다.`) + (col.patternDesc ? ` (${col.patternDesc})` : ''));
                                     return false;
                                 }
                             } catch { /* 잘못된 패턴 무시 */ }
@@ -977,19 +978,6 @@ export const findDuplicateKeys = (keys: string[]): string[] => {
 };
 
 /**
- * Slug Entity ID → 연결된 data slug 조회 (entity 목록에서 entityId가 일치하는 항목의 slug)
- * - widget 빌더에서 "Slug Entity 선택" 시 실제 저장/조회에 쓰이는 data slug로 변환할 때 공용 사용
- * - 일치하는 항목이 없으면(레지스트리 미로딩·entity에 연결된 slug 없음 등) undefined 반환
- * @param slugEntityId 선택된 Slug Entity의 ID (미선택 시 undefined)
- * @param slugOptions  entityId ↔ slug 매핑 목록
- * @example resolveConnectedSlug(3, [{ entityId: 3, slug: 'banner-list' }]) // → 'banner-list'
- */
-export const resolveConnectedSlug = (
-    slugEntityId: number | undefined,
-    slugOptions: { entityId?: number; slug: string }[],
-): string | undefined => slugOptions.find(s => s.entityId === slugEntityId)?.slug;
-
-/**
  * SpaceWidget의 align 설정에 따라 외부 그리드 컬럼 위치(gridColumn) 계산
  * - left  : span N (자동 배치, 기본)
  * - center: 중앙 시작 위치 / span N
@@ -1053,6 +1041,10 @@ export const getTemplateLabel = (t: {
  * @param subListRowsMap      widgetId → 행 배열 (_rowId 제거, 파일 컬럼 ID 배열 완성 상태)
  * @param multiSelectMap             widgetId → number[] 선택된 ID 배열
  * @param multiSelectExtraFieldMap   widgetId → itemId → fieldKey → value (extraFields 있을 때만)
+ * @param mainConnectedSlug          기준 entity slug (_rel 분리 판별용)
+ * @param allFormValues              hideCondition 평가용 전체 폼 값
+ * @param isEntity                   true면 entity 저장 경로 — contentKey 유무와 무관하게 항상 flat 저장
+ *                                   (entity 저장 바디는 중첩 객체를 지원하지 않으므로 반드시 flat이어야 함)
  * @returns { dataJson, pkKeys }
  *
  * @example
@@ -1075,6 +1067,8 @@ export function buildDataJson(
     mainConnectedSlug?: string,
     /** hideCondition 평가용 전체 폼 값 — 미전달 시 위젯 자체 rawValues로 평가 */
     allFormValues?: Record<string, string>,
+    /** entity 저장 경로 여부 — true면 contentKey가 있어도 flat(Object.assign)으로 저장 */
+    isEntity?: boolean,
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
     const dataJson: Record<string, unknown> = {};
     const pkKeys: string[] = [];
@@ -1122,7 +1116,9 @@ export function buildDataJson(
                 if (!dataJson['_rel']) dataJson['_rel'] = {};
                 (dataJson['_rel'] as Record<string, unknown>)[w.connectedSlug] = section;
             } else {
-                if (w.contentKey) dataJson[w.contentKey] = section;
+                /* entity 저장 경로는 contentKey가 있어도 항상 flat(Object.assign) —
+                 * entity 저장 바디는 중첩 객체를 지원하지 않음(buildEntityRequestBody가 중첩 객체 제외) */
+                if (w.contentKey && !isEntity) dataJson[w.contentKey] = section;
                 else Object.assign(dataJson, section);
             }
 
@@ -1190,7 +1186,8 @@ export function buildDataJson(
 
         } else if (w.type === 'sublist') {
             const rows = subListRowsMap[w.widgetId ?? ''] ?? [];
-            if (w.contentKey) dataJson[w.contentKey] = rows;
+            /* entity 저장 경로는 contentKey가 있어도 항상 flat(dataJson.rows) */
+            if (w.contentKey && !isEntity) dataJson[w.contentKey] = rows;
             else dataJson.rows = rows;
         }
     }
@@ -1549,7 +1546,7 @@ export function validateDataSaveWidgets(opts: {
     subListFileMap: Record<string, Record<string, Record<string, File[]>>>;
     multiSelectValuesMap: Record<string, number[]>;
     tableSelectedRowsMap?: Record<string, number[]>;
-    t?: (key: string) => string;
+    t?: (key: string, vars?: Record<string, string>) => string;
 }): boolean {
     const { targetWidgets, formValuesMap, fileValuesMap, existingFileMetaMap, subListRowsMap, subListFileMap, multiSelectValuesMap, tableSelectedRowsMap, t } = opts;
 
@@ -1591,7 +1588,8 @@ export function validateDataSaveWidgets(opts: {
         if (w.type !== 'multiselect') continue;
         if (!w.required) continue;
         if ((multiSelectValuesMap[w.widgetId ?? ''] ?? []).length === 0) {
-            toast.warning(`'${w.title || '다중선택'}' 항목은 필수 선택입니다.`);
+            const title = w.title || '다중선택';
+            toast.warning(t ? t('common.validation.multiselect_required', { title }) : `'${title}' 항목은 필수 선택입니다.`);
             return false;
         }
     }
@@ -1602,7 +1600,7 @@ export function validateDataSaveWidgets(opts: {
             if (w.type !== 'table') continue;
             if (!w.enableRowSelection) continue;
             if ((tableSelectedRowsMap[w.widgetId ?? ''] ?? []).length === 0) {
-                toast.warning('선택된 항목이 없습니다.');
+                toast.warning(t ? t('common.validation.no_selection') : '선택된 항목이 없습니다.');
                 return false;
             }
         }
@@ -1768,6 +1766,7 @@ export async function saveTableRows(opts: {
 export function validateSearchDateRange(
     fields: import('./types').SearchFieldConfig[],
     searchValues: Record<string, string>,
+    t?: (key: string, vars?: Record<string, string>) => string,
 ): boolean {
     for (const f of fields) {
         if ((f.type !== 'dateRange' && f.type !== 'yearMonthRange') || !f.maxRangeValue) continue;
@@ -1787,14 +1786,16 @@ export function validateSearchDateRange(
             if (unit === 'month') limit.setMonth(limit.getMonth() - f.maxRangeValue);
             else limit.setFullYear(limit.getFullYear() - f.maxRangeValue);
             if (fromDate < limit) {
-                toast.warning(`'${label}' 최대 ${f.maxRangeValue}${unit === 'month' ? '개월' : '년'} 이내로 조회하세요.`);
+                const unitText = unit === 'month' ? '개월' : '년';
+                toast.warning(t ? t('common.validation.max_range', { label, value: String(f.maxRangeValue), unit: unitText }) : `'${label}' 최대 ${f.maxRangeValue}${unitText} 이내로 조회하세요.`);
                 return false;
             }
         } else {
             /* day/week: ms 차이 비교 */
             const maxMs = f.maxRangeValue * (unit === 'week' ? 7 : 1) * 86400000;
             if (toDate.getTime() - fromDate.getTime() > maxMs) {
-                toast.warning(`'${label}' 최대 ${f.maxRangeValue}${unit === 'week' ? '주' : '일'} 이내로 조회하세요.`);
+                const unitText = unit === 'week' ? '주' : '일';
+                toast.warning(t ? t('common.validation.max_range', { label, value: String(f.maxRangeValue), unit: unitText }) : `'${label}' 최대 ${f.maxRangeValue}${unitText} 이내로 조회하세요.`);
                 return false;
             }
         }

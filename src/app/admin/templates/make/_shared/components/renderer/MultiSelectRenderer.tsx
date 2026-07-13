@@ -235,8 +235,8 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
                     >
                         <span className={selected.length > 0 ? 'text-slate-800' : 'text-slate-400'}>
                             {selected.length > 0
-                                ? `${selected.length}개 선택됨`
-                                : (widget.placeholderMsgKey ? t(widget.placeholderMsgKey) : (widget.placeholder ?? '항목을 선택하세요'))}
+                                ? t('common.multiselect.selected_count', { count: String(selected.length) })
+                                : (widget.placeholderMsgKey ? t(widget.placeholderMsgKey) : (widget.placeholder ?? t('common.multiselect.placeholder')))}
                         </span>
                         <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -257,7 +257,7 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
                                     disabled={isPreview}
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
-                                    placeholder="검색..."
+                                    placeholder={t('common.input.search_placeholder')}
                                     className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
                                 />
                             </div>
@@ -267,7 +267,7 @@ export function MultiSelectRenderer({ mode, widget, selectedIds = [], onChange, 
                         <ul className="max-h-48 overflow-y-auto py-1">
                             {filteredOptions.length === 0 ? (
                                 <li className="px-3 py-2 text-xs text-slate-400 text-center">
-                                    항목이 없습니다
+                                    {t('common.table.no_data')}
                                 </li>
                             ) : (
                                 filteredOptions.map(opt => {

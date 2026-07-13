@@ -11,6 +11,9 @@ import { TabBuilder } from './TabBuilder';
 import type { AnyWidget } from '../renderer/types';
 import type { TemplateItem } from '../../types';
 import type { ContentWidgetOption } from './fields/ActionButtonField';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
+import type { SlugOption } from './fields';
+import type { ConnMode } from './connFieldOptions';
 
 /**
  * CommonBuilderDispatcher — 위젯 타입별 설정 빌더 통합 디스패처
@@ -25,6 +28,8 @@ interface CommonBuilderDispatcherProps {
     // 컨텐츠 구성을 위한 외부 데이터 컨텍스트
     context: {
         slugOptions: { id: number; slug: string; name: string }[];
+        /** API 정보 목록 — Space ActionButton API 연동 연결용 */
+        apiInfoOptions?: { id: number; name: string; method: string; urlPattern: string }[];
         pageTemplates?: TemplateItem[];
         searchWidgets?: Array<{ widgetId: string; contentKey: string }>;
         /** 현재 페이지의 Form + SubList 위젯 목록 — ActionButton 컨텐츠 연결용 */
@@ -37,13 +42,21 @@ interface CommonBuilderDispatcherProps {
         categoryWidgets?: { widgetId: string; label?: string; depth: number }[];
         /** Space 위젯에서 ActionButton만 추가 가능하도록 제한 (quick-list, quick-detail 전용) */
         actionButtonOnly?: boolean;
-        /** Slug Entity 필드 목록 — FormBuilder fieldKey selectbox 전환용 (widget 빌더 전용) */
-        slugEntityFields?: { key: string | null; label: string }[];
+        /** Slug Entity 필드 목록 — FormBuilder fieldKey selectbox 전환 + Search/Table/Form "이 위젯만 빌드" 버튼 공용 (widget 빌더 전용) */
+        slugEntityFields?: SlugEntityFieldItem[];
+        /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 (widget 빌더 전용) */
+        connLabel?: string;
+        /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 (widget 빌더 전용) */
+        connDefaultSlug?: string;
+        /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 (widget 빌더 전용) */
+        connMode?: ConnMode;
+        /** Data Entity 타입 전용 — SlugEntity 전체 목록(/slug-entity/active). connMode==='data'일 때 "연결 Slug" 옵션 소스 (widget 빌더 전용) */
+        dataEntityOptions?: SlugOption[];
     };
 }
 
 export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBuilderDispatcherProps) {
-    const { slugOptions, pageTemplates = [], searchWidgets = [], contentWidgets, formWidgets = [], maxColSpan, categoryWidgets = [], actionButtonOnly, slugEntityFields } = context;
+    const { slugOptions, apiInfoOptions = [], pageTemplates = [], searchWidgets = [], contentWidgets, formWidgets = [], maxColSpan, categoryWidgets = [], actionButtonOnly, slugEntityFields, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] } = context;
 
     switch (widget.type) {
         case 'search':
@@ -51,6 +64,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                 <SearchWidgetBuilder
                     widget={widget}
                     onChange={w => onChange(w)}
+                    slugEntityFields={slugEntityFields}
                 />
             );
 
@@ -61,6 +75,11 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     onChange={w => onChange(w)}
                     searchWidgets={searchWidgets}
                     slugOptions={slugOptions}
+                    slugEntityFields={slugEntityFields}
+                    connLabel={connLabel}
+                    connDefaultSlug={connDefaultSlug}
+                    connMode={connMode}
+                    dataEntityOptions={dataEntityOptions}
                 />
             );
 
@@ -72,6 +91,10 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     slugOptions={slugOptions}
                     maxColSpan={maxColSpan}
                     slugEntityFields={slugEntityFields}
+                    connLabel={connLabel}
+                    connDefaultSlug={connDefaultSlug}
+                    connMode={connMode}
+                    dataEntityOptions={dataEntityOptions}
                 />
             );
 
@@ -86,6 +109,7 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     actionButtonOnly={actionButtonOnly}
                     maxColSpan={maxColSpan}
                     slugOptions={slugOptions}
+                    apiInfoOptions={apiInfoOptions}
                 />
             );
 
@@ -106,6 +130,11 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     widget={widget}
                     onChange={w => onChange(w)}
                     slugOptions={slugOptions}
+                    slugEntityFields={slugEntityFields}
+                    connLabel={connLabel}
+                    connDefaultSlug={connDefaultSlug}
+                    connMode={connMode}
+                    dataEntityOptions={dataEntityOptions}
                 />
             );
 
@@ -115,6 +144,11 @@ export function CommonBuilderDispatcher({ widget, onChange, context }: CommonBui
                     widget={widget}
                     onChange={w => onChange(w)}
                     slugOptions={slugOptions}
+                    slugEntityFields={slugEntityFields}
+                    connLabel={connLabel}
+                    connDefaultSlug={connDefaultSlug}
+                    connMode={connMode}
+                    dataEntityOptions={dataEntityOptions}
                 />
             );
 

@@ -20,6 +20,8 @@ import { usePageTitleStore } from '@/store/use-page-title-store';
 import { PageGridRenderer } from '@/app/admin/templates/make/_shared/components/renderer';
 import type { PageWidgetItem } from '@/app/admin/templates/make/_shared/components/renderer';
 import { useWidgetPageState } from '@/app/admin/templates/make/_shared/hooks/useWidgetPageState';
+import type { ConnectedType } from '@/app/admin/templates/make/_shared/hooks/useOutputMode';
+import { useI18n } from '@/hooks/use-i18n';
 
 /* ══════════════════════════════════════════ */
 /*  타입                                      */
@@ -28,6 +30,8 @@ import { useWidgetPageState } from '@/app/admin/templates/make/_shared/hooks/use
 interface WidgetConfig {
     widgetItems: PageWidgetItem[];
     pageTitle?: string;
+    /** 페이지 레벨 메인 연결 타입 — 'entity' | 'data'면 Table 위젯이 Slug Entity REST API를 조회한다 */
+    connectedType?: ConnectedType;
 }
 
 /* ══════════════════════════════════════════ */
@@ -38,14 +42,16 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
     const { slug } = React.use(params);
     const { groups: codeGroups, fetchGroups } = useCodeStore();
     const setPageTitle = usePageTitleStore(s => s.setPageTitle);
+    const { t } = useI18n();
 
     /* 템플릿 로딩 상태 */
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
+    const [connectedType, setConnectedType] = useState<ConnectedType | undefined>(undefined);
 
     /* 공통 훅 — 검색·테이블·폼·서브리스트·파일업로드·멀티셀렉트 상태 및 핸들러 전체 */
-    const { gridProps } = useWidgetPageState(widgetItems, slug);
+    const { gridProps } = useWidgetPageState(widgetItems, slug, { connectedType });
 
     /* 템플릿 + 공통코드 로딩 */
     useEffect(() => {
@@ -55,10 +61,11 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
                 const config = JSON.parse(res.data.configJson) as WidgetConfig;
                 const items = config.widgetItems || [];
                 setWidgetItems(items);
+                setConnectedType(config.connectedType || undefined);
                 /* 빌더에서 설정한 페이지 제목을 전역 스토어에 저장 */
                 setPageTitle(config.pageTitle || '');
             })
-            .catch(() => setError('페이지를 불러오는 중 오류가 발생했습니다.'))
+            .catch(() => setError(t('common.error.page_load')))
             .finally(() => setLoading(false));
     }, [slug, fetchGroups]); // eslint-disable-line react-hooks/exhaustive-deps
 

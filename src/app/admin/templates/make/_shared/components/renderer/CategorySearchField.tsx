@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import { resolveAccessor, evalConditionExpr } from '../../utils';
+import { useI18n } from '@/hooks/use-i18n';
 import type { SearchFieldConfig } from '../../types';
 import type { RendererMode } from './types';
 
@@ -44,6 +45,7 @@ const SELECT_CLS = 'flex-1 h-8 rounded border border-slate-200 bg-white px-2 tex
 export function CategorySearchField({
     mode, field, value, onChange, isDisabled,
 }: CategorySearchFieldProps) {
+    const { t } = useI18n();
     const isPreview = mode === 'preview';
     const maxDepth        = field.maxDepth        ?? 1;
     const depthLabels     = field.depthLabels     ?? [];
@@ -179,13 +181,14 @@ export function CategorySearchField({
                 /* 상위 depth 값이 없으면 이 selectbox 비활성 (depth 1은 항상 활성) */
                 const isParentEmpty = i > 0 && !depthValues[i - 1];
 
-                /* placeholder 텍스트: msgKey > 라벨 > 기본값 순 */
-                const labelText = depthLabelMsgKeys[i] || depthLabels[i] || `${depth}depth`;
+                /* placeholder 텍스트: msgKey > 라벨 > 기본값 순 (기본값 "{n}depth"는 설정 누락 시의 식별자성 표기라 번역 대상 아님) */
+                const labelText     = depthLabelMsgKeys[i] || depthLabels[i] || `${depth}depth`;
+                const prevLabelText = depthLabelMsgKeys[i - 1] || depthLabels[i - 1] || `${i}depth`;
                 const placeholder = loading
-                    ? '로딩 중...'
+                    ? t('common.loading')
                     : isParentEmpty
-                        ? `${depthLabelMsgKeys[i - 1] || depthLabels[i - 1] || `${i}depth`} 선택 후 이용`
-                        : `${labelText} 선택`;
+                        ? t('common.category.select_after', { label: prevLabelText })
+                        : t('common.category.label_select', { label: labelText });
 
                 return (
                     <select

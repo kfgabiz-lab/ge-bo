@@ -31,6 +31,9 @@ import { CodeGroupDef } from '../../types';
 import { SearchFieldType, SearchFieldConfig } from '../SearchBuilder';
 import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
 import { createIdGenerator } from '../../utils';
+import { buildFormFromEntity } from '../../utils/entityBuild';
+import { EntityBuildButton } from './EntityBuildButton';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
 import {
     InputField, TextField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
@@ -38,11 +41,13 @@ import {
     FormTextareaField, TimeField,
     SlugSelectField,
 } from './fields';
-import type { FieldEditValues } from './fields';
+import type { FieldEditValues, SlugOption } from './fields';
 // SpaceBuilder와 동일한 스타일 유틸 재사용
 import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
 import { ToggleRow } from './fields/_ToggleRow';
 import { BG_COLOR_OPTIONS } from './SpaceBuilder';
+import { getConnFieldOptions, resolveEntityId, type ConnMode } from './connFieldOptions';
+import { useEntityFields } from '../../hooks/useEntityFields';
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -180,15 +185,34 @@ function SortableFormField({
 interface FormBuilderProps {
     widget: FormWidget;
     onChange: (w: FormWidget) => void;
-    slugOptions: { id: number; slug: string; name: string }[];
+    slugOptions: SlugOption[];
     /** 필드 ColSpan 최대값 (기본 12, 우측 드로어 등 좁은 공간에서 2로 제한) */
     maxColSpan?: number;
-    /** Slug Entity 필드 목록 — fieldKey selectbox 전환용 (widget 빌더 전용) */
-    slugEntityFields?: { key: string | null; label: string }[];
+    /** @deprecated 더 이상 FormBuilder 내부에서 직접 사용하지 않음 — widget.connectedSlug(이 Form의 연결 Entity) 기준으로
+     *  useEntityFields 훅을 통해 자체적으로 재조회한다(contentEntityFields). CommonBuilderDispatcher 호환을 위해 타입만 유지. */
+    slugEntityFields?: SlugEntityFieldItem[];
+    /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
+    connLabel?: string;
+    /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
+    connDefaultSlug?: string;
+    /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
+    connMode?: ConnMode;
+    /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
+    dataEntityOptions?: SlugOption[];
 }
 
 /** Form 위젯 필드 설정 빌더 */
-export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, slugEntityFields }: FormBuilderProps) {
+export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] }: FormBuilderProps) {
+    /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
+    const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
+
+    /* ── 이 컨텐츠(Form)가 실제로 연결된 Entity 기준 필드 목록 ──
+       widget.connectedSlug(이 Form 자체의 연결 Entity)가 없으면 위젯 최상위 연결 Entity(connDefaultSlug)로 자연 폴백한다.
+       fieldKey selectbox 옵션은 위젯 최상위가 아니라 이 값을 기준으로 구성해야 한다. */
+    const effectiveSlug = widget.connectedSlug || connDefaultSlug;
+    const entityId = resolveEntityId(effectiveSlug, connMode, slugOptions, dataEntityOptions);
+    const contentEntityFields = useEntityFields(entityId);
+
     const { i18nMode } = useBuilderI18nMode();
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -350,7 +374,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
             rowSpanConfig: { min: 1, max: 30 },
             codeGroups,
             codeGroupsLoading,
-            slugEntityFields,
+            slugEntityFields: contentEntityFields,
         };
 
         switch (f.type) {
@@ -419,9 +443,11 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                     />
                 </div>
                 <SlugSelectField
-                    value={widget.connectedSlug ?? ''}
+                    value={widget.connectedSlug ?? connDefaultSlug ?? ''}
                     onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
-                    slugOptions={slugOptions}
+                    slugOptions={connFieldOptions.options}
+                    formatDisplay={connFieldOptions.formatDisplay}
+                    label={connLabel}
                 />
             </div>
 
@@ -489,6 +515,16 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, sl
                         ))}
                     </select>
                 </div>
+            </div>
+
+            {/* 필드 구성 헤더 — "이 위젯만 빌드" 버튼 */}
+            <div className="flex items-center justify-between pt-1">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">필드 구성</p>
+                <EntityBuildButton
+                    onClick={() => onChange(buildFormFromEntity(widget, contentEntityFields))}
+                    disabled={!contentEntityFields.length}
+                    title="Slug Entity 필드로 폼 필드 자동 구성"
+                />
             </div>
 
             {/* 필드 목록 (드래그 재정렬) — accordion 구조 */}

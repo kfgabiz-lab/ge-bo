@@ -2,6 +2,9 @@
 
 import { SearchBuilder } from '../SearchBuilder';
 import type { SearchWidget } from '../renderer/types';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
+import { EntityBuildButton } from './EntityBuildButton';
+import { buildSearchFromEntity } from '../../utils/entityBuild';
 
 /**
  * SearchWidgetBuilder — 검색 위젯 전용 설정 빌더
@@ -11,9 +14,11 @@ import type { SearchWidget } from '../renderer/types';
 interface SearchWidgetBuilderProps {
     widget: SearchWidget;
     onChange: (w: SearchWidget) => void;
+    /** Slug Entity 필드 목록 — "이 위젯만 빌드" 버튼용 (widget 빌더 전용) */
+    slugEntityFields?: SlugEntityFieldItem[];
 }
 
-export function SearchWidgetBuilder({ widget, onChange }: SearchWidgetBuilderProps) {
+export function SearchWidgetBuilder({ widget, onChange, slugEntityFields }: SearchWidgetBuilderProps) {
     const displayStyle = widget.displayStyle ?? 'standard';
 
     return (
@@ -64,7 +69,14 @@ export function SearchWidgetBuilder({ widget, onChange }: SearchWidgetBuilderPro
             </div>
 
             {/* 검색 필드 구성 (SearchBuilder 재사용) */}
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-3 mb-1">검색 필드 구성</p>
+            <div className="flex items-center justify-between mt-3 mb-1">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">검색 필드 구성</p>
+                <EntityBuildButton
+                    onClick={() => onChange(buildSearchFromEntity(widget, slugEntityFields ?? []))}
+                    disabled={!slugEntityFields?.length}
+                    title="Slug Entity 필드로 검색 필드 자동 구성"
+                />
+            </div>
             <SearchBuilder
                 rows={widget.rows}
                 onChange={rows => onChange({ ...widget, rows })}

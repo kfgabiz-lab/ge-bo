@@ -171,6 +171,8 @@ interface WidgetRendererProps {
     onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean) => void;
     /** Space 위젯 버튼 클릭 시 데이터저장 동작 — connType='datasave' 전용 */
     onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
+    /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId, params, connectedContentWidgetIds), live 모드에서만 호출됨 */
+    onApiCall?: (apiInfoId: number, params?: string, connectedContentWidgetIds?: string[]) => void;
     /** Space 위젯 닫기 버튼 — 없으면 router.back() */
     onClose?: () => void;
 
@@ -265,6 +267,8 @@ interface WidgetRendererProps {
     leaveCheck?: boolean;
     /** _fetchedRel{id} 원본 데이터 — FormRenderer rowData dot-notation 확장용 */
     fetchRelData?: Record<string, unknown>;
+    /** entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
+    isEntity?: boolean;
     /**
      * 외부에서 팝업을 직접 트리거할 때 사용 (LIST 버튼바, test 페이지 등).
      * ts가 변경될 때마다 팝업을 오픈한다.
@@ -314,6 +318,7 @@ export function WidgetRenderer({
     crossTabFormValues,
     onContentAction,
     onDataSave,
+    onApiCall,
     onClose,
     /* file */
     fileValues,
@@ -361,6 +366,7 @@ export function WidgetRenderer({
     leaveCheck,
     externalPopupTrigger,
     fetchRelData,
+    isEntity,
 }: WidgetRendererProps) {
     const router  = useRouter();
     const { t }   = useI18n();
@@ -455,7 +461,7 @@ export function WidgetRenderer({
     const doExcelDownload = useCallback(async (tableWidgetId: string, reason?: string) => {
         const tableWidget = tableWidgetsMap?.[tableWidgetId];
         if (!tableWidget?.connectedSlug) {
-            toast.error('다운로드할 테이블 정보가 없습니다.');
+            toast.error(t('common.table.no_table_info'));
             return;
         }
         try {
@@ -504,7 +510,7 @@ export function WidgetRenderer({
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch {
-            toast.error('엑셀 다운로드 중 오류가 발생했습니다.');
+            toast.error(t('common.error.excel'));
         }
     }, [tableWidgetsMap, currentSearchParams, codeGroups, t]);
 
@@ -755,9 +761,9 @@ export function WidgetRenderer({
             setPopupCfg(cfg);
             setPopupOpen(true);
         } catch {
-            toast.error('팝업 설정을 불러오는 중 오류가 발생했습니다.');
+            toast.error(t('common.error.load'));
         }
-    }, [mode, router, dataSlug]);
+    }, [mode, router, dataSlug, t]);
 
     /* ── 외부 팝업 트리거 감지 (LIST 버튼바 등 WidgetRenderer 외부에서 팝업 오픈 시) ── */
     useEffect(() => {
@@ -831,15 +837,15 @@ export function WidgetRenderer({
 
         /* 삭제 */
         if (action === 'delete') {
-            if (!popupEditId) { toast.info('삭제할 데이터가 없습니다.'); return; }
-            if (!confirm('삭제하시겠습니까?')) return;
+            if (!popupEditId) { toast.info(t('common.table.no_delete_data')); return; }
+            if (!confirm(t('common.confirm.delete'))) return;
             try {
                 await api.delete(`/page-data/${popupListSlug}/${popupEditId}`);
-                toast.success('삭제되었습니다.');
+                toast.success(t('common.deleted'));
                 onRefresh?.();
                 handlePopupClose();
             } catch {
-                toast.error('삭제 중 오류가 발생했습니다.');
+                toast.error(t('common.error.delete'));
             }
             return;
         }
@@ -958,11 +964,11 @@ export function WidgetRenderer({
             if (popupEditId) {
                 await api.put(`/page-data/${popupListSlug}/${popupEditId}`, { dataJson, ...(pageSlug && { templateSlug: pageSlug }) });
                 savedId = popupEditId;
-                toast.success('수정되었습니다.');
+                toast.success(t('common.updated'));
             } else {
                 const saveRes = await api.post(`/page-data/${popupListSlug}`, { dataJson, ...(pageSlug && { templateSlug: pageSlug }) });
                 savedId = saveRes.data.id;
-                toast.success('저장되었습니다.');
+                toast.success(t('common.saved'));
             }
 
             /* 5단계: 신규 업로드 파일 dataId 연결 */
@@ -975,11 +981,11 @@ export function WidgetRenderer({
             handlePopupClose();
         } catch (err) {
             console.error('[WidgetRenderer] 팝업 저장 실패:', err);
-            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
+            toast.error(getApiErrorMessage(err, t('common.error.save')));
         } finally {
             setPopupSaving(false);
         }
-    }, [popupListSlug, popupEditId, popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupParamSaveExtras, handlePopupClose, onRefresh]);
+    }, [popupListSlug, popupEditId, popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupParamSaveExtras, handlePopupClose, onRefresh, t]);
 
     /**
      * 팝업 내 datasave 버튼 핸들러 — connType='datasave' 전용
@@ -1012,7 +1018,7 @@ export function WidgetRenderer({
             .filter((w): w is NonNullable<typeof w> => w !== null);
 
         if (targetWidgets.length === 0) {
-            toast.warning('연결된 컨텐츠 위젯이 없습니다.');
+            toast.warning(t('common.widget.no_content'));
             return;
         }
 
@@ -1097,7 +1103,7 @@ export function WidgetRenderer({
                     : allRows;
 
                 if (rowsToSave.length === 0) {
-                    toast.warning('저장할 데이터가 없습니다.');
+                    toast.warning(t('common.table.no_save_data'));
                     return;
                 }
 
@@ -1117,16 +1123,16 @@ export function WidgetRenderer({
             }
 
             if (anySaved) {
-                toast.success('저장되었습니다.');
+                toast.success(t('common.saved'));
                 onRefresh?.();
                 handlePopupClose();
             }
         } catch (err) {
-            toast.error(getApiErrorMessage(err, '저장 중 오류가 발생했습니다.'));
+            toast.error(getApiErrorMessage(err, t('common.error.save')));
         } finally {
             setPopupSaving(false);
         }
-    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, popupTableDataMap, popupParamSaveExtras, pageSlug, onRefresh, handlePopupClose]);
+    }, [popupCfg, popupFormValuesMap, popupFileValuesMap, popupExistingMetaMap, popupSubListRowsMap, popupSubListFileMap, popupMultiSelectValuesMap, popupTableSelectedRowsMap, popupTableDataMap, popupParamSaveExtras, pageSlug, onRefresh, handlePopupClose, t]);
 
     /* ══════════════════════════════════════════ */
     /*  팝업 오버레이 — live 모드 전용, 단 한 번만  */
@@ -1210,7 +1216,7 @@ export function WidgetRenderer({
                 {/* 저장 중 표시 */}
                 {popupSaving && (
                     <div className="flex items-center justify-center gap-2 py-2 text-slate-400 text-sm">
-                        <Loader2 className="w-4 h-4 animate-spin" />저장 중...
+                        <Loader2 className="w-4 h-4 animate-spin" />{t('common.saving')}
                     </div>
                 )}
             </div>
@@ -1338,13 +1344,13 @@ export function WidgetRenderer({
             /* 외부 핸들러 우선, 없으면 connectedSlug로 직접 삭제 */
             onDelete: handlers?.onDelete ?? (mode === 'live' && connectedSlug
                 ? async (id: number) => {
-                    if (!confirm('삭제하시겠습니까?')) return;
+                    if (!confirm(t('common.confirm.delete'))) return;
                     try {
                         await api.delete(`/page-data/${connectedSlug}/${id}`);
-                        toast.success('삭제되었습니다.');
+                        toast.success(t('common.deleted'));
                         onRefresh?.();
                     } catch {
-                        toast.error('삭제 중 오류가 발생했습니다.');
+                        toast.error(t('common.error.delete'));
                     }
                 }
                 : undefined
@@ -1354,7 +1360,7 @@ export function WidgetRenderer({
              * GET 단건조회(기존 API)로 원본 dataJson을 다시 조회한 뒤 신규 등록(POST, 기존 API)한다 */
             onCopy: handlers?.onCopy ?? (mode === 'live' && connectedSlug
                 ? async (row: Record<string, unknown>) => {
-                    if (!confirm('복사하시겠습니까?')) return;
+                    if (!confirm(t('common.confirm.copy'))) return;
                     const id = row._id as number;
                     if (!id) return;
                     try {
@@ -1395,14 +1401,14 @@ export function WidgetRenderer({
                         }
 
                         await api.post(`/page-data/${connectedSlug}`, { dataJson: copyDataJson });
-                        toast.success('복사되었습니다.');
+                        toast.success(t('common.copied'));
                         onRefresh?.();
                     } catch (e: unknown) {
                         const response = (e as { response?: { status?: number; data?: { message?: string } } })?.response;
                         if (response?.status === 409) {
-                            toast.error(response.data?.message || '이미 동일한 키 값의 데이터가 존재합니다.');
+                            toast.error(response.data?.message || t('common.error.duplicate_key'));
                         } else {
-                            toast.error('복사 중 오류가 발생했습니다.');
+                            toast.error(t('common.error.copy'));
                         }
                     }
                 }
@@ -1492,7 +1498,7 @@ export function WidgetRenderer({
                         onRefresh?.();
                     } catch (e) {
                         console.error('[inlineEdit] 오류:', e);
-                        toast.error('수정 중 오류가 발생했습니다.');
+                        toast.error(t('common.error.update'));
                     }
                 }
                 : undefined
@@ -1558,6 +1564,7 @@ export function WidgetRenderer({
                 onFileChange={onFileChange}
                 onRemoveExisting={onRemoveExisting}
                 fetchRelData={fetchRelData}
+                isEntity={isEntity}
             />
         );
     }
@@ -1575,6 +1582,7 @@ export function WidgetRenderer({
                     bgColor={widget.bgColor}
                     onContentAction={onContentAction}
                     onDataSave={mode === 'live' ? onDataSave : undefined}
+                    onApiCall={mode === 'live' ? onApiCall : undefined}
                     onClose={onClose}
                     onPopupOpen={(slug, params) => handleInternalPopupOpen(slug, null, dataSlug, params ? parseActionParams(params, {}) : undefined)}
                     onExcelDownload={

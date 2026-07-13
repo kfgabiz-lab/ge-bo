@@ -38,11 +38,12 @@ import { useOutputMode } from '../_shared/hooks/useOutputMode';
 import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
 import type { SearchWidget, SpaceWidget, CategoryWidget, SubListWidget, MultiSelectWidget, TabWidget } from '../_shared/components/renderer';
 import type { TableWidget } from '../_shared/components/builder/TableBuilder';
-import type { FormWidget, FormFieldItem } from '../_shared/components/builder/FormBuilder';
-import { createIdGenerator, toSlug, resolveConnectedSlug } from '../_shared/utils';
-import { stampFormConnectedSlug } from '../_shared/hooks/useWidgetPageState';
+import type { FormWidget } from '../_shared/components/builder/FormBuilder';
+import { createIdGenerator, toSlug } from '../_shared/utils';
+import { buildFormFromEntity } from '../_shared/utils/entityBuild';
+import { stampConnectedSlug } from '../_shared/hooks/useWidgetPageState';
 import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
-import type { SearchFieldType } from '../_shared/types';
+import type { SlugOption } from '../_shared/components/builder/fields/SlugSelectField';
 import PageLayout from '@/components/layout/page-layout';
 import { SaveModal, RuleCreateModal } from '../_shared/components/TemplateModals';
 import { SortableRowWrapper } from '../_shared/components/DndWrappers';
@@ -207,30 +208,46 @@ export default function PageBuilderPage() {
     /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
     const tm = useTemplateManagement('PAGE');
 
-    /* ── Slug 레지스트리 — connectedSlug 드롭다운 용도 (entityId 포함) ── */
-    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string; entityId?: number }[]>([]);
+    /* ── Slug 레지스트리 — connectedSlug 드롭다운 용도 (entity 연결 정보 entityId/entityName 포함) ── */
+    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string; entityId?: number; entityName?: string }[]>([]);
     useEffect(() => {
         api.get('/slug-registry/active')
             .then(res => setSlugOptions((res.data || []).filter((s: { type: string }) => s.type === 'PAGE_DATA')))
             .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
     }, []);
 
-    /* ── Slug Entity 목록 — 페이지 연결용 ── */
-    const [slugEntityOptions, setSlugEntityOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
+    /* ── API 정보 — Space ActionButton API 연동 연결용 ── */
+    const [apiInfoOptions, setApiInfoOptions] = useState<{ id: number; name: string; method: string; urlPattern: string }[]>([]);
     useEffect(() => {
-        api.get('/slug-entity/active')
-            .then(res => setSlugEntityOptions(res.data || []))
+        api.get('/api-infos/active')
+            .then(res => setApiInfoOptions(res.data || []))
             .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
     }, []);
+
+    /* ── Data Entity 전체 목록 — SlugRegistry 연결 여부와 무관하게 SlugEntity 전체를 대상으로 한다.
+       (Slug Entity 타입은 slugOptions 중 entity가 연결된 slug만 쓰지만, Data Entity 타입은 이 목록을 쓴다) */
+    const [dataEntityOptions, setDataEntityOptions] = useState<SlugOption[]>([]);
+    useEffect(() => {
+        api.get('/slug-entity/active')
+            .then(res => setDataEntityOptions(res.data))
+            .catch(() => setDataEntityOptions([]));
+    }, []);
+
+    /* ── 선택된 연결 Entity(slug)의 entityId — connectedType에 따라 소스가 다르다 ──
+       - data: dataEntityOptions(SlugEntity 고유 slug 네임스페이스)에서 id를 직접 찾는다
+       - entity(그 외): entity가 연결된 slug를 고르면 그 slug의 entityId를 사용한다 */
+    const selectedEntityId = om.connectedType === 'data'
+        ? dataEntityOptions.find(e => e.slug === om.mainConnectedSlug)?.id
+        : slugOptions.find(s => s.slug === om.mainConnectedSlug)?.entityId;
 
     /* ── 선택된 Slug Entity 필드 목록 — fieldKey selectbox 및 빌드용 ── */
     const [slugEntityFields, setSlugEntityFields] = useState<SlugEntityFieldItem[]>([]);
     useEffect(() => {
-        if (!om.slugEntityId) { setSlugEntityFields([]); return; }
-        api.get(`/slug-entity/${om.slugEntityId}`)
+        if (!selectedEntityId) { setSlugEntityFields([]); return; }
+        api.get(`/slug-entity/${selectedEntityId}`)
             .then(res => setSlugEntityFields(res.data.fields ?? []))
             .catch(() => setSlugEntityFields([]));
-    }, [om.slugEntityId]);
+    }, [selectedEntityId]);
 
     /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
     const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
@@ -329,7 +346,7 @@ export default function PageBuilderPage() {
                 case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
                 case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
                 case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true, ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as SubListWidget;
-                case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', sourceSlug: '', connectedSlug: '', labelFields: 'name' } as MultiSelectWidget;
+                case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', sourceSlug: '', labelFields: 'name', ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as MultiSelectWidget;
                 case 'tab':         return { type: 'tab', widgetId: id, tabs: [{ id: `tab-${Date.now()}-0`, label: '탭 1', pageSlug: '' }] } as TabWidget;
             }
         })();
@@ -416,142 +433,46 @@ export default function PageBuilderPage() {
         ));
     };
 
-    /* ── 메인 연결 slug 변경 — form/sublist connectedSlug 자동 동기화 ── */
+    /* ── 메인 연결 slug 변경 ── */
     const handleMainConnectedSlugChange = (slug: string) => {
         om.setMainConnectedSlug(slug);
-        /* slug 모드는 form+sublist 모두 stamp (기존 동작 유지 — includeSublist=true) */
-        setWidgetItems(prev => stampFormConnectedSlug(prev, slug || undefined, true));
     };
 
-    /* ── Slug Entity 변경 — entity와 연결된 data slug를 form connectedSlug에 자동 설정 ── */
-    const handleSlugEntityIdChange = (id: number | undefined) => {
-        om.setSlugEntityId(id);
-        const connectedSlug = resolveConnectedSlug(id, slugOptions);
-        /* entity 모드는 form만 stamp (기본값 includeSublist=false) */
-        setWidgetItems(prev => stampFormConnectedSlug(prev, connectedSlug));
+    /* ── 연결 Entity(slug) 변경 — entity가 연결된 slug를 그대로 Form connectedSlug에 자동 설정 (역산 없이 직접 사용) ── */
+    const handleConnectedSlugChange = (slug: string) => {
+        om.setMainConnectedSlug(slug);
     };
 
-    /* snake_case → camelCase 변환 */
-    const toCamelCase = (str: string): string =>
-        str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-
-    /* dateRange suffix 제거 — 빌더는 fieldKey만 저장하므로 entity key(_from/_to)와 비교 시 suffix 제거 */
-    const stripRangeSuffix = (key: string): string | null => {
-        if (key.endsWith('_from')) return key.slice(0, -5);
-        if (key.endsWith('_to'))   return key.slice(0, -3);
-        return null;
-    };
-
-    /* entity key → 비교 가능한 모든 변형 반환 (원본·camelCase·suffix제거·suffix제거+camelCase) */
-    const getKeyVariants = (key: string): string[] => {
-        const variants = new Set<string>();
-        variants.add(key);
-        variants.add(toCamelCase(key));
-        const base = stripRangeSuffix(key);
-        if (base) {
-            variants.add(base);
-            variants.add(toCamelCase(base));
-        }
-        return [...variants];
-    };
-
-    /** columnType → Form 필드 타입 매핑 (widget 빌더 전용) */
-    const mapColumnTypeToFieldType = (columnType: string): SearchFieldType => {
-        switch (columnType.toUpperCase()) {
-            case 'VARCHAR':                  return 'input';
-            case 'BIGINT': case 'INT':       return 'input';
-            case 'DATE': case 'TIMESTAMPTZ': return 'date';
-            case 'BOOLEAN':                  return 'checkbox';
-            default:                         return 'textarea';
-        }
-    };
-
-    /* ── entity field → FormFieldItem 생성 헬퍼 ──
-       1순위: entity에 직접 지정된 fieldType 사용
-       2순위: fieldType 없으면 DB 타입(columnType)으로 자동 매핑 */
-    const buildFieldItem = (f: SlugEntityFieldItem): FormFieldItem => {
-        const type = (f.fieldType as SearchFieldType | undefined) ?? mapColumnTypeToFieldType(f.columnType);
-        const wideTypes = ['textarea', 'dateRange', 'yearMonthRange'];
-        return {
-            id: uid(),
-            type,
-            label: f.label,
-            fieldKey: f.key!,
-            colSpan: wideTypes.includes(type) ? 2 : 1,
-            rowSpan: 1,
-            required: f.isNullable === false,
-            ...(type === 'date' && { dateSubType: 'date' as const }),
-            ...(f.codeGroupCode ? { codeGroupCode: f.codeGroupCode } : {}),
-        } as FormFieldItem;
-    };
-
-    /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 ── */
+    /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 (공통 로직은 entityBuild.ts의 buildFormFromEntity) ── */
     const handleBuildFromEntity = () => {
-        if (!om.slugEntityId || slugEntityFields.length === 0) return;
-
-        /* entity field를 key 기준으로 맵 생성 — 원본·camelCase·_from/_to suffix 제거 등 모든 변형 등록 */
-        const entityFieldMap = new Map<string, SlugEntityFieldItem>();
-        slugEntityFields.filter(f => f.key).forEach(f => {
-            getKeyVariants(f.key!).forEach(v => entityFieldMap.set(v, f));
-        });
+        if (!selectedEntityId || slugEntityFields.length === 0) return;
 
         const hasFormContent = widgetItems.some(item =>
             item.contents.some(c => c.widget.type === 'form')
         );
 
         if (hasFormContent) {
-            /* ── 케이스 1: form 위젯이 이미 있는 경우 ── */
-            setWidgetItems(prev => {
-                /* 1단계: entity field 기준 라벨/required 갱신 + 누락 필드 추가 */
-                const fieldMerged = prev.map(item => ({
-                    ...item,
-                    contents: item.contents.map(c => {
-                        if (c.widget.type !== 'form') return c;
-                        const formWidget = c.widget as FormWidget;
-
-                        /* 1-1. key가 같은 기존 필드 → 라벨/required 업데이트만 */
-                        const updatedFields = formWidget.fields.map(f => {
-                            const entityField = f.fieldKey ? entityFieldMap.get(f.fieldKey) : undefined;
-                            if (!entityField) return f;
-                            return {
-                                ...f,
-                                /* 라벨이 없는 경우에만 entity 라벨 적용 */
-                                label: f.label || entityField.label,
-                                /* entity not null → required 반영 */
-                                required: entityField.isNullable === false ? true : f.required,
-                            };
-                        });
-
-                        /* 1-2. 기존 form에 없는 entity field → 하단에 추가
-                           원본·camelCase·_from/_to suffix 제거 등 모든 변형이 existingKeys에 없는 경우에만 추가 */
-                        const existingKeys = new Set(
-                            formWidget.fields.map(f => f.fieldKey).filter(Boolean) as string[]
-                        );
-                        const appendFields = slugEntityFields
-                            .filter(f => f.key && getKeyVariants(f.key!).every(v => !existingKeys.has(v)))
-                            .map(buildFieldItem);
-
-                        return { ...c, widget: { ...formWidget, fields: [...updatedFields, ...appendFields] } };
-                    }),
-                }));
-
-                /* 2단계: 이미 존재하는 form을 entity로 재빌드할 때도 connectedSlug가 비어있을 수 있으므로 재확인 stamp
-                 * — resolveConnectedSlug가 undefined면(레지스트리 미로딩 등) 기존 connectedSlug를 덮어쓰지 않고 스킵 */
-                const resolvedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
-                return resolvedSlug !== undefined ? stampFormConnectedSlug(fieldMerged, resolvedSlug) : fieldMerged;
-            });
+            /* ── 케이스 1: form 위젯이 이미 있는 경우 — 페이지 내 모든 form 위젯에 동일하게 빌드 적용 ── */
+            setWidgetItems(prev => prev.map(item => ({
+                ...item,
+                contents: item.contents.map(c =>
+                    c.widget.type !== 'form'
+                        ? c
+                        : { ...c, widget: buildFormFromEntity(c.widget as FormWidget, slugEntityFields) }
+                ),
+            })));
         } else {
-            /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ── */
-            const newFields = slugEntityFields.filter(f => f.key).map(buildFieldItem);
-            const connectedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
-
-            const newFormWidget: FormWidget = {
+            /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ──
+               빈 fields로 시작한 Form에 buildFormFromEntity를 적용하면 entity 필드 전체가 그대로 추가된다 */
+            const connectedSlug = om.mainConnectedSlug || undefined;
+            const emptyFormWidget: FormWidget = {
                 type: 'form',
                 widgetId: wuid(),
                 contentKey: '',
-                fields: newFields,
+                fields: [],
                 ...(connectedSlug ? { connectedSlug } : {}),
             };
+            const newFormWidget = buildFormFromEntity(emptyFormWidget, slugEntityFields);
 
             const newContent: PageContentItem = {
                 id: uid(),
@@ -667,16 +588,9 @@ export default function PageBuilderPage() {
         if (!tm.saveModalName.trim() || !tm.saveModalSlug.trim()) return;
         if (!validateBeforeSave()) return;
 
-        /* entity 연결 모드(connectedType==='entity')일 때 Form 위젯 connectedSlug를 저장 직전 재확인 stamp
-         * — entity 모드에서는 slugEntityId가 우선이므로 slug 모드 값(mainConnectedSlug)은 이 분기에서 건드리지 않음
-         * — resolveConnectedSlug가 undefined면(레지스트리 미로딩 등) 기존 connectedSlug를 덮어쓰지 않고 스킵 */
-        let itemsToSave = widgetItems;
-        if (om.connectedType === 'entity') {
-            const resolvedSlug = resolveConnectedSlug(om.slugEntityId, slugOptions);
-            if (resolvedSlug !== undefined) {
-                itemsToSave = stampFormConnectedSlug(widgetItems, resolvedSlug);
-            }
-        }
+        /* 저장 직전 — Form/Table/SubList/MultiSelect 4종 위젯 중 connectedSlug가 비어있는 위젯만
+         * om.mainConnectedSlug로 채운다(fill-if-empty). 이미 개별 지정된 위젯은 그대로 유지된다. */
+        const itemsToSave = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
 
         await tm.handleSaveConfirm(
             itemsToSave as unknown as import('../_shared/templateApi').PageWidgetItem[],
@@ -691,7 +605,7 @@ export default function PageBuilderPage() {
                 mainConnectedSlug:   om.mainConnectedSlug || undefined,
                 leaveCheck:          om.leaveCheck || undefined,
                 singlePage:          om.singlePage || undefined,
-                slugEntityId:        om.slugEntityId || undefined,
+                connectedType:       om.connectedType,
             },
         );
     };
@@ -759,10 +673,9 @@ export default function PageBuilderPage() {
                         layerWidth={om.layerWidth}
                         mainConnectedSlug={om.mainConnectedSlug}
                         onMainConnectedSlugChange={handleMainConnectedSlugChange}
+                        onConnectedSlugChange={handleConnectedSlugChange}
                         slugOptions={slugOptions}
-                        slugEntityOptions={slugEntityOptions}
-                        slugEntityId={om.slugEntityId}
-                        onSlugEntityIdChange={handleSlugEntityIdChange}
+                        dataEntityOptions={dataEntityOptions}
                         onBuildFromEntity={handleBuildFromEntity}
                         leaveCheck={om.leaveCheck}
                         onLeaveCheckChange={om.setLeaveCheck}
@@ -911,6 +824,8 @@ export default function PageBuilderPage() {
                                                                                                 onChange={w => updateContent(item.id, content.id, w)}
                                                                                                 context={{
                                                                                                     slugOptions,
+                                                                                                    dataEntityOptions,
+                                                                                                    apiInfoOptions,
                                                                                                     pageTemplates: mainLayerTemplates,
                                                                                                     searchWidgets: (collectWidgets(widgetItems, 'search') as SearchWidget[]).map(w => ({ widgetId: w.widgetId, contentKey: w.contentKey })),
                                                                                                     contentWidgets: [
@@ -923,6 +838,11 @@ export default function PageBuilderPage() {
                                                                                                     categoryWidgets: (collectWidgets(widgetItems, 'category') as CategoryWidget[]).map(w => ({ widgetId: w.widgetId, label: w.label, depth: w.depth })),
                                                                                                     maxColSpan: om.isRightDrawer ? 2 : 12,
                                                                                                     slugEntityFields,
+                                                                                                    /* entity/data 연결 모드일 때 "연결 Slug" 라벨을 "연결 Entity"로 표시 + 기본값 자동 설정 */
+                                                                                                    connLabel: (om.connectedType === 'entity' || om.connectedType === 'data') ? '연결 Entity' : undefined,
+                                                                                                    connDefaultSlug: om.mainConnectedSlug,
+                                                                                                    /* entity/data 연결 모드일 때 "연결 Slug" 옵션 소스를 구분 — entity: slugOptions 중 entity 연결분, data: dataEntityOptions */
+                                                                                                    connMode: (om.connectedType === 'entity' || om.connectedType === 'data') ? om.connectedType : undefined,
                                                                                                 }}
                                                                                             />
                                                                                         </div>

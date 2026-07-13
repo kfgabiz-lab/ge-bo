@@ -159,11 +159,11 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 });
             setItems(rows);
         } catch {
-            toast.error('카테고리 목록을 불러오지 못했습니다.');
+            toast.error(t('common.error.load'));
         } finally {
             setLoading(false);
         }
-    }, [isPreview, widget.dbSlug, widget.depth, widget.parentWidgetId, selectedParentId, parentNotSelected]);
+    }, [isPreview, widget.dbSlug, widget.depth, widget.parentWidgetId, selectedParentId, parentNotSelected, t]);
 
     /* 상위 선택값이 바뀔 때마다 재조회 + 선택 초기화 */
     useEffect(() => {
@@ -207,7 +207,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
 
     /* ── 등록 ── */
     const handleCreate = async () => {
-        if (!inputName.trim()) { toast.warning('이름을 입력하세요.'); return; }
+        if (!inputName.trim()) { toast.warning(t('common.validation.name.required')); return; }
         try {
             const dataJson: Record<string, unknown> = {
                 name: inputName.trim(),
@@ -220,21 +220,21 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 dataJson.parentId = selectedParentId;
             }
             await api.post(`/page-data/${widget.dbSlug}`, { dataJson });
-            toast.success('등록되었습니다.');
+            toast.success(t('common.saved'));
             setInputName('');
             setShowInput(false);
             fetchItems();
         } catch {
-            toast.error('등록 중 오류가 발생했습니다.');
+            toast.error(t('common.error.save'));
         }
     };
 
     /* ── 삭제 ── */
     const handleDelete = async (id: number) => {
-        if (!confirm('삭제하시겠습니까?')) return;
+        if (!confirm(t('common.confirm.delete'))) return;
         try {
             await api.delete(`/page-data/${widget.dbSlug}/${id}`);
-            toast.success('삭제되었습니다.');
+            toast.success(t('common.deleted'));
             /* 삭제된 항목이 선택 중이었으면 선택 해제 */
             if (selectedId === id) {
                 setSelectedId(null);
@@ -242,7 +242,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             }
             fetchItems();
         } catch {
-            toast.error('삭제 중 오류가 발생했습니다.');
+            toast.error(t('common.error.delete'));
         }
     };
 
@@ -304,7 +304,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 })
             );
         } catch {
-            toast.error('순번 저장 중 오류가 발생했습니다.');
+            toast.error(t('common.error.sort'));
             fetchItems(); // 실패 시 원래 순서로 복원
         }
     };
@@ -317,7 +317,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
             {/* 헤더: 레이블 + 등록 버튼 */}
             <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200 flex-shrink-0">
                 <span className="text-xs font-semibold text-slate-700">
-                    {widget.labelMsgKey ? t(widget.labelMsgKey) : (widget.label || `카테고리 (depth ${widget.depth})`)}
+                    {widget.labelMsgKey ? t(widget.labelMsgKey) : (widget.label || t('common.category.default_label', { depth: String(widget.depth) }))}
                 </span>
                 {/* 등록 버튼 — preview: 항상 표시 / live 인라인: 상위 선택 후 표시 / live popup·path: 항상 표시 */}
                 {(widget.allowCreate !== false) && (isPreview || !parentNotSelected || widget.createConnType === 'popup' || widget.createConnType === 'path') && (
@@ -326,7 +326,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                             if (isPreview) return;
                             /* 상위 카테고리 미선택 시 validation (depth 2 이상) */
                             if (parentNotSelected) {
-                                toast.warning('상위 카테고리를 선택하세요.');
+                                toast.warning(t('common.category.select_parent_warning'));
                                 return;
                             }
                             /* 연결 타입에 따라 동작 분기 */
@@ -357,7 +357,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                         }`}
                     >
                         <Plus className="w-3.5 h-3.5" />
-                        추가
+                        {t('common.btn.add')}
                     </button>
                 )}
             </div>
@@ -371,7 +371,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                         value={inputName}
                         onChange={e => setInputName(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowInput(false); }}
-                        placeholder="카테고리 이름"
+                        placeholder={t('common.input.name_placeholder')}
                         className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
                     />
                     <button onClick={handleCreate} className="p-1 text-emerald-600 hover:text-emerald-700">
@@ -389,21 +389,21 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                 {/* 상위 미선택 안내 */}
                 {parentNotSelected && (
                     <div className="h-full flex items-center justify-center">
-                        <span className="text-[11px] text-slate-300 italic">상위 카테고리를 선택하세요</span>
+                        <span className="text-[11px] text-slate-300 italic">{t('common.category.select_parent')}</span>
                     </div>
                 )}
 
                 {/* 로딩 */}
                 {!parentNotSelected && loading && (
                     <div className="h-full flex items-center justify-center">
-                        <span className="text-[11px] text-slate-300">불러오는 중...</span>
+                        <span className="text-[11px] text-slate-300">{t('common.loading')}</span>
                     </div>
                 )}
 
                 {/* 항목 없음 */}
                 {!parentNotSelected && !loading && items.length === 0 && (
                     <div className="h-full flex items-center justify-center">
-                        <span className="text-[11px] text-slate-300 italic">항목이 없습니다</span>
+                        <span className="text-[11px] text-slate-300 italic">{t('common.table.no_data')}</span>
                     </div>
                 )}
 
@@ -488,7 +488,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                                             }
                                                         }}
                                                         className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
-                                                        title="수정"
+                                                        title={t('common.btn.edit')}
                                                     >
                                                         <Pencil className="w-3 h-3" />
                                                     </button>
@@ -498,7 +498,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                                     <button
                                                         onClick={e => handleDetail(e, item)}
                                                         className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
-                                                        title="상세"
+                                                        title={t('common.btn.detail')}
                                                     >
                                                         <Eye className="w-3 h-3" />
                                                     </button>
@@ -507,7 +507,7 @@ export function CategoryRenderer({ mode, widget, selectedParentId, onSelect, onP
                                                     <button
                                                         onClick={() => { if (!isPreview) handleDelete(item.id); }}
                                                         className={`p-0.5 transition-colors ${isPreview ? 'pointer-events-none' : ''} ${selectedId === item.id ? 'text-slate-300 hover:text-red-300' : 'text-slate-400 hover:text-red-500'}`}
-                                                        title="삭제"
+                                                        title={t('common.btn.delete')}
                                                     >
                                                         <Trash2 className="w-3 h-3" />
                                                     </button>

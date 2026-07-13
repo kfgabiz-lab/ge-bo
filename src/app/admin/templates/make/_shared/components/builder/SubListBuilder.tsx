@@ -42,8 +42,12 @@ import {
 } from './fields';
 import { ActionsField } from './fields/ActionsField';
 import type { FieldEditValues } from './fields/types';
+import type { SlugOption } from './fields';
 import { createIdGenerator } from '../../utils';
 import type { SubListWidget, SubListColumn, SubListColumnType } from '../renderer/types';
+import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
+import { getConnFieldOptions, resolveEntityId, type ConnMode } from './connFieldOptions';
+import { useEntityFields } from '../../hooks/useEntityFields';
 
 const uid = createIdGenerator('slc');
 
@@ -64,7 +68,18 @@ const SUBLIST_COLUMN_TYPES: FieldTypeItem[] = [
 interface SubListBuilderProps {
     widget: SubListWidget;
     onChange: (w: SubListWidget) => void;
-    slugOptions: { id: number; slug: string; name: string }[];
+    slugOptions: SlugOption[];
+    /** @deprecated 더 이상 SubListBuilder 내부에서 직접 사용하지 않음 — widget.connectedSlug(이 SubList의 연결 Entity) 기준으로
+     *  useEntityFields 훅을 통해 자체적으로 재조회한다(contentEntityFields). CommonBuilderDispatcher 호환을 위해 타입만 유지. */
+    slugEntityFields?: SlugEntityFieldItem[];
+    /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
+    connLabel?: string;
+    /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
+    connDefaultSlug?: string;
+    /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
+    connMode?: ConnMode;
+    /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
+    dataEntityOptions?: SlugOption[];
 }
 
 /* ══════════════════════════════════════════════════════════════ */
@@ -308,7 +323,7 @@ function SortableColumnItem({
 /* ══════════════════════════════════════════ */
 
 function ColumnEditPanel({
-    col, onChange, codeGroups, codeGroupsLoading, slugOptions,
+    col, onChange, codeGroups, codeGroupsLoading, slugOptions, slugEntityFields,
 }: {
     col: SubListColumn;
     onChange: (patch: Partial<SubListColumn>) => void;
@@ -316,6 +331,8 @@ function ColumnEditPanel({
     codeGroupsLoading: boolean;
     /** SLUG 옵션 소스 목록 — select 컬럼의 SLUG 탭 옵션 선택에 사용 */
     slugOptions: { id: number; slug: string; name: string }[];
+    /** Slug Entity 필드 목록 — 있으면 컬럼 Key 입력이 selectbox로 전환됨 (widget 빌더 전용) */
+    slugEntityFields?: SlugEntityFieldItem[];
 }) {
     const values = toFieldValues(col);
     const handleChange = (updates: Partial<FieldEditValues>) =>
@@ -330,6 +347,7 @@ function ColumnEditPanel({
         codeGroupsLoading,
         hideColSpan: true,           // SubList 컬럼은 colSpan 개념 없음 — ColSpan 입력란 숨김
         hideConditionFields: true,   // SubList 렌더러는 동적 조건 미지원 — HIDE/Disable 조건 입력란 숨김
+        slugEntityFields,            // Key 입력 selectbox 전환 (_FieldBase가 자동 처리)
     };
 
     return (
@@ -366,7 +384,17 @@ function ColumnEditPanel({
 /*  메인 컴포넌트                               */
 /* ══════════════════════════════════════════ */
 
-export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilderProps) {
+export function SubListBuilder({ widget, onChange, slugOptions, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] }: SubListBuilderProps) {
+    /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
+    const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
+
+    /* ── 이 컨텐츠(SubList)가 실제로 연결된 Entity 기준 필드 목록 ──
+       widget.connectedSlug(이 SubList 자체의 연결 Entity)가 없으면 위젯 최상위 연결 Entity(connDefaultSlug)로 자연 폴백한다.
+       컬럼 Key selectbox 옵션은 위젯 최상위가 아니라 이 값을 기준으로 구성해야 한다. */
+    const effectiveSlug = widget.connectedSlug || connDefaultSlug;
+    const entityId = resolveEntityId(effectiveSlug, connMode, slugOptions, dataEntityOptions);
+    const contentEntityFields = useEntityFields(entityId);
+
     const { i18nMode } = useBuilderI18nMode();
     const [editingColId, setEditingColId] = useState<string | null>(null);
     const [showPicker, setShowPicker] = useState(false);
@@ -438,11 +466,34 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
                         />
                     </div>
                     <SlugSelectField
-                        value={widget.connectedSlug ?? ''}
+                        value={widget.connectedSlug ?? connDefaultSlug ?? ''}
                         onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
-                        slugOptions={slugOptions}
+                        slugOptions={connFieldOptions.options}
+                        formatDisplay={connFieldOptions.formatDisplay}
+                        label={connLabel}
                     />
                 </div>
+
+                {/* 부모 연결 필드 — 이 SubList가 부모 Form과 다른 Entity에 연결되어 있고(API연동 컨텐츠),
+                    그 Entity의 필드 목록을 조회할 수 있을 때만 노출. 부모 Form 저장 후 생성된 id를
+                    이 필드(자식 Entity의 FK 필드)에 담아 자식 행을 저장한다. */}
+                {contentEntityFields.length > 0 && (
+                    <div>
+                        <label className={LABEL_CLS}>
+                            부모 연결 필드 <span className="text-slate-300 font-normal">(API연동 시 자식 Entity 저장에 사용, 선택)</span>
+                        </label>
+                        <select
+                            value={widget.parentIdField ?? ''}
+                            onChange={e => onChange({ ...widget, parentIdField: e.target.value || undefined })}
+                            className={`${INPUT_CLS} font-mono`}
+                        >
+                            <option value="">— 선택없음 —</option>
+                            {contentEntityFields.filter(f => f.key).map(f => (
+                                <option key={f.key} value={f.key!}>{f.key} ({f.label})</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* title / addButtonLabel */}
                 <div className="grid grid-cols-2 gap-2">
@@ -533,6 +584,8 @@ export function SubListBuilder({ widget, onChange, slugOptions }: SubListBuilder
                                         codeGroupsLoading={codeGroupsLoading}
                                         /* slugOptions: select 컬럼의 SLUG 탭 옵션 소스 선택에 사용 */
                                         slugOptions={slugOptions}
+                                        /* slugEntityFields: 있으면 컬럼 Key 입력이 selectbox로 전환됨 — 이 SubList의 연결 Entity 기준 */
+                                        slugEntityFields={contentEntityFields}
                                     />
                                 </SortableColumnItem>
                             ))}

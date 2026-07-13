@@ -30,9 +30,11 @@ interface ExtraSimpleSelectFieldProps {
     onChange: (updates: Partial<ExtraSimpleSelectFieldValues>) => void;
     codeGroups: CodeGroupDef[];
     codeGroupsLoading: boolean;
+    /** Slug Entity 필드 목록 — 있으면 Key 입력이 selectbox로 전환됨 (widget 빌더 전용) */
+    slugEntityFields?: { key: string | null; label: string }[];
 }
 
-export function ExtraSimpleSelectField({ values, onChange, codeGroups, codeGroupsLoading }: ExtraSimpleSelectFieldProps) {
+export function ExtraSimpleSelectField({ values, onChange, codeGroups, codeGroupsLoading, slugEntityFields }: ExtraSimpleSelectFieldProps) {
     return (
         <div className="space-y-1.5">
             {/* 라벨 | Key | 필수항목 — FieldBase가 다국어 포함 처리 */}
@@ -45,6 +47,7 @@ export function ExtraSimpleSelectField({ values, onChange, codeGroups, codeGroup
                 hideColSpan={true}
                 hideConditionFields={true}
                 required={values.required}
+                slugEntityFields={slugEntityFields}
                 onChange={updates => onChange({
                     ...(updates.label       !== undefined && { label:       updates.label }),
                     ...(updates.labelMsgKey !== undefined && { labelMsgKey: updates.labelMsgKey }),

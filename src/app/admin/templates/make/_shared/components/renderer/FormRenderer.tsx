@@ -83,6 +83,8 @@ interface FormRendererProps {
     onRemoveExisting?: (fieldId: string, fileId: number) => void;
     /** _fetchedRel{id} 원본 데이터 — TABLE과 동일한 dot-notation rowData 구성용 */
     fetchRelData?: Record<string, unknown>;
+    /** entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
+    isEntity?: boolean;
 }
 
 export function FormRenderer({
@@ -110,6 +112,7 @@ export function FormRenderer({
     onFileChange,
     onRemoveExisting,
     fetchRelData,
+    isEntity,
 }: FormRendererProps) {
     const isPreview = mode === 'preview';
     const { t } = useI18n();
@@ -311,6 +314,7 @@ export function FormRenderer({
                             onRemoveExisting={isPreview ? undefined : fileId => onRemoveExisting?.(f.id, fileId)}
                             forceDisabled={shouldDisable(f)}
                             rowData={rowData}
+                            isEntity={isEntity}
                         />
                     </div>
                 </div>

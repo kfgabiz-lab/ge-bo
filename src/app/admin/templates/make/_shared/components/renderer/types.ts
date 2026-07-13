@@ -225,6 +225,14 @@ export interface SubListWidget {
     required?: boolean;           // 필수 여부 (true: 행이 1개 이상 있어야 저장 가능)
     showBorder?: boolean;         // 테두리 표시 여부 (기본 true)
     columns: SubListColumn[];     // 컬럼 설정 목록
+    /**
+     * 부모 연결 필드 — 이 SubList가 API연동(connType='api') 컨텐츠로 부모 Form과 함께 선택되고
+     * 부모 Form과 다른 connectedSlug(다른 Entity)에 연결된 경우에만 의미가 있다.
+     * 부모 Form 저장 후 생성/수정된 id를 이 SubList 자신(자식 Entity)의 어느 필드에 담아 저장할지
+     * 지정한다(예: 자식 Entity의 FK 필드 key). 빌더에서 이 SubList의 연결 Entity 필드 목록 중 선택.
+     * 값이 없으면 런타임(useWidgetPageState.handleApiCall)이 이 SubList를 저장하지 않고 경고를 띄운다.
+     */
+    parentIdField?: string;
 }
 
 /** 다중선택 항목별 추가 입력 필드 타입 (FieldRenderer 재사용 대상 타입만) */
@@ -271,7 +279,7 @@ export interface MultiSelectWidget {
      *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
     sourceFilter?: string;
     /** 저장 시 연결되는 slug (연결 slug) */
-    connectedSlug: string;
+    connectedSlug?: string;
     /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
     labelFields: string;
     placeholder?: string;

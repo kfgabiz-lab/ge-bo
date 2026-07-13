@@ -23,6 +23,10 @@ export interface SlugEntityItem {
     active: boolean;
     fieldCount: number;
     fields: SlugEntityFieldItem[];
+    /** 마스터(부모) Entity ID — 없으면 독립 Entity */
+    parentEntityId: number | null;
+    /** 마스터(부모) Entity slug — 화면 표시용 */
+    parentEntitySlug: string | null;
     createdBy: string;
     createdAt: string;
     updatedBy: string;
@@ -41,13 +45,15 @@ export interface SlugEntityFieldItem {
     codeGroupCode?: string | null;
     /** 기본값 */
     defaultValue?: string | null;
+    /** 연동 대상 Slug Entity ID — columnType === 'ENTITY_REF'일 때 이 필드가 어느 Slug Entity를 참조하는지 가리키는 단일 참조값 (실제 레코드 id 배열과는 별개의 메타 정보) */
+    connectedEntityId?: number | null;
     isNullable: boolean;
     description: string | null;
     sortOrder: number;
 }
 
 /* ── 빈 등록 폼 초기값 ── */
-const EMPTY_FORM = { slug: '', name: '', description: '', active: true };
+const EMPTY_FORM = { slug: '', name: '', tableName: '', description: '', active: true, parentEntityId: '' };
 
 /* ── 스타일 상수 ── */
 const ITEM_SELECTED = 'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all bg-slate-900 text-white';
@@ -65,6 +71,9 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
     const [entities, setEntities] = useState<SlugEntityItem[]>([]);
     const [search, setSearch]     = useState('');
     const [loading, setLoading]   = useState(false);
+
+    /* 마스터 Entity 선택 옵션 — 등록 모달용 (신규 등록이라 자기 자신 제외 불필요) */
+    const [entityOptions, setEntityOptions] = useState<{ id: number; slug: string; name: string }[]>([]);
 
     /* 등록 모달 상태 */
     const [modalOpen, setModalOpen] = useState(false);
@@ -87,6 +96,13 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
     }, []);
 
     useEffect(() => { fetchList(); }, [fetchList]);
+
+    /* 마스터 Entity 옵션 로드 */
+    useEffect(() => {
+        api.get<{ id: number; slug: string; name: string }[]>('/slug-entity/active')
+            .then(res => setEntityOptions(res.data || []))
+            .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
+    }, []);
 
     /* 클라이언트 필터 */
     const filtered = entities.filter(e =>
@@ -113,15 +129,21 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
         setSaving(true);
         try {
             const res = await api.post<SlugEntityItem>('/slug-entity', {
-                slug:        form.slug.trim(),
-                name:        form.name.trim(),
-                description: form.description.trim() || null,
-                active:      form.active,
+                slug:           form.slug.trim(),
+                name:           form.name.trim(),
+                tableName:      form.tableName.trim() || null,
+                description:    form.description.trim() || null,
+                active:         form.active,
+                parentEntityId: form.parentEntityId ? Number(form.parentEntityId) : null,
             });
             toast.success('등록되었습니다.');
             setModalOpen(false);
             setForm(EMPTY_FORM);
             await fetchList();
+            /* 신규 등록된 entity도 다음 등록 시 마스터 Entity 옵션에 즉시 노출되도록 갱신 */
+            api.get<{ id: number; slug: string; name: string }[]>('/slug-entity/active')
+                .then(r => setEntityOptions(r.data || []))
+                .catch(() => {});
             /* 등록 후 상세 조회로 fields 포함된 entity 전달 */
             const detail = await api.get<SlugEntityItem>(`/slug-entity/${res.data.id}`);
             onCreated(detail.data);
@@ -252,6 +274,39 @@ export function EntityList({ selectedId, onSelect, onCreated }: Props) {
                                     placeholder="예: 회원"
                                     className={INPUT_CLS}
                                 />
+                            </div>
+
+                            {/* DB 테이블명 (선택) */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                                    DB 테이블명
+                                    <span className="ml-2 text-[10px] font-normal text-slate-400">(선택, entity 생성 기능에 사용)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={form.tableName}
+                                    onChange={e => setForm(f => ({ ...f, tableName: e.target.value }))}
+                                    placeholder="예: tbl_member"
+                                    className={`${INPUT_CLS} font-mono`}
+                                />
+                            </div>
+
+                            {/* 마스터 Entity — 선택 시 저장 후 자식 필드 목록에 참조 필드가 자동 추가됨 */}
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                                    마스터 Entity
+                                    <span className="ml-2 text-[10px] font-normal text-slate-400">(선택, 이 entity가 참조하는 부모 entity)</span>
+                                </label>
+                                <select
+                                    value={form.parentEntityId}
+                                    onChange={e => setForm(f => ({ ...f, parentEntityId: e.target.value }))}
+                                    className={`${INPUT_CLS} cursor-pointer`}
+                                >
+                                    <option value="">— 없음 (독립 entity) —</option>
+                                    {entityOptions.map(o => (
+                                        <option key={o.id} value={o.id}>{o.slug} ({o.name})</option>
+                                    ))}
+                                </select>
                             </div>
 
                             {/* 설명 */}

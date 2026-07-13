@@ -114,8 +114,8 @@ export function TableCellRenderer({
             /* preview: 홀/짝 행 교번으로 true/false 샘플 표시 */
             const boolVal = isPreview ? (rowIndex % 2 === 0) : Boolean(value);
             const boolText = boolVal
-                ? (col.trueTextMsgKey ? t(col.trueTextMsgKey) : (col.trueText || '공개'))
-                : (col.falseTextMsgKey ? t(col.falseTextMsgKey) : (col.falseText || '비공개'));
+                ? (col.trueTextMsgKey ? t(col.trueTextMsgKey) : (col.trueText || t('common.label.public')))
+                : (col.falseTextMsgKey ? t(col.falseTextMsgKey) : (col.falseText || t('common.label.private')));
             return (
                 <span className={`text-sm truncate block ${boolVal ? 'text-emerald-600 font-medium' : 'text-slate-400'}`} title={boolText}>
                     {boolText}
@@ -137,7 +137,7 @@ export function TableCellRenderer({
                             disabled={isPreview}
                             onClick={!isPreview ? () => handlers?.onEdit?.(row) : undefined}
                             className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                            title="수정"
+                            title={t('common.btn.edit')}
                         >
                             <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -148,7 +148,7 @@ export function TableCellRenderer({
                             disabled={isPreview}
                             onClick={!isPreview ? () => handlers?.onDelete?.(row._id as number) : undefined}
                             className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                            title="삭제"
+                            title={t('common.btn.delete')}
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -160,7 +160,7 @@ export function TableCellRenderer({
                             disabled={isPreview}
                             onClick={!isPreview ? () => handlers?.onCopy?.(row) : undefined}
                             className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                            title="복사"
+                            title={t('common.btn.copy')}
                         >
                             <CopyPlus className="w-3.5 h-3.5" />
                         </button>
@@ -186,7 +186,7 @@ export function TableCellRenderer({
                         onClick={!isPreview ? () => handlers?.onButtonClick?.(col, row) : undefined}
                         className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${colorDef.cls}`}
                     >
-                        {col.buttonLabel || '버튼'}
+                        {col.buttonLabel || t('common.btn.default')}
                     </button>
                 </div>
             );
@@ -244,9 +244,9 @@ export function TableCellRenderer({
         /* ── dateRangeStatus ── */
         case 'dateRangeStatus': {
             /* 다국어 키 우선, 없으면 직접 텍스트, 없으면 기본값 */
-            const beforeLabel  = col.beforeTextMsgKey  ? t(col.beforeTextMsgKey)  : (col.beforeText  || '예정');
-            const inRangeLabel = col.inRangeTextMsgKey ? t(col.inRangeTextMsgKey) : (col.inRangeText || '진행중');
-            const afterLabel   = col.afterTextMsgKey   ? t(col.afterTextMsgKey)   : (col.afterText   || '종료');
+            const beforeLabel  = col.beforeTextMsgKey  ? t(col.beforeTextMsgKey)  : (col.beforeText  || t('common.status.before'));
+            const inRangeLabel = col.inRangeTextMsgKey ? t(col.inRangeTextMsgKey) : (col.inRangeText || t('common.status.inrange'));
+            const afterLabel   = col.afterTextMsgKey   ? t(col.afterTextMsgKey)   : (col.afterText   || t('common.status.after'));
             /* preview: 고정 샘플 텍스트 순환 표시 */
             if (isPreview) {
                 const previewTexts = [beforeLabel, inRangeLabel, afterLabel];
@@ -316,7 +316,7 @@ export function TableCellRenderer({
             /* ── 라디오 ── */
             if (editType === 'radio') {
                 const currentVal = isPreview ? (resolvedOpts[rowIndex % Math.max(resolvedOpts.length, 1)]?.value ?? '') : String(value ?? '');
-                if (!resolvedOpts.length) return <span className="text-slate-400 text-xs">옵션 없음</span>;
+                if (!resolvedOpts.length) return <span className="text-slate-400 text-xs">{t('common.table.no_option')}</span>;
                 return (
                     <div className="flex items-center gap-2 flex-wrap">
                         {resolvedOpts.map(opt => (

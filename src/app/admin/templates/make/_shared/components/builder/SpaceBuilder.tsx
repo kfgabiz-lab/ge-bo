@@ -34,6 +34,7 @@ import { createIdGenerator } from '../../utils';
 import { TextareaField, ActionButtonField } from './fields';
 import type { ContentWidgetOption } from './fields/ActionButtonField';
 import type { SlugOption } from './fields/SlugSelectField';
+import type { ApiInfoOption } from './fields/ApiInfoSelectField';
 import type { SpaceWidget } from '../renderer/types';
 import type { SearchFieldConfig, TemplateItem } from '../../types';
 import type { FieldEditValues } from './fields/types';
@@ -87,6 +88,8 @@ interface SpaceBuilderProps {
     maxColSpan?: number;
     /** slug 레지스트리 목록 — 데이터저장 연결slug 선택용 */
     slugOptions?: SlugOption[];
+    /** API 정보 목록 — ActionButton API 연동 연결용 */
+    apiInfoOptions?: ApiInfoOption[];
 }
 
 /** 
@@ -181,6 +184,7 @@ export function SpaceBuilder({
     actionButtonOnly = false,
     maxColSpan = 12,
     slugOptions = [],
+    apiInfoOptions = [],
 }: SpaceBuilderProps) {
     /* formWidgets를 contentWidgets 형식으로 변환 (하위 호환) */
     const resolvedContentWidgets: ContentWidgetOption[] = contentWidgets.length > 0
@@ -309,6 +313,7 @@ export function SpaceBuilder({
                                         pageTemplates={pageTemplates}
                                         contentWidgets={resolvedContentWidgets}
                                         slugOptions={slugOptions}
+                                        apiInfoOptions={apiInfoOptions}
                                     />
                                 )}
                             </SortableSpaceItem>
