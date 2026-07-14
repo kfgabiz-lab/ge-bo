@@ -138,13 +138,27 @@ export interface FieldEditValues {
     data?: string;
     /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 (text 타입 전용) */
     fetchDisplayMode?: 'ONE_LINE' | 'MULTI_LINE';
-    maxDepth?: 1 | 2 | 3 | 4;       // 표시할 최대 depth 수
+    maxDepth?: 1 | 2 | 3 | 4;       // 표시할 depth 개수 — activeDepths 미설정 시 [1..maxDepth] 파생용 레거시 필드(삭제 금지)
+    /** 화면에 노출할 depth 번호 배열 — 오름차순 연속 정수(예: [1,2,3], [2,3,4]).
+     *  미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth]를 파생해 기존 동작을 그대로 유지한다. */
+    activeDepths?: number[];
     depthLabels?: string[];          // depth별 라벨 배열
     depthLabelMsgKeys?: string[];    // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];     // depth별 value 경로 (예: 'id', 'dataJson.id')
     depthTextFields?: string[];      // depth별 표시 텍스트 경로 (예: 'name', 'dataJson.name')
     /** depth별 옵션 필터 조건식 — evalConditionExpr 문법 재사용, resolveAccessor(dataJson, key) 기준 raw item 단계에서 필터 */
     depthFilters?: string[];
+    /** depth별 상위(부모) ID 경로 (예: ['', 'category.parentId', 'product.parentId']).
+     *  옵션 사전필터(optionFilter*)의 상향 교집합 매핑에도 재사용된다 */
+    depthParentFields?: string[];
+    /** 옵션 사전필터 — 연동 slug-relation ID (FETCH 타입만 선택 가능) */
+    optionFilterRelationSlugId?: number;
+    /** 옵션 사전필터 — 필터를 적용할 카테고리 depth 번호 */
+    optionFilterDepth?: number;
+    /** 옵션 사전필터 — optionFilterDepth 레코드의 dataJson에서 부모(카테고리) id를 읽는 경로 */
+    optionFilterParentField?: string;
+    /** 옵션 사전필터 — optionFilterDepth 레코드를 걸러낼 조건식 (evalConditionExpr 문법) */
+    optionFilterExpr?: string;
     /* ── time 전용 ── */
     defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
     timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
@@ -188,6 +202,9 @@ export interface FieldEditValues {
     optionOrderDir?: 'ASC' | 'DESC';
     /** SLUG 옵션 필터 조건식 — evalConditionExpr 문법 재사용, flattenPageDataItem 기준 flat key로 평가 */
     optionFilter?: string;
+    /* ── address 전용 ── */
+    /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
+    addressLanguage?: 'ko' | 'en';
 }
 
 /**

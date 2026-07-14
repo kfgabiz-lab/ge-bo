@@ -38,7 +38,7 @@ import {
     InputField, TextField, SelectField, DateField, DateRangeField,
     RadioField, CheckboxField, ButtonField,
     EditorField, FileField, ImageField, VideoField, MediaField,
-    FormTextareaField, TimeField,
+    FormTextareaField, TimeField, AddressField,
     SlugSelectField,
 } from './fields';
 import type { FieldEditValues, SlugOption } from './fields';
@@ -96,6 +96,7 @@ const FORM_FIELD_TYPES: FieldTypeItem[] = [
     { type: 'media',          label: '미디어',           desc: '이미지·동영상 통합',        defaultColSpan: 2 },
     { type: 'textarea',       label: 'Textarea',         desc: '여러 줄 텍스트 입력',      defaultColSpan: 2 },
     { type: 'time',           label: 'Time',             desc: '시간 선택 (HH:MM)',        defaultColSpan: 1 },
+    { type: 'address',        label: '주소검색',          desc: '주소 자동완성 (위도/경도 저장)', defaultColSpan: 6 },
     { type: 'hidden',         label: 'Hidden',           desc: '숨김 필드 (KEY + 기본값)', defaultColSpan: 1 },
 ];
 
@@ -366,6 +367,8 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, co
                 data:               f.data,
                 /* ── 다건 매칭 표시 방식 (text 전용) ── */
                 fetchDisplayMode:   f.fetchDisplayMode,
+                /* ── address 전용 ── */
+                addressLanguage:    f.addressLanguage,
             } satisfies FieldEditValues,
             onChange: (updates: Partial<FieldEditValues>) =>
                 updateField(f.id, updates as Partial<FormFieldItem>),
@@ -397,6 +400,7 @@ export function FormBuilder({ widget, onChange, slugOptions, maxColSpan = 12, co
             case 'video':     return <VideoField {...props} />;
             case 'media':     return <MediaField {...props} />;
             case 'time':      return <TimeField {...props} />;
+            case 'address':   return <AddressField {...props} />;
             case 'textarea':  return <FormTextareaField {...props} />;
             /* hidden: KEY(fieldKey) + VALUE(defaultValue) 한 줄 배치 */
             case 'hidden':

@@ -226,11 +226,13 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             /* category 초기값 */
             ...(type === 'category' && {
                 maxDepth: 1,
+                activeDepths: [1],
                 depthLabels: [],
                 depthLabelMsgKeys: [],
                 depthValueFields: [],
                 depthTextFields: [],
                 depthFilters: [],
+                depthParentFields: [],
                 dbSlug: '',
             }),
         });
@@ -268,7 +270,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             defaultDateOffset, defaultDate, disablePast, defaultToday,
             defaultStartDateOffset, defaultStartDate, disableStartPast, defaultStartToday,
             defaultEndDateOffset, defaultEndDate, disableEndPast, defaultEndToday,
-            dbSlug, relationSlugId, maxDepth, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields, depthFilters,
+            dbSlug, relationSlugId, maxDepth, activeDepths, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields, depthFilters, depthParentFields,
+            optionFilterRelationSlugId, optionFilterDepth, optionFilterParentField, optionFilterExpr,
             linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
             hideCondition, disableCondition,
             rangeSubType, dateSubType, singleDateRange,
@@ -331,11 +334,18 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             dbSlug:            pendingType === 'category' ? (dbSlug || undefined) : undefined,
             relationSlugId:    pendingType === 'category' ? (relationSlugId || undefined) : undefined,
             maxDepth:          pendingType === 'category' ? (maxDepth ?? 1) : undefined,
+            activeDepths:      pendingType === 'category' ? (activeDepths?.length ? activeDepths : undefined) : undefined,
             depthLabels:       pendingType === 'category' ? (depthLabels?.length ? depthLabels : undefined) : undefined,
             depthLabelMsgKeys: pendingType === 'category' ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
             depthValueFields:  pendingType === 'category' ? (depthValueFields?.length ? depthValueFields : undefined) : undefined,
             depthTextFields:   pendingType === 'category' ? (depthTextFields?.length ? depthTextFields : undefined) : undefined,
             depthFilters:      pendingType === 'category' ? (depthFilters?.length ? depthFilters : undefined) : undefined,
+            depthParentFields: pendingType === 'category' ? (depthParentFields?.length ? depthParentFields : undefined) : undefined,
+            /* 옵션 사전필터 */
+            optionFilterRelationSlugId: pendingType === 'category' ? (optionFilterRelationSlugId || undefined) : undefined,
+            optionFilterDepth:          pendingType === 'category' ? (optionFilterDepth ?? undefined) : undefined,
+            optionFilterParentField:    pendingType === 'category' ? (optionFilterParentField?.trim() || undefined) : undefined,
+            optionFilterExpr:           pendingType === 'category' ? (optionFilterExpr?.trim() || undefined) : undefined,
             /* dateRangeStatus 전용 */
             linkedDateRangeKey: pendingType === 'dateRangeStatus' ? (linkedDateRangeKey?.trim() || undefined) : undefined,
             beforeText:         pendingType === 'dateRangeStatus' ? (beforeText?.trim() || undefined) : undefined,
@@ -415,13 +425,16 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
             case 'button':           return <ButtonField {...props} />;
             case 'dateRangeStatus':  return <DateRangeStatusSearchField {...props} />;
             case 'category':
-                /* slugOptions, slugRelationOptions는 SearchBuilder 클로저에서 직접 참조 */
+                /* slugOptions, slugRelationOptions는 SearchBuilder 클로저에서 직접 참조
+                   - slugRelationOptions: FILTER 타입만 — "연동 Slug"(relationSlugId, 카테고리 목록 자체 필터링)
+                   - fetchRelationOptions: FETCH 타입만 — "옵션 사전필터"(optionFilterRelationSlugId) */
                 return (
                     <CategoryField
                         {...props}
                         slugOptions={slugOptions}
                         slugOptionsLoading={slugOptionsLoading}
                         slugRelationOptions={slugRelationOptions.filter(r => r.relationDir === 'FILTER')}
+                        fetchRelationOptions={slugRelationOptions.filter(r => r.relationDir === 'FETCH')}
                     />
                 );
             default:               return null;
@@ -556,11 +569,18 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                                                                 dbSlug:            field.dbSlug,
                                                                                 relationSlugId:    field.relationSlugId,
                                                                                 maxDepth:          field.maxDepth,
+                                                                                activeDepths:      field.activeDepths,
                                                                                 depthLabels:       field.depthLabels,
                                                                                 depthLabelMsgKeys: field.depthLabelMsgKeys,
                                                                                 depthValueFields:  field.depthValueFields,
                                                                                 depthTextFields:   field.depthTextFields,
                                                                                 depthFilters:      field.depthFilters,
+                                                                                depthParentFields: field.depthParentFields,
+                                                                                /* 옵션 사전필터 */
+                                                                                optionFilterRelationSlugId: field.optionFilterRelationSlugId,
+                                                                                optionFilterDepth:          field.optionFilterDepth,
+                                                                                optionFilterParentField:    field.optionFilterParentField,
+                                                                                optionFilterExpr:           field.optionFilterExpr,
                                                                                 /* dateRangeStatus 전용 */
                                                                                 linkedDateRangeKey:  field.linkedDateRangeKey,
                                                                                 beforeText:          field.beforeText,

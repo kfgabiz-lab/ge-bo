@@ -183,6 +183,12 @@ async function restoreFormDataFromJson(
         const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[f.fieldKey + '_to'];
         if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
         if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
+      } else if (f.type === 'address') {
+        /* address(주소검색) 복원 — buildDataJson과 대칭: fieldKey/fieldKey_lat/fieldKey_lng 3개
+           flat 키에서 각각 복원한다 (dateRange의 _from/_to 복원과 동일한 패턴) */
+        if (section[f.fieldKey] !== undefined) vals[f.id] = String(section[f.fieldKey] ?? '');
+        if (section[f.fieldKey + '_lat'] !== undefined) vals[f.id + '_lat'] = String(section[f.fieldKey + '_lat'] ?? '');
+        if (section[f.fieldKey + '_lng'] !== undefined) vals[f.id + '_lng'] = String(section[f.fieldKey + '_lng'] ?? '');
       } else if (section[f.fieldKey] !== undefined) {
         const raw = section[f.fieldKey];
         if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');

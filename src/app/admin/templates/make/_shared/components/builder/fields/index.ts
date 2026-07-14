@@ -28,6 +28,7 @@ export { ImageField } from './ImageField';
 export { VideoField } from './VideoField';
 export { MediaField } from './MediaField';
 export { TimeField } from './TimeField';
+export { AddressField } from './AddressField';
 export { ColorField } from './ColorField';
 export { ActionButtonField } from './ActionButtonField';
 export type { ActionButtonFieldProps } from './ActionButtonField';

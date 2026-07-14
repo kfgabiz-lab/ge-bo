@@ -20,7 +20,8 @@ export type SearchFieldType =
     | 'message-key-select' // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
     | 'category'        // 카테고리 계층 검색 (1~4 depth selectbox 연동)
     | 'dateRangeStatus'  // 날짜 범위 상태 필터 (이전/포함/이후 선택)
-    | 'time';            // 시간 선택 (HH:MM, input[type="time"])
+    | 'time'            // 시간 선택 (HH:MM, input[type="time"])
+    | 'address';         // 주소검색 (입력창 + 자동완성 드롭다운, 저장값: AddressFieldValue)
 
 /** date/dateRange 계열 필드의 입력 단위 서브타입 (dateSubType·rangeSubType·linkedRangeSubType 공용) */
 export type DateSubType = 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
@@ -129,8 +130,11 @@ export interface SearchFieldConfig {
     maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
     /* ── category 전용 ── */
     dbSlug?: string;                // 연결할 카테고리 slug (slugOptions 선택)
-    relationSlugId?: number;        // 연동 slug-relation ID
-    maxDepth?: 1 | 2 | 3 | 4;      // 표시할 최대 depth 수
+    relationSlugId?: number;        // 연동 slug-relation ID (FILTER 타입 — 카테고리 목록 자체를 필터링)
+    maxDepth?: 1 | 2 | 3 | 4;      // 표시할 depth 개수 — activeDepths 미설정 시 [1..maxDepth] 파생용 레거시 필드(삭제 금지)
+    /** 화면에 노출할 depth 번호 배열 — 오름차순 연속 정수(예: [1,2,3], [2,3,4]).
+     *  미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth]를 파생해 기존 동작을 그대로 유지한다. */
+    activeDepths?: number[];
     depthLabels?: string[];         // depth별 라벨 배열 (예: ['대분류', '중분류', '소분류'])
     depthLabelMsgKeys?: string[];   // depth별 라벨 다국어 키 배열
     depthValueFields?: string[];    // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
@@ -138,6 +142,20 @@ export interface SearchFieldConfig {
     /** depth별 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
      *  raw item(dataJson) 단계에서 resolveAccessor 기준으로 평가, 없으면 필터 없이 전체 표시 */
     depthFilters?: string[];
+    /** depth별 상위(부모) ID 경로. 선택한 항목의 dataJson에서 이 경로로 부모 id를 읽는다
+     *  (예: ['', 'category.parentId', 'product.parentId']). depth1(최상위 가시 depth)은 부모가 없으므로 빈 문자열.
+     *  옵션 사전필터(optionFilter*)의 상향 교집합 매핑에도 재사용된다 */
+    depthParentFields?: string[];
+    /** 옵션 사전필터 — 연동 slug-relation ID (FETCH 타입만 선택 가능). 필터 대상 depth 레코드에
+     *  이 relation이 FETCH로 병합해 준 `_fetchedRel{id}` 값을 optionFilterExpr에서 참조할 때 사용 */
+    optionFilterRelationSlugId?: number;
+    /** 옵션 사전필터 — 필터를 적용할 카테고리 depth 번호. 최심 가시 depth와 같으면 그 depth 자신을,
+     *  최심 가시 depth보다 1 깊으면(예: 리프 depth) optionFilterParentField로 부모 id를 추출해 필터링한다 */
+    optionFilterDepth?: number;
+    /** 옵션 사전필터 — optionFilterDepth 레코드의 dataJson에서 부모(카테고리) id를 읽는 경로 (예: 'product.parentId') */
+    optionFilterParentField?: string;
+    /** 옵션 사전필터 — optionFilterDepth 레코드를 걸러낼 조건식 (evalConditionExpr 문법, 예: `_fetchedRel11=P`) */
+    optionFilterExpr?: string;
     /* ── time 전용 ── */
     defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
     timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
@@ -189,6 +207,20 @@ export interface SearchFieldConfig {
     /** SLUG 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
      *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
     optionFilter?: string;
+    /* ── address 전용 ── */
+    /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
+    addressLanguage?: 'ko' | 'en';
+}
+
+/**
+ * address(주소검색) 필드 저장값 구조
+ * - 화면에는 address(주소 텍스트)만 노출되고, lat/lng는 내부 데이터로만 저장된다 (비노출).
+ * - STEP2(퍼블리싱) 시점에는 실제 좌표 연동이 없으므로 값 구조 문서화 목적으로만 사용한다.
+ */
+export interface AddressFieldValue {
+    address: string;
+    lat: number;
+    lng: number;
 }
 
 /** 검색폼 행 설정 */

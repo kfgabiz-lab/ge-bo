@@ -307,6 +307,13 @@ export function FormRenderer({
                             valueTo={(f.type === 'dateRange' || f.type === 'yearMonthRange') ? (values?.[f.id + '_to'] ?? '') : undefined}
                             onFromChange={(f.type === 'dateRange' || f.type === 'yearMonthRange') ? (isPreview ? undefined : v => handleFieldChange(f.id + '_from', v)) : undefined}
                             onToChange={(f.type === 'dateRange' || f.type === 'yearMonthRange') ? (isPreview ? undefined : v => handleFieldChange(f.id + '_to', v)) : undefined}
+                            /* address 전용: Places 후보 선택 시 주소+위도+경도 3값을 fieldId/_lat/_lng 3키로 한 번에 저장
+                               (dateRange가 _from/_to 2키로 나눠 저장하는 것과 동일한 flat key 패턴) */
+                            onAddressSelect={(f.type === 'address' && !isPreview) ? (address, lat, lng) => {
+                                handleFieldChange(f.id, address);
+                                handleFieldChange(f.id + '_lat', String(lat));
+                                handleFieldChange(f.id + '_lng', String(lng));
+                            } : undefined}
                             fileList={fileValues?.[f.id]}
                             existingFileMeta={existingFileMeta?.[f.id]}
                             imgBlobUrls={imgBlobUrls}

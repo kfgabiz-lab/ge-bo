@@ -39,7 +39,8 @@ const fmtSize = (bytes: number) =>
     bytes >= 1024 * 1024
         ? `${(bytes / 1024 / 1024).toFixed(1)}MB`
         : `${Math.round(bytes / 1024)}KB`;
-import { parseOpt, flattenPageDataItem, evalColumnDataExpr, evalConditionExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel } from '../../utils';
+import { parseOpt, flattenPageDataItem, evalColumnDataExpr, evalConditionExpr, formatFetchedRelValue, formatNowBySubType, resolveCodeLabel, debounce } from '../../utils';
+import { searchAddressPredictions, getAddressDetail, type AddressPrediction } from '../../utils/googlePlaces';
 import type { RendererMode } from './types';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -144,6 +145,10 @@ interface FieldRendererProps {
     onFromChange?: (v: string) => void;
     /** dateRange 전용: 종료일 변경 핸들러 */
     onToChange?: (v: string) => void;
+    /** address 전용: Places 후보 선택 시 주소+위도+경도를 한 번에 전달하는 배치 콜백
+     *  (dateRange가 onFromChange/onToChange 두 개로 나눠 받는 것과 동일한 이유 —
+     *   3값이 후보 선택 한 번에 동시에 확정되므로 단일 onChange로는 표현이 안 됨) */
+    onAddressSelect?: (address: string, lat: number, lng: number) => void;
     codeGroups?: CodeGroupDef[];
     /** action-button 클릭 시 호출 (SpaceRenderer 등에서 주입) */
     onButtonClick?: () => void;
@@ -496,6 +501,131 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
 }
 
 /**
+ * AddressAutocompleteInput — 주소검색 자동완성 입력 (live 모드 전용)
+ *
+ * 입력할 때마다(디바운스 300ms) Google Places 저수준 검색 API로 후보를 조회하여
+ * 바로 위 AutocompleteInput과 동일한 PortalDropdown 골격으로 목록을 보여준다
+ * (preview 단계에서 만든 UI와 동일한 모양을 live에서도 유지하기 위함).
+ * 후보 선택 시 상세정보(좌표)까지 조회한 뒤 onAddressSelect(address, lat, lng)를
+ * 한 번에 호출한다 — dateRange의 onFromChange/onToChange처럼 여러 값을 동시에
+ * 상위로 전달하는 배치 콜백 패턴.
+ *
+ * 사용법:
+ *   <AddressAutocompleteInput value={value} onAddressSelect={(addr, lat, lng) => ...} />
+ */
+interface AddressAutocompleteInputProps {
+    /** 현재 저장된 주소 텍스트 */
+    value: string;
+    /** 후보 선택 시 주소+위도+경도를 한 번에 전달 */
+    onAddressSelect?: (address: string, lat: number, lng: number) => void;
+    placeholder?: string;
+    isDisabled?: boolean;
+    isReadOnly?: boolean;
+    /** 검색 결과 언어 — 필드 설정 addressLanguage 값을 그대로 전달받는다 (기본: 'en') */
+    language: 'ko' | 'en';
+}
+
+function AddressAutocompleteInput({ value, onAddressSelect, placeholder, isDisabled, isReadOnly, language }: AddressAutocompleteInputProps) {
+    const { t } = useI18n();
+
+    /* 입력창에 보이는 텍스트 — 선택 전에는 타이핑 중인 검색어, 선택 후에는 저장된 주소 */
+    const [text, setText] = useState(value);
+    const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    /* 상세정보(좌표) 조회 중에는 중복 클릭 방지 */
+    const [isResolving, setIsResolving] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    /* 외부(초기 데이터 복원 등)에서 value가 바뀌면 입력창 텍스트를 동기화 */
+    useEffect(() => {
+        setText(value);
+    }, [value]);
+
+    /* 디바운스된 검색 함수 — 컴포넌트 인스턴스당 한 번만 생성 */
+    const debouncedSearch = useMemo(
+        () => debounce(async (query: string) => {
+            setIsSearching(true);
+            const results = await searchAddressPredictions(query, language);
+            setPredictions(results);
+            setIsSearching(false);
+        }, 300),
+        [language],
+    );
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const next = e.target.value;
+        setText(next);
+        setIsOpen(true);
+        if (next.trim()) {
+            debouncedSearch(next);
+        } else {
+            setPredictions([]);
+        }
+    };
+
+    /* 후보 선택 → 상세정보(좌표) 조회 후 3값(주소+위도+경도)을 한 번에 상위로 전달 */
+    const handleSelect = async (prediction: AddressPrediction) => {
+        setIsOpen(false);
+        setIsResolving(true);
+        const detail = await getAddressDetail(prediction.placeId, language);
+        setIsResolving(false);
+        if (!detail) {
+            toast.error('주소 상세정보를 가져오지 못했습니다.');
+            return;
+        }
+        setText(detail.address);
+        onAddressSelect?.(detail.address, detail.lat, detail.lng);
+    };
+
+    const readonlyCls = isReadOnly ? ' bg-slate-50 text-slate-500 cursor-default' : '';
+
+    return (
+        <div className="relative">
+            <input
+                ref={inputRef}
+                type="text"
+                disabled={isDisabled}
+                readOnly={isReadOnly}
+                placeholder={placeholder}
+                className={`${inputCls}${readonlyCls}`}
+                value={text}
+                onFocus={() => { if (!isReadOnly) setIsOpen(true); }}
+                onChange={isReadOnly ? undefined : handleInputChange}
+            />
+            {/* 드롭다운 옵션 목록 — select autocomplete(AutocompleteInput)와 동일한 PortalDropdown 골격 재사용 */}
+            <PortalDropdown
+                open={isOpen && !isReadOnly}
+                anchorRef={inputRef}
+                onOutsideClick={() => setIsOpen(false)}
+                className="bg-white border border-slate-200 rounded-md shadow-lg"
+            >
+                <ul className="max-h-48 overflow-y-auto py-1">
+                    {isSearching || isResolving ? (
+                        <li className="px-3 py-2 text-sm text-slate-400 italic">검색 중...</li>
+                    ) : predictions.length > 0 ? (
+                        predictions.map(p => (
+                            <li key={p.placeId}>
+                                <button
+                                    type="button"
+                                    /* mousedown: input의 blur보다 먼저 발화하여 클릭 누락 방지 */
+                                    onMouseDown={() => handleSelect(p)}
+                                    className="w-full px-3 py-2 text-sm text-slate-700 text-left hover:bg-slate-50 cursor-pointer"
+                                >
+                                    {p.description}
+                                </button>
+                            </li>
+                        ))
+                    ) : (
+                        <li className="px-3 py-2 text-sm text-slate-400 italic">{t('common.input.no_match')}</li>
+                    )}
+                </ul>
+            </PortalDropdown>
+        </div>
+    );
+}
+
+/**
  * optionFilter 조건식의 필드 리졸버 — SlugOptionSelect / SlugAutocompleteInput 공용
  *
  * - "$fieldKey" 형식: 같은 Form/Search 위젯 내 **다른 필드의 현재 선택값**(rowData)만 참조한다.
@@ -686,6 +816,7 @@ export function FieldRenderer({
     valueTo,
     onFromChange,
     onToChange,
+    onAddressSelect,
     codeGroups = [],
     onButtonClick,
     fileList,
@@ -2164,6 +2295,57 @@ export function FieldRenderer({
                         </label>
                     ))}
                 </div>
+            );
+        }
+
+        /* ── address — 주소검색. preview는 목데이터 드롭다운(STEP2), live는 Google Places 저수준 검색
+           API 연동(AddressAutocompleteInput, STEP3) — 두 모드 모두 동일한 시각 UI를 유지한다 ── */
+        case 'address': {
+            const addressPlaceholder = field.placeholderMsgKey
+                ? t(field.placeholderMsgKey)
+                : (field.placeholder || t('common.input.placeholder'));
+
+            /* preview 모드 — select의 autocomplete preview 분기와 동일한 패턴으로,
+               드롭다운을 항상 펼쳐서 목데이터(field.options)로 UI 모양만 확인 가능하게 함 */
+            if (isPreview) {
+                return (
+                    <div className="relative">
+                        <input
+                            type="text"
+                            disabled={isDisabled}
+                            placeholder={addressPlaceholder}
+                            className={inputCls}
+                            defaultValue=""
+                        />
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg">
+                            <ul className="max-h-48 overflow-y-auto py-1">
+                                {opts.map(opt => {
+                                    const { text } = parseOpt(opt);
+                                    return (
+                                        <li key={opt}>
+                                            <div className="px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-default">
+                                                {t(text)}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                );
+            }
+
+            /* live 모드 — Google Places 저수준 검색 API로 후보를 조회하고, 선택 시
+               onAddressSelect(address, lat, lng)로 3값을 한 번에 상위(FormRenderer)에 전달 */
+            return (
+                <AddressAutocompleteInput
+                    value={value}
+                    onAddressSelect={onAddressSelect}
+                    placeholder={addressPlaceholder}
+                    isDisabled={isDisabled}
+                    isReadOnly={isReadOnly}
+                    language={field.addressLanguage ?? 'en'}
+                />
             );
         }
 

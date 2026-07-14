@@ -48,6 +48,21 @@ function inferDateSubType(val: string): DateSubType | null {
 }
 
 /**
+ * 디바운스 — 연속 호출 중 마지막 호출 후 delay(ms)가 지나야 실제 fn을 실행
+ * - 주소검색(Places API)처럼 타이핑마다 API를 호출하면 과도한 호출이 발생하는 곳에서 사용
+ * @example
+ * const debounced = debounce((q: string) => search(q), 300);
+ * debounced('서울'); // 300ms 안에 또 호출되면 이전 예약은 취소되고 새로 다시 300ms 대기
+ */
+export function debounce<Args extends unknown[]>(fn: (...args: Args) => void, delay: number): (...args: Args) => void {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    return (...args: Args) => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
+/**
  * "텍스트:값" 형식의 옵션 문자열 파싱
  * @example parseOpt("전체:all") // { text: "전체", value: "all" }
  */
@@ -1116,6 +1131,13 @@ export function buildDataJson(
                         section[key + '_from'] = rawValues[f.id + '_from'] ?? '';
                         section[key + '_to'] = rawValues[f.id + '_to'] ?? '';
                     }
+                } else if (f.type === 'address') {
+                    /* address(주소검색) 저장 키 — dateRange의 _from/_to 분리저장 패턴과 동일하게
+                       주소 텍스트 + 위도 + 경도를 flat 3키로 저장한다 (types.ts AddressFieldValue 참조).
+                       위도/경도는 number 타입으로 저장하기 위해 변환하고, 값이 없으면 0으로 저장 */
+                    section[key] = rawValues[f.id] ?? '';
+                    section[key + '_lat'] = Number(rawValues[f.id + '_lat']) || 0;
+                    section[key + '_lng'] = Number(rawValues[f.id + '_lng']) || 0;
                 } else {
                     section[key] = rawValues[f.id] ?? '';
                 }

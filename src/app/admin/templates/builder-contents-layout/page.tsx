@@ -297,6 +297,13 @@ const SAMPLE_FORM: FormWidget = {
             id: 'ff15', type: 'color', label: '색상',         colSpan: 12, rowSpan: 1,
             options: ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6b7280'],
         },
+        {
+            // 주소검색 — STEP2 퍼블리싱: 목데이터(샘플 주소 3개)로 입력창+드롭다운 UI만 확인.
+            // 저장값은 { address, lat, lng } 구조지만 위도/경도는 화면에 노출하지 않는다 (types.ts AddressFieldValue 참조).
+            id: 'ff21', type: 'address', label: '주소검색', colSpan: 6, rowSpan: 1,
+            placeholder: '주소를 검색하세요',
+            options: ['서울특별시 강남구 테헤란로 123', '경기도 성남시 분당구 판교역로 235', '부산광역시 해운대구 마린시티2로 33'],
+        },
     ],
 };
 
@@ -435,7 +442,7 @@ const SAMPLE_TAB: TabWidget = {
             id: 'tab2',
             label: '상세정보',
             items: [
-                { widget: SAMPLE_FORM,  colSpan: 12, rowSpan: 23 },
+                { widget: SAMPLE_FORM,  colSpan: 12, rowSpan: 24 },
                 { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2  },
             ],
         },
@@ -462,7 +469,7 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
         { widget: SAMPLE_SEARCH_CATEGORY, colSpan: 12, rowSpan: 3 },
     ],
     table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 23 }],
+    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 24 }],
     space: [
         { widget: SAMPLE_SPACE,       colSpan: 12, rowSpan: 2 },
         { widget: SAMPLE_SPACE_EXCEL, colSpan: 12, rowSpan: 2 },
