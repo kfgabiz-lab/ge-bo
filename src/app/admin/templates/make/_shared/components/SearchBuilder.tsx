@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * SearchBuilder — 검색 행/필드 빌더 공통 컴포넌트
@@ -10,37 +10,40 @@
  *   <SearchBuilder rows={rows} onChange={setRows} />
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { useSlugRelations } from '../hooks/useSlugRelations';
+import React, { useState, useCallback, useEffect } from "react";
+import { useSlugRelations } from "../hooks/useSlugRelations";
+import { Plus, Trash2, GripVertical, ChevronUp, ChevronDown, X, Pencil } from "lucide-react";
+import { CodeGroupDef, SearchFieldType, SearchFieldConfig, SearchRowConfig } from "../types";
+import { useI18n } from "@/hooks/use-i18n";
+import { needsOptions as sharedNeedsOptions, createIdGenerator } from "../utils";
+import { RowHeader } from "./RowHeader";
+import { FieldPickerTypeList } from "./FieldPickerTypeList";
+import { DndContext } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useSortableRows } from "../hooks/useSortableRows";
+import { SortableRowWrapper, SortableFieldWrapper, EmptyFieldDropZone } from "./DndWrappers";
+import api from "@/lib/api";
 import {
-    Plus, Trash2, GripVertical,
-    ChevronUp, ChevronDown, X, Pencil,
-} from 'lucide-react';
-import { CodeGroupDef, SearchFieldType, SearchFieldConfig, SearchRowConfig } from '../types';
-import { useI18n } from '@/hooks/use-i18n';
-import { needsOptions as sharedNeedsOptions, createIdGenerator } from '../utils';
-import { RowHeader } from './RowHeader';
-import { FieldPickerTypeList } from './FieldPickerTypeList';
-import { DndContext } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useSortableRows } from '../hooks/useSortableRows';
-import { SortableRowWrapper, SortableFieldWrapper, EmptyFieldDropZone } from './DndWrappers';
-import api from '@/lib/api';
-import {
-    InputField, SelectField, DateField, DateRangeField,
-    RadioField, CheckboxField, ButtonField, CategoryField,
-    DateRangeStatusSearchField,
-} from './builder/fields';
-import type { FieldEditValues, SlugOption } from './builder/fields';
+  InputField,
+  SelectField,
+  DateField,
+  DateRangeField,
+  RadioField,
+  CheckboxField,
+  ButtonField,
+  CategoryField,
+  DateRangeStatusSearchField,
+} from "./builder/fields";
+import type { FieldEditValues, SlugOption } from "./builder/fields";
 
 /** slug-relation 목록 아이템 타입 */
 export interface SlugRelationOption {
-    id: number;
-    masterSlug: string;
-    slaveSlug: string;
-    relationDir?: string;
-    slaveType?: string;
-    description?: string;
+  id: number;
+  masterSlug: string;
+  slaveSlug: string;
+  relationDir?: string;
+  slaveType?: string;
+  description?: string;
 }
 
 /* ══════════════════════════════════════════ */
@@ -55,8 +58,8 @@ export type { SearchFieldType, SearchFieldConfig, SearchRowConfig };
 /* ══════════════════════════════════════════ */
 
 interface SearchBuilderProps {
-    rows: SearchRowConfig[];
-    onChange: (rows: SearchRowConfig[]) => void;
+  rows: SearchRowConfig[];
+  onChange: (rows: SearchRowConfig[]) => void;
 }
 
 /* ══════════════════════════════════════════ */
@@ -65,631 +68,801 @@ interface SearchBuilderProps {
 
 /** 필드 유형 메타 (list/page.tsx FIELD_TYPES와 동일) */
 const FIELD_TYPES: { type: SearchFieldType; label: string; desc: string; defaultColSpan: 1 | 2 }[] = [
-    { type: 'input',            label: 'Input',            desc: '텍스트 입력',               defaultColSpan: 1 },
-    { type: 'select',           label: 'Select',           desc: '셀렉트 박스',               defaultColSpan: 1 },
-    { type: 'date',             label: 'Date',             desc: '날짜/년월/일시 단독',        defaultColSpan: 1 },
-    { type: 'dateRange',        label: 'Date Range',       desc: '날짜/년월/일시/시간 범위',   defaultColSpan: 2 },
-    { type: 'radio',            label: 'Radio',            desc: '라디오 단일선택',            defaultColSpan: 1 },
-    { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 필터',       defaultColSpan: 1 },
-    { type: 'checkbox',       label: 'Checkbox',         desc: '체크박스 복수선택',    defaultColSpan: 1 },
-    { type: 'button',         label: 'Button',           desc: '선택 버튼',            defaultColSpan: 1 },
-    { type: 'category',       label: 'Category',         desc: '카테고리 계층 검색',   defaultColSpan: 1 },
+  { type: "input", label: "Input", desc: "텍스트 입력", defaultColSpan: 1 },
+  { type: "select", label: "Select", desc: "셀렉트 박스", defaultColSpan: 1 },
+  { type: "date", label: "Date", desc: "날짜/년월/일시 단독", defaultColSpan: 1 },
+  { type: "dateRange", label: "Date Range", desc: "날짜/년월/일시/시간 범위", defaultColSpan: 2 },
+  { type: "radio", label: "Radio", desc: "라디오 단일선택", defaultColSpan: 1 },
+  { type: "dateRangeStatus", label: "DateRangeStatus", desc: "날짜 범위 상태 필터", defaultColSpan: 1 },
+  { type: "checkbox", label: "Checkbox", desc: "체크박스 복수선택", defaultColSpan: 1 },
+  { type: "button", label: "Button", desc: "선택 버튼", defaultColSpan: 1 },
+  { type: "category", label: "Category", desc: "카테고리 계층 검색", defaultColSpan: 1 },
 ];
 
 /** 옵션이 필요한 필드 타입 여부 */
-const needsOptions = (type: SearchFieldType | null) =>
-    sharedNeedsOptions(type) || type === 'button';
+const needsOptions = (type: SearchFieldType | null) => sharedNeedsOptions(type) || type === "button";
 
-const uid = createIdGenerator('sb');
+const uid = createIdGenerator("sb");
 
 /* ══════════════════════════════════════════ */
 /*  컴포넌트                                   */
 /* ══════════════════════════════════════════ */
 
 export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
-    const { t } = useI18n();
+  const { t } = useI18n();
 
-    /* ── DnD: rows prop을 그대로 쓰되, 변경 시 onChange 호출 ── */
-    const rowsSetter = useCallback<React.Dispatch<React.SetStateAction<SearchRowConfig[]>>>(
-        (updater) => {
-            const next = typeof updater === 'function' ? updater(rows) : updater;
-            onChange(next);
-        },
-        [rows, onChange],
+  /* ── DnD: rows prop을 그대로 쓰되, 변경 시 onChange 호출 ── */
+  const rowsSetter = useCallback<React.Dispatch<React.SetStateAction<SearchRowConfig[]>>>(
+    (updater) => {
+      const next = typeof updater === "function" ? updater(rows) : updater;
+      onChange(next);
+    },
+    [rows, onChange]
+  );
+  const { sensors, collisionDetection, handleDragStart, handleDragOver, handleDragEnd } = useSortableRows(
+    rows,
+    rowsSetter
+  );
+
+  /* ── 행 접기/펼치기 ── */
+  const [collapsedRows, setCollapsedRows] = useState<Set<string>>(new Set());
+  const toggleRowCollapse = (id: string) =>
+    setCollapsedRows((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  /* ── 필드 추가 플로우 상태 ── */
+  const [showFieldPicker, setShowFieldPicker] = useState<string | null>(null); // row id
+  const [pendingType, setPendingType] = useState<SearchFieldType | null>(null);
+  const [pendingValues, setPendingValues] = useState<FieldEditValues | null>(null);
+
+  /* ── 필드 편집 상태 ── */
+  const [editingField, setEditingField] = useState<string | null>(null);
+
+  /* ── 공통코드 ── */
+  const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
+  /* 초기값을 true로 둬서 effect 안에서 동기 setState를 안 해도 되게 함(react-hooks/set-state-in-effect) */
+  const [codeGroupsLoading, setCodeGroupsLoading] = useState(true);
+
+  /* 공통코드 로드 */
+  useEffect(() => {
+    api
+      .get("/codes")
+      .then((res) => {
+        setCodeGroups(res.data || []);
+      })
+      .catch(() => {})
+      .finally(() => setCodeGroupsLoading(false));
+  }, []);
+
+  /* ── 카테고리 슬러그 목록 (PAGE_DATA 타입) ── */
+  const [slugOptions, setSlugOptions] = useState<SlugOption[]>([]);
+  /* 초기값을 true로 둬서 effect 안에서 동기 setState를 안 해도 되게 함(react-hooks/set-state-in-effect) */
+  const [slugOptionsLoading, setSlugOptionsLoading] = useState(true);
+
+  /* category 슬러그 로드 */
+  useEffect(() => {
+    api
+      .get("/slug-registry", { params: { type: "PAGE_DATA", size: "200", sort: "slug,asc" } })
+      .then((res) => setSlugOptions(res.data?.content || []))
+      .catch(() => {})
+      .finally(() => setSlugOptionsLoading(false));
+  }, []);
+
+  /* ── slug-relation 목록 — 공통 훅으로 fetch ── */
+  const slugRelationOptions = useSlugRelations();
+
+  /* ══════════════════════════════════════════ */
+  /*  행 조작                                   */
+  /* ══════════════════════════════════════════ */
+
+  const addRow = () => onChange([...rows, { id: uid(), cols: 4, fields: [] }]);
+
+  const removeRow = (rowId: string) => {
+    onChange(rows.filter((r) => r.id !== rowId));
+    if (showFieldPicker === rowId) setShowFieldPicker(null);
+  };
+
+  const moveRow = (rowId: string, direction: "up" | "down") => {
+    const idx = rows.findIndex((r) => r.id === rowId);
+    const target = direction === "up" ? idx - 1 : idx + 1;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  };
+
+  const updateRowCols = (rowId: string, cols: 1 | 2 | 3 | 4 | 5) =>
+    onChange(rows.map((r) => (r.id === rowId ? { ...r, cols } : r)));
+
+  /* ══════════════════════════════════════════ */
+  /*  필드 조작                                  */
+  /* ══════════════════════════════════════════ */
+
+  const removeSearchField = (rowId: string, fieldId: string) => {
+    onChange(rows.map((r) => (r.id === rowId ? { ...r, fields: r.fields.filter((f) => f.id !== fieldId) } : r)));
+    if (editingField === fieldId) setEditingField(null);
+  };
+
+  const updateSearchField = (fieldId: string, updates: Partial<SearchFieldConfig>) =>
+    onChange(
+      rows.map((r) => ({
+        ...r,
+        fields: r.fields.map((f) => (f.id === fieldId ? { ...f, ...updates } : f)),
+      }))
     );
-    const { sensors, collisionDetection, handleDragStart, handleDragOver, handleDragEnd } =
-        useSortableRows(rows, rowsSetter);
 
-    /* ── 행 접기/펼치기 ── */
-    const [collapsedRows, setCollapsedRows] = useState<Set<string>>(new Set());
-    const toggleRowCollapse = (id: string) =>
-        setCollapsedRows(prev => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
-            return next;
-        });
+  const moveFieldInRow = (rowId: string, fieldIdx: number, direction: "up" | "down") => {
+    const target = direction === "up" ? fieldIdx - 1 : fieldIdx + 1;
+    onChange(
+      rows.map((r) => {
+        if (r.id !== rowId || target < 0 || target >= r.fields.length) return r;
+        const next = [...r.fields];
+        [next[fieldIdx], next[target]] = [next[target], next[fieldIdx]];
+        return { ...r, fields: next };
+      })
+    );
+  };
 
-    /* ── 필드 추가 플로우 상태 ── */
-    const [showFieldPicker, setShowFieldPicker] = useState<string | null>(null); // row id
-    const [pendingType, setPendingType]         = useState<SearchFieldType | null>(null);
-    const [pendingValues, setPendingValues]     = useState<FieldEditValues | null>(null);
+  /* ══════════════════════════════════════════ */
+  /*  필드 추가 플로우                            */
+  /* ══════════════════════════════════════════ */
 
-    /* ── 필드 편집 상태 ── */
-    const [editingField, setEditingField] = useState<string | null>(null);
+  /** 필드 유형 선택 시 pendingValues 초기화 */
+  const selectFieldType = (type: SearchFieldType) => {
+    const defaultColSpan = FIELD_TYPES.find((t) => t.type === type)?.defaultColSpan || 1;
+    setPendingType(type);
+    setPendingValues({
+      label: "",
+      label2: "",
+      fieldKey: "",
+      placeholder: "",
+      colSpan: defaultColSpan,
+      required: false,
+      excludeFromSearch: false,
+      options: [],
+      codeGroupCode: undefined,
+      multiSelect: false,
+      /* date 초기값 */
+      ...(type === "date" && {
+        dateSubType: "date" as const,
+      }),
+      /* dateRange 초기값 */
+      ...(type === "dateRange" && {
+        rangeSubType: "date" as const,
+      }),
+      /* category 초기값 */
+      ...(type === "category" && {
+        maxDepth: 1,
+        activeDepths: [1],
+        depthLabels: [],
+        depthLabelMsgKeys: [],
+        depthValueFields: [],
+        depthTextFields: [],
+        depthFilters: [],
+        depthParentFields: [],
+        dbSlug: "",
+      }),
+    });
+  };
 
-    /* ── 공통코드 ── */
-    const [codeGroups, setCodeGroups]           = useState<CodeGroupDef[]>([]);
-    const [codeGroupsLoading, setCodeGroupsLoading] = useState(false);
+  /** 추가 버튼 비활성화 여부 */
+  const isAddDisabled = (): boolean => {
+    if (!pendingType || !pendingValues) return true;
+    const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options, linkedDateRangeKey } =
+      pendingValues;
+    if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
+    if ((pendingType === "dateRange" || pendingType === "yearMonthRange") && !label2?.trim() && !label2MsgKey?.trim())
+      return true;
+    if (pendingType === "dateRangeStatus" && !linkedDateRangeKey?.trim()) return true;
+    if (needsOptions(pendingType)) {
+      const hasCodeGroup = !!codeGroupCode;
+      const hasOptions = !!options?.some((o) => o.trim());
+      const hasSlug = !!pendingValues.optionSlug;
+      if (!hasCodeGroup && !hasOptions && !hasSlug) return true;
+    }
+    return false;
+  };
 
-    /* 공통코드 로드 */
-    useEffect(() => {
-        setCodeGroupsLoading(true);
-        api.get('/codes').then(res => {
-            setCodeGroups(res.data || []);
-        }).catch(() => {}).finally(() => setCodeGroupsLoading(false));
-    }, []);
+  /** 필드 추가 확정 */
+  const confirmAddField = () => {
+    if (!showFieldPicker || !pendingType || !pendingValues) return;
+    if (isAddDisabled()) return;
 
-    /* ── 카테고리 슬러그 목록 (PAGE_DATA 타입) ── */
-    const [slugOptions, setSlugOptions]               = useState<SlugOption[]>([]);
-    const [slugOptionsLoading, setSlugOptionsLoading] = useState(false);
+    const {
+      label,
+      labelMsgKey,
+      label2,
+      label2MsgKey,
+      fieldKey,
+      fieldKey2,
+      placeholder,
+      placeholderMsgKey,
+      description,
+      descriptionMsgKey,
+      colSpan,
+      required,
+      excludeFromSearch,
+      options,
+      codeGroupCode,
+      multiSelect,
+      minLength,
+      maxLength,
+      pattern,
+      patternDesc,
+      minSelect,
+      maxSelect,
+      defaultValue,
+      defaultValueMsgKey,
+      defaultOptionValue,
+      defaultDateOffset,
+      defaultDate,
+      disablePast,
+      defaultToday,
+      defaultStartDateOffset,
+      defaultStartDate,
+      disableStartPast,
+      defaultStartToday,
+      defaultEndDateOffset,
+      defaultEndDate,
+      disableEndPast,
+      defaultEndToday,
+      dbSlug,
+      relationSlugId,
+      maxDepth,
+      activeDepths,
+      depthLabels,
+      depthLabelMsgKeys,
+      depthValueFields,
+      depthTextFields,
+      depthFilters,
+      depthParentFields,
+      optionFilterRelationSlugId,
+      optionFilterDepth,
+      optionFilterParentField,
+      optionFilterExpr,
+      linkedDateRangeKey,
+      beforeText,
+      beforeTextMsgKey,
+      inRangeText,
+      inRangeTextMsgKey,
+      afterText,
+      afterTextMsgKey,
+      statusDisplayStyle,
+      hideCondition,
+      disableCondition,
+      rangeSubType,
+      dateSubType,
+      singleDateRange,
+      /* select 표시 방식 */
+      selectType,
+      /* select SLUG 옵션 소스 */
+      optionSlug,
+      optionValueKey,
+      optionTextKey,
+      optionOrderKey,
+      optionOrderDir,
+      optionFilter,
+      /* 조건식 검색 연동 (select 전용, data 재사용) */
+      data,
+      /* 조인 검색 연동 (select/input 전용) */
+      joinRelationSlugId,
+      joinSlaveKey,
+    } = pendingValues;
 
-    /* category 슬러그 로드 */
-    useEffect(() => {
-        setSlugOptionsLoading(true);
-        api.get('/slug-registry', { params: { type: 'PAGE_DATA', size: '200', sort: 'slug,asc' } })
-            .then(res => setSlugOptions(res.data?.content || []))
-            .catch(() => {})
-            .finally(() => setSlugOptionsLoading(false));
-    }, []);
-
-    /* ── slug-relation 목록 — 공통 훅으로 fetch ── */
-    const slugRelationOptions = useSlugRelations();
-
-    /* ══════════════════════════════════════════ */
-    /*  행 조작                                   */
-    /* ══════════════════════════════════════════ */
-
-    const addRow = () =>
-        onChange([...rows, { id: uid(), cols: 4, fields: [] }]);
-
-    const removeRow = (rowId: string) => {
-        onChange(rows.filter(r => r.id !== rowId));
-        if (showFieldPicker === rowId) setShowFieldPicker(null);
+    const newField: SearchFieldConfig = {
+      id: uid(),
+      type: pendingType,
+      label: label.trim(),
+      labelMsgKey: labelMsgKey?.trim() || undefined,
+      label2: pendingType === "dateRange" || pendingType === "yearMonthRange" ? label2?.trim() : undefined,
+      label2MsgKey:
+        pendingType === "dateRange" || pendingType === "yearMonthRange" ? label2MsgKey?.trim() || undefined : undefined,
+      fieldKey: fieldKey?.trim() || undefined,
+      /* 종료일 저장 Key — dateRange/yearMonthRange 전용, 미입력 시 undefined(자동유도 폴백) */
+      fieldKey2:
+        pendingType === "dateRange" || pendingType === "yearMonthRange" ? fieldKey2?.trim() || undefined : undefined,
+      placeholder:
+        placeholder?.trim() || (pendingType === "input" ? "입력하세요" : pendingType === "select" ? "전체" : ""),
+      placeholderMsgKey: placeholderMsgKey?.trim() || undefined,
+      description: description?.trim() || undefined,
+      descriptionMsgKey: descriptionMsgKey?.trim() || undefined,
+      colSpan: colSpan as 1 | 2 | 3 | 4 | 5,
+      required: required || undefined,
+      excludeFromSearch: excludeFromSearch || undefined,
+      options: options?.length ? options : undefined,
+      codeGroupCode: codeGroupCode || undefined,
+      multiSelect: pendingType === "button" && multiSelect ? true : undefined,
+      minLength: pendingType === "input" && minLength ? minLength : undefined,
+      maxLength: pendingType === "input" && maxLength ? maxLength : undefined,
+      pattern: pendingType === "input" && pattern ? pattern : undefined,
+      patternDesc: pendingType === "input" && patternDesc ? patternDesc : undefined,
+      minSelect: pendingType === "checkbox" && minSelect ? minSelect : undefined,
+      maxSelect: pendingType === "checkbox" && maxSelect ? maxSelect : undefined,
+      defaultValue: defaultValue || undefined,
+      defaultValueMsgKey: defaultValueMsgKey || undefined,
+      defaultOptionValue: defaultOptionValue || undefined,
+      defaultDateOffset: defaultDateOffset ?? undefined,
+      defaultDate: defaultDate || undefined,
+      disablePast: disablePast || undefined,
+      defaultToday: defaultToday || undefined,
+      defaultStartDateOffset: defaultStartDateOffset ?? undefined,
+      defaultStartDate: defaultStartDate || undefined,
+      disableStartPast: disableStartPast || undefined,
+      defaultStartToday: defaultStartToday || undefined,
+      defaultEndDateOffset: defaultEndDateOffset ?? undefined,
+      defaultEndDate: defaultEndDate || undefined,
+      disableEndPast: disableEndPast || undefined,
+      defaultEndToday: defaultEndToday || undefined,
+      /* date 서브타입 */
+      dateSubType: pendingType === "date" ? (dateSubType ?? "date") : undefined,
+      /* dateRange 서브타입 */
+      rangeSubType: pendingType === "dateRange" ? (rangeSubType ?? "date") : undefined,
+      /* singleDateRange — dateRange 단일 date 컬럼 범위 검색 옵션 */
+      singleDateRange:
+        pendingType === "dateRange" || pendingType === "yearMonthRange" ? singleDateRange || undefined : undefined,
+      /* category 전용 */
+      dbSlug: pendingType === "category" ? dbSlug || undefined : undefined,
+      relationSlugId: pendingType === "category" ? relationSlugId || undefined : undefined,
+      maxDepth: pendingType === "category" ? (maxDepth ?? 1) : undefined,
+      activeDepths: pendingType === "category" ? (activeDepths?.length ? activeDepths : undefined) : undefined,
+      depthLabels: pendingType === "category" ? (depthLabels?.length ? depthLabels : undefined) : undefined,
+      depthLabelMsgKeys:
+        pendingType === "category" ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
+      depthValueFields:
+        pendingType === "category" ? (depthValueFields?.length ? depthValueFields : undefined) : undefined,
+      depthTextFields: pendingType === "category" ? (depthTextFields?.length ? depthTextFields : undefined) : undefined,
+      depthFilters: pendingType === "category" ? (depthFilters?.length ? depthFilters : undefined) : undefined,
+      depthParentFields:
+        pendingType === "category" ? (depthParentFields?.length ? depthParentFields : undefined) : undefined,
+      /* 옵션 사전필터 */
+      optionFilterRelationSlugId: pendingType === "category" ? optionFilterRelationSlugId || undefined : undefined,
+      optionFilterDepth: pendingType === "category" ? (optionFilterDepth ?? undefined) : undefined,
+      optionFilterParentField: pendingType === "category" ? optionFilterParentField?.trim() || undefined : undefined,
+      optionFilterExpr: pendingType === "category" ? optionFilterExpr?.trim() || undefined : undefined,
+      /* dateRangeStatus 전용 */
+      linkedDateRangeKey: pendingType === "dateRangeStatus" ? linkedDateRangeKey?.trim() || undefined : undefined,
+      beforeText: pendingType === "dateRangeStatus" ? beforeText?.trim() || undefined : undefined,
+      beforeTextMsgKey: pendingType === "dateRangeStatus" ? beforeTextMsgKey?.trim() || undefined : undefined,
+      inRangeText: pendingType === "dateRangeStatus" ? inRangeText?.trim() || undefined : undefined,
+      inRangeTextMsgKey: pendingType === "dateRangeStatus" ? inRangeTextMsgKey?.trim() || undefined : undefined,
+      afterText: pendingType === "dateRangeStatus" ? afterText?.trim() || undefined : undefined,
+      afterTextMsgKey: pendingType === "dateRangeStatus" ? afterTextMsgKey?.trim() || undefined : undefined,
+      statusDisplayStyle: pendingType === "dateRangeStatus" ? (statusDisplayStyle ?? "select") : undefined,
+      /* 동적 조건 */
+      hideCondition: hideCondition?.trim() || undefined,
+      disableCondition: disableCondition?.trim() || undefined,
+      /* select 표시 방식 */
+      selectType: pendingType === "select" ? (selectType ?? "selectbox") : undefined,
+      /* select SLUG 옵션 소스 */
+      optionSlug: pendingType === "select" ? optionSlug || undefined : undefined,
+      optionValueKey: pendingType === "select" ? optionValueKey || undefined : undefined,
+      optionTextKey: pendingType === "select" ? optionTextKey || undefined : undefined,
+      optionOrderKey: pendingType === "select" ? optionOrderKey || undefined : undefined,
+      optionOrderDir: pendingType === "select" ? optionOrderDir || undefined : undefined,
+      optionFilter: pendingType === "select" ? optionFilter || undefined : undefined,
+      data: pendingType === "select" ? data?.trim() || undefined : undefined,
+      /* 조인 검색 연동 (select/input 전용) */
+      joinRelationSlugId:
+        pendingType === "select" || pendingType === "input" ? joinRelationSlugId || undefined : undefined,
+      joinSlaveKey: pendingType === "select" || pendingType === "input" ? joinSlaveKey?.trim() || undefined : undefined,
     };
 
-    const moveRow = (rowId: string, direction: 'up' | 'down') => {
-        const idx = rows.findIndex(r => r.id === rowId);
-        const target = direction === 'up' ? idx - 1 : idx + 1;
-        if (target < 0 || target >= rows.length) return;
-        const next = [...rows];
-        [next[idx], next[target]] = [next[target], next[idx]];
-        onChange(next);
+    onChange(rows.map((r) => (r.id === showFieldPicker ? { ...r, fields: [...r.fields, newField] } : r)));
+    cancelAddField();
+  };
+
+  const cancelAddField = () => {
+    setPendingType(null);
+    setPendingValues(null);
+    setShowFieldPicker(null);
+  };
+
+  /* ══════════════════════════════════════════ */
+  /*  필드 컴포넌트 렌더 헬퍼                     */
+  /* ══════════════════════════════════════════ */
+
+  /**
+   * 필드 타입에 맞는 설정 컴포넌트를 렌더링
+   * - SearchBuilder는 버튼형 ColSpan (1~5) 사용
+   */
+  const renderFieldComponent = (
+    type: SearchFieldType,
+    values: FieldEditValues,
+    onChangeFn: (updates: Partial<FieldEditValues>) => void,
+    extra?: {
+      autoFocus?: boolean;
+      onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+    }
+  ) => {
+    const props = {
+      values,
+      onChange: onChangeFn,
+      colSpanMode: {
+        type: "button" as const,
+        options: [1, 2, 3, 4, 5],
+        minSpan: type === "dateRange" || type === "yearMonthRange" ? 2 : 1,
+      },
+      codeGroups,
+      codeGroupsLoading,
+      autoFocus: extra?.autoFocus,
+      onLabelKeyDown: extra?.onLabelKeyDown,
     };
-
-    const updateRowCols = (rowId: string, cols: 1|2|3|4|5) =>
-        onChange(rows.map(r => r.id === rowId ? { ...r, cols } : r));
-
-    /* ══════════════════════════════════════════ */
-    /*  필드 조작                                  */
-    /* ══════════════════════════════════════════ */
-
-    const removeSearchField = (rowId: string, fieldId: string) => {
-        onChange(rows.map(r =>
-            r.id === rowId ? { ...r, fields: r.fields.filter(f => f.id !== fieldId) } : r
-        ));
-        if (editingField === fieldId) setEditingField(null);
-    };
-
-    const updateSearchField = (fieldId: string, updates: Partial<SearchFieldConfig>) =>
-        onChange(rows.map(r => ({
-            ...r,
-            fields: r.fields.map(f => f.id === fieldId ? { ...f, ...updates } : f),
-        })));
-
-    const moveFieldInRow = (rowId: string, fieldIdx: number, direction: 'up' | 'down') => {
-        const target = direction === 'up' ? fieldIdx - 1 : fieldIdx + 1;
-        onChange(rows.map(r => {
-            if (r.id !== rowId || target < 0 || target >= r.fields.length) return r;
-            const next = [...r.fields];
-            [next[fieldIdx], next[target]] = [next[target], next[fieldIdx]];
-            return { ...r, fields: next };
-        }));
-    };
-
-    /* ══════════════════════════════════════════ */
-    /*  필드 추가 플로우                            */
-    /* ══════════════════════════════════════════ */
-
-    /** 필드 유형 선택 시 pendingValues 초기화 */
-    const selectFieldType = (type: SearchFieldType) => {
-        const defaultColSpan = FIELD_TYPES.find(t => t.type === type)?.defaultColSpan || 1;
-        setPendingType(type);
-        setPendingValues({
-            label: '',
-            label2: '',
-            fieldKey: '',
-            placeholder: '',
-            colSpan: defaultColSpan,
-            required: false,
-            excludeFromSearch: false,
-            options: [],
-            codeGroupCode: undefined,
-            multiSelect: false,
-            /* date 초기값 */
-            ...(type === 'date' && {
-                dateSubType: 'date' as const,
-            }),
-            /* dateRange 초기값 */
-            ...(type === 'dateRange' && {
-                rangeSubType: 'date' as const,
-            }),
-            /* category 초기값 */
-            ...(type === 'category' && {
-                maxDepth: 1,
-                activeDepths: [1],
-                depthLabels: [],
-                depthLabelMsgKeys: [],
-                depthValueFields: [],
-                depthTextFields: [],
-                depthFilters: [],
-                depthParentFields: [],
-                dbSlug: '',
-            }),
-        });
-    };
-
-
-    /** 추가 버튼 비활성화 여부 */
-    const isAddDisabled = (): boolean => {
-        if (!pendingType || !pendingValues) return true;
-        const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options, linkedDateRangeKey } = pendingValues;
-        if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
-        if ((pendingType === 'dateRange' || pendingType === 'yearMonthRange') && (!label2?.trim() && !label2MsgKey?.trim())) return true;
-        if (pendingType === 'dateRangeStatus' && !linkedDateRangeKey?.trim()) return true;
-        if (needsOptions(pendingType)) {
-            const hasCodeGroup = !!codeGroupCode;
-            const hasOptions = !!options?.some(o => o.trim());
-            const hasSlug = !!pendingValues.optionSlug;
-            if (!hasCodeGroup && !hasOptions && !hasSlug) return true;
-        }
-        return false;
-    };
-
-    /** 필드 추가 확정 */
-    const confirmAddField = () => {
-        if (!showFieldPicker || !pendingType || !pendingValues) return;
-        if (isAddDisabled()) return;
-
-        const {
-            label, labelMsgKey, label2, label2MsgKey,
-            fieldKey, fieldKey2, placeholder, placeholderMsgKey,
-            description, descriptionMsgKey,
-            colSpan, required, excludeFromSearch, options, codeGroupCode, multiSelect,
-            minLength, maxLength, pattern, patternDesc, minSelect, maxSelect,
-            defaultValue, defaultValueMsgKey, defaultOptionValue,
-            defaultDateOffset, defaultDate, disablePast, defaultToday,
-            defaultStartDateOffset, defaultStartDate, disableStartPast, defaultStartToday,
-            defaultEndDateOffset, defaultEndDate, disableEndPast, defaultEndToday,
-            dbSlug, relationSlugId, maxDepth, activeDepths, depthLabels, depthLabelMsgKeys, depthValueFields, depthTextFields, depthFilters, depthParentFields,
-            optionFilterRelationSlugId, optionFilterDepth, optionFilterParentField, optionFilterExpr,
-            linkedDateRangeKey, beforeText, beforeTextMsgKey, inRangeText, inRangeTextMsgKey, afterText, afterTextMsgKey, statusDisplayStyle,
-            hideCondition, disableCondition,
-            rangeSubType, dateSubType, singleDateRange,
-            /* select 표시 방식 */
-            selectType,
-            /* select SLUG 옵션 소스 */
-            optionSlug, optionValueKey, optionTextKey, optionOrderKey, optionOrderDir, optionFilter,
-            /* 조건식 검색 연동 (select 전용, data 재사용) */
-            data,
-        } = pendingValues;
-
-        const newField: SearchFieldConfig = {
-            id: uid(),
-            type: pendingType,
-            label: label.trim(),
-            labelMsgKey: labelMsgKey?.trim() || undefined,
-            label2: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? label2?.trim() : undefined,
-            label2MsgKey: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (label2MsgKey?.trim() || undefined) : undefined,
-            fieldKey: fieldKey?.trim() || undefined,
-            /* 종료일 저장 Key — dateRange/yearMonthRange 전용, 미입력 시 undefined(자동유도 폴백) */
-            fieldKey2: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (fieldKey2?.trim() || undefined) : undefined,
-            placeholder: placeholder?.trim() || (pendingType === 'input' ? '입력하세요' : pendingType === 'select' ? '전체' : ''),
-            placeholderMsgKey: placeholderMsgKey?.trim() || undefined,
-            description: description?.trim() || undefined,
-            descriptionMsgKey: descriptionMsgKey?.trim() || undefined,
-            colSpan: colSpan as 1|2|3|4|5,
-            required: required || undefined,
-            excludeFromSearch: excludeFromSearch || undefined,
-            options: options?.length ? options : undefined,
-            codeGroupCode: codeGroupCode || undefined,
-            multiSelect: pendingType === 'button' && multiSelect ? true : undefined,
-            minLength: pendingType === 'input' && minLength ? minLength : undefined,
-            maxLength: pendingType === 'input' && maxLength ? maxLength : undefined,
-            pattern: pendingType === 'input' && pattern ? pattern : undefined,
-            patternDesc: pendingType === 'input' && patternDesc ? patternDesc : undefined,
-            minSelect: pendingType === 'checkbox' && minSelect ? minSelect : undefined,
-            maxSelect: pendingType === 'checkbox' && maxSelect ? maxSelect : undefined,
-            defaultValue: defaultValue || undefined,
-            defaultValueMsgKey: defaultValueMsgKey || undefined,
-            defaultOptionValue: defaultOptionValue || undefined,
-            defaultDateOffset: defaultDateOffset ?? undefined,
-            defaultDate: defaultDate || undefined,
-            disablePast: disablePast || undefined,
-            defaultToday: defaultToday || undefined,
-            defaultStartDateOffset: defaultStartDateOffset ?? undefined,
-            defaultStartDate: defaultStartDate || undefined,
-            disableStartPast: disableStartPast || undefined,
-            defaultStartToday: defaultStartToday || undefined,
-            defaultEndDateOffset: defaultEndDateOffset ?? undefined,
-            defaultEndDate: defaultEndDate || undefined,
-            disableEndPast: disableEndPast || undefined,
-            defaultEndToday: defaultEndToday || undefined,
-            /* date 서브타입 */
-            dateSubType: pendingType === 'date' ? (dateSubType ?? 'date') : undefined,
-            /* dateRange 서브타입 */
-            rangeSubType: pendingType === 'dateRange' ? (rangeSubType ?? 'date') : undefined,
-            /* singleDateRange — dateRange 단일 date 컬럼 범위 검색 옵션 */
-            singleDateRange: (pendingType === 'dateRange' || pendingType === 'yearMonthRange') ? (singleDateRange || undefined) : undefined,
-            /* category 전용 */
-            dbSlug:            pendingType === 'category' ? (dbSlug || undefined) : undefined,
-            relationSlugId:    pendingType === 'category' ? (relationSlugId || undefined) : undefined,
-            maxDepth:          pendingType === 'category' ? (maxDepth ?? 1) : undefined,
-            activeDepths:      pendingType === 'category' ? (activeDepths?.length ? activeDepths : undefined) : undefined,
-            depthLabels:       pendingType === 'category' ? (depthLabels?.length ? depthLabels : undefined) : undefined,
-            depthLabelMsgKeys: pendingType === 'category' ? (depthLabelMsgKeys?.length ? depthLabelMsgKeys : undefined) : undefined,
-            depthValueFields:  pendingType === 'category' ? (depthValueFields?.length ? depthValueFields : undefined) : undefined,
-            depthTextFields:   pendingType === 'category' ? (depthTextFields?.length ? depthTextFields : undefined) : undefined,
-            depthFilters:      pendingType === 'category' ? (depthFilters?.length ? depthFilters : undefined) : undefined,
-            depthParentFields: pendingType === 'category' ? (depthParentFields?.length ? depthParentFields : undefined) : undefined,
-            /* 옵션 사전필터 */
-            optionFilterRelationSlugId: pendingType === 'category' ? (optionFilterRelationSlugId || undefined) : undefined,
-            optionFilterDepth:          pendingType === 'category' ? (optionFilterDepth ?? undefined) : undefined,
-            optionFilterParentField:    pendingType === 'category' ? (optionFilterParentField?.trim() || undefined) : undefined,
-            optionFilterExpr:           pendingType === 'category' ? (optionFilterExpr?.trim() || undefined) : undefined,
-            /* dateRangeStatus 전용 */
-            linkedDateRangeKey: pendingType === 'dateRangeStatus' ? (linkedDateRangeKey?.trim() || undefined) : undefined,
-            beforeText:         pendingType === 'dateRangeStatus' ? (beforeText?.trim() || undefined) : undefined,
-            beforeTextMsgKey:   pendingType === 'dateRangeStatus' ? (beforeTextMsgKey?.trim() || undefined) : undefined,
-            inRangeText:        pendingType === 'dateRangeStatus' ? (inRangeText?.trim() || undefined) : undefined,
-            inRangeTextMsgKey:  pendingType === 'dateRangeStatus' ? (inRangeTextMsgKey?.trim() || undefined) : undefined,
-            afterText:          pendingType === 'dateRangeStatus' ? (afterText?.trim() || undefined) : undefined,
-            afterTextMsgKey:    pendingType === 'dateRangeStatus' ? (afterTextMsgKey?.trim() || undefined) : undefined,
-            statusDisplayStyle: pendingType === 'dateRangeStatus' ? (statusDisplayStyle ?? 'select') : undefined,
-            /* 동적 조건 */
-            hideCondition:     hideCondition?.trim()    || undefined,
-            disableCondition:  disableCondition?.trim() || undefined,
-            /* select 표시 방식 */
-            selectType:        pendingType === 'select' ? (selectType ?? 'selectbox') : undefined,
-            /* select SLUG 옵션 소스 */
-            optionSlug:        pendingType === 'select' ? (optionSlug || undefined) : undefined,
-            optionValueKey:    pendingType === 'select' ? (optionValueKey || undefined) : undefined,
-            optionTextKey:     pendingType === 'select' ? (optionTextKey || undefined) : undefined,
-            optionOrderKey:    pendingType === 'select' ? (optionOrderKey || undefined) : undefined,
-            optionOrderDir:    pendingType === 'select' ? (optionOrderDir || undefined) : undefined,
-            optionFilter:      pendingType === 'select' ? (optionFilter || undefined) : undefined,
-            data:              pendingType === 'select' ? (data?.trim() || undefined) : undefined,
-        };
-
-        onChange(rows.map(r =>
-            r.id === showFieldPicker ? { ...r, fields: [...r.fields, newField] } : r
-        ));
-        cancelAddField();
-    };
-
-    const cancelAddField = () => {
-        setPendingType(null);
-        setPendingValues(null);
-        setShowFieldPicker(null);
-    };
-
-    /* ══════════════════════════════════════════ */
-    /*  필드 컴포넌트 렌더 헬퍼                     */
-    /* ══════════════════════════════════════════ */
-
-    /**
-     * 필드 타입에 맞는 설정 컴포넌트를 렌더링
-     * - SearchBuilder는 버튼형 ColSpan (1~5) 사용
-     */
-    const renderFieldComponent = (
-        type: SearchFieldType,
-        values: FieldEditValues,
-        onChangeFn: (updates: Partial<FieldEditValues>) => void,
-        extra?: {
-            autoFocus?: boolean;
-            onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-        }
-    ) => {
-        const props = {
-            values,
-            onChange: onChangeFn,
-            colSpanMode: {
-                type: 'button' as const,
-                options: [1, 2, 3, 4, 5],
-                minSpan: (type === 'dateRange' || type === 'yearMonthRange') ? 2 : 1,
-            },
-            codeGroups,
-            codeGroupsLoading,
-            autoFocus: extra?.autoFocus,
-            onLabelKeyDown: extra?.onLabelKeyDown,
-        };
-        switch (type) {
-            case 'input':          return <InputField {...props} />;
-            /* slugOptions: PAGE_DATA slug 목록 전달 — SLUG 탭 옵션 소스 선택에 사용 */
-            case 'select':         return <SelectField {...props} slugOptions={slugOptions} />;
-            case 'date':           return <DateField {...props} />;
-            case 'dateRange':      return <DateRangeField {...props} />;
-            case 'yearMonth':      return <DateField {...props} />;
-            case 'yearMonthRange': return <DateRangeField {...props} />;
-            case 'radio':            return <RadioField {...props} />;
-            case 'checkbox':         return <CheckboxField {...props} />;
-            case 'button':           return <ButtonField {...props} />;
-            case 'dateRangeStatus':  return <DateRangeStatusSearchField {...props} />;
-            case 'category':
-                /* slugOptions, slugRelationOptions는 SearchBuilder 클로저에서 직접 참조
+    switch (type) {
+      /* fetchRelations: FETCH 타입 relation 목록 — "조인 검색 연동" 섹션에서 연동 slug 선택에 사용 */
+      case "input":
+        return <InputField {...props} fetchRelations={slugRelationOptions.filter((r) => r.relationDir === "FETCH")} />;
+      /* slugOptions: PAGE_DATA slug 목록 전달 — SLUG 탭 옵션 소스 선택에 사용 */
+      case "select":
+        return (
+          <SelectField
+            {...props}
+            slugOptions={slugOptions}
+            fetchRelations={slugRelationOptions.filter((r) => r.relationDir === "FETCH")}
+          />
+        );
+      case "date":
+        return <DateField {...props} />;
+      case "dateRange":
+        return <DateRangeField {...props} />;
+      case "yearMonth":
+        return <DateField {...props} />;
+      case "yearMonthRange":
+        return <DateRangeField {...props} />;
+      case "radio":
+        return <RadioField {...props} />;
+      case "checkbox":
+        return <CheckboxField {...props} />;
+      case "button":
+        return <ButtonField {...props} />;
+      case "dateRangeStatus":
+        return <DateRangeStatusSearchField {...props} />;
+      case "category":
+        /* slugOptions, slugRelationOptions는 SearchBuilder 클로저에서 직접 참조
                    - slugRelationOptions: FILTER 타입만 — "연동 Slug"(relationSlugId, 카테고리 목록 자체 필터링)
                    - fetchRelationOptions: FETCH 타입만 — "옵션 사전필터"(optionFilterRelationSlugId) */
-                return (
-                    <CategoryField
-                        {...props}
-                        slugOptions={slugOptions}
-                        slugOptionsLoading={slugOptionsLoading}
-                        slugRelationOptions={slugRelationOptions.filter(r => r.relationDir === 'FILTER')}
-                        fetchRelationOptions={slugRelationOptions.filter(r => r.relationDir === 'FETCH')}
-                    />
-                );
-            default:               return null;
-        }
-    };
+        return (
+          <CategoryField
+            {...props}
+            slugOptions={slugOptions}
+            slugOptionsLoading={slugOptionsLoading}
+            slugRelationOptions={slugRelationOptions.filter((r) => r.relationDir === "FILTER")}
+            fetchRelationOptions={slugRelationOptions.filter((r) => r.relationDir === "FETCH")}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
-    /* ══════════════════════════════════════════ */
-    /*  렌더                                      */
-    /* ══════════════════════════════════════════ */
+  /* ══════════════════════════════════════════ */
+  /*  렌더                                      */
+  /* ══════════════════════════════════════════ */
 
-    return (
-        <div className="space-y-2">
-            <DndContext
-                sensors={sensors}
-                collisionDetection={collisionDetection}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-                accessibility={{ announcements: { onDragStart() { return ''; }, onDragOver() { return ''; }, onDragEnd() { return ''; }, onDragCancel() { return ''; } }, screenReaderInstructions: { draggable: '' } }}
-            >
-                <SortableContext items={rows.map(r => r.id)} strategy={verticalListSortingStrategy}>
-                    {rows.map((row, ri) => (
-                        <SortableRowWrapper key={row.id} id={row.id}>
-                            {(rowHandleProps) => (
-                                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                    {/* ── 행 헤더 ── */}
-                                    <RowHeader
-                                        rowIdx={ri}
-                                        rowCount={rows.length}
-                                        cols={row.cols}
-                                        onChangeCols={n => updateRowCols(row.id, n)}
-                                        onMoveUp={() => moveRow(row.id, 'up')}
-                                        onMoveDown={() => moveRow(row.id, 'down')}
-                                        onRemove={() => removeRow(row.id)}
-                                        collapsed={collapsedRows.has(row.id)}
-                                        onToggleCollapse={() => toggleRowCollapse(row.id)}
-                                        dragHandleProps={rowHandleProps}
-                                    />
+  return (
+    <div className="space-y-2">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={collisionDetection}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        accessibility={{
+          announcements: {
+            onDragStart() {
+              return "";
+            },
+            onDragOver() {
+              return "";
+            },
+            onDragEnd() {
+              return "";
+            },
+            onDragCancel() {
+              return "";
+            },
+          },
+          screenReaderInstructions: { draggable: "" },
+        }}
+      >
+        <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+          {rows.map((row, ri) => (
+            <SortableRowWrapper key={row.id} id={row.id}>
+              {(rowHandleProps) => (
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  {/* ── 행 헤더 ── */}
+                  <RowHeader
+                    rowIdx={ri}
+                    rowCount={rows.length}
+                    cols={row.cols}
+                    onChangeCols={(n) => updateRowCols(row.id, n)}
+                    onMoveUp={() => moveRow(row.id, "up")}
+                    onMoveDown={() => moveRow(row.id, "down")}
+                    onRemove={() => removeRow(row.id)}
+                    collapsed={collapsedRows.has(row.id)}
+                    onToggleCollapse={() => toggleRowCollapse(row.id)}
+                    dragHandleProps={rowHandleProps}
+                  />
 
-                                    {/* ── 행 내부 (접히면 숨김) ── */}
-                                    {!collapsedRows.has(row.id) && (
-                                        <div className="p-2 space-y-1.5">
-                                            <SortableContext
-                                                id={`rc-${row.id}`}
-                                                items={row.fields.map(f => f.id)}
-                                                strategy={verticalListSortingStrategy}
-                                            >
-                                                {/* 필드 목록 */}
-                                                {row.fields.length > 0 ? row.fields.map((field, fi) => (
-                                                    <SortableFieldWrapper key={field.id} id={field.id}>
-                                                        {(fieldHandleProps) => (
-                                                            <div className={`border rounded-md transition-all ${editingField === field.id ? 'border-slate-900 bg-slate-50' : 'border-slate-100'}`}>
-                                                                {/* 필드 헤더 */}
-                                                                <div className="flex items-center gap-1.5 px-2 py-1.5">
-                                                                    <span
-                                                                        ref={fieldHandleProps.ref as React.Ref<HTMLSpanElement>}
-                                                                        {...Object.fromEntries(Object.entries(fieldHandleProps).filter(([k]) => k !== 'ref')) as React.HTMLAttributes<HTMLSpanElement>}
-                                                                        onClick={e => e.stopPropagation()}
-                                                                        className="cursor-grab active:cursor-grabbing touch-none flex-shrink-0 px-1 rounded hover:bg-slate-100"
-                                                                    >
-                                                                        <GripVertical className="w-3 h-3 text-slate-400" />
-                                                                    </span>
-                                                                    <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">{field.type}</span>
-                                                                    <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
-                                                                        {(field.type === 'dateRange' || field.type === 'yearMonthRange')
-                                                                            ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : (field.label2 || '')}`
-                                                                            : (field.labelMsgKey ? t(field.labelMsgKey) : field.label)
-                                                                        }
-                                                                    </span>
-                                                                    {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
-                                                                    {field.excludeFromSearch && <span className="text-[9px] px-1 py-0.5 bg-slate-200 text-slate-500 rounded font-medium">검색제외</span>}
-                                                                    {field.colSpan > 1 && <span className="text-[10px] text-slate-400">×{field.colSpan}</span>}
-                                                                    <div className="flex items-center gap-0.5">
-                                                                        <button onClick={() => moveFieldInRow(row.id, fi, 'up')} disabled={fi === 0} className="p-1 rounded text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ChevronUp className="w-3 h-3" /></button>
-                                                                        <button onClick={() => moveFieldInRow(row.id, fi, 'down')} disabled={fi === row.fields.length - 1} className="p-1 rounded text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ChevronDown className="w-3 h-3" /></button>
-                                                                        <button onClick={() => setEditingField(editingField === field.id ? null : field.id)} className="p-1 rounded text-slate-400 hover:bg-slate-100"><Pencil className="w-3 h-3" /></button>
-                                                                        <button onClick={() => removeSearchField(row.id, field.id)} className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* 필드 편집 패널 — 필드 컴포넌트 재사용 */}
-                                                                {editingField === field.id && (
-                                                                    <div className="px-2 pb-1.5 pt-1 space-y-1.5 border-t border-slate-100">
-                                                                        {renderFieldComponent(
-                                                                            field.type,
-                                                                            {
-                                                                                label:              field.label,
-                                                                                labelMsgKey:        field.labelMsgKey,
-                                                                                label2:             field.label2,
-                                                                                label2MsgKey:       field.label2MsgKey,
-                                                                                fieldKey:           field.fieldKey || '',
-                                                                                fieldKey2:          field.fieldKey2,
-                                                                                colSpan:            field.colSpan,
-                                                                                placeholder:        field.placeholder,
-                                                                                placeholderMsgKey:  field.placeholderMsgKey,
-                                                                                description:        field.description,
-                                                                                descriptionMsgKey:  field.descriptionMsgKey,
-                                                                                required:           field.required,
-                                                                                excludeFromSearch:  field.excludeFromSearch,
-                                                                                options:            field.options,
-                                                                                codeGroupCode:      field.codeGroupCode,
-                                                                                multiSelect:        field.multiSelect,
-                                                                                minLength:          field.minLength,
-                                                                                maxLength:          field.maxLength,
-                                                                                pattern:            field.pattern,
-                                                                                patternDesc:        field.patternDesc,
-                                                                                minSelect:          field.minSelect,
-                                                                                maxSelect:          field.maxSelect,
-                                                                                defaultValue:       field.defaultValue,
-                                                                                defaultValueMsgKey: field.defaultValueMsgKey,
-                                                                                defaultOptionValue: field.defaultOptionValue,
-                                                                                defaultDateOffset:      field.defaultDateOffset,
-                                                                                defaultDate:            field.defaultDate,
-                                                                                disablePast:            field.disablePast,
-                                                                                defaultToday:           field.defaultToday,
-                                                                                defaultStartDateOffset: field.defaultStartDateOffset,
-                                                                                defaultStartDate:       field.defaultStartDate,
-                                                                                disableStartPast:       field.disableStartPast,
-                                                                                defaultStartToday:      field.defaultStartToday,
-                                                                                defaultEndDateOffset:   field.defaultEndDateOffset,
-                                                                                defaultEndDate:         field.defaultEndDate,
-                                                                                disableEndPast:         field.disableEndPast,
-                                                                                defaultEndToday:        field.defaultEndToday,
-                                                                                /* date 서브타입 (yearMonth 기존 데이터 → yearMonth fallback) */
-                                                                                dateSubType:            field.dateSubType ?? (field.type === 'yearMonth' ? 'yearMonth' : undefined),
-                                                                                /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */
-                                                                                rangeSubType:           field.rangeSubType ?? (field.type === 'yearMonthRange' ? 'yearMonth' : undefined),
-                                                                                singleDateRange:        field.singleDateRange,
-                                                                                maxRangeValue:          field.maxRangeValue,
-                                                                                maxRangeUnit:           field.maxRangeUnit,
-                                                                                /* category 전용 */
-                                                                                dbSlug:            field.dbSlug,
-                                                                                relationSlugId:    field.relationSlugId,
-                                                                                maxDepth:          field.maxDepth,
-                                                                                activeDepths:      field.activeDepths,
-                                                                                depthLabels:       field.depthLabels,
-                                                                                depthLabelMsgKeys: field.depthLabelMsgKeys,
-                                                                                depthValueFields:  field.depthValueFields,
-                                                                                depthTextFields:   field.depthTextFields,
-                                                                                depthFilters:      field.depthFilters,
-                                                                                depthParentFields: field.depthParentFields,
-                                                                                /* 옵션 사전필터 */
-                                                                                optionFilterRelationSlugId: field.optionFilterRelationSlugId,
-                                                                                optionFilterDepth:          field.optionFilterDepth,
-                                                                                optionFilterParentField:    field.optionFilterParentField,
-                                                                                optionFilterExpr:           field.optionFilterExpr,
-                                                                                /* dateRangeStatus 전용 */
-                                                                                linkedDateRangeKey:  field.linkedDateRangeKey,
-                                                                                beforeText:          field.beforeText,
-                                                                                beforeTextMsgKey:    field.beforeTextMsgKey,
-                                                                                inRangeText:         field.inRangeText,
-                                                                                inRangeTextMsgKey:   field.inRangeTextMsgKey,
-                                                                                afterText:           field.afterText,
-                                                                                afterTextMsgKey:     field.afterTextMsgKey,
-                                                                                statusDisplayStyle:  field.statusDisplayStyle,
-                                                                                /* 동적 조건 */
-                                                                                hideCondition:       field.hideCondition,
-                                                                                disableCondition:    field.disableCondition,
-                                                                                /* select 표시 방식 */
-                                                                                selectType:          field.selectType,
-                                                                                /* select SLUG 옵션 소스 */
-                                                                                optionSlug:          field.optionSlug,
-                                                                                optionValueKey:      field.optionValueKey,
-                                                                                optionTextKey:       field.optionTextKey,
-                                                                                optionOrderKey:      field.optionOrderKey,
-                                                                                optionOrderDir:      field.optionOrderDir,
-                                                                                optionFilter:        field.optionFilter,
-                                                                                /* 조건식 검색 연동 (select 전용, data 재사용) */
-                                                                                data:                field.data,
-                                                                            },
-                                                                            updates => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </SortableFieldWrapper>
-                                                )) : (
-                                                    <EmptyFieldDropZone rowId={row.id} />
-                                                )}
-                                            </SortableContext>
-
-                                            {/* 필드 추가 */}
-                                            {showFieldPicker === row.id ? (
-                                                <div className="border border-slate-200 rounded-md p-2 space-y-1 bg-slate-50">
-                                                    {pendingType && pendingValues ? (
-                                                        <div className="p-2 space-y-2">
-                                                            {/* 헤더 */}
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">{pendingType}</span>
-                                                                    <span className="text-[10px] font-semibold text-slate-500">필드 설정</span>
-                                                                </div>
-                                                                <button onClick={cancelAddField} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
-                                                            </div>
-
-                                                            {/* 필드 추가 패널 — 필드 컴포넌트 재사용 */}
-                                                            {renderFieldComponent(
-                                                                pendingType,
-                                                                pendingValues,
-                                                                updates => setPendingValues(prev => prev ? { ...prev, ...updates } : prev),
-                                                                {
-                                                                    autoFocus: true,
-                                                                    onLabelKeyDown: e => {
-                                                                        if (e.key === 'Enter' && pendingType !== 'dateRange' && pendingType !== 'yearMonthRange') confirmAddField();
-                                                                        if (e.key === 'Escape') cancelAddField();
-                                                                    },
-                                                                }
-                                                            )}
-
-                                                            {/* 취소 | 추가 버튼 */}
-                                                            <div className="flex gap-1.5">
-                                                                <button onClick={cancelAddField} className="px-3 py-2 border border-slate-200 text-slate-500 text-xs rounded-md hover:bg-slate-50 transition-all">취소</button>
-                                                                <button
-                                                                    onClick={confirmAddField}
-                                                                    disabled={isAddDisabled()}
-                                                                    className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-semibold rounded-md transition-all"
-                                                                >
-                                                                    추가
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        /* 필드 유형 선택 */
-                                                        <FieldPickerTypeList
-                                                            types={FIELD_TYPES}
-                                                            onSelect={type => selectFieldType(type as SearchFieldType)}
-                                                            onCancel={() => setShowFieldPicker(null)}
-                                                        />
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => { setShowFieldPicker(row.id); setPendingType(null); }}
-                                                    className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
-                                                >
-                                                    <Plus className="w-3 h-3" />필드 추가
-                                                </button>
-                                            )}
-                                        </div>
+                  {/* ── 행 내부 (접히면 숨김) ── */}
+                  {!collapsedRows.has(row.id) && (
+                    <div className="p-2 space-y-1.5">
+                      <SortableContext
+                        id={`rc-${row.id}`}
+                        items={row.fields.map((f) => f.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {/* 필드 목록 */}
+                        {row.fields.length > 0 ? (
+                          row.fields.map((field, fi) => (
+                            <SortableFieldWrapper key={field.id} id={field.id}>
+                              {(fieldHandleProps) => (
+                                <div
+                                  className={`border rounded-md transition-all ${editingField === field.id ? "border-slate-900 bg-slate-50" : "border-slate-100"}`}
+                                >
+                                  {/* 필드 헤더 */}
+                                  <div className="flex items-center gap-1.5 px-2 py-1.5">
+                                    <span
+                                      ref={fieldHandleProps.ref as React.Ref<HTMLSpanElement>}
+                                      {...(Object.fromEntries(
+                                        Object.entries(fieldHandleProps).filter(([k]) => k !== "ref")
+                                      ) as React.HTMLAttributes<HTMLSpanElement>)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="cursor-grab active:cursor-grabbing touch-none flex-shrink-0 px-1 rounded hover:bg-slate-100"
+                                    >
+                                      <GripVertical className="w-3 h-3 text-slate-400" />
+                                    </span>
+                                    <span className="text-[10px] px-1 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">
+                                      {field.type}
+                                    </span>
+                                    <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
+                                      {field.type === "dateRange" || field.type === "yearMonthRange"
+                                        ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : field.label2 || ""}`
+                                        : field.labelMsgKey
+                                          ? t(field.labelMsgKey)
+                                          : field.label}
+                                    </span>
+                                    {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
+                                    {field.excludeFromSearch && (
+                                      <span className="text-[9px] px-1 py-0.5 bg-slate-200 text-slate-500 rounded font-medium">
+                                        검색제외
+                                      </span>
                                     )}
-                                </div>
-                            )}
-                        </SortableRowWrapper>
-                    ))}
-                </SortableContext>
-            </DndContext>
+                                    {field.colSpan > 1 && (
+                                      <span className="text-[10px] text-slate-400">×{field.colSpan}</span>
+                                    )}
+                                    <div className="flex items-center gap-0.5">
+                                      <button
+                                        onClick={() => moveFieldInRow(row.id, fi, "up")}
+                                        disabled={fi === 0}
+                                        className="p-1 rounded text-slate-400 hover:bg-slate-100 disabled:opacity-30"
+                                      >
+                                        <ChevronUp className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => moveFieldInRow(row.id, fi, "down")}
+                                        disabled={fi === row.fields.length - 1}
+                                        className="p-1 rounded text-slate-400 hover:bg-slate-100 disabled:opacity-30"
+                                      >
+                                        <ChevronDown className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingField(editingField === field.id ? null : field.id)}
+                                        className="p-1 rounded text-slate-400 hover:bg-slate-100"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => removeSearchField(row.id, field.id)}
+                                        className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
 
-            {/* 행 추가 버튼 */}
-            <button
-                onClick={addRow}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
-            >
-                <Plus className="w-3.5 h-3.5" />행 추가
-            </button>
-        </div>
-    );
+                                  {/* 필드 편집 패널 — 필드 컴포넌트 재사용 */}
+                                  {editingField === field.id && (
+                                    <div className="px-2 pb-1.5 pt-1 space-y-1.5 border-t border-slate-100">
+                                      {renderFieldComponent(
+                                        field.type,
+                                        {
+                                          label: field.label,
+                                          labelMsgKey: field.labelMsgKey,
+                                          label2: field.label2,
+                                          label2MsgKey: field.label2MsgKey,
+                                          fieldKey: field.fieldKey || "",
+                                          fieldKey2: field.fieldKey2,
+                                          colSpan: field.colSpan,
+                                          placeholder: field.placeholder,
+                                          placeholderMsgKey: field.placeholderMsgKey,
+                                          description: field.description,
+                                          descriptionMsgKey: field.descriptionMsgKey,
+                                          required: field.required,
+                                          excludeFromSearch: field.excludeFromSearch,
+                                          options: field.options,
+                                          codeGroupCode: field.codeGroupCode,
+                                          multiSelect: field.multiSelect,
+                                          minLength: field.minLength,
+                                          maxLength: field.maxLength,
+                                          pattern: field.pattern,
+                                          patternDesc: field.patternDesc,
+                                          minSelect: field.minSelect,
+                                          maxSelect: field.maxSelect,
+                                          defaultValue: field.defaultValue,
+                                          defaultValueMsgKey: field.defaultValueMsgKey,
+                                          defaultOptionValue: field.defaultOptionValue,
+                                          defaultDateOffset: field.defaultDateOffset,
+                                          defaultDate: field.defaultDate,
+                                          disablePast: field.disablePast,
+                                          defaultToday: field.defaultToday,
+                                          defaultStartDateOffset: field.defaultStartDateOffset,
+                                          defaultStartDate: field.defaultStartDate,
+                                          disableStartPast: field.disableStartPast,
+                                          defaultStartToday: field.defaultStartToday,
+                                          defaultEndDateOffset: field.defaultEndDateOffset,
+                                          defaultEndDate: field.defaultEndDate,
+                                          disableEndPast: field.disableEndPast,
+                                          defaultEndToday: field.defaultEndToday,
+                                          /* date 서브타입 (yearMonth 기존 데이터 → yearMonth fallback) */
+                                          dateSubType:
+                                            field.dateSubType ?? (field.type === "yearMonth" ? "yearMonth" : undefined),
+                                          /* dateRange 서브타입 (yearMonthRange 기존 데이터 → yearMonth fallback) */
+                                          rangeSubType:
+                                            field.rangeSubType ??
+                                            (field.type === "yearMonthRange" ? "yearMonth" : undefined),
+                                          singleDateRange: field.singleDateRange,
+                                          maxRangeValue: field.maxRangeValue,
+                                          maxRangeUnit: field.maxRangeUnit,
+                                          /* category 전용 */
+                                          dbSlug: field.dbSlug,
+                                          relationSlugId: field.relationSlugId,
+                                          maxDepth: field.maxDepth,
+                                          activeDepths: field.activeDepths,
+                                          depthLabels: field.depthLabels,
+                                          depthLabelMsgKeys: field.depthLabelMsgKeys,
+                                          depthValueFields: field.depthValueFields,
+                                          depthTextFields: field.depthTextFields,
+                                          depthFilters: field.depthFilters,
+                                          depthParentFields: field.depthParentFields,
+                                          /* 옵션 사전필터 */
+                                          optionFilterRelationSlugId: field.optionFilterRelationSlugId,
+                                          optionFilterDepth: field.optionFilterDepth,
+                                          optionFilterParentField: field.optionFilterParentField,
+                                          optionFilterExpr: field.optionFilterExpr,
+                                          /* dateRangeStatus 전용 */
+                                          linkedDateRangeKey: field.linkedDateRangeKey,
+                                          beforeText: field.beforeText,
+                                          beforeTextMsgKey: field.beforeTextMsgKey,
+                                          inRangeText: field.inRangeText,
+                                          inRangeTextMsgKey: field.inRangeTextMsgKey,
+                                          afterText: field.afterText,
+                                          afterTextMsgKey: field.afterTextMsgKey,
+                                          statusDisplayStyle: field.statusDisplayStyle,
+                                          /* 동적 조건 */
+                                          hideCondition: field.hideCondition,
+                                          disableCondition: field.disableCondition,
+                                          /* select 표시 방식 */
+                                          selectType: field.selectType,
+                                          /* select SLUG 옵션 소스 */
+                                          optionSlug: field.optionSlug,
+                                          optionValueKey: field.optionValueKey,
+                                          optionTextKey: field.optionTextKey,
+                                          optionOrderKey: field.optionOrderKey,
+                                          optionOrderDir: field.optionOrderDir,
+                                          optionFilter: field.optionFilter,
+                                          /* 조건식 검색 연동 (select 전용, data 재사용) */
+                                          data: field.data,
+                                          /* 조인 검색 연동 (select/input 전용) */
+                                          joinRelationSlugId: field.joinRelationSlugId,
+                                          joinSlaveKey: field.joinSlaveKey,
+                                        },
+                                        (updates) => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </SortableFieldWrapper>
+                          ))
+                        ) : (
+                          <EmptyFieldDropZone rowId={row.id} />
+                        )}
+                      </SortableContext>
+
+                      {/* 필드 추가 */}
+                      {showFieldPicker === row.id ? (
+                        <div className="border border-slate-200 rounded-md p-2 space-y-1 bg-slate-50">
+                          {pendingType && pendingValues ? (
+                            <div className="p-2 space-y-2">
+                              {/* 헤더 */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">
+                                    {pendingType}
+                                  </span>
+                                  <span className="text-[10px] font-semibold text-slate-500">필드 설정</span>
+                                </div>
+                                <button onClick={cancelAddField} className="text-slate-400 hover:text-slate-600">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* 필드 추가 패널 — 필드 컴포넌트 재사용 */}
+                              {renderFieldComponent(
+                                pendingType,
+                                pendingValues,
+                                (updates) => setPendingValues((prev) => (prev ? { ...prev, ...updates } : prev)),
+                                {
+                                  autoFocus: true,
+                                  onLabelKeyDown: (e) => {
+                                    if (
+                                      e.key === "Enter" &&
+                                      pendingType !== "dateRange" &&
+                                      pendingType !== "yearMonthRange"
+                                    )
+                                      confirmAddField();
+                                    if (e.key === "Escape") cancelAddField();
+                                  },
+                                }
+                              )}
+
+                              {/* 취소 | 추가 버튼 */}
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={cancelAddField}
+                                  className="px-3 py-2 border border-slate-200 text-slate-500 text-xs rounded-md hover:bg-slate-50 transition-all"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  onClick={confirmAddField}
+                                  disabled={isAddDisabled()}
+                                  className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-semibold rounded-md transition-all"
+                                >
+                                  추가
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* 필드 유형 선택 */
+                            <FieldPickerTypeList
+                              types={FIELD_TYPES}
+                              onSelect={(type) => selectFieldType(type as SearchFieldType)}
+                              onCancel={() => setShowFieldPicker(null)}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setShowFieldPicker(row.id);
+                            setPendingType(null);
+                          }}
+                          className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
+                        >
+                          <Plus className="w-3 h-3" />
+                          필드 추가
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </SortableRowWrapper>
+          ))}
+        </SortableContext>
+      </DndContext>
+
+      {/* 행 추가 버튼 */}
+      <button
+        onClick={addRow}
+        className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
+      >
+        <Plus className="w-3.5 h-3.5" />행 추가
+      </button>
+    </div>
+  );
 }

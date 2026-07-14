@@ -11,9 +11,17 @@
  * 미리 계산해두고(computeOptionPreFilter) 각 depth 옵션을 로드할 때마다 그 집합과 교집합해서
  * 최종 옵션으로 보여준다. 설정이 없으면 기존과 동일하게 전체 옵션을 그대로 보여준다.
  *
+ * depthValues(화면에 보이는 depth별 선택값)는 이 훅 내부 로컬 state로 관리된다. 검색폼
+ * "초기화" 버튼처럼 부모가 검색값 전체를 비우는 경우 이 필드의 value prop만 ''로 내려오고
+ * 로컬 depthValues는 그대로 남아있어 selectbox 텍스트가 이전 선택값으로 계속 보이는 문제가
+ * 있었다. 이를 막기 위해 handleSelect가 스스로 onChange로 넘긴 값을 lastOwnValueRef에 기록해
+ * 두고, value prop이 그 값과 다르게(=우리가 만든 변화가 아니게) 바뀌면 "외부 리셋"으로 간주해
+ * depthValues/depthOptions를 함께 비운다(외부 value로 캐스케이드를 역으로 복원하지는 않음 —
+ * 기존과 동일하게 정방향 전용 유지).
+ *
  * 사용법:
  *   const { depthValues, depthOptions, depthLoading, disabledDepths, handleSelect }
- *     = useCategoryCascade({ mode, field, onChange });
+ *     = useCategoryCascade({ mode, field, value, onChange });
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -33,6 +41,8 @@ export interface CategoryItem {
 interface UseCategoryCascadeParams {
   mode: RendererMode;
   field: SearchFieldConfig;
+  /** 상위(부모)가 관리하는 현재 필드 값 — 검색폼 초기화 등 외부 리셋 감지용 */
+  value?: string;
   onChange?: (v: string) => void;
 }
 
@@ -107,7 +117,12 @@ async function fetchDepthItems(params: {
   });
 }
 
-export function useCategoryCascade({ mode, field, onChange }: UseCategoryCascadeParams): UseCategoryCascadeResult {
+export function useCategoryCascade({
+  mode,
+  field,
+  value = "",
+  onChange,
+}: UseCategoryCascadeParams): UseCategoryCascadeResult {
   const isPreview = mode === "preview";
 
   /* 화면에 노출할 depth 번호 배열 — 미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth] 파생 (하위호환) */
@@ -128,6 +143,10 @@ export function useCategoryCascade({ mode, field, onChange }: UseCategoryCascade
 
   /* 옵션 사전필터로 계산된 "depth별 허용 value 집합" — 설정이 없거나 계산 전이면 null(=제한 없음) */
   const allowedSetsRef = useRef<(Set<string> | null)[]>(Array(depthCount).fill(null));
+
+  /* handleSelect가 스스로 onChange로 넘긴 마지막 값 — 마운트 시 초기 value로 시작해서
+     "우리가 만든 변화"인지 "부모가 강제로 되돌린 변화(초기화 등)"인지 구분하는 기준이 된다 */
+  const lastOwnValueRef = useRef(value);
 
   const [depthValues, setDepthValues] = useState<string[]>(Array(depthCount).fill(""));
   const [depthOptions, setDepthOptions] = useState<CategoryItem[][]>(Array(depthCount).fill([]));
@@ -301,6 +320,32 @@ export function useCategoryCascade({ mode, field, onChange }: UseCategoryCascade
     };
   }, [isPreview, field.optionFilterDepth, computeOptionPreFilter, loadDepthOptions]);
 
+  /* ══════════════════════════════════════════ */
+  /*  외부 리셋 감지 — 검색폼 초기화 등으로 value prop이 강제로 바뀌면 로컬 선택값도 함께 비움  */
+  /* ══════════════════════════════════════════ */
+
+  /**
+   * value prop이 lastOwnValueRef(우리가 마지막으로 emit한 값)와 다르게 바뀌면, 그 변화는
+   * 이 훅이 만든 게 아니라 부모(검색폼 초기화 등)가 강제로 되돌린 것이다. 이때 value가
+   * 빈 문자열이면 로컬 depthValues 전체와 depth 1 이후 옵션을 함께 비운다(depth 0 옵션은
+   * dbSlug 전체 목록이라 선택과 무관하므로 유지 — handleSelect의 하위 초기화와 동일한 범위).
+   * value===lastOwnValueRef.current(우리가 스스로 만든 변화, 예: 중간 depth를 사용자가 직접
+   * 지운 경우)이면 이미 depthValues가 올바르게 부분 초기화돼 있으므로 아무것도 하지 않는다.
+   */
+  useEffect(() => {
+    if (isPreview) return;
+    if (value === lastOwnValueRef.current) return;
+    lastOwnValueRef.current = value;
+    if (value === "") {
+      setDepthValues(Array(depthCount).fill(""));
+      setDepthOptions((prev) => {
+        const next = [...prev];
+        for (let i = 1; i < depthCount; i++) next[i] = [];
+        return next;
+      });
+    }
+  }, [value, isPreview, depthCount]);
+
   /**
    * depth selectbox 선택 처리 — idx는 activeDepths 배열의 0-based 위치.
    * 하위 depth 선택값·옵션을 초기화하고, 다음 depth가 있으면 그 옵션을 로드한다.
@@ -318,6 +363,9 @@ export function useCategoryCascade({ mode, field, onChange }: UseCategoryCascade
         for (let i = idx + 1; i < depthCount; i++) next[i] = [];
         return next;
       });
+      /* 부모로 값을 올리기 전에 "우리가 만든 변화"임을 기록 — 다음 렌더에서 value prop이
+         이 값으로 내려와도 위 리셋 감지 effect가 다시 손대지 않도록 함 */
+      lastOwnValueRef.current = selectedValue;
       onChange?.(selectedValue);
       if (selectedValue && idx < depthCount - 1) {
         loadDepthOptions(idx + 1, selectedValue);

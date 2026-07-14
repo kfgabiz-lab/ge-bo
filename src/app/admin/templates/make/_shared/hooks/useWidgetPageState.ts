@@ -21,8 +21,32 @@ import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
-import { buildDataJson, buildDataSavePayload, validateFormFields, validateSubListRows, uploadFiles, flattenPageDataItem, applySortChange, initFormDefaultValues, validateDataSaveWidgets, saveTableRows, processFormFilesAndSubList, evalFieldCondition, validateSearchDateRange, parseActionParams } from "../utils";
-import { entityApiPath, entityItemPath, normalizeEntityRow, normalizeEntityPageEnvelope, buildEntityRequestBody, buildEntityDateFieldMeta, buildSubListEntityDateFieldMeta, restoreEntityDateFields } from "../utils/entityApi";
+import {
+  buildDataJson,
+  buildDataSavePayload,
+  validateFormFields,
+  validateSubListRows,
+  uploadFiles,
+  flattenPageDataItem,
+  applySortChange,
+  initFormDefaultValues,
+  validateDataSaveWidgets,
+  saveTableRows,
+  processFormFilesAndSubList,
+  evalFieldCondition,
+  validateSearchDateRange,
+  parseActionParams,
+} from "../utils";
+import {
+  entityApiPath,
+  entityItemPath,
+  normalizeEntityRow,
+  normalizeEntityPageEnvelope,
+  buildEntityRequestBody,
+  buildEntityDateFieldMeta,
+  buildSubListEntityDateFieldMeta,
+  restoreEntityDateFields,
+} from "../utils/entityApi";
 import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
@@ -57,12 +81,15 @@ export function stampConnectedSlug<
   W extends { type: string; connectedSlug?: string },
   C extends { widget: W },
   T extends { contents: C[] },
->(widgetItems: T[], defaultSlug: string | undefined,
-  targetTypes: string[] = ["form", "table", "sublist", "multiselect"]): T[] {
+>(
+  widgetItems: T[],
+  defaultSlug: string | undefined,
+  targetTypes: string[] = ["form", "table", "sublist", "multiselect"]
+): T[] {
   if (!defaultSlug) return widgetItems;
-  return widgetItems.map(item => ({
+  return widgetItems.map((item) => ({
     ...item,
-    contents: item.contents.map(c => {
+    contents: item.contents.map((c) => {
       if (!targetTypes.includes(c.widget.type)) return c;
       if (c.widget.connectedSlug) return c;
       return { ...c, widget: { ...c.widget, connectedSlug: defaultSlug } };
@@ -126,13 +153,13 @@ interface UseWidgetPageStateOptions {
  */
 function findSection(dataJson: Record<string, unknown>, contentKey: string | undefined): Record<string, unknown> {
   if (!contentKey) return dataJson;
-  if (dataJson[contentKey] && typeof dataJson[contentKey] === 'object') {
+  if (dataJson[contentKey] && typeof dataJson[contentKey] === "object") {
     return dataJson[contentKey] as Record<string, unknown>;
   }
   for (const val of Object.values(dataJson)) {
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
       const nested = (val as Record<string, unknown>)[contentKey];
-      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
         return nested as Record<string, unknown>;
       }
     }
@@ -165,44 +192,50 @@ async function restoreFormDataFromJson(
   setFormValuesMap: React.Dispatch<React.SetStateAction<Record<string, Record<string, string>>>>,
   setSubListRowsMap: React.Dispatch<React.SetStateAction<Record<string, SubListRow[]>>>,
   setMultiSelectValuesMap: React.Dispatch<React.SetStateAction<Record<string, number[]>>>,
-  setMultiSelectExtraFieldValuesMap: React.Dispatch<React.SetStateAction<Record<string, Record<number, Record<string, string>>>>>,
-  setExistingFileMetaMap: React.Dispatch<React.SetStateAction<Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>>>,
+  setMultiSelectExtraFieldValuesMap: React.Dispatch<
+    React.SetStateAction<Record<string, Record<number, Record<string, string>>>>
+  >,
+  setExistingFileMetaMap: React.Dispatch<
+    React.SetStateAction<Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>>
+  >,
   setImgBlobUrls: React.Dispatch<React.SetStateAction<Record<number, string>>>,
-  isEntity?: boolean,
+  isEntity?: boolean
 ): Promise<void> {
   /* 폼 필드 값 복원 */
-  forms.forEach(fw => {
+  forms.forEach((fw) => {
     const section = findSection(dataJson, fw.contentKey);
     const vals: Record<string, string> = {};
-    fw.fields.forEach(f => {
+    fw.fields.forEach((f) => {
       if (!f.fieldKey) return;
-      if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+      if (f.type === "dateRange" || f.type === "yearMonthRange") {
         /* dateRange/yearMonthRange 복원 키 — fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키로 복원,
            미지정 시 기존처럼 dataJson에서 _from/_to 분리 키로 복원(buildDataJson과 대칭) */
-        const fromVal = f.fieldKey2 ? section[f.fieldKey] : section[f.fieldKey + '_from'];
-        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[f.fieldKey + '_to'];
-        if (fromVal !== undefined) vals[f.id + '_from'] = String(fromVal ?? '');
-        if (toVal !== undefined) vals[f.id + '_to'] = String(toVal ?? '');
-      } else if (f.type === 'address') {
+        const fromVal = f.fieldKey2 ? section[f.fieldKey] : section[f.fieldKey + "_from"];
+        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[f.fieldKey + "_to"];
+        if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
+        if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
+      } else if (f.type === "address") {
         /* address(주소검색) 복원 — buildDataJson과 대칭: fieldKey/fieldKey_lat/fieldKey_lng 3개
            flat 키에서 각각 복원한다 (dateRange의 _from/_to 복원과 동일한 패턴) */
-        if (section[f.fieldKey] !== undefined) vals[f.id] = String(section[f.fieldKey] ?? '');
-        if (section[f.fieldKey + '_lat'] !== undefined) vals[f.id + '_lat'] = String(section[f.fieldKey + '_lat'] ?? '');
-        if (section[f.fieldKey + '_lng'] !== undefined) vals[f.id + '_lng'] = String(section[f.fieldKey + '_lng'] ?? '');
+        if (section[f.fieldKey] !== undefined) vals[f.id] = String(section[f.fieldKey] ?? "");
+        if (section[f.fieldKey + "_lat"] !== undefined)
+          vals[f.id + "_lat"] = String(section[f.fieldKey + "_lat"] ?? "");
+        if (section[f.fieldKey + "_lng"] !== undefined)
+          vals[f.id + "_lng"] = String(section[f.fieldKey + "_lng"] ?? "");
       } else if (section[f.fieldKey] !== undefined) {
         const raw = section[f.fieldKey];
-        if (!Array.isArray(raw)) vals[f.id] = String(raw ?? '');
+        if (!Array.isArray(raw)) vals[f.id] = String(raw ?? "");
       }
     });
-    setFormValuesMap(prev => ({ ...prev, [fw.widgetId]: vals }));
+    setFormValuesMap((prev) => ({ ...prev, [fw.widgetId]: vals }));
   });
 
   /* SubList 행 복원 */
-  sublists.forEach(sw => {
+  sublists.forEach((sw) => {
     const raw = sw.contentKey ? dataJson[sw.contentKey] : null;
     /* { rows } 래핑 제거 후 배열 직접 저장 방식 */
-    const rawRows = Array.isArray(raw) ? raw as Record<string, unknown>[] : [];
-    setSubListRowsMap(prev => ({
+    const rawRows = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+    setSubListRowsMap((prev) => ({
       ...prev,
       [sw.widgetId]: rawRows.map((r, i) => ({
         _rowId: (r.id as string) ?? `row-${i}`,
@@ -212,25 +245,25 @@ async function restoreFormDataFromJson(
   });
 
   /* MultiSelect 값 복원 */
-  multiSels.forEach(mw => {
+  multiSels.forEach((mw) => {
     if (!mw.contentKey) return;
     /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
-    const rel = dataJson['_rel'] as Record<string, unknown> | undefined;
+    const rel = dataJson["_rel"] as Record<string, unknown> | undefined;
     const raw = (mw.connectedSlug ? rel?.[mw.connectedSlug] : undefined) ?? dataJson[mw.contentKey];
     if (!Array.isArray(raw)) return;
-    if (raw.length > 0 && typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
+    if (raw.length > 0 && typeof raw[0] === "object" && raw[0] !== null && "id" in (raw[0] as object)) {
       const items = raw as { id: number; [key: string]: unknown }[];
-      setMultiSelectValuesMap(prev => ({ ...prev, [mw.widgetId]: items.map(i => i.id) }));
+      setMultiSelectValuesMap((prev) => ({ ...prev, [mw.widgetId]: items.map((i) => i.id) }));
       const extraVals: Record<number, Record<string, string>> = {};
-      items.forEach(item => {
+      items.forEach((item) => {
         const { id, ...fields } = item;
-        extraVals[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')]));
+        extraVals[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? "")]));
       });
-      setMultiSelectExtraFieldValuesMap(prev => ({ ...prev, [mw.widgetId]: extraVals }));
+      setMultiSelectExtraFieldValuesMap((prev) => ({ ...prev, [mw.widgetId]: extraVals }));
     } else {
-      setMultiSelectValuesMap(prev => ({
+      setMultiSelectValuesMap((prev) => ({
         ...prev,
-        [mw.widgetId]: (raw as unknown[]).filter(x => typeof x === 'number') as number[],
+        [mw.widgetId]: (raw as unknown[]).filter((x) => typeof x === "number") as number[],
       }));
     }
   });
@@ -239,9 +272,9 @@ async function restoreFormDataFromJson(
   try {
     const fileIds: number[] = [];
     const collectIds = (obj: Record<string, unknown>) => {
-      Object.values(obj).forEach(v => {
-        if (Array.isArray(v) && v.every(x => typeof x === 'number')) fileIds.push(...v as number[]);
-        else if (v && typeof v === 'object' && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
+      Object.values(obj).forEach((v) => {
+        if (Array.isArray(v) && v.every((x) => typeof x === "number")) fileIds.push(...(v as number[]));
+        else if (v && typeof v === "object" && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
       });
     };
     collectIds(dataJson);
@@ -250,37 +283,46 @@ async function restoreFormDataFromJson(
       /* entity 모드: file_meta 전용 API 사용 — 응답 필드명이 origName이 아닌 originalName(camelCase)
        * 이라 조회 직후 기존 { id, origName, fileSize } 형태로 맞춰 이후 로직은 공용으로 재사용한다. */
       const metaList = isEntity
-        ? await api.get('/file-meta', { params: { ids: fileIds.join(',') } })
-            .then(r => (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[])
-              .map(m => ({ id: m.id, origName: m.originalName, fileSize: m.fileSize })))
-        : await api.get('/page-files/meta', { params: { ids: fileIds.join(',') } })
-            .then(r => r.data as { id: number; origName: string; fileSize: number; mimeType: string }[]);
-      forms.forEach(fw => {
+        ? await api
+            .get("/file-meta", { params: { ids: fileIds.join(",") } })
+            .then((r) =>
+              (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[]).map((m) => ({
+                id: m.id,
+                origName: m.originalName,
+                fileSize: m.fileSize,
+              }))
+            )
+        : await api
+            .get("/page-files/meta", { params: { ids: fileIds.join(",") } })
+            .then((r) => r.data as { id: number; origName: string; fileSize: number; mimeType: string }[]);
+      forms.forEach((fw) => {
         const section = findSection(dataJson, fw.contentKey);
         const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
-        fw.fields.forEach(f => {
-          if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) return;
+        fw.fields.forEach((f) => {
+          if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
           const ids = section[f.fieldKey];
           if (!Array.isArray(ids)) return;
-          metaByFieldId[f.id] = (ids as number[]).map(id => {
-            const m = metaList.find(m => m.id === id);
-            return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: '', fileSize: 0 };
+          metaByFieldId[f.id] = (ids as number[]).map((id) => {
+            const m = metaList.find((m) => m.id === id);
+            return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: "", fileSize: 0 };
           });
-          if (f.type === 'image' || f.type === 'video' || f.type === 'media') {
-            (ids as number[]).forEach(id => {
+          if (f.type === "image" || f.type === "video" || f.type === "media") {
+            (ids as number[]).forEach((id) => {
               const blobReq = isEntity
-                ? api.get(`/file-meta/${id}/download`, { responseType: 'blob' })
-                : api.get(`/page-files/${id}`, { responseType: 'blob' });
+                ? api.get(`/file-meta/${id}/download`, { responseType: "blob" })
+                : api.get(`/page-files/${id}`, { responseType: "blob" });
               blobReq
-                .then(r => setImgBlobUrls(prev => ({ ...prev, [id]: URL.createObjectURL(r.data) })))
+                .then((r) => setImgBlobUrls((prev) => ({ ...prev, [id]: URL.createObjectURL(r.data) })))
                 .catch(() => {});
             });
           }
         });
-        setExistingFileMetaMap(prev => ({ ...prev, [fw.widgetId]: metaByFieldId }));
+        setExistingFileMetaMap((prev) => ({ ...prev, [fw.widgetId]: metaByFieldId }));
       });
     }
-  } catch { /* 파일 없으면 조용히 처리 */ }
+  } catch {
+    /* 파일 없으면 조용히 처리 */
+  }
 }
 
 /**
@@ -293,7 +335,7 @@ async function restoreFormDataFromJson(
 function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   Object.entries(dataJson).forEach(([key, val]) => {
-    if (key.startsWith('_fetchedRel')) {
+    if (key.startsWith("_fetchedRel")) {
       result[key] = val;
     }
   });
@@ -303,7 +345,7 @@ function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, 
 export function useWidgetPageState(
   widgetItems: PageWidgetItem[],
   pageSlug?: string,
-  options?: UseWidgetPageStateOptions,
+  options?: UseWidgetPageStateOptions
 ) {
   /* URL 파라미터 — 폼 필드 초기값 세팅용 */
   const searchParams = useSearchParams();
@@ -314,7 +356,7 @@ export function useWidgetPageState(
 
   /* 페이지 레벨 메인 연결이 Slug Entity API(/api/v1/{slug})를 가리키는지 여부 —
    * connectedType이 'data'면 Table 위젯이 entity REST API로 데이터를 조회한다. */
-  const pageIsEntity = options?.connectedType === 'data';
+  const pageIsEntity = options?.connectedType === "data";
 
   /* 검색 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>({});
@@ -346,14 +388,14 @@ export function useWidgetPageState(
   /** fileId → blob URL 캐시 (이미지 필드 미리보기용) */
   const [imgBlobUrls, setImgBlobUrls] = useState<Record<number, string>>({});
   /** SubList 파일 — widgetId → rowId → colId → 새로 선택한 파일 목록 */
-  const [subListFileMap, setSubListFileMap] = useState<
-    Record<string, Record<string, Record<string, File[]>>>
-  >({});
+  const [subListFileMap, setSubListFileMap] = useState<Record<string, Record<string, Record<string, File[]>>>>({});
 
   /* 멀티셀렉트 */
   const [multiSelectValuesMap, setMultiSelectValuesMap] = useState<Record<string, number[]>>({});
   /** widgetId → itemId → fieldKey → value */
-  const [multiSelectExtraFieldValuesMap, setMultiSelectExtraFieldValuesMap] = useState<Record<string, Record<number, Record<string, string>>>>({});
+  const [multiSelectExtraFieldValuesMap, setMultiSelectExtraFieldValuesMap] = useState<
+    Record<string, Record<number, Record<string, string>>>
+  >({});
 
   /* 수정 모드 group_id (신규 저장 후 다음 저장 시 수정 모드로 처리) */
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
@@ -369,9 +411,12 @@ export function useWidgetPageState(
    * (위젯 빌더 widget/page.tsx의 apiInfoOptions 조회와 동일한 패턴 — mount 1회 useEffect) */
   const [apiInfoOptions, setApiInfoOptions] = useState<ApiInfoOption[]>([]);
   useEffect(() => {
-    api.get('/api-infos/active')
+    api
+      .get("/api-infos/active")
       .then((res) => setApiInfoOptions(res.data || []))
-      .catch(() => { /* 조회 실패 시 빈 배열 유지 — 버튼 클릭 시 "연결된 API 없음" 안내로 처리 */ });
+      .catch(() => {
+        /* 조회 실패 시 빈 배열 유지 — 버튼 클릭 시 "연결된 API 없음" 안내로 처리 */
+      });
   }, []);
 
   /* 테이블 데이터 fetch */
@@ -427,7 +472,9 @@ export function useWidgetPageState(
         if (!isEntity) {
           /* fieldKey → fieldId 역매핑 — hideCondition 평가용 */
           const keyToId: Record<string, string> = {};
-          searchFields.forEach((f) => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
+          searchFields.forEach((f) => {
+            if (f.fieldKey) keyToId[f.fieldKey] = f.id;
+          });
           searchFields.forEach((f) => {
             /* 검색제외 필드는 API 파라미터에서 제외 */
             if (f.excludeFromSearch) return;
@@ -435,22 +482,22 @@ export function useWidgetPageState(
             const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, sv) : false;
             if (f.hideCondition && hideResult) return;
             /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
-            if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
+            if (f.type === "dateRange" || f.type === "yearMonthRange") {
               const paramKey = f.fieldKey || f.label;
-              const from = sv[f.id + '_from'];
-              const to   = sv[f.id + '_to'];
+              const from = sv[f.id + "_from"];
+              const to = sv[f.id + "_to"];
               if (paramKey) {
                 /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
                 if (f.singleDateRange) {
                   if (from?.trim()) params[`${paramKey}_gte`] = from;
-                  if (to?.trim())   params[`${paramKey}_lte`] = to;
+                  if (to?.trim()) params[`${paramKey}_lte`] = to;
                 } else if (f.fieldKey2) {
                   /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
                   if (from?.trim()) params[paramKey] = from;
-                  if (to?.trim())   params[f.fieldKey2] = to;
+                  if (to?.trim()) params[f.fieldKey2] = to;
                 } else {
                   if (from?.trim()) params[`${paramKey}_from`] = from;
-                  if (to?.trim())   params[`${paramKey}_to`]   = to;
+                  if (to?.trim()) params[`${paramKey}_to`] = to;
                 }
               }
               return;
@@ -458,13 +505,24 @@ export function useWidgetPageState(
             const val = sv[f.id];
             if (!val || !val.trim()) return;
             /* category + relationSlugId: FILTER slug_relation 파라미터 */
-            if (f.type === 'category' && f.relationSlugId) {
+            if (f.type === "category" && f.relationSlugId) {
               params[`rel_${f.relationSlugId}`] = val;
+              return;
+            }
+            /* select/input + joinRelationSlugId: 조인 검색 연동 파라미터 — 연결된 slug의 필드 값으로 다른 목록을 필터링
+               연산자는 필드 타입으로 자동 결정: select → EQ(정확일치), input → ILIKE(부분일치, joink_ 값 앞에 '~' 마커 부여) */
+            if ((f.type === "select" || f.type === "input") && f.joinRelationSlugId && f.joinSlaveKey) {
+              const joinParamKey = f.fieldKey || f.label;
+              if (joinParamKey) {
+                params[`joinr_${joinParamKey}`] = String(f.joinRelationSlugId);
+                params[`joink_${joinParamKey}`] = f.type === "input" ? `~${f.joinSlaveKey}` : f.joinSlaveKey;
+                params[`joinv_${joinParamKey}`] = val;
+              }
               return;
             }
             /* select + data(조건식 "cond?트루텍스트:펄스텍스트"): evalConditionExpr 문법 재사용 —
                condexpr_{fieldKey}=조건식 원문 + condval_{fieldKey}=선택값 그대로 전송, 필드명 파싱은 서버가 담당 */
-            if (f.type === 'select' && f.data?.includes('?')) {
+            if (f.type === "select" && f.data?.includes("?")) {
               const paramKey = f.fieldKey || f.label;
               if (paramKey) {
                 params[`condexpr_${paramKey}`] = f.data;
@@ -473,7 +531,7 @@ export function useWidgetPageState(
               return;
             }
             /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
-            if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
+            if (f.type === "dateRangeStatus" && f.linkedDateRangeKey) {
               params[`drs_${f.linkedDateRangeKey}`] = val;
             } else {
               const paramKey = f.fieldKey || f.label;
@@ -552,7 +610,7 @@ export function useWidgetPageState(
   useEffect(() => {
     if (!widgetItems.length) return;
 
-    const formWidgets = flatWidgets(widgetItems).filter(w => w.type === 'form') as FormWidget[];
+    const formWidgets = flatWidgets(widgetItems).filter((w) => w.type === "form") as FormWidget[];
 
     /* 공통 함수로 모든 타입의 기본값 초기화 */
     const patch = initFormDefaultValues(formWidgets, t);
@@ -570,7 +628,7 @@ export function useWidgetPageState(
       });
     });
 
-    if (Object.values(patch).every(v => Object.keys(v).length === 0)) return;
+    if (Object.values(patch).every((v) => Object.keys(v).length === 0)) return;
 
     setFormValuesMap((prev) => {
       const next = { ...prev };
@@ -585,93 +643,107 @@ export function useWidgetPageState(
   useEffect(() => {
     if (!widgetItems.length) return;
     const initVals: Record<string, string> = {};
-    flatWidgets(widgetItems).forEach(w => {
-      if (w.type !== 'search') return;
-      (w.rows as { fields: SearchFieldConfig[] }[]).flatMap(r => r.fields).forEach((f: SearchFieldConfig) => {
-        if ((f.type === 'date' || f.type === 'yearMonth') && (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)) {
-          /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
-          const subType = f.type === 'yearMonth' ? 'yearMonth' : (f.dateSubType ?? 'date');
-          const calcDateBySubType = (offset: number): string => {
-            const d = new Date(); d.setDate(d.getDate() - offset);
-            const iso = d.toISOString();
-            if (subType === 'yearMonth') return iso.slice(0, 7);
-            if (subType === 'datetime') return iso.slice(0, 16);
-            return iso.slice(0, 10);
-          };
-          let val = '';
-          if (f.defaultToday) {
-            /* 오늘날짜 ON: 오늘 날짜를 subType 포맷으로 반환 */
-            const iso = new Date().toISOString();
-            if (subType === 'yearMonth') val = iso.slice(0, 7);
-            else if (subType === 'datetime') val = iso.slice(0, 16);
-            else val = iso.slice(0, 10);
-          } else {
-            val = (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) ? calcDateBySubType(f.defaultDateOffset) : (f.defaultDate ?? '');
+    flatWidgets(widgetItems).forEach((w) => {
+      if (w.type !== "search") return;
+      (w.rows as { fields: SearchFieldConfig[] }[])
+        .flatMap((r) => r.fields)
+        .forEach((f: SearchFieldConfig) => {
+          if (
+            (f.type === "date" || f.type === "yearMonth") &&
+            (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)
+          ) {
+            /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
+            const subType = f.type === "yearMonth" ? "yearMonth" : (f.dateSubType ?? "date");
+            const calcDateBySubType = (offset: number): string => {
+              const d = new Date();
+              d.setDate(d.getDate() - offset);
+              const iso = d.toISOString();
+              if (subType === "yearMonth") return iso.slice(0, 7);
+              if (subType === "datetime") return iso.slice(0, 16);
+              return iso.slice(0, 10);
+            };
+            let val = "";
+            if (f.defaultToday) {
+              /* 오늘날짜 ON: 오늘 날짜를 subType 포맷으로 반환 */
+              const iso = new Date().toISOString();
+              if (subType === "yearMonth") val = iso.slice(0, 7);
+              else if (subType === "datetime") val = iso.slice(0, 16);
+              else val = iso.slice(0, 10);
+            } else {
+              val =
+                f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0
+                  ? calcDateBySubType(f.defaultDateOffset)
+                  : (f.defaultDate ?? "");
+            }
+            if (val) initVals[f.id] = val;
+          } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
+            /* rangeSubType에 따라 날짜 포맷 분기 */
+            const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
+            const calcRangeDate = (offset: number): string => {
+              const d = new Date();
+              d.setDate(d.getDate() - offset);
+              const iso = d.toISOString();
+              const pad = (n: number) => String(n).padStart(2, "0");
+              if (subType === "yearMonth") return iso.slice(0, 7);
+              if (subType === "datetime") return iso.slice(0, 16);
+              if (subType === "time") return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+              if (subType === "timeSec") return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+              return iso.slice(0, 10);
+            };
+            /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 오늘 날짜(offset 0)로 대체 */
+            const start = f.defaultStartToday
+              ? calcRangeDate(0)
+              : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
+                ? calcRangeDate(f.defaultStartDateOffset)
+                : (f.defaultStartDate ?? "");
+            const end = f.defaultEndToday
+              ? calcRangeDate(0)
+              : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
+                ? calcRangeDate(f.defaultEndDateOffset)
+                : (f.defaultEndDate ?? "");
+            /* dateRange/yearMonthRange: from/to 분리 저장 */
+            if (start) initVals[f.id + "_from"] = start;
+            if (end) initVals[f.id + "_to"] = end;
+          } else if ((f.type === "select" || f.type === "radio" || f.type === "checkbox") && f.defaultOptionValue) {
+            initVals[f.id] = f.defaultOptionValue;
+          } else if (f.defaultValue) {
+            initVals[f.id] = f.defaultValue;
           }
-          if (val) initVals[f.id] = val;
-        } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-          /* rangeSubType에 따라 날짜 포맷 분기 */
-          const subType = f.rangeSubType ?? (f.type === 'yearMonthRange' ? 'yearMonth' : 'date');
-          const calcRangeDate = (offset: number): string => {
-            const d = new Date(); d.setDate(d.getDate() - offset);
-            const iso = d.toISOString();
-            const pad = (n: number) => String(n).padStart(2, '0');
-            if (subType === 'yearMonth') return iso.slice(0, 7);
-            if (subType === 'datetime')  return iso.slice(0, 16);
-            if (subType === 'time')      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            if (subType === 'timeSec')   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-            return iso.slice(0, 10);
-          };
-          /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 오늘 날짜(offset 0)로 대체 */
-          const start = f.defaultStartToday
-            ? calcRangeDate(0)
-            : (f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0) ? calcRangeDate(f.defaultStartDateOffset) : (f.defaultStartDate ?? '');
-          const end = f.defaultEndToday
-            ? calcRangeDate(0)
-            : (f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0) ? calcRangeDate(f.defaultEndDateOffset) : (f.defaultEndDate ?? '');
-          /* dateRange/yearMonthRange: from/to 분리 저장 */
-          if (start) initVals[f.id + '_from'] = start;
-          if (end)   initVals[f.id + '_to']   = end;
-        } else if ((f.type === 'select' || f.type === 'radio' || f.type === 'checkbox') && f.defaultOptionValue) {
-          initVals[f.id] = f.defaultOptionValue;
-        } else if (f.defaultValue) {
-          initVals[f.id] = f.defaultValue;
-        }
-      });
+        });
     });
     if (Object.keys(initVals).length > 0) {
-      setSearchValues(prev => ({ ...initVals, ...prev }));
+      setSearchValues((prev) => ({ ...initVals, ...prev }));
       searchValuesRef.current = { ...initVals, ...searchValuesRef.current };
     }
-  }, [widgetItems]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [widgetItems]);
 
   /* URL ?id / ?group_id 기반 수정 모드 — enableUrlEditMode: true 시 동작 */
   useEffect(() => {
     if (!options?.enableUrlEditMode || !widgetItems.length) return;
 
-    const allWidgets      = flatWidgets(widgetItems);
-    const formWidgets     = allWidgets.filter(w => w.type === 'form')        as FormWidget[];
-    const sublistWidgets  = allWidgets.filter(w => w.type === 'sublist')     as SubListWidget[];
-    const multiSelWidgets = allWidgets.filter(w => w.type === 'multiselect') as MultiSelectWidget[];
+    const allWidgets = flatWidgets(widgetItems);
+    const formWidgets = allWidgets.filter((w) => w.type === "form") as FormWidget[];
+    const sublistWidgets = allWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
+    const multiSelWidgets = allWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
 
-    const queryGroupId = searchParams.get('group_id');
-    const queryId      = searchParams.get('id');
+    const queryGroupId = searchParams.get("group_id");
+    const queryId = searchParams.get("id");
 
     /** URL 파라미터 → 폼 필드 세팅, 폼에 없는 값은 urlParamSaveExtras에 보관 */
     const applyUrlParams = () => {
-      const SKIP = new Set(['id', 'group_id', '_paramSave']);
-      const isParamSave = searchParams.get('_paramSave') === 'true';
+      const SKIP = new Set(["id", "group_id", "_paramSave"]);
+      const isParamSave = searchParams.get("_paramSave") === "true";
       const urlOverrides: Record<string, Record<string, string>> = {};
       const extras: Record<string, unknown> = {};
       searchParams.forEach((value, key) => {
         if (SKIP.has(key)) return;
-        const dotIdx = key.indexOf('.');
+        const dotIdx = key.indexOf(".");
         if (dotIdx !== -1) {
           const ck = key.slice(0, dotIdx);
           const fk = key.slice(dotIdx + 1);
-          const fw = formWidgets.find(f => f.contentKey === ck);
+          const fw = formWidgets.find((f) => f.contentKey === ck);
           if (!fw) return;
-          const field = fw.fields.find(f => (f.fieldKey || f.label) === fk);
+          const field = fw.fields.find((f) => (f.fieldKey || f.label) === fk);
           if (field) {
             if (!urlOverrides[fw.widgetId]) urlOverrides[fw.widgetId] = {};
             urlOverrides[fw.widgetId][field.id] = value;
@@ -681,8 +753,8 @@ export function useWidgetPageState(
           }
         } else {
           let found = false;
-          formWidgets.forEach(fw => {
-            const field = fw.fields.find(f => (f.fieldKey || f.label) === key);
+          formWidgets.forEach((fw) => {
+            const field = fw.fields.find((f) => (f.fieldKey || f.label) === key);
             if (field) {
               found = true;
               if (!urlOverrides[fw.widgetId]) urlOverrides[fw.widgetId] = {};
@@ -693,7 +765,7 @@ export function useWidgetPageState(
         }
       });
       if (Object.keys(urlOverrides).length > 0) {
-        setFormValuesMap(prev => {
+        setFormValuesMap((prev) => {
           const next = { ...prev };
           Object.entries(urlOverrides).forEach(([wId, vals]) => {
             next[wId] = { ...(next[wId] ?? {}), ...vals };
@@ -706,71 +778,85 @@ export function useWidgetPageState(
 
     if (queryGroupId) {
       setCurrentGroupId(queryGroupId);
-      const slugSet = new Set([
-        ...formWidgets.map(fw => fw.connectedSlug),
-        ...sublistWidgets.map(sw => sw.connectedSlug),
-        ...multiSelWidgets.map(mw => mw.connectedSlug),
-      ].filter((s): s is string => !!s));
-      slugSet.forEach(s => {
+      const slugSet = new Set(
+        [
+          ...formWidgets.map((fw) => fw.connectedSlug),
+          ...sublistWidgets.map((sw) => sw.connectedSlug),
+          ...multiSelWidgets.map((mw) => mw.connectedSlug),
+        ].filter((s): s is string => !!s)
+      );
+      slugSet.forEach((s) => {
         /* entity 모드: entity는 group_id 개념이 없어(단일 id만 존재) URL의 group_id 값을
          * 그대로 entity 단건 id로 취급해 조회한다 — page_data 모드는 기존 group 조회 그대로 유지
          * 조회 직후 restoreEntityDateFields로 날짜/일시 필드를 FE input이 기대하는 로컬 문자열로 변환한다 */
         const fetchPromise = pageIsEntity
-          ? api.get(entityItemPath(s, queryGroupId)).then(r => {
+          ? api.get(entityItemPath(s, queryGroupId)).then((r) => {
               const dateFieldMeta = buildEntityDateFieldMeta(
-                formWidgets.filter(fw => fw.connectedSlug === s).flatMap(fw => fw.fields),
+                formWidgets.filter((fw) => fw.connectedSlug === s).flatMap((fw) => fw.fields)
               );
               return restoreEntityDateFields(normalizeEntityRow(r.data), dateFieldMeta);
             })
-          : api.get(`/page-data/${s}/group/${queryGroupId}`).then(r => (r.data.dataJson || {}) as Record<string, unknown>);
+          : api
+              .get(`/page-data/${s}/group/${queryGroupId}`)
+              .then((r) => (r.data.dataJson || {}) as Record<string, unknown>);
         fetchPromise
-          .then(async dataJson => {
+          .then(async (dataJson) => {
             await restoreFormDataFromJson(
               dataJson,
-              formWidgets.filter(fw => fw.connectedSlug === s),
-              sublistWidgets.filter(sw => sw.connectedSlug === s),
-              multiSelWidgets.filter(mw => mw.connectedSlug === s),
-              setFormValuesMap, setSubListRowsMap,
-              setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
-              setExistingFileMetaMap, setImgBlobUrls,
-              pageIsEntity,
+              formWidgets.filter((fw) => fw.connectedSlug === s),
+              sublistWidgets.filter((sw) => sw.connectedSlug === s),
+              multiSelWidgets.filter((mw) => mw.connectedSlug === s),
+              setFormValuesMap,
+              setSubListRowsMap,
+              setMultiSelectValuesMap,
+              setMultiSelectExtraFieldValuesMap,
+              setExistingFileMetaMap,
+              setImgBlobUrls,
+              pageIsEntity
             );
             applyUrlParams();
           })
           .catch(() => {});
       });
     } else if (queryId) {
-      const connectedSlug = formWidgets[0]?.connectedSlug
-        ?? multiSelWidgets[0]?.connectedSlug
-        ?? sublistWidgets[0]?.connectedSlug;
+      const connectedSlug =
+        formWidgets[0]?.connectedSlug ?? multiSelWidgets[0]?.connectedSlug ?? sublistWidgets[0]?.connectedSlug;
       if (connectedSlug) {
         /* entity 모드: /api/v1/{slug}/{id} 단건 조회 + normalizeEntityRow로 케이싱 별칭 부여
          * + restoreEntityDateFields로 날짜/일시 필드를 FE input이 기대하는 로컬 문자열로 변환 */
         const fetchPromise = pageIsEntity
-          ? api.get(entityItemPath(connectedSlug, Number(queryId))).then(r => {
-              const dateFieldMeta = buildEntityDateFieldMeta(formWidgets.flatMap(fw => fw.fields));
+          ? api.get(entityItemPath(connectedSlug, Number(queryId))).then((r) => {
+              const dateFieldMeta = buildEntityDateFieldMeta(formWidgets.flatMap((fw) => fw.fields));
               return restoreEntityDateFields(normalizeEntityRow(r.data), dateFieldMeta);
             })
-          : api.get(`/page-data/${connectedSlug}/${Number(queryId)}`).then(r => (r.data.dataJson || {}) as Record<string, unknown>);
+          : api
+              .get(`/page-data/${connectedSlug}/${Number(queryId)}`)
+              .then((r) => (r.data.dataJson || {}) as Record<string, unknown>);
         fetchPromise
-          .then(async dataJson => {
+          .then(async (dataJson) => {
             await restoreFormDataFromJson(
-              dataJson, formWidgets, sublistWidgets, multiSelWidgets,
-              setFormValuesMap, setSubListRowsMap,
-              setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
-              setExistingFileMetaMap, setImgBlobUrls,
-              pageIsEntity,
+              dataJson,
+              formWidgets,
+              sublistWidgets,
+              multiSelWidgets,
+              setFormValuesMap,
+              setSubListRowsMap,
+              setMultiSelectValuesMap,
+              setMultiSelectExtraFieldValuesMap,
+              setExistingFileMetaMap,
+              setImgBlobUrls,
+              pageIsEntity
             );
             // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
             const fetchRelData = extractFetchRelData(dataJson);
             if (Object.keys(fetchRelData).length > 0) {
-              formWidgets.forEach(fw => {
-                setFormFetchRelMap(prev => ({ ...prev, [fw.widgetId]: fetchRelData }));
+              formWidgets.forEach((fw) => {
+                setFormFetchRelMap((prev) => ({ ...prev, [fw.widgetId]: fetchRelData }));
               });
             }
             applyUrlParams();
           })
-          .catch(() => toast.error(t('common.error.load_existing_data')));
+          .catch(() => toast.error(t("common.error.load_existing_data")));
       }
     } else {
       /* 신규 모드 — 기본값 초기화 */
@@ -779,7 +865,7 @@ export function useWidgetPageState(
       setFormValuesMap(initFormDefaultValues(formWidgets, t));
       applyUrlParams();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgetItems, searchParams, options?.enableUrlEditMode]);
 
   /* 수정 모드 초기 데이터 로드 — sharedDataId(탭 공유 row id) 있을 때
@@ -790,10 +876,10 @@ export function useWidgetPageState(
     const id = options?.sharedDataId ?? null;
     if (!id) return;
 
-    const allWidgets    = flatWidgets(widgetItems);
-    const forms         = allWidgets.filter((w) => w.type === 'form')        as FormWidget[];
-    const sublists      = allWidgets.filter((w) => w.type === 'sublist')     as SubListWidget[];
-    const multiSels     = allWidgets.filter((w) => w.type === 'multiselect') as MultiSelectWidget[];
+    const allWidgets = flatWidgets(widgetItems);
+    const forms = allWidgets.filter((w) => w.type === "form") as FormWidget[];
+    const sublists = allWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
+    const multiSels = allWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
     if (!forms.length) return;
 
     const connectedSlug = forms[0].connectedSlug;
@@ -802,32 +888,37 @@ export function useWidgetPageState(
     /* entity 모드: /api/v1/{slug}/{id} 단건 조회 + normalizeEntityRow로 케이싱 별칭 부여
      * + restoreEntityDateFields로 날짜/일시 필드를 FE input이 기대하는 로컬 문자열로 변환 */
     const fetchPromise = pageIsEntity
-      ? api.get(entityItemPath(connectedSlug, id)).then(r => {
-          const dateFieldMeta = buildEntityDateFieldMeta(forms.flatMap(fw => fw.fields));
+      ? api.get(entityItemPath(connectedSlug, id)).then((r) => {
+          const dateFieldMeta = buildEntityDateFieldMeta(forms.flatMap((fw) => fw.fields));
           return restoreEntityDateFields(normalizeEntityRow(r.data), dateFieldMeta);
         })
-      : api.get(`/page-data/${connectedSlug}/${id}`).then(r => (r.data.dataJson ?? {}) as Record<string, unknown>);
+      : api.get(`/page-data/${connectedSlug}/${id}`).then((r) => (r.data.dataJson ?? {}) as Record<string, unknown>);
 
     fetchPromise
       .then(async (rawDataJson) => {
         await restoreFormDataFromJson(
           rawDataJson,
-          forms, sublists, multiSels,
-          setFormValuesMap, setSubListRowsMap,
-          setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
-          setExistingFileMetaMap, setImgBlobUrls,
-          pageIsEntity,
+          forms,
+          sublists,
+          multiSels,
+          setFormValuesMap,
+          setSubListRowsMap,
+          setMultiSelectValuesMap,
+          setMultiSelectExtraFieldValuesMap,
+          setExistingFileMetaMap,
+          setImgBlobUrls,
+          pageIsEntity
         );
         // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
         const fetchRelData = extractFetchRelData(rawDataJson);
         if (Object.keys(fetchRelData).length > 0) {
-          forms.forEach(fw => {
-            setFormFetchRelMap(prev => ({ ...prev, [fw.widgetId]: fetchRelData }));
+          forms.forEach((fw) => {
+            setFormFetchRelMap((prev) => ({ ...prev, [fw.widgetId]: fetchRelData }));
           });
         }
       })
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgetItems, options?.sharedDataId]);
 
   /* 검색 값 업데이트 */
@@ -927,7 +1018,10 @@ export function useWidgetPageState(
         const rows = tableDataMap[tableWidgetId]?.rows ?? [];
         for (const row of rows) {
           const pathMap = row._pathMap as Record<string, string> | undefined;
-          if (pathMap?.[sk]) { resolvedSk = pathMap[sk]; break; }
+          if (pathMap?.[sk]) {
+            resolvedSk = pathMap[sk];
+            break;
+          }
         }
       }
 
@@ -945,10 +1039,13 @@ export function useWidgetPageState(
   );
 
   /* 폼 값 업데이트 */
-  const updateFormValue = useCallback((widgetId: string, fieldId: string, value: string) => {
-    setFormValuesMap((prev) => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: value } }));
-    markDirty();
-  }, [markDirty]);
+  const updateFormValue = useCallback(
+    (widgetId: string, fieldId: string, value: string) => {
+      setFormValuesMap((prev) => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: value } }));
+      markDirty();
+    },
+    [markDirty]
+  );
 
   /**
    * 파일 선택 핸들러
@@ -1024,7 +1121,7 @@ export function useWidgetPageState(
       goBackAfterAction?: boolean,
       resolvedFormValuesMap?: Record<string, Record<string, string>>,
       /** action-button 설정의 위젯별 검증 규칙 ID 맵 (key=위젯ID) — connType='content' 전용 */
-      contentValidationRuleIds?: Record<string, number[]>,
+      contentValidationRuleIds?: Record<string, number[]>
     ) => {
       /* resolvedFormValuesMap: PageGridRenderer가 crossTab 값 병합 후 전달 — 없으면 내부 formValuesMap 사용 */
       const mapToUse = resolvedFormValuesMap ?? formValuesMap;
@@ -1056,15 +1153,16 @@ export function useWidgetPageState(
       /* 수정 모드 구분
        * URL params 우선, 없으면 sharedDataId(탭 공유 row id) 확인 */
       const storedGroupId = searchParams.get("group_id") ?? currentGroupId;
-      const storedId = searchParams.get("id")
-        ? Number(searchParams.get("id"))
-        : (options?.sharedDataId ?? null);
+      const storedId = searchParams.get("id") ? Number(searchParams.get("id")) : (options?.sharedDataId ?? null);
       const isUpdate = !!(storedGroupId || storedId);
 
       try {
         /* ── DELETE ── */
         if (action === "delete") {
-          if (!isUpdate) { toast.info(t("common.info.no_data_to_delete")); return; }
+          if (!isUpdate) {
+            toast.info(t("common.info.no_data_to_delete"));
+            return;
+          }
           if (!confirm(t("common.confirm.delete"))) return;
 
           const firstSlug = slugGroupsMap.keys().next().value!;
@@ -1089,10 +1187,10 @@ export function useWidgetPageState(
         const allFormValues = Object.assign({}, ...Object.values(mapToUse)) as Record<string, string>;
         const allFieldKeyToId: Record<string, string> = {};
         flatWidgets(widgetItems)
-          .filter(w => w.type === 'form')
-          .forEach(w => {
+          .filter((w) => w.type === "form")
+          .forEach((w) => {
             const fw = w as FormWidget;
-            fw.fields?.forEach(f => {
+            fw.fields?.forEach((f) => {
               if (!f.fieldKey) return;
               allFieldKeyToId[f.fieldKey] = f.id;
               /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 */
@@ -1111,27 +1209,29 @@ export function useWidgetPageState(
               existingFileMetaMap[fw.widgetId] ?? {},
               allFormValues,
               allFieldKeyToId,
-              t,
+              t
             )
           )
             return;
         }
 
         /* SubList 유효성 검사 — required/minLength/maxLength/pattern/파일제한 */
-        const subWidgetsForValidation = targetWidgets.filter(
-          (w) => w.type === "sublist"
-        ) as Array<{ type: string; widgetId?: string; required?: boolean; title?: string; columns?: import('../components/renderer/types').SubListColumn[] }>;
-        if (!validateSubListRows(subWidgetsForValidation, subListRowsMap, subListFileMap, t))
-          return;
+        const subWidgetsForValidation = targetWidgets.filter((w) => w.type === "sublist") as Array<{
+          type: string;
+          widgetId?: string;
+          required?: boolean;
+          title?: string;
+          columns?: import("../components/renderer/types").SubListColumn[];
+        }>;
+        if (!validateSubListRows(subWidgetsForValidation, subListRowsMap, subListFileMap, t)) return;
 
         /* mainConnectedSlug가 있으면 전체 위젯을 하나의 slug로 통합 저장 */
         const slugGroups = options?.mainConnectedSlug
-            ? [[options.mainConnectedSlug, targetWidgets] as [string, (FormWidget | SubListWidget | MultiSelectWidget)[]]]
-            : Array.from(slugGroupsMap.entries());
+          ? [[options.mainConnectedSlug, targetWidgets] as [string, (FormWidget | SubListWidget | MultiSelectWidget)[]]]
+          : Array.from(slugGroupsMap.entries());
 
         /* group_id 결정 */
-        const groupId =
-          slugGroups.length > 1 ? (storedGroupId ?? crypto.randomUUID()) : undefined;
+        const groupId = slugGroups.length > 1 ? (storedGroupId ?? crypto.randomUUID()) : undefined;
 
         /* slug 그룹별 반복 저장 */
         for (let groupIdx = 0; groupIdx < slugGroups.length; groupIdx++) {
@@ -1141,9 +1241,7 @@ export function useWidgetPageState(
 
           /* 이 slug 그룹에 속한 위젯들의 검증 규칙 ID를 모두 모아 중복 제거 — 위젯별로 각각 설정된 규칙이 있을 수 있음 */
           const groupValidationRuleIds = contentValidationRuleIds
-            ? [...new Set(
-                widgets.flatMap((w) => contentValidationRuleIds[(w as { widgetId: string }).widgetId] ?? []),
-              )]
+            ? [...new Set(widgets.flatMap((w) => contentValidationRuleIds[(w as { widgetId: string }).widgetId] ?? []))]
             : [];
 
           /* 1. 파일 업로드
@@ -1189,9 +1287,7 @@ export function useWidgetPageState(
               const processedRow: Record<string, unknown> = { ...rest };
               for (const col of sw.columns ?? []) {
                 if (!["file", "image"].includes(col.type)) continue;
-                const existingIds = Array.isArray(processedRow[col.key])
-                  ? (processedRow[col.key] as number[])
-                  : [];
+                const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
                 const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
                 const allIds = [...existingIds];
                 for (const file of newFiles) {
@@ -1220,7 +1316,7 @@ export function useWidgetPageState(
             const fw = w as FormWidget;
             formFileIdsMap[fw.widgetId] = {};
             for (const f of fw.fields) {
-              if (!FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number])) continue;
+              if (!FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) continue;
               const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map((m) => m.id);
               formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
             }
@@ -1246,16 +1342,19 @@ export function useWidgetPageState(
             multiSelectExtraFieldValuesMap,
             options?.mainConnectedSlug,
             allFormValues,
-            pageIsEntity,
+            pageIsEntity
           );
 
           /* 5-1. urlParamSaveExtras 병합 — enableUrlEditMode 시 폼에 없던 URL 파라미터를 dataJson에 추가 */
           if (Object.keys(urlParamSaveExtras).length > 0) {
             Object.entries(urlParamSaveExtras).forEach(([key, val]) => {
-              if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-                const hasContentKey = widgets.some(w => w.type === 'form' && (w as FormWidget).contentKey === key);
+              if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+                const hasContentKey = widgets.some((w) => w.type === "form" && (w as FormWidget).contentKey === key);
                 if (hasContentKey) {
-                  dataJson[key] = { ...(dataJson[key] as Record<string, unknown> ?? {}), ...(val as Record<string, unknown>) };
+                  dataJson[key] = {
+                    ...((dataJson[key] as Record<string, unknown>) ?? {}),
+                    ...(val as Record<string, unknown>),
+                  };
                 }
               } else if (isFirstSlugGroup) {
                 dataJson[key] = val as unknown;
@@ -1273,7 +1372,7 @@ export function useWidgetPageState(
             const entityRecordId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
             /* 이 slug 그룹에 속한 Form 위젯들의 fields에서 날짜/일시 필드 메타를 뽑아 변환에 사용 */
             const dateFieldMeta = buildEntityDateFieldMeta(
-              widgets.filter(w => w.type === 'form').flatMap(w => (w as FormWidget).fields),
+              widgets.filter((w) => w.type === "form").flatMap((w) => (w as FormWidget).fields)
             );
             const entityBody = buildEntityRequestBody(dataJson, dateFieldMeta);
             if (entityRecordId) {
@@ -1364,10 +1463,8 @@ export function useWidgetPageState(
             const fileIds: number[] = [];
             const collectIds = (obj: Record<string, unknown>) => {
               Object.values(obj).forEach((v) => {
-                if (Array.isArray(v) && v.every((x) => typeof x === "number"))
-                  fileIds.push(...(v as number[]));
-                else if (v && typeof v === "object" && !Array.isArray(v))
-                  collectIds(v as Record<string, unknown>);
+                if (Array.isArray(v) && v.every((x) => typeof x === "number")) fileIds.push(...(v as number[]));
+                else if (v && typeof v === "object" && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
               });
             };
             collectIds(dataJson);
@@ -1384,35 +1481,25 @@ export function useWidgetPageState(
                         (m) => ({ id: m.id, origName: m.originalName, fileSize: m.fileSize })
                       )
                     )
-                : await api
-                    .get("/page-files/meta", { params: { ids: fileIds.join(",") } })
-                    .then(
-                      (r) =>
-                        r.data as {
-                          id: number;
-                          fieldKey: string;
-                          origName: string;
-                          fileSize: number;
-                          mimeType: string;
-                        }[]
-                    );
+                : await api.get("/page-files/meta", { params: { ids: fileIds.join(",") } }).then(
+                    (r) =>
+                      r.data as {
+                        id: number;
+                        fieldKey: string;
+                        origName: string;
+                        fileSize: number;
+                        mimeType: string;
+                      }[]
+                  );
 
               for (const w of widgets) {
                 if (w.type !== "form") continue;
                 const fw = w as FormWidget;
-                const section = fw.contentKey
-                  ? (dataJson[fw.contentKey] as Record<string, unknown>)
-                  : dataJson;
-                const imageFieldIds = new Set(
-                  fw.fields.filter((f) => f.type === "image").map((f) => f.id)
-                );
-                const metaByFieldId: Record<
-                  string,
-                  { id: number; origName: string; fileSize: number }[]
-                > = {};
+                const section = fw.contentKey ? (dataJson[fw.contentKey] as Record<string, unknown>) : dataJson;
+                const imageFieldIds = new Set(fw.fields.filter((f) => f.type === "image").map((f) => f.id));
+                const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
                 fw.fields.forEach((f) => {
-                  if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as typeof FILE_FIELD_TYPES[number]))
-                    return;
+                  if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
                   const ids = section[f.fieldKey];
                   if (!Array.isArray(ids)) return;
                   metaByFieldId[f.id] = (ids as number[]).map((id) => {
@@ -1455,9 +1542,7 @@ export function useWidgetPageState(
         if (action === "save" && response?.status === 409) {
           toast.error(response.data?.message || t("common.error.duplicate_key"));
         } else {
-          toast.error(
-            action === "save" ? t("common.error.save") : t("common.error.delete")
-          );
+          toast.error(action === "save" ? t("common.error.save") : t("common.error.delete"));
         }
       }
     },
@@ -1490,7 +1575,7 @@ export function useWidgetPageState(
       goBackAfterAction?: boolean,
       paramSave?: string,
       /** action-button 설정의 검증 규칙 ID 목록 — connType='datasave' 전용, 요청 바디에 그대로 포함 */
-      validationRuleIds?: number[],
+      validationRuleIds?: number[]
     ) => {
       if (!dataSaveSlug) return;
       const allFlat = flatWidgets(widgetItems);
@@ -1506,23 +1591,33 @@ export function useWidgetPageState(
         )
         .filter(Boolean) as (FormWidget | SubListWidget | MultiSelectWidget | TableWidget)[];
 
-      if (targetWidgets.length === 0) { toast.warning(t("common.widget.no_content")); return; }
+      if (targetWidgets.length === 0) {
+        toast.warning(t("common.widget.no_content"));
+        return;
+      }
 
       /* 유효성 검사 — form / sublist / multiselect / table 통합 */
-      if (!validateDataSaveWidgets({
-        targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]['targetWidgets'],
-        formValuesMap,
-        fileValuesMap,
-        existingFileMetaMap,
-        subListRowsMap,
-        subListFileMap,
-        multiSelectValuesMap,
-        tableSelectedRowsMap,
-        t,
-      })) return;
+      if (
+        !validateDataSaveWidgets({
+          targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"],
+          formValuesMap,
+          fileValuesMap,
+          existingFileMetaMap,
+          subListRowsMap,
+          subListFileMap,
+          multiSelectValuesMap,
+          tableSelectedRowsMap,
+          t,
+        })
+      )
+        return;
 
-      const nonTableWidgets = targetWidgets.filter(w => w.type !== 'table') as (FormWidget | SubListWidget | MultiSelectWidget)[];
-      const tableWidgets    = targetWidgets.filter(w => w.type === 'table') as TableWidget[];
+      const nonTableWidgets = targetWidgets.filter((w) => w.type !== "table") as (
+        | FormWidget
+        | SubListWidget
+        | MultiSelectWidget
+      )[];
+      const tableWidgets = targetWidgets.filter((w) => w.type === "table") as TableWidget[];
 
       try {
         let anySaved = false;
@@ -1530,7 +1625,7 @@ export function useWidgetPageState(
         /* form / sublist / multiselect → 파일 업로드 + dataJson 저장 */
         if (nonTableWidgets.length > 0) {
           const { formFileIdsMap, processedSubListRowsMap, allNewIds } = await processFormFilesAndSubList({
-            targetWidgets: nonTableWidgets as Parameters<typeof processFormFilesAndSubList>[0]['targetWidgets'],
+            targetWidgets: nonTableWidgets as Parameters<typeof processFormFilesAndSubList>[0]["targetWidgets"],
             fileValuesMap,
             existingFileMetaMap,
             subListRowsMap,
@@ -1554,12 +1649,12 @@ export function useWidgetPageState(
             multiSelectMap,
             multiSelectExtraFieldValuesMap,
             options?.mainConnectedSlug,
-            dataSaveAllFormValues,
+            dataSaveAllFormValues
           );
 
           const res = await api.post(
             `/page-data/${dataSaveSlug}`,
-            buildDataSavePayload({ dataJson, pkKeys, templateSlug: pageSlug, validationRuleIds }),
+            buildDataSavePayload({ dataJson, pkKeys, templateSlug: pageSlug, validationRuleIds })
           );
 
           if (allNewIds.length > 0 && res.data.id) {
@@ -1570,22 +1665,23 @@ export function useWidgetPageState(
 
         /* table 위젯 행 저장 — 선택된 행(enableRowSelection=true) 또는 전체 행 */
         for (const tw of tableWidgets) {
-          const allRows     = tableDataMapRef.current[tw.widgetId]?.rows ?? [];
+          const allRows = tableDataMapRef.current[tw.widgetId]?.rows ?? [];
           const selectedIds = tableSelectedRowsMap[tw.widgetId] ?? [];
-          const rowsToSave  = tw.enableRowSelection
-            ? allRows.filter(r => selectedIds.includes(Number(r['_id'])))
+          const rowsToSave = tw.enableRowSelection
+            ? allRows.filter((r) => selectedIds.includes(Number(r["_id"])))
             : allRows;
 
-          if (rowsToSave.length === 0) { toast.warning(t('common.table.no_save_data')); return; }
+          if (rowsToSave.length === 0) {
+            toast.warning(t("common.table.no_save_data"));
+            return;
+          }
 
-          const tableExtras = paramSave
-            ? {}
-            : (urlParamSaveExtras[tw.contentKey] ?? {}) as Record<string, unknown>;
+          const tableExtras = paramSave ? {} : ((urlParamSaveExtras[tw.contentKey] ?? {}) as Record<string, unknown>);
           const saved = await saveTableRows({
-            contentKey:   tw.contentKey,
-            columns:      tw.columns,
-            rows:         rowsToSave,
-            extras:       tableExtras,
+            contentKey: tw.contentKey,
+            columns: tw.columns,
+            rows: rowsToSave,
+            extras: tableExtras,
             dataSaveSlug,
             templateSlug: pageSlug,
             paramSave,
@@ -1604,7 +1700,20 @@ export function useWidgetPageState(
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [widgetItems, formValuesMap, fileValuesMap, subListRowsMap, subListFileMap, existingFileMetaMap, multiSelectValuesMap, tableSelectedRowsMap, urlParamSaveExtras, pageSlug, options, markClean]
+    [
+      widgetItems,
+      formValuesMap,
+      fileValuesMap,
+      subListRowsMap,
+      subListFileMap,
+      existingFileMetaMap,
+      multiSelectValuesMap,
+      tableSelectedRowsMap,
+      urlParamSaveExtras,
+      pageSlug,
+      options,
+      markClean,
+    ]
   );
 
   /**
@@ -1638,9 +1747,7 @@ export function useWidgetPageState(
         const targetWidgets = connectedContentWidgetIds
           .map((wid) =>
             allFlat.find(
-              (w) =>
-                (w.type === "form" || w.type === "sublist") &&
-                (w as FormWidget | SubListWidget).widgetId === wid
+              (w) => (w.type === "form" || w.type === "sublist") && (w as FormWidget | SubListWidget).widgetId === wid
             )
           )
           .filter(Boolean) as (FormWidget | SubListWidget)[];
@@ -1648,16 +1755,19 @@ export function useWidgetPageState(
         if (targetWidgets.length === 0) return;
 
         /* 유효성 검사 — handleDataSave와 동일 공통함수 재사용 */
-        if (!validateDataSaveWidgets({
-          targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]['targetWidgets'],
-          formValuesMap,
-          fileValuesMap,
-          existingFileMetaMap,
-          subListRowsMap,
-          subListFileMap,
-          multiSelectValuesMap,
-          t,
-        })) return;
+        if (
+          !validateDataSaveWidgets({
+            targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"],
+            formValuesMap,
+            fileValuesMap,
+            existingFileMetaMap,
+            subListRowsMap,
+            subListFileMap,
+            multiSelectValuesMap,
+            t,
+          })
+        )
+          return;
 
         /* main = 선택된 Form 중 첫 번째, sub = main과 다른 connectedSlug를 쓰는 SubList
          * — mode2에서 쓰던 부모/자식 분류 기준(§02.builder_data_process.md)과 동일 */
@@ -1671,21 +1781,19 @@ export function useWidgetPageState(
           (w) =>
             w.type === "sublist" &&
             (w as SubListWidget).connectedSlug &&
-            (w as SubListWidget).connectedSlug !== mainWidget.connectedSlug,
+            (w as SubListWidget).connectedSlug !== mainWidget.connectedSlug
         ) as SubListWidget[];
 
         /* 페이지가 이미 들고 있는 현재 레코드 식별자 — handleContentAction(1047~1051행)과 동일 판별 기준.
          * URL ?id / ?group_id 우선, 없으면 탭 공유 sharedDataId 확인 */
         const storedGroupId = searchParams.get("group_id") ?? currentGroupId;
-        const storedId = searchParams.get("id")
-          ? Number(searchParams.get("id"))
-          : (options?.sharedDataId ?? null);
+        const storedId = searchParams.get("id") ? Number(searchParams.get("id")) : (options?.sharedDataId ?? null);
         const existingParentId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
 
         try {
           /* 파일 업로드 + SubList 행 가공 — main/sub 전체를 한 번에 처리(최신 fileIds 반영) */
           const { formFileIdsMap, processedSubListRowsMap } = await processFormFilesAndSubList({
-            targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]['targetWidgets'],
+            targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]["targetWidgets"],
             fileValuesMap,
             existingFileMetaMap,
             subListRowsMap,
@@ -1703,11 +1811,11 @@ export function useWidgetPageState(
             multiSelectExtraFieldValuesMap,
             undefined,
             undefined,
-            true,
+            true
           );
           const entityBody = buildEntityRequestBody(
             dataJson,
-            buildEntityDateFieldMeta(formWidgets.flatMap((fw) => fw.fields)),
+            buildEntityDateFieldMeta(formWidgets.flatMap((fw) => fw.fields))
           );
 
           /* id 유무로 생성(POST)/수정(PUT) 자동 판단 */
@@ -1819,22 +1927,25 @@ export function useWidgetPageState(
 
         if (targetWidgets.length > 0) {
           /* 유효성 검사 — handleDataSave와 동일 공통함수 재사용 (Table 제외이므로 tableSelectedRowsMap 미전달) */
-          if (!validateDataSaveWidgets({
-            targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]['targetWidgets'],
-            formValuesMap,
-            fileValuesMap,
-            existingFileMetaMap,
-            subListRowsMap,
-            subListFileMap,
-            multiSelectValuesMap,
-            t,
-          })) return;
+          if (
+            !validateDataSaveWidgets({
+              targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"],
+              formValuesMap,
+              fileValuesMap,
+              existingFileMetaMap,
+              subListRowsMap,
+              subListFileMap,
+              multiSelectValuesMap,
+              t,
+            })
+          )
+            return;
 
           const formWidgetsForParent = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
 
           /* 파일 업로드 + SubList 행 가공 — buildDataJson 이전에 반드시 먼저 실행 (최신 fileIds 반영) */
           const { formFileIdsMap, processedSubListRowsMap } = await processFormFilesAndSubList({
-            targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]['targetWidgets'],
+            targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]["targetWidgets"],
             fileValuesMap,
             existingFileMetaMap,
             subListRowsMap,
@@ -1867,7 +1978,7 @@ export function useWidgetPageState(
             multiSelectExtraFieldValuesMap,
             undefined,
             undefined,
-            !!apiInfo.connectedEntity,
+            !!apiInfo.connectedEntity
           );
 
           /* connectedEntity가 있으면 entity 요청 DTO가 기대하는 camelCase 필드명 + 날짜 오프셋 포맷으로
@@ -1875,7 +1986,10 @@ export function useWidgetPageState(
            * 동일한 패턴. 변환 없이 fieldKey(snake_case 등) 그대로 보내면 codegen DTO가 알 수 없는
            * 필드로 요청을 거부한다. connectedEntity가 없는 일반 외부 API는 기존과 동일하게 그대로 사용. */
           contentBody = apiInfo.connectedEntity
-            ? buildEntityRequestBody(dataJson, buildEntityDateFieldMeta(formWidgetsForParent.flatMap((fw) => fw.fields)))
+            ? buildEntityRequestBody(
+                dataJson,
+                buildEntityDateFieldMeta(formWidgetsForParent.flatMap((fw) => fw.fields))
+              )
             : dataJson;
         }
       }
@@ -1959,48 +2073,65 @@ export function useWidgetPageState(
   const currentSearchParams = useMemo(() => {
     const fieldsMap = buildSearchFieldsMap(widgetItems);
     const keyToId: Record<string, string> = {};
-    Object.values(fieldsMap).flat().forEach(f => { if (f.fieldKey) keyToId[f.fieldKey] = f.id; });
+    Object.values(fieldsMap)
+      .flat()
+      .forEach((f) => {
+        if (f.fieldKey) keyToId[f.fieldKey] = f.id;
+      });
     const params: Record<string, string> = {};
-    Object.values(fieldsMap).flat().forEach(f => {
-      /* 검색제외 필드는 엑셀다운로드 파라미터에서도 제외 */
-      if (f.excludeFromSearch) return;
-      const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
-      if (f.hideCondition && hideResult) return;
-      /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
-      if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-        const paramKey = f.fieldKey || f.label;
-        const from = searchValues[f.id + '_from'];
-        const to   = searchValues[f.id + '_to'];
-        if (paramKey) {
-          /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
-          if (f.singleDateRange) {
-            if (from?.trim()) params[`${paramKey}_gte`] = from;
-            if (to?.trim())   params[`${paramKey}_lte`] = to;
-          } else if (f.fieldKey2) {
-            /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
-            if (from?.trim()) params[paramKey] = from;
-            if (to?.trim())   params[f.fieldKey2] = to;
-          } else {
-            if (from?.trim()) params[`${paramKey}_from`] = from;
-            if (to?.trim())   params[`${paramKey}_to`]   = to;
+    Object.values(fieldsMap)
+      .flat()
+      .forEach((f) => {
+        /* 검색제외 필드는 엑셀다운로드 파라미터에서도 제외 */
+        if (f.excludeFromSearch) return;
+        const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
+        if (f.hideCondition && hideResult) return;
+        /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
+        if (f.type === "dateRange" || f.type === "yearMonthRange") {
+          const paramKey = f.fieldKey || f.label;
+          const from = searchValues[f.id + "_from"];
+          const to = searchValues[f.id + "_to"];
+          if (paramKey) {
+            /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
+            if (f.singleDateRange) {
+              if (from?.trim()) params[`${paramKey}_gte`] = from;
+              if (to?.trim()) params[`${paramKey}_lte`] = to;
+            } else if (f.fieldKey2) {
+              /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
+              if (from?.trim()) params[paramKey] = from;
+              if (to?.trim()) params[f.fieldKey2] = to;
+            } else {
+              if (from?.trim()) params[`${paramKey}_from`] = from;
+              if (to?.trim()) params[`${paramKey}_to`] = to;
+            }
           }
+          return;
         }
-        return;
-      }
-      const val = searchValues[f.id];
-      if (!val || !val.trim()) return;
-      /* category + relationSlugId: FILTER slug_relation 파라미터 */
-      if (f.type === 'category' && f.relationSlugId) {
-        params[`rel_${f.relationSlugId}`] = val;
-        return;
-      }
-      if (f.type === 'dateRangeStatus' && f.linkedDateRangeKey) {
-        params[`drs_${f.linkedDateRangeKey}`] = val;
-      } else {
-        const paramKey = f.fieldKey || f.label;
-        if (paramKey) params[paramKey] = val;
-      }
-    });
+        const val = searchValues[f.id];
+        if (!val || !val.trim()) return;
+        /* category + relationSlugId: FILTER slug_relation 파라미터 */
+        if (f.type === "category" && f.relationSlugId) {
+          params[`rel_${f.relationSlugId}`] = val;
+          return;
+        }
+        /* select/input + joinRelationSlugId: 조인 검색 연동 파라미터 — 연결된 slug의 필드 값으로 다른 목록을 필터링
+         연산자는 필드 타입으로 자동 결정: select → EQ(정확일치), input → ILIKE(부분일치, joink_ 값 앞에 '~' 마커 부여) */
+        if ((f.type === "select" || f.type === "input") && f.joinRelationSlugId && f.joinSlaveKey) {
+          const joinParamKey = f.fieldKey || f.label;
+          if (joinParamKey) {
+            params[`joinr_${joinParamKey}`] = String(f.joinRelationSlugId);
+            params[`joink_${joinParamKey}`] = f.type === "input" ? `~${f.joinSlaveKey}` : f.joinSlaveKey;
+            params[`joinv_${joinParamKey}`] = val;
+          }
+          return;
+        }
+        if (f.type === "dateRangeStatus" && f.linkedDateRangeKey) {
+          params[`drs_${f.linkedDateRangeKey}`] = val;
+        } else {
+          const paramKey = f.fieldKey || f.label;
+          if (paramKey) params[paramKey] = val;
+        }
+      });
     return params;
   }, [searchValues, widgetItems]);
 
@@ -2027,8 +2158,7 @@ export function useWidgetPageState(
     onPageChange: handlePageChange,
     onLoadMore: handleLoadMore,
     tableSelectedRowsMap,
-    onTableRowsSelect: (wId: string, ids: number[]) =>
-      setTableSelectedRowsMap((prev) => ({ ...prev, [wId]: ids })),
+    onTableRowsSelect: (wId: string, ids: number[]) => setTableSelectedRowsMap((prev) => ({ ...prev, [wId]: ids })),
     categorySelections,
     onCategorySelect: handleCategorySelect,
     onRefresh: handleRefresh,

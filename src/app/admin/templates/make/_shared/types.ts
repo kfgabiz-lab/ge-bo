@@ -7,24 +7,33 @@
 
 /** 검색·폼 필드 유형 */
 export type SearchFieldType =
-    | 'input' | 'select' | 'date' | 'dateRange'
-    | 'yearMonth' | 'yearMonthRange'            // 년월 선택 (저장값: YYYY-MM)
-    | 'radio' | 'checkbox' | 'button'
-    | 'text'            // 연결 Slug 값 표시 전용 (다건 매칭 시 한줄/여러줄 표시 지원)
-    | 'textarea'        // 여러 줄 텍스트 표시 (Space 텍스트 아이템 등)
-    | 'action-button'   // 액션 버튼 (팝업·API·경로 연결)
-    | 'file' | 'image' | 'video' | 'media' // 파일 업로드 및 미디어 타입
-    | 'editor'          // 위지윅 에디터
-    | 'hidden'          // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
-    | 'color'           // 색상 선택 (Preset 원형 버튼)
-    | 'message-key-select' // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
-    | 'category'        // 카테고리 계층 검색 (1~4 depth selectbox 연동)
-    | 'dateRangeStatus'  // 날짜 범위 상태 필터 (이전/포함/이후 선택)
-    | 'time'            // 시간 선택 (HH:MM, input[type="time"])
-    | 'address';         // 주소검색 (입력창 + 자동완성 드롭다운, 저장값: AddressFieldValue)
+  | "input"
+  | "select"
+  | "date"
+  | "dateRange"
+  | "yearMonth"
+  | "yearMonthRange" // 년월 선택 (저장값: YYYY-MM)
+  | "radio"
+  | "checkbox"
+  | "button"
+  | "text" // 연결 Slug 값 표시 전용 (다건 매칭 시 한줄/여러줄 표시 지원)
+  | "textarea" // 여러 줄 텍스트 표시 (Space 텍스트 아이템 등)
+  | "action-button" // 액션 버튼 (팝업·API·경로 연결)
+  | "file"
+  | "image"
+  | "video"
+  | "media" // 파일 업로드 및 미디어 타입
+  | "editor" // 위지윅 에디터
+  | "hidden" // 숨김 필드 (화면 미노출, 저장 시 defaultValue 자동 포함)
+  | "color" // 색상 선택 (Preset 원형 버튼)
+  | "message-key-select" // 다국어 키 자동완성 셀렉터 (message_resource WORD 타입)
+  | "category" // 카테고리 계층 검색 (1~4 depth selectbox 연동)
+  | "dateRangeStatus" // 날짜 범위 상태 필터 (이전/포함/이후 선택)
+  | "time" // 시간 선택 (HH:MM, input[type="time"])
+  | "address"; // 주소검색 (입력창 + 자동완성 드롭다운, 저장값: AddressFieldValue)
 
 /** date/dateRange 계열 필드의 입력 단위 서브타입 (dateSubType·rangeSubType·linkedRangeSubType 공용) */
-export type DateSubType = 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec';
+export type DateSubType = "date" | "yearMonth" | "datetime" | "time" | "timeSec";
 
 /**
  * 검색·폼 필드 설정 (SearchBuilder, FormBuilder, renderer 공유)
@@ -32,184 +41,199 @@ export type DateSubType = 'date' | 'yearMonth' | 'datetime' | 'time' | 'timeSec'
  * - accessor: 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
  */
 export interface SearchFieldConfig {
-    id: string;
-    type: SearchFieldType;
-    label: string;
-    labelMsgKey?: string;    // 라벨 다국어 키 (있으면 t(key), 없으면 label 표시)
-    label2?: string;        // dateRange 두 번째 라벨
-    label2MsgKey?: string;  // dateRange 두 번째 라벨 다국어 키
-    fieldKey?: string;
-    /** dateRange 종료일 저장 Key — 미설정 시 fieldKey+'_from'/'_to'로 자동유도.
-     *  entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */
-    fieldKey2?: string;
-    /** dateRange 통합 서브타입 — 범위 입력 방식 (기본: 'date') */
-    rangeSubType?: DateSubType;
-    /** date 통합 서브타입 — 단독 날짜 입력 방식 (기본: 'date') */
-    dateSubType?: DateSubType;
-    /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
-    singleDateRange?: boolean;
-    accessor?: string;      // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
-    // 데이터 표현식 (예: code=1?title:title2, title+'-'+code) — input 필드 표시값 계산
-    data?: string;
-    /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 (text 타입 전용) */
-    fetchDisplayMode?: 'ONE_LINE' | 'MULTI_LINE';
-    placeholder?: string;
-    placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
-    /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
-    description?: string;
-    descriptionMsgKey?: string; // 설명 다국어 키 (있으면 t(key), 없으면 description 표시)
-    colSpan: 1 | 2 | 3 | 4 | 5;
-    rowSpan?: number;
-    required?: boolean;
-    options?: string[];
-    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
-    selectType?: 'selectbox' | 'autocomplete';
-    minLength?: number;
-    maxLength?: number;
-    showCharCount?: boolean;    // 글자수 표시 여부 (input/textarea 전용)
-    pattern?: string;
-    patternDesc?: string;
-    minSelect?: number;
-    maxSelect?: number;
-    codeGroupCode?: string;
-    displayAs?: 'text' | 'value';  // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
-    multiSelect?: boolean;      // button 전용: 다중선택 여부
-    /* ── textarea 전용 ── */
-    content?: string;           // 표시할 텍스트 내용
-    contentMsgKey?: string;     // 다국어 내용 키 (textarea 전용)
-    fontSize?: number;          // 글자 크기 (px)
-    bold?: boolean;             // 굵게 여부
-    textColor?: string;         // 텍스트 색상
-    /* ── action-button 전용 ── */
-    color?: string;             // 버튼 색상 프리셋 (black/green/...)
-    bgColor?: string;           // 커스텀 배경색 (hex)
-    connType?: '' | 'content' | 'popup' | 'path' | 'close' | 'excel' | 'datasave' | 'api'; // 클릭 시 연결 방식
-    popupSlug?: string;         // 연결 방식 popup: LAYER 템플릿 slug
-    fileLayerSlug?: string;     // 연결 방식 path: 로컬 컴포넌트명
-    params?: string;            // 연결 시 전달할 파라미터 (popup·path 공통, 예: depth=1,type=create)
-    connectedSlug?: string;     // 연결 방식 slug: DB slug (레거시)
-    connectedContentWidgetIds?: string[];    // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
-    excelTableWidgetId?: string;             // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
-    excelPrivacyPopup?: boolean;             // 개인정보 다운로드 사유 입력 팝업 사용 여부 (connType='excel' 전용)
-    contentAction?: 'save' | 'delete';       // 버튼 클릭 시 컨텐츠 저장/삭제 동작
-    goBackAfterAction?: boolean;             // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
-    dataSaveSlug?: string;                   // 데이터저장 연결 slug (connType='datasave' 전용)
-    apiInfoId?: number;                      // API 연동 연결 api_info.id (connType='api' 전용)
-    saveConfirm?: boolean;                   // 저장 컨펌 여부 — true 시 버튼 클릭 시 확인창 표시 (action-button 전용)
-    validationRuleIds?: number[];            // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
-    contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)
-    isPk?: boolean;                 // PK(Primary Key) 여부 (Form 전용)
-    readonly?: boolean;             // 읽기 전용 여부 (Form 전용)
-    // ── 파일/이미지/비디오 전용 ──
-    maxFileCount?: number;
-    maxFileSizeMB?: number;
-    maxTotalSizeMB?: number;
-    fileTypeMode?: 'doc' | 'image' | 'video' | 'custom' | '';
-    allowedExtensions?: string[];
-    videoMode?: 'url' | 'file';
-    /* ── media 전용 ── */
-    mediaImageMaxSizeMB?: number;   // 이미지 최대 크기 MB (기본: 5)
-    mediaVideoMaxSizeMB?: number;   // 동영상 최대 크기 MB (기본: 20)
-    /* ── 기본값 설정 ── */
-    defaultValue?: string;          // 직접 텍스트 기본값 (hidden·input·textarea·editor 전용)
-    defaultValueMsgKey?: string;    // 다국어 기본값 키 (input·textarea·editor 전용)
-    defaultOptionValue?: string;    // 옵션 기본 선택값 (select·radio·checkbox 전용)
-    defaultDateOffset?: number;     // date: 오늘 기준 N일 전 기본값 (0=오늘)
-    defaultDate?: string;           // date: 기본값 날짜 미리보기용 (YYYY-MM-DD)
-    disablePast?: boolean;          // date: 오늘 이전 날짜 비활성화
-    defaultToday?: boolean;         // date: 오늘 날짜를 기본값으로 자동 적용
-    defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
-    defaultStartDate?: string;      // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
-    disableStartPast?: boolean;     // dateRange: 시작일 이전 비활성화
-    defaultStartToday?: boolean;    // dateRange: 시작일 오늘 날짜 자동 적용 (종료일과 독립)
-    defaultEndDateOffset?: number;  // dateRange: 종료일 오늘 기준 N일 전
-    defaultEndDate?: string;        // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
-    disableEndPast?: boolean;       // dateRange: 종료일 이전 비활성화
-    defaultEndToday?: boolean;      // dateRange: 종료일 오늘 날짜 자동 적용 (시작일과 독립)
-    maxRangeValue?: number;         // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
-    maxRangeUnit?: 'day' | 'week' | 'month' | 'year'; // dateRange: 최대 조회 기간 단위
-    /* ── category 전용 ── */
-    dbSlug?: string;                // 연결할 카테고리 slug (slugOptions 선택)
-    relationSlugId?: number;        // 연동 slug-relation ID (FILTER 타입 — 카테고리 목록 자체를 필터링)
-    maxDepth?: 1 | 2 | 3 | 4;      // 표시할 depth 개수 — activeDepths 미설정 시 [1..maxDepth] 파생용 레거시 필드(삭제 금지)
-    /** 화면에 노출할 depth 번호 배열 — 오름차순 연속 정수(예: [1,2,3], [2,3,4]).
-     *  미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth]를 파생해 기존 동작을 그대로 유지한다. */
-    activeDepths?: number[];
-    depthLabels?: string[];         // depth별 라벨 배열 (예: ['대분류', '중분류', '소분류'])
-    depthLabelMsgKeys?: string[];   // depth별 라벨 다국어 키 배열
-    depthValueFields?: string[];    // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
-    depthTextFields?: string[];     // depth별 selectbox 표시 텍스트 경로 (예: 'name', 'dataJson.name')
-    /** depth별 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
-     *  raw item(dataJson) 단계에서 resolveAccessor 기준으로 평가, 없으면 필터 없이 전체 표시 */
-    depthFilters?: string[];
-    /** depth별 상위(부모) ID 경로. 선택한 항목의 dataJson에서 이 경로로 부모 id를 읽는다
-     *  (예: ['', 'category.parentId', 'product.parentId']). depth1(최상위 가시 depth)은 부모가 없으므로 빈 문자열.
-     *  옵션 사전필터(optionFilter*)의 상향 교집합 매핑에도 재사용된다 */
-    depthParentFields?: string[];
-    /** 옵션 사전필터 — 연동 slug-relation ID (FETCH 타입만 선택 가능). 필터 대상 depth 레코드에
-     *  이 relation이 FETCH로 병합해 준 `_fetchedRel{id}` 값을 optionFilterExpr에서 참조할 때 사용 */
-    optionFilterRelationSlugId?: number;
-    /** 옵션 사전필터 — 필터를 적용할 카테고리 depth 번호. 최심 가시 depth와 같으면 그 depth 자신을,
-     *  최심 가시 depth보다 1 깊으면(예: 리프 depth) optionFilterParentField로 부모 id를 추출해 필터링한다 */
-    optionFilterDepth?: number;
-    /** 옵션 사전필터 — optionFilterDepth 레코드의 dataJson에서 부모(카테고리) id를 읽는 경로 (예: 'product.parentId') */
-    optionFilterParentField?: string;
-    /** 옵션 사전필터 — optionFilterDepth 레코드를 걸러낼 조건식 (evalConditionExpr 문법, 예: `_fetchedRel11=P`) */
-    optionFilterExpr?: string;
-    /* ── time 전용 ── */
-    defaultTime?: string;   // 기본 시간값 (HH:MM 형식)
-    timeStep?: number;      // 분 단위 간격 (1/5/10/30, 기본 1)
-    /* ── 동적 조건 (Search 전용) ── */
-    /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 숨김
-     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
-    hideCondition?: string;
-    /** 동적 Disable 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 비활성화
-     *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
-    disableCondition?: string;
-    /** 검색제외 — true 시 검색 버튼 클릭 시 API 파라미터에 포함하지 않음 */
-    excludeFromSearch?: boolean;
-    /* ── dateRangeStatus 전용 ── */
-    linkedDateRangeKey?: string;    // 연결할 dateRange 필드의 accessor (예: 'period')
-    beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
-    beforeTextMsgKey?: string;      // 이전 텍스트 다국어 키
-    inRangeText?: string;           // 날짜 포함 표시 텍스트 (예: '진행중')
-    inRangeTextMsgKey?: string;     // 포함 텍스트 다국어 키
-    afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
-    afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
-    statusDisplayStyle?: 'select' | 'radio'; // 검색 UI 표시 방식 (기본: select)
-    /* ── editor 전용 ── */
-    /** 에디터 종류 선택 — tiptap(기본) 또는 toast (과도기 공존) */
-    editorType?: 'tiptap' | 'toast';
-    /* ── 데이터생성 전용 (Input/FormTextarea) ── */
-    /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
-    generationKey?: string;
-    /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
-    dataReplacement?: 'none' | 'hyphen';
-    /** 문자변경: 없음(none) / 대문자(upper) / 소문자(lower) */
-    caseChange?: 'none' | 'upper' | 'lower';
-    /** 텍스트추가(끝) — 변환 후 끝에 붙이는 문자열 */
+  id: string;
+  type: SearchFieldType;
+  label: string;
+  labelMsgKey?: string; // 라벨 다국어 키 (있으면 t(key), 없으면 label 표시)
+  label2?: string; // dateRange 두 번째 라벨
+  label2MsgKey?: string; // dateRange 두 번째 라벨 다국어 키
+  fieldKey?: string;
+  /** dateRange 종료일 저장 Key — 미설정 시 fieldKey+'_from'/'_to'로 자동유도.
+   *  entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */
+  fieldKey2?: string;
+  /** dateRange 통합 서브타입 — 범위 입력 방식 (기본: 'date') */
+  rangeSubType?: DateSubType;
+  /** date 통합 서브타입 — 단독 날짜 입력 방식 (기본: 'date') */
+  dateSubType?: DateSubType;
+  /** 단일 date 컬럼 범위 검색 — true 시 _gte/_lte 파라미터로 전송 (단일 date 값 범위 필터) */
+  singleDateRange?: boolean;
+  accessor?: string; // 검색 API 파라미터 키 (fieldKey 없을 때 fallback)
+  // 데이터 표현식 (예: code=1?title:title2, title+'-'+code) — input 필드 표시값 계산
+  data?: string;
+  /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 (text 타입 전용) */
+  fetchDisplayMode?: "ONE_LINE" | "MULTI_LINE";
+  placeholder?: string;
+  placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
+  /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
+  description?: string;
+  descriptionMsgKey?: string; // 설명 다국어 키 (있으면 t(key), 없으면 description 표시)
+  colSpan: 1 | 2 | 3 | 4 | 5;
+  rowSpan?: number;
+  required?: boolean;
+  options?: string[];
+  /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+  selectType?: "selectbox" | "autocomplete";
+  minLength?: number;
+  maxLength?: number;
+  showCharCount?: boolean; // 글자수 표시 여부 (input/textarea 전용)
+  pattern?: string;
+  patternDesc?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  codeGroupCode?: string;
+  displayAs?: "text" | "value"; // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
+  multiSelect?: boolean; // button 전용: 다중선택 여부
+  /* ── textarea 전용 ── */
+  content?: string; // 표시할 텍스트 내용
+  contentMsgKey?: string; // 다국어 내용 키 (textarea 전용)
+  fontSize?: number; // 글자 크기 (px)
+  bold?: boolean; // 굵게 여부
+  textColor?: string; // 텍스트 색상
+  /* ── action-button 전용 ── */
+  color?: string; // 버튼 색상 프리셋 (black/green/...)
+  bgColor?: string; // 커스텀 배경색 (hex)
+  connType?: "" | "content" | "popup" | "path" | "close" | "excel" | "datasave" | "api"; // 클릭 시 연결 방식
+  popupSlug?: string; // 연결 방식 popup: LAYER 템플릿 slug
+  fileLayerSlug?: string; // 연결 방식 path: 로컬 컴포넌트명
+  params?: string; // 연결 시 전달할 파라미터 (popup·path 공통, 예: depth=1,type=create)
+  connectedSlug?: string; // 연결 방식 slug: DB slug (레거시)
+  connectedContentWidgetIds?: string[]; // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
+  excelTableWidgetId?: string; // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
+  excelPrivacyPopup?: boolean; // 개인정보 다운로드 사유 입력 팝업 사용 여부 (connType='excel' 전용)
+  contentAction?: "save" | "delete"; // 버튼 클릭 시 컨텐츠 저장/삭제 동작
+  goBackAfterAction?: boolean; // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
+  dataSaveSlug?: string; // 데이터저장 연결 slug (connType='datasave' 전용)
+  apiInfoId?: number; // API 연동 연결 api_info.id (connType='api' 전용)
+  saveConfirm?: boolean; // 저장 컨펌 여부 — true 시 버튼 클릭 시 확인창 표시 (action-button 전용)
+  validationRuleIds?: number[]; // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
+  contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)
+  isPk?: boolean; // PK(Primary Key) 여부 (Form 전용)
+  readonly?: boolean; // 읽기 전용 여부 (Form 전용)
+  // ── 파일/이미지/비디오 전용 ──
+  maxFileCount?: number;
+  maxFileSizeMB?: number;
+  maxTotalSizeMB?: number;
+  fileTypeMode?: "doc" | "image" | "video" | "custom" | "";
+  allowedExtensions?: string[];
+  videoMode?: "url" | "file";
+  /* ── media 전용 ── */
+  mediaImageMaxSizeMB?: number; // 이미지 최대 크기 MB (기본: 5)
+  mediaVideoMaxSizeMB?: number; // 동영상 최대 크기 MB (기본: 20)
+  /* ── 기본값 설정 ── */
+  defaultValue?: string; // 직접 텍스트 기본값 (hidden·input·textarea·editor 전용)
+  defaultValueMsgKey?: string; // 다국어 기본값 키 (input·textarea·editor 전용)
+  defaultOptionValue?: string; // 옵션 기본 선택값 (select·radio·checkbox 전용)
+  defaultDateOffset?: number; // date: 오늘 기준 N일 전 기본값 (0=오늘)
+  defaultDate?: string; // date: 기본값 날짜 미리보기용 (YYYY-MM-DD)
+  disablePast?: boolean; // date: 오늘 이전 날짜 비활성화
+  defaultToday?: boolean; // date: 오늘 날짜를 기본값으로 자동 적용
+  defaultStartDateOffset?: number; // dateRange: 시작일 오늘 기준 N일 전
+  defaultStartDate?: string; // dateRange: 시작일 기본값 미리보기용 (YYYY-MM-DD)
+  disableStartPast?: boolean; // dateRange: 시작일 이전 비활성화
+  defaultStartToday?: boolean; // dateRange: 시작일 오늘 날짜 자동 적용 (종료일과 독립)
+  defaultEndDateOffset?: number; // dateRange: 종료일 오늘 기준 N일 전
+  defaultEndDate?: string; // dateRange: 종료일 기본값 미리보기용 (YYYY-MM-DD)
+  disableEndPast?: boolean; // dateRange: 종료일 이전 비활성화
+  defaultEndToday?: boolean; // dateRange: 종료일 오늘 날짜 자동 적용 (시작일과 독립)
+  maxRangeValue?: number; // dateRange: 최대 조회 기간 숫자 (0 또는 미설정 시 제한 없음)
+  maxRangeUnit?: "day" | "week" | "month" | "year"; // dateRange: 최대 조회 기간 단위
+  /* ── category 전용 ── */
+  dbSlug?: string; // 연결할 카테고리 slug (slugOptions 선택)
+  relationSlugId?: number; // 연동 slug-relation ID (FILTER 타입 — 카테고리 목록 자체를 필터링)
+  maxDepth?: 1 | 2 | 3 | 4; // 표시할 depth 개수 — activeDepths 미설정 시 [1..maxDepth] 파생용 레거시 필드(삭제 금지)
+  /** 화면에 노출할 depth 번호 배열 — 오름차순 연속 정수(예: [1,2,3], [2,3,4]).
+   *  미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth]를 파생해 기존 동작을 그대로 유지한다. */
+  activeDepths?: number[];
+  depthLabels?: string[]; // depth별 라벨 배열 (예: ['대분류', '중분류', '소분류'])
+  depthLabelMsgKeys?: string[]; // depth별 라벨 다국어 키 배열
+  depthValueFields?: string[]; // depth별 selectbox value 경로 (예: 'id', 'dataJson.id')
+  depthTextFields?: string[]; // depth별 selectbox 표시 텍스트 경로 (예: 'name', 'dataJson.name')
+  /** depth별 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
+   *  raw item(dataJson) 단계에서 resolveAccessor 기준으로 평가, 없으면 필터 없이 전체 표시 */
+  depthFilters?: string[];
+  /** depth별 상위(부모) ID 경로. 선택한 항목의 dataJson에서 이 경로로 부모 id를 읽는다
+   *  (예: ['', 'category.parentId', 'product.parentId']). depth1(최상위 가시 depth)은 부모가 없으므로 빈 문자열.
+   *  옵션 사전필터(optionFilter*)의 상향 교집합 매핑에도 재사용된다 */
+  depthParentFields?: string[];
+  /** 옵션 사전필터 — 연동 slug-relation ID (FETCH 타입만 선택 가능). 필터 대상 depth 레코드에
+   *  이 relation이 FETCH로 병합해 준 `_fetchedRel{id}` 값을 optionFilterExpr에서 참조할 때 사용 */
+  optionFilterRelationSlugId?: number;
+  /** 옵션 사전필터 — 필터를 적용할 카테고리 depth 번호. 최심 가시 depth와 같으면 그 depth 자신을,
+   *  최심 가시 depth보다 1 깊으면(예: 리프 depth) optionFilterParentField로 부모 id를 추출해 필터링한다 */
+  optionFilterDepth?: number;
+  /** 옵션 사전필터 — optionFilterDepth 레코드의 dataJson에서 부모(카테고리) id를 읽는 경로 (예: 'product.parentId') */
+  optionFilterParentField?: string;
+  /** 옵션 사전필터 — optionFilterDepth 레코드를 걸러낼 조건식 (evalConditionExpr 문법, 예: `_fetchedRel11=P`) */
+  optionFilterExpr?: string;
+  /* ── time 전용 ── */
+  defaultTime?: string; // 기본 시간값 (HH:MM 형식)
+  timeStep?: number; // 분 단위 간격 (1/5/10/30, 기본 1)
+  /* ── 동적 조건 (Search 전용) ── */
+  /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 숨김
+   *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
+  hideCondition?: string;
+  /** 동적 Disable 조건 — live 모드에서 다른 필드 값 기준으로 이 필드를 비활성화
+   *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
+  disableCondition?: string;
+  /** 검색제외 — true 시 검색 버튼 클릭 시 API 파라미터에 포함하지 않음 */
+  excludeFromSearch?: boolean;
+  /* ── 조인 검색 연동 (select/input, Search 전용) ──
+   * 연결된 slug(예: product-data)의 필드 값으로 다른 목록(예: category-data)을 필터링한다.
+   * 연산자는 필드 타입으로 자동 결정 — select: EQ(정확일치) / input: ILIKE(부분일치). 관리자가 별도로 고르지 않는다. */
+  /** 조인 검색 연동 slug-relation ID (FETCH 타입 relation 중에서 선택) */
+  joinRelationSlugId?: number;
+  /** 조인 대상(연동 slug)의 필드 경로 — dot notation 지원 (예: productDataForm.productType) */
+  joinSlaveKey?: string;
+  /* ── dateRangeStatus 전용 ── */
+  linkedDateRangeKey?: string; // 연결할 dateRange 필드의 accessor (예: 'period')
+  beforeText?: string; // 날짜 이전 표시 텍스트 (예: '예정')
+  beforeTextMsgKey?: string; // 이전 텍스트 다국어 키
+  inRangeText?: string; // 날짜 포함 표시 텍스트 (예: '진행중')
+  inRangeTextMsgKey?: string; // 포함 텍스트 다국어 키
+  afterText?: string; // 날짜 이후 표시 텍스트 (예: '종료')
+  afterTextMsgKey?: string; // 이후 텍스트 다국어 키
+  statusDisplayStyle?: "select" | "radio"; // 검색 UI 표시 방식 (기본: select)
+  /* ── editor 전용 ── */
+  /** 에디터 종류 선택 — tiptap(기본) 또는 toast (과도기 공존) */
+  editorType?: "tiptap" | "toast";
+  /* ── 데이터생성 전용 (Input/FormTextarea) ── */
+  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+  generationKey?: string;
+  /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
+  dataReplacement?: "none" | "hyphen";
+  /** 문자변경: 없음(none) / 대문자(upper) / 소문자(lower) */
+  caseChange?: "none" | "upper" | "lower";
+  /** 텍스트추가(끝) — 변환 후 끝에 붙이는 문자열 */
+  appendText?: string;
+  /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
+  truncateLength?: number;
+  /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
+  dataGenerations?: {
+    generationKey: string;
+    onlyIfEmpty?: boolean;
+    stripHtml?: boolean;
+    dataReplacement?: "none" | "hyphen";
+    caseChange?: "none" | "upper" | "lower";
     appendText?: string;
-    /** 글자자르기 — N자 미만으로 자름 (해당 길이 이상이면 N-1자까지 보존) */
     truncateLength?: number;
-    /** 다중 데이터생성 세트 — 세트별로 독립된 generationKey·변환옵션 적용 */
-    dataGenerations?: { generationKey: string; onlyIfEmpty?: boolean; stripHtml?: boolean; dataReplacement?: 'none' | 'hyphen'; caseChange?: 'none' | 'upper' | 'lower'; appendText?: string; truncateLength?: number; }[];
-    /* ── select SLUG 옵션 소스 전용 ── */
-    /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
-    optionSlug?: string;
-    /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원, 예: id, form1.code) */
-    optionValueKey?: string;
-    /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원, 예: name, form1.title) */
-    optionTextKey?: string;
-    /** SLUG 데이터 정렬 기준 필드 key */
-    optionOrderKey?: string;
-    /** SLUG 데이터 정렬 방향 (ASC / DESC) */
-    optionOrderDir?: 'ASC' | 'DESC';
-    /** SLUG 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
-     *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
-    optionFilter?: string;
-    /* ── address 전용 ── */
-    /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
-    addressLanguage?: 'ko' | 'en';
+  }[];
+  /* ── select SLUG 옵션 소스 전용 ── */
+  /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
+  optionSlug?: string;
+  /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원, 예: id, form1.code) */
+  optionValueKey?: string;
+  /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원, 예: name, form1.title) */
+  optionTextKey?: string;
+  /** SLUG 데이터 정렬 기준 필드 key */
+  optionOrderKey?: string;
+  /** SLUG 데이터 정렬 방향 (ASC / DESC) */
+  optionOrderDir?: "ASC" | "DESC";
+  /** SLUG 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
+   *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
+  optionFilter?: string;
+  /* ── address 전용 ── */
+  /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
+  addressLanguage?: "ko" | "en";
 }
 
 /**
@@ -218,65 +242,74 @@ export interface SearchFieldConfig {
  * - STEP2(퍼블리싱) 시점에는 실제 좌표 연동이 없으므로 값 구조 문서화 목적으로만 사용한다.
  */
 export interface AddressFieldValue {
-    address: string;
-    lat: number;
-    lng: number;
+  address: string;
+  lat: number;
+  lng: number;
 }
 
 /** 검색폼 행 설정 */
 export interface SearchRowConfig {
-    id: string;
-    cols: 1 | 2 | 3 | 4 | 5;
-    fields: SearchFieldConfig[];
+  id: string;
+  cols: 1 | 2 | 3 | 4 | 5;
+  fields: SearchFieldConfig[];
 }
 
 /** 공통 필드 기본 인터페이스 */
 export interface BaseFieldConfig {
-    id: string;
-    type: string;
-    label: string;
-    fieldKey?: string;
-    placeholder?: string;
-    colSpan: 1 | 2 | 3 | 4 | 5;
-    rowSpan?: number;
-    required?: boolean;
-    options?: string[];
-    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
-    selectType?: 'selectbox' | 'autocomplete';
-    minLength?: number;
-    maxLength?: number;
-    pattern?: string;
-    patternDesc?: string;
-    minSelect?: number;
-    maxSelect?: number;
-    codeGroupCode?: string;
-    displayAs?: 'text' | 'value';  // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
+  id: string;
+  type: string;
+  label: string;
+  fieldKey?: string;
+  placeholder?: string;
+  colSpan: 1 | 2 | 3 | 4 | 5;
+  rowSpan?: number;
+  required?: boolean;
+  options?: string[];
+  /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+  selectType?: "selectbox" | "autocomplete";
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  patternDesc?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  codeGroupCode?: string;
+  displayAs?: "text" | "value"; // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
 }
 
 /** 행 설정 공통 인터페이스 */
 export interface RowConfig {
-    id: string;
-    cols: 1 | 2 | 3 | 4 | 5;
-    fields: BaseFieldConfig[];
+  id: string;
+  cols: 1 | 2 | 3 | 4 | 5;
+  fields: BaseFieldConfig[];
 }
 
 /** 공통코드 그룹 타입 */
 export interface CodeGroupDef {
-    groupCode: string;
-    groupName: string;
-    details: { code: string; name: string; nameMsgKey?: string; active: boolean }[];
+  groupCode: string;
+  groupName: string;
+  details: { code: string; name: string; nameMsgKey?: string; active: boolean }[];
 }
 
 /* ── 테이블 컬럼 관련 타입 ── */
 
 /** 셀 렌더링 타입 */
-export type CellType = 'text' | 'badge' | 'boolean' | 'actions' | 'file' | 'date' | 'dateRangeStatus' | 'inlineEdit' | 'button';
+export type CellType =
+  | "text"
+  | "badge"
+  | "boolean"
+  | "actions"
+  | "file"
+  | "date"
+  | "dateRangeStatus"
+  | "inlineEdit"
+  | "button";
 
 /** 셀 옵션 (badge용) */
 export interface CellOption {
-    text: string;
-    value: string;
-    color: string;
+  text: string;
+  value: string;
+  color: string;
 }
 
 /**
@@ -286,11 +319,11 @@ export interface CellOption {
  * - passParam: 전달 파라미터 (예: id,title=abc — =없으면 row 필드값, =있으면 고정값)
  */
 export interface EditPageRule {
-    id: string;
-    connType: 'page' | 'popup';  // page: 직접 페이지 이동 / popup: 팝업 오픈(outputMode 자동 분기)
-    pageSlug: string;
-    conditionParam: string;
-    passParam: string;
+  id: string;
+  connType: "page" | "popup"; // page: 직접 페이지 이동 / popup: 팝업 오픈(outputMode 자동 분기)
+  pageSlug: string;
+  conditionParam: string;
+  passParam: string;
 }
 
 /**
@@ -298,97 +331,97 @@ export interface EditPageRule {
  * - list/page.tsx(빌더), [slug]/page.tsx(렌더러) 공통 사용
  */
 export interface TableColumnConfig {
-    id: string;
-    header: string;
-    headerMsgKey?: string;    // 헤더명 다국어 키 (있으면 t(key), 없으면 header 표시)
-    accessor: string;
-    data?: string;          // 표현식 (예: code=1?title:title2, title+'-'+code)
-    /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 */
-    fetchDisplayMode?: 'ONE_LINE' | 'MULTI_LINE';
-    width?: number;
-    widthUnit?: 'px' | '%';
-    align: 'left' | 'center' | 'right';
-    sortable: boolean;
-    cellType: CellType;
-    cellOptions?: CellOption[];         // badge 옵션
-    showIcon?: boolean;                 // badge 아이콘(●) 표시
-    badgeShape?: 'round' | 'square';    // badge 모양
-    isNumber?: boolean;                 // 숫자 포맷 여부
-    trueText?: string;                  // boolean 타입 true 텍스트
-    trueTextMsgKey?: string;           // boolean true 텍스트 다국어 키
-    falseText?: string;                 // boolean 타입 false 텍스트
-    falseTextMsgKey?: string;          // boolean false 텍스트 다국어 키
-    actions?: ('edit' | 'detail' | 'delete' | 'copy')[]; // 프리셋 액션 버튼
-    editPageRules?: EditPageRule[];      // 수정 버튼 페이지 이동 규칙 목록
-    editPopupSlug?: string;             // 수정 버튼 연결 LAYER slug (관리자방식)
-    detailPopupSlug?: string;           // 상세 버튼 연결 LAYER slug (관리자방식)
-    editFileLayerSlug?: string;         // 수정 버튼 연결 로컬 컴포넌트명 (개발자방식)
-    detailFileLayerSlug?: string;       // 상세 버튼 연결 로컬 컴포넌트명 (개발자방식)
-    editParams?: string;                // 수정 버튼 파라미터 (예: title,temp1=1,temp2=abc) — editPopupSlug/editFileLayerSlug 공통
-    detailParams?: string;              // 상세 버튼 파라미터 — detailPopupSlug/detailFileLayerSlug 공통
-    copyFixedParams?: string;           // 복사 시 고정값 세팅 (예: title=타이틀,type=001) — 원본 값 대신 지정값으로 덮어써서 저장
-    fileLayerSlug?: string;             // file 타입 — 파일 뷰어 LAYER slug
-    /** 공통코드 연동 — text 셀에서 코드값을 이름으로 변환 */
-    codeGroupCode?: string;
-    /** 공통코드 연동 시 표시 방식: 'text'=이름 표시(기본), 'value'=코드값 표시 */
-    displayAs?: 'text' | 'value';
-    /* ── 마스킹 전용 (text 셀 전용) ── */
-    /** 마스킹 타입 — 미설정 시 마스킹 없음 */
-    maskType?: 'email' | 'phone' | 'name' | 'custom';
-    /** maskType별 패턴 키 — email: idMid/idFull/prefix3/suffix3, phone: mid4/suffix4/midSuffix, name: mid/initial/full */
-    maskPattern?: string;
-    /** maskType='custom' 전용 — 매칭할 정규식 문자열 */
-    maskCustomRegex?: string;
-    /** maskType='custom' 전용 — 매칭부 치환 문자열 */
-    maskCustomReplacement?: string;
-    /** date 타입 — 날짜 표시 포맷 (예: 'YYYY-MM-DD HH:mm') */
-    dateFormat?: string;
-    /* ── dateRangeStatus 전용 ── */
-    linkedDateRangeKey?: string;    // 연결할 dateRange 컬럼의 accessor (예: 'period')
-    linkedRangeSubType?: DateSubType; // 연결된 dateRange 컬럼의 서브타입 (기본: 'date')
-    beforeText?: string;            // 날짜 이전 표시 텍스트 (예: '예정')
-    beforeTextMsgKey?: string;      // 이전 텍스트 다국어 키
-    inRangeText?: string;           // 날짜 포함 표시 텍스트 (예: '진행중')
-    inRangeTextMsgKey?: string;     // 포함 텍스트 다국어 키
-    afterText?: string;             // 날짜 이후 표시 텍스트 (예: '종료')
-    afterTextMsgKey?: string;       // 이후 텍스트 다국어 키
-    relationSlugId?: number;        // 연동 slug-relation ID (FETCH 카테고리 연동)
-    /* ── inlineEdit 전용 ── */
-    inlineEditType?: 'toggle' | 'checkbox' | 'radio'; // 즉시 수정 UI 타입
-    options?: string[];             // 수동 입력 옵션 목록 ("텍스트|값" 형식, radio/checkbox 전용)
-    inlineEditFieldKey?: string;    // 저장 경로 (dot notation, 예: form1.active) — 필수 입력
-    /* ── button 전용 (cellType: 'button') — 클릭 시 페이지이동/레이어팝업/윈도우팝업 실행 ── */
-    /** 버튼에 표시할 라벨 (예: '상세보기') */
-    buttonLabel?: string;
-    /** 버튼 색상 (col-types.ts CUSTOM_ACTION_COLORS 팔레트 값, 예: 'blue', 'green') */
-    buttonColor?: string;
-    /** 클릭 시 연결 방식 — page: 페이지 이동, popup: 레이어팝업(EditPageRule 패턴 재사용), windowPopup: 별도 창으로 열기(신규) */
-    connType?: 'page' | 'popup' | 'windowPopup';
-    /** 이동/오픈 대상 slug (페이지 slug 또는 팝업 slug 공통 사용, EditPageRule.pageSlug와 동일한 역할) */
-    targetSlug?: string;
-    /** 연결대상 방식 — slug: 내부 페이지(기본), url: 외부 URL. connType='page'/'windowPopup'에서만 의미 있음 (popup은 항상 slug) */
-    targetType?: 'slug' | 'url';
-    /** 연결대상 방식='url' 전용 — 이동/오픈할 외부 URL (예: 'www.naver.com', 프로토콜 미입력 시 https:// 자동 보정) */
-    externalUrl?: string;
-    /** (미사용) 과거 노출조건 필드 — 버튼은 항상 노출하는 정책으로 변경되어 현재 렌더링에 영향 없음 */
-    conditionParam?: string;
-    /** 이동/오픈 시 전달할 파라미터 (예: id,title=abc — =없으면 row 필드값, =있으면 고정값) */
-    passParam?: string;
-    /** connType='windowPopup' 전용 — 새 창 크기 옵션 */
-    windowPopupOption?: {
-        width?: number;   // 창 너비(px)
-        height?: number;  // 창 높이(px)
-    };
+  id: string;
+  header: string;
+  headerMsgKey?: string; // 헤더명 다국어 키 (있으면 t(key), 없으면 header 표시)
+  accessor: string;
+  data?: string; // 표현식 (예: code=1?title:title2, title+'-'+code)
+  /** 연결 Slug 다건 매칭 시 표시 방식 — 'ONE_LINE'=한줄로 합침(기본), 'MULTI_LINE'=줄바꿈으로 나열 */
+  fetchDisplayMode?: "ONE_LINE" | "MULTI_LINE";
+  width?: number;
+  widthUnit?: "px" | "%";
+  align: "left" | "center" | "right";
+  sortable: boolean;
+  cellType: CellType;
+  cellOptions?: CellOption[]; // badge 옵션
+  showIcon?: boolean; // badge 아이콘(●) 표시
+  badgeShape?: "round" | "square"; // badge 모양
+  isNumber?: boolean; // 숫자 포맷 여부
+  trueText?: string; // boolean 타입 true 텍스트
+  trueTextMsgKey?: string; // boolean true 텍스트 다국어 키
+  falseText?: string; // boolean 타입 false 텍스트
+  falseTextMsgKey?: string; // boolean false 텍스트 다국어 키
+  actions?: ("edit" | "detail" | "delete" | "copy")[]; // 프리셋 액션 버튼
+  editPageRules?: EditPageRule[]; // 수정 버튼 페이지 이동 규칙 목록
+  editPopupSlug?: string; // 수정 버튼 연결 LAYER slug (관리자방식)
+  detailPopupSlug?: string; // 상세 버튼 연결 LAYER slug (관리자방식)
+  editFileLayerSlug?: string; // 수정 버튼 연결 로컬 컴포넌트명 (개발자방식)
+  detailFileLayerSlug?: string; // 상세 버튼 연결 로컬 컴포넌트명 (개발자방식)
+  editParams?: string; // 수정 버튼 파라미터 (예: title,temp1=1,temp2=abc) — editPopupSlug/editFileLayerSlug 공통
+  detailParams?: string; // 상세 버튼 파라미터 — detailPopupSlug/detailFileLayerSlug 공통
+  copyFixedParams?: string; // 복사 시 고정값 세팅 (예: title=타이틀,type=001) — 원본 값 대신 지정값으로 덮어써서 저장
+  fileLayerSlug?: string; // file 타입 — 파일 뷰어 LAYER slug
+  /** 공통코드 연동 — text 셀에서 코드값을 이름으로 변환 */
+  codeGroupCode?: string;
+  /** 공통코드 연동 시 표시 방식: 'text'=이름 표시(기본), 'value'=코드값 표시 */
+  displayAs?: "text" | "value";
+  /* ── 마스킹 전용 (text 셀 전용) ── */
+  /** 마스킹 타입 — 미설정 시 마스킹 없음 */
+  maskType?: "email" | "phone" | "name" | "custom";
+  /** maskType별 패턴 키 — email: idMid/idFull/prefix3/suffix3, phone: mid4/suffix4/midSuffix, name: mid/initial/full */
+  maskPattern?: string;
+  /** maskType='custom' 전용 — 매칭할 정규식 문자열 */
+  maskCustomRegex?: string;
+  /** maskType='custom' 전용 — 매칭부 치환 문자열 */
+  maskCustomReplacement?: string;
+  /** date 타입 — 날짜 표시 포맷 (예: 'YYYY-MM-DD HH:mm') */
+  dateFormat?: string;
+  /* ── dateRangeStatus 전용 ── */
+  linkedDateRangeKey?: string; // 연결할 dateRange 컬럼의 accessor (예: 'period')
+  linkedRangeSubType?: DateSubType; // 연결된 dateRange 컬럼의 서브타입 (기본: 'date')
+  beforeText?: string; // 날짜 이전 표시 텍스트 (예: '예정')
+  beforeTextMsgKey?: string; // 이전 텍스트 다국어 키
+  inRangeText?: string; // 날짜 포함 표시 텍스트 (예: '진행중')
+  inRangeTextMsgKey?: string; // 포함 텍스트 다국어 키
+  afterText?: string; // 날짜 이후 표시 텍스트 (예: '종료')
+  afterTextMsgKey?: string; // 이후 텍스트 다국어 키
+  relationSlugId?: number; // 연동 slug-relation ID (FETCH 카테고리 연동)
+  /* ── inlineEdit 전용 ── */
+  inlineEditType?: "toggle" | "checkbox" | "radio"; // 즉시 수정 UI 타입
+  options?: string[]; // 수동 입력 옵션 목록 ("텍스트|값" 형식, radio/checkbox 전용)
+  inlineEditFieldKey?: string; // 저장 경로 (dot notation, 예: form1.active) — 필수 입력
+  /* ── button 전용 (cellType: 'button') — 클릭 시 페이지이동/레이어팝업/윈도우팝업 실행 ── */
+  /** 버튼에 표시할 라벨 (예: '상세보기') */
+  buttonLabel?: string;
+  /** 버튼 색상 (col-types.ts CUSTOM_ACTION_COLORS 팔레트 값, 예: 'blue', 'green') */
+  buttonColor?: string;
+  /** 클릭 시 연결 방식 — page: 페이지 이동, popup: 레이어팝업(EditPageRule 패턴 재사용), windowPopup: 별도 창으로 열기(신규) */
+  connType?: "page" | "popup" | "windowPopup";
+  /** 이동/오픈 대상 slug (페이지 slug 또는 팝업 slug 공통 사용, EditPageRule.pageSlug와 동일한 역할) */
+  targetSlug?: string;
+  /** 연결대상 방식 — slug: 내부 페이지(기본), url: 외부 URL. connType='page'/'windowPopup'에서만 의미 있음 (popup은 항상 slug) */
+  targetType?: "slug" | "url";
+  /** 연결대상 방식='url' 전용 — 이동/오픈할 외부 URL (예: 'www.naver.com', 프로토콜 미입력 시 https:// 자동 보정) */
+  externalUrl?: string;
+  /** (미사용) 과거 노출조건 필드 — 버튼은 항상 노출하는 정책으로 변경되어 현재 렌더링에 영향 없음 */
+  conditionParam?: string;
+  /** 이동/오픈 시 전달할 파라미터 (예: id,title=abc — =없으면 row 필드값, =있으면 고정값) */
+  passParam?: string;
+  /** connType='windowPopup' 전용 — 새 창 크기 옵션 */
+  windowPopupOption?: {
+    width?: number; // 창 너비(px)
+    height?: number; // 창 높이(px)
+  };
 }
 
 /** 불러오기 목록 아이템 */
 export interface TemplateItem {
-    id: number;
-    name: string;
-    slug: string;
-    description?: string;
-    configJson: string;
-    templateType?: string;
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  configJson: string;
+  templateType?: string;
 }
 
 /* ── 표시 방식 타입 ── */
@@ -398,50 +431,50 @@ export interface TemplateItem {
  * - pagination: 페이지네이션 (고전적인 페이지 번호)
  * - scroll: 무한 스크롤 (Intersection Observer 기반)
  */
-export type DisplayMode = 'pagination' | 'scroll';
+export type DisplayMode = "pagination" | "scroll";
 
 /* ── 버튼 영역 관련 타입 (페이지 메이커 List v2) ── */
 
 /** 버튼 유형 */
-export type ButtonType = 'primary' | 'secondary' | 'danger' | 'blue' | 'success';
+export type ButtonType = "primary" | "secondary" | "danger" | "blue" | "success";
 
 /** 버튼 액션 */
-export type ButtonAction = 'register' | 'excel' | 'custom';
+export type ButtonAction = "register" | "excel" | "custom";
 
 /** 버튼 위치 */
-export type ButtonPosition = 'above' | 'between';
+export type ButtonPosition = "above" | "between";
 
 /** 버튼 설정 */
 export interface ButtonConfig {
-    id: string;
-    label: string;
-    type: ButtonType;
-    action: ButtonAction;
-    popupSlug?: string;          // DB 저장 레이어 팝업 연동 slug
-    fileLayerSlug?: string;      // 생성 파일용 직접 import slug (./LayerPopup)
-    excelFormat?: 'xlsx' | 'csv';  // action이 'excel'일 때 파일 형식
+  id: string;
+  label: string;
+  type: ButtonType;
+  action: ButtonAction;
+  popupSlug?: string; // DB 저장 레이어 팝업 연동 slug
+  fileLayerSlug?: string; // 생성 파일용 직접 import slug (./LayerPopup)
+  excelFormat?: "xlsx" | "csv"; // action이 'excel'일 때 파일 형식
 }
 
 /* ── Layer 팝업 관련 타입 (quick-detail/page.tsx, popup 컴포넌트 공유) ── */
 
 /** 레이어 팝업 유형 */
-export type LayerType = 'center' | 'right';
+export type LayerType = "center" | "right";
 
 /** 중앙 팝업 너비 */
-export type LayerWidth = 'sm' | 'md' | 'lg' | 'xl';
+export type LayerWidth = "sm" | "md" | "lg" | "xl";
 
 /** 하단 버튼 스타일 타입 */
-export type LayerButtonType = 'primary' | 'secondary' | 'blue' | 'success' | 'danger';
+export type LayerButtonType = "primary" | "secondary" | "blue" | "success" | "danger";
 
 /** 하단 버튼 액션 타입 */
-export type LayerButtonAction = 'close' | 'save' | 'custom';
+export type LayerButtonAction = "close" | "save" | "custom";
 
 /** 하단 버튼 설정 */
 export interface LayerButtonConfig {
-    id: string;
-    label: string;
-    type: LayerButtonType;
-    action: LayerButtonAction;
+  id: string;
+  label: string;
+  type: LayerButtonType;
+  action: LayerButtonAction;
 }
 
 /* ── 데이터 검증 규칙 관련 타입 (widget 빌더 "규칙생성" 기능) ──
@@ -455,10 +488,10 @@ export interface LayerButtonConfig {
  * - type='maxCount': 조건에 맞는 데이터가 지정 건수를 넘지 않도록 검사
  */
 export interface ValidationRule {
-    id: number;              // 서버 발급 PK
-    slugRegistryId: number;  // 연결 Slug 레지스트리 FK
-    type: 'unique' | 'maxCount';
-    fields?: string;         // type='unique'일 때 복합키 필드 목록 (콤마구분 문자열, 예: "email,userId")
-    condition?: string;      // 옵션 조건식 (콤마구분 key=value, 예: "status='active'")
-    maxCount?: number;       // type='maxCount'일 때 최대 건수
+  id: number; // 서버 발급 PK
+  slugRegistryId: number; // 연결 Slug 레지스트리 FK
+  type: "unique" | "maxCount";
+  fields?: string; // type='unique'일 때 복합키 필드 목록 (콤마구분 문자열, 예: "email,userId")
+  condition?: string; // 옵션 조건식 (콤마구분 key=value, 예: "status='active'")
+  maxCount?: number; // type='maxCount'일 때 최대 건수
 }

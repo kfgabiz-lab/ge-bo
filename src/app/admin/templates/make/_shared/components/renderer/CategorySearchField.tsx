@@ -42,7 +42,7 @@ const PREVIEW_OPTIONS: CategoryItem[] = [
 const SELECT_CLS =
   "flex-1 h-8 rounded border border-slate-200 bg-white px-2 text-[13px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400";
 
-export function CategorySearchField({ mode, field, onChange, isDisabled }: CategorySearchFieldProps) {
+export function CategorySearchField({ mode, field, value = "", onChange, isDisabled }: CategorySearchFieldProps) {
   const { t } = useI18n();
   const isPreview = mode === "preview";
   /* 화면에 노출할 depth 번호 배열 — 미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth] 파생 (하위호환) */
@@ -50,9 +50,10 @@ export function CategorySearchField({ mode, field, onChange, isDisabled }: Categ
   const depthLabels = field.depthLabels ?? [];
   const depthLabelMsgKeys = field.depthLabelMsgKeys ?? [];
 
-  /* 로드·선택 로직은 훅이 전담 — 컴포넌트는 반환값으로 그리기만 함 */
+  /* 로드·선택 로직은 훅이 전담 — 컴포넌트는 반환값으로 그리기만 함.
+     value는 검색폼 "초기화" 등 외부 리셋을 감지하는 데 사용된다(useCategoryCascade 참고) */
   const { depthValues, depthOptions, depthLoading, disabledDepths, configErrorDepths, handleSelect } =
-    useCategoryCascade({ mode, field, onChange });
+    useCategoryCascade({ mode, field, value, onChange });
 
   /* ── preview 모드: 샘플 selectbox (disabled) ── */
   if (isPreview) {
