@@ -390,6 +390,16 @@ export interface TableColumnConfig {
   inlineEditType?: "toggle" | "checkbox" | "radio"; // 즉시 수정 UI 타입
   options?: string[]; // 수동 입력 옵션 목록 ("텍스트|값" 형식, radio/checkbox 전용)
   inlineEditFieldKey?: string; // 저장 경로 (dot notation, 예: form1.active) — 필수 입력
+  /** 토글 전용 — 화면에 보이는 값이 true로 판정될 실제 저장값 (예: '001'). trueValue/falseValue가 둘 다 있을 때만
+   *  값 비교로 판정하고, 없으면 기존처럼 Boolean(value)로 판정한다(하위호환) */
+  inlineEditTrueValue?: string;
+  /** 토글 전용 — 화면에 보이는 값이 false로 판정될 실제 저장값 (예: '002') */
+  inlineEditFalseValue?: string;
+  /** 저장 대상 리다이렉트 — 연동 slug-relation ID(FETCH 타입). 설정 시 이 컬럼의 즉시수정 저장을
+   *  테이블 자신(connectedSlug)이 아니라 relation의 slave(연동 slug)로 보낸다.
+   *  slave 레코드 id는 relation.masterKey 경로(예: 'product.id')로 이 행 자신에서 읽는다.
+   *  미설정 시 기존처럼 테이블 자신의 connectedSlug로 저장한다(하위호환) */
+  inlineEditRelationSlugId?: number;
   /* ── button 전용 (cellType: 'button') — 클릭 시 페이지이동/레이어팝업/윈도우팝업 실행 ── */
   /** 버튼에 표시할 라벨 (예: '상세보기') */
   buttonLabel?: string;

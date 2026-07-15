@@ -6,9 +6,9 @@
  * - 핸들러 타입: live 모드에서 테이블·검색폼에 전달하는 이벤트 콜백
  */
 
-import type { SearchRowConfig, TableColumnConfig, SearchFieldConfig, DateSubType } from '../../types';
-import type { FormWidget } from '../builder/FormBuilder';
-import type { TableWidget } from '../builder/TableBuilder';
+import type { SearchRowConfig, TableColumnConfig, SearchFieldConfig, DateSubType } from "../../types";
+import type { FormWidget } from "../builder/FormBuilder";
+import type { TableWidget } from "../builder/TableBuilder";
 
 /* ── 렌더링 맥락 ── */
 
@@ -17,7 +17,7 @@ import type { TableWidget } from '../builder/TableBuilder';
  * - preview: 빌더 우측 미리보기 패널 (disabled, 샘플 데이터)
  * - live: 실제 생성된 페이지 (인터랙티브, API 실데이터)
  */
-export type RendererMode = 'preview' | 'live';
+export type RendererMode = "preview" | "live";
 
 /* ── 위젯 데이터 타입 ── */
 
@@ -30,24 +30,24 @@ export type RendererMode = 'preview' | 'live';
 export type SpaceItem = SearchFieldConfig;
 
 export interface SpaceWidget {
-    type: 'space';
-    widgetId: string;
-    items: SearchFieldConfig[];
-    align?: 'left' | 'center' | 'right';
-    /** 영역 테두리 표시 여부 (기본 true) */
-    showBorder?: boolean;
-    /** 영역 바탕색 (기본 'white') */
-    bgColor?: string;
+  type: "space";
+  widgetId: string;
+  items: SearchFieldConfig[];
+  align?: "left" | "center" | "right";
+  /** 영역 테두리 표시 여부 (기본 true) */
+  showBorder?: boolean;
+  /** 영역 바탕색 (기본 'white') */
+  bgColor?: string;
 }
 
 /** 검색 위젯 */
 export interface SearchWidget {
-    type: 'search';
-    widgetId: string;
-    contentKey: string;
-    rows: SearchRowConfig[];
-    /** 검색 레이아웃 스타일 — standard: 그리드(기본), simple: 한 줄 인라인 */
-    displayStyle?: 'standard' | 'simple';
+  type: "search";
+  widgetId: string;
+  contentKey: string;
+  rows: SearchRowConfig[];
+  /** 검색 레이아웃 스타일 — standard: 그리드(기본), simple: 한 줄 인라인 */
+  displayStyle?: "standard" | "simple";
 }
 
 /**
@@ -58,156 +58,156 @@ export interface SearchWidget {
  * - parentWidgetId: 상위 depth 위젯 ID (선택된 값으로 eq_parentId 필터 적용)
  */
 export interface CategoryWidget {
-    type: 'category';
-    widgetId: string;
-    contentKey: string;
-    /** 연결할 카테고리 데이터 slug (page_data.template_slug) */
-    dbSlug: string;
-    /** 이 위젯의 depth 번호 (1=루트/대분류, 2=중분류, ...) */
-    depth: number;
-    /** 상위 카테고리 위젯 ID — 이 위젯의 선택값을 parentId 필터로 사용 */
-    parentWidgetId?: string;
-    /** 이 depth 레이블 (예: '대분류', '중분류') */
-    label?: string;
-    /** 레이블 다국어 키 */
-    labelMsgKey?: string;
-    /** 카드에 표시할 필드 키 매핑 — 미설정 시 기본값 사용 */
-    /** 고유 ID 필드 키 (카드 미노출, 기본: 'id') */
-    fieldId?: string;
-    /** 코드 배지 필드 키 (기본: 'code') */
-    fieldCode?: string;
-    /** 제목 필드 키 (기본: 'name') */
-    fieldTitle?: string;
-    /** 설명 필드 키 (기본: 'description') */
-    fieldDesc?: string;
-    /** 항목 등록 허용 여부 (기본 true) */
-    allowCreate?: boolean;
-    /** 등록 버튼 연결 타입 ('popup'=페이지, 'path'=경로) — 미설정 시 inline 입력 */
-    createConnType?: 'popup' | 'path';
-    /** 등록 연결 페이지 slug (createConnType='popup'일 때) */
-    createPopupSlug?: string;
-    /** 등록 연결 경로 (createConnType='path'일 때) */
-    createPath?: string;
-    /** 등록 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (쉼표 구분, 예: depth=4,name) */
-    createParams?: string;
-    /** 등록: 파라미터를 전달받은 화면 저장 버튼 클릭 시 폼에 없는 파라미터도 함께 저장 */
-    createParamSave?: boolean;
-    /** 항목 수정 허용 여부 (기본 true) */
-    allowEdit?: boolean;
-    /** 수정 버튼 연결 타입 ('popup'=페이지, 'path'=경로) — 미설정 시 inline 입력 */
-    editConnType?: 'popup' | 'path';
-    /** 수정 연결 페이지 slug (editConnType='popup'일 때) */
-    editPopupSlug?: string;
-    /** 수정 연결 경로 (editConnType='path'일 때) */
-    editPath?: string;
-    /** 수정 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (쉼표 구분, 예: depth=4,name) */
-    editParams?: string;
-    /** 수정: 파라미터를 전달받은 화면 저장 버튼 클릭 시 폼에 없는 파라미터도 함께 저장 */
-    editParamSave?: boolean;
-    /** 상세 버튼 표시 여부 — 토글 ON 시 카드 hover에 상세 버튼 표시 */
-    allowDetail?: boolean;
-    /** 상세 버튼 연결 타입 ('popup'=페이지, 'path'=경로) */
-    detailConnType?: 'popup' | 'path';
-    /** 상세 연결 페이지 slug (detailConnType='popup'일 때) */
-    detailPopupSlug?: string;
-    /** 상세 연결 경로 (detailConnType='path'일 때) */
-    detailPath?: string;
-    /** 상세 연결 파라미터 (param1=1&param2=2 형식) */
-    detailParams?: string;
-    /** 항목 삭제 허용 여부 (기본 true) */
-    allowDelete?: boolean;
-    /** 연결 Slug — slug-relation(FETCH 방향) id. depth 2+ 전용. 설정 시 등록(datasave) 팝업에서
-     *  테이블 행선택 저장 성공 직후 { depth, parentId, refId } 경량 row를 이 위젯 dbSlug에 추가 저장한다.
-     *  카드 표시는 fieldTitle 등에 `_fetchedRel{id}.경로`를 입력해 BE applyFetch 결과를 그대로 조회. */
-    relationSlugId?: number;
+  type: "category";
+  widgetId: string;
+  contentKey: string;
+  /** 연결할 카테고리 데이터 slug (page_data.template_slug) */
+  dbSlug: string;
+  /** 이 위젯의 depth 번호 (1=루트/대분류, 2=중분류, ...) */
+  depth: number;
+  /** 상위 카테고리 위젯 ID — 이 위젯의 선택값을 parentId 필터로 사용 */
+  parentWidgetId?: string;
+  /** 이 depth 레이블 (예: '대분류', '중분류') */
+  label?: string;
+  /** 레이블 다국어 키 */
+  labelMsgKey?: string;
+  /** 카드에 표시할 필드 키 매핑 — 미설정 시 기본값 사용 */
+  /** 고유 ID 필드 키 (카드 미노출, 기본: 'id') */
+  fieldId?: string;
+  /** 코드 배지 필드 키 (기본: 'code') */
+  fieldCode?: string;
+  /** 제목 필드 키 (기본: 'name') */
+  fieldTitle?: string;
+  /** 설명 필드 키 (기본: 'description') */
+  fieldDesc?: string;
+  /** 항목 등록 허용 여부 (기본 true) */
+  allowCreate?: boolean;
+  /** 등록 버튼 연결 타입 ('popup'=페이지, 'path'=경로) — 미설정 시 inline 입력 */
+  createConnType?: "popup" | "path";
+  /** 등록 연결 페이지 slug (createConnType='popup'일 때) */
+  createPopupSlug?: string;
+  /** 등록 연결 경로 (createConnType='path'일 때) */
+  createPath?: string;
+  /** 등록 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (쉼표 구분, 예: depth=4,name) */
+  createParams?: string;
+  /** 등록: 파라미터를 전달받은 화면 저장 버튼 클릭 시 폼에 없는 파라미터도 함께 저장 */
+  createParamSave?: boolean;
+  /** 항목 수정 허용 여부 (기본 true) */
+  allowEdit?: boolean;
+  /** 수정 버튼 연결 타입 ('popup'=페이지, 'path'=경로) — 미설정 시 inline 입력 */
+  editConnType?: "popup" | "path";
+  /** 수정 연결 페이지 slug (editConnType='popup'일 때) */
+  editPopupSlug?: string;
+  /** 수정 연결 경로 (editConnType='path'일 때) */
+  editPath?: string;
+  /** 수정 연결 추가 파라미터 — 연결된 화면 필드 key에 매핑 (쉼표 구분, 예: depth=4,name) */
+  editParams?: string;
+  /** 수정: 파라미터를 전달받은 화면 저장 버튼 클릭 시 폼에 없는 파라미터도 함께 저장 */
+  editParamSave?: boolean;
+  /** 상세 버튼 표시 여부 — 토글 ON 시 카드 hover에 상세 버튼 표시 */
+  allowDetail?: boolean;
+  /** 상세 버튼 연결 타입 ('popup'=페이지, 'path'=경로) */
+  detailConnType?: "popup" | "path";
+  /** 상세 연결 페이지 slug (detailConnType='popup'일 때) */
+  detailPopupSlug?: string;
+  /** 상세 연결 경로 (detailConnType='path'일 때) */
+  detailPath?: string;
+  /** 상세 연결 파라미터 (param1=1&param2=2 형식) */
+  detailParams?: string;
+  /** 항목 삭제 허용 여부 (기본 true) */
+  allowDelete?: boolean;
+  /** 연결 Slug — slug-relation(FETCH 방향) id. depth 2+ 전용. 설정 시 등록(datasave) 팝업에서
+   *  테이블 행선택 저장 성공 직후 { depth, parentId, refId } 경량 row를 이 위젯 dbSlug에 추가 저장한다.
+   *  카드 표시는 fieldTitle 등에 `_fetchedRel{id}.경로`를 입력해 BE applyFetch 결과를 그대로 조회. */
+  relationSlugId?: number;
 }
 
 /* ── SubList 위젯 타입 ── */
 
 /** 서브 목록 컬럼 셀 입력 타입 — 기존 FieldRenderer 필드 컴포넌트와 1:1 대응 */
 export type SubListColumnType =
-    | 'input'      // 텍스트 입력 (InputField)
-    | 'select'     // 셀렉트 박스 (SelectField)
-    | 'radio'      // 라디오 단일선택 (RadioField)
-    | 'checkbox'   // 체크박스 복수선택 (CheckboxField)
-    | 'date'       // 날짜 단독 (DateField)
-    | 'dateRange'  // 날짜 범위 from~to (DateRangeField)
-    | 'textarea'   // 여러 줄 텍스트 (FormTextareaField)
-    | 'file'       // 파일 첨부 (FileField)
-    | 'image'      // 이미지 업로드 (ImageField)
-    | 'action';    // 액션 버튼 (복사 전용)
+  | "input" // 텍스트 입력 (InputField)
+  | "select" // 셀렉트 박스 (SelectField)
+  | "radio" // 라디오 단일선택 (RadioField)
+  | "checkbox" // 체크박스 복수선택 (CheckboxField)
+  | "date" // 날짜 단독 (DateField)
+  | "dateRange" // 날짜 범위 from~to (DateRangeField)
+  | "textarea" // 여러 줄 텍스트 (FormTextareaField)
+  | "file" // 파일 첨부 (FileField)
+  | "image" // 이미지 업로드 (ImageField)
+  | "action"; // 액션 버튼 (복사 전용)
 
 /**
  * 서브 목록 컬럼 설정
  * 빌더에서 구성하고, 렌더러에서 테이블 컬럼으로 표시된다.
  */
 export interface SubListColumn {
-    id: string;                    // 컬럼 고유 ID (자동 생성)
-    key: string;                   // 데이터 키 (영문 필수)
-    label: string;                 // 헤더 표시명
-    labelMsgKey?: string;          // 헤더 다국어 키
-    type: SubListColumnType;       // 셀 입력 타입
-    required?: boolean;            // 필수 여부
-    placeholder?: string;          // 입력 placeholder
-    placeholderMsgKey?: string;    // placeholder 다국어 키
-    description?: string;          // 필드 설명
-    descriptionMsgKey?: string;    // 필드 설명 다국어 키
-    options?: string[];            // select 타입 전용 옵션 목록
-    codeGroup?: string;            // 공통코드 그룹 연결 (select/input 타입)
-    displayAs?: 'text' | 'value'; // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
-    maxFileCount?: number;         // file/image 타입 최대 파일 수 (기본 1)
-    maxFileSizeMB?: number;        // file 타입 개당 최대 용량 (MB)
-    maxTotalSizeMB?: number;       // file 타입 전체 최대 용량 (MB)
-    fileTypeMode?: string;         // file 타입 허용 파일 종류 ('doc'|'image'|'video'|'custom')
-    allowedExtensions?: string[];  // file 타입 커스텀 확장자 목록
-    readonly?: boolean;            // 읽기 전용 여부
-    /* ── 유효성검사 (input/textarea 공통) ── */
-    minLength?: number;
-    maxLength?: number;
-    showCharCount?: boolean;
-    pattern?: string;
-    patternDesc?: string;
-    /* ── 기본값 ── */
-    defaultValue?: string;         // input/textarea 기본 텍스트
-    defaultValueMsgKey?: string;   // input/textarea 다국어 기본값 키
-    defaultOptionValue?: string;   // select 기본 선택값
-    /* ── date 전용 ── */
-    defaultDateOffset?: number;    // 오늘 기준 N일 전 기본값
-    defaultDate?: string;          // 기본값 날짜 미리보기 (YYYY-MM-DD)
-    disablePast?: boolean;         // 오늘 이전 날짜 비활성화
-    dateSubType?: DateSubType; // 날짜 단독 서브타입 (기본: 'date')
-    defaultToday?: boolean;        // 오늘 날짜를 기본값으로 자동 적용
-    /* ── dateRange 전용 ── */
-    label2?: string;               // 종료일 라벨
-    label2MsgKey?: string;         // 종료일 라벨 다국어 키
-    /** 종료일 저장 Key — 미설정 시 key+'_from'/'_to'로 자동유도.
-     *  entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */
-    key2?: string;
-    defaultStartDateOffset?: number;
-    defaultStartDate?: string;
-    disableStartPast?: boolean;
-    defaultStartToday?: boolean;   // 시작일 오늘 날짜 자동 적용 (종료일과 독립)
-    defaultEndDateOffset?: number;
-    defaultEndDate?: string;
-    disableEndPast?: boolean;
-    defaultEndToday?: boolean;     // 종료일 오늘 날짜 자동 적용 (시작일과 독립)
-    rangeSubType?: DateSubType; // 날짜 범위 서브타입 (기본: 'date')
-    /* ── action 타입 전용 ── */
-    actions?: ('copy' | 'delete')[];    // SubList action 컬럼: copy, delete 가능
-    /* ── select 표시 방식 ── */
-    /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
-    selectType?: 'selectbox' | 'autocomplete';
-    /* ── select SLUG 옵션 소스 전용 ── */
-    /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
-    optionSlug?: string;
-    /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원) */
-    optionValueKey?: string;
-    /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원) */
-    optionTextKey?: string;
-    /** SLUG 데이터 정렬 기준 필드 key */
-    optionOrderKey?: string;
-    /** SLUG 데이터 정렬 방향 (ASC / DESC) */
-    optionOrderDir?: 'ASC' | 'DESC';
+  id: string; // 컬럼 고유 ID (자동 생성)
+  key: string; // 데이터 키 (영문 필수)
+  label: string; // 헤더 표시명
+  labelMsgKey?: string; // 헤더 다국어 키
+  type: SubListColumnType; // 셀 입력 타입
+  required?: boolean; // 필수 여부
+  placeholder?: string; // 입력 placeholder
+  placeholderMsgKey?: string; // placeholder 다국어 키
+  description?: string; // 필드 설명
+  descriptionMsgKey?: string; // 필드 설명 다국어 키
+  options?: string[]; // select 타입 전용 옵션 목록
+  codeGroup?: string; // 공통코드 그룹 연결 (select/input 타입)
+  displayAs?: "text" | "value"; // 공통코드 표시 방식 (이름 표시 / 코드값 표시)
+  maxFileCount?: number; // file/image 타입 최대 파일 수 (기본 1)
+  maxFileSizeMB?: number; // file 타입 개당 최대 용량 (MB)
+  maxTotalSizeMB?: number; // file 타입 전체 최대 용량 (MB)
+  fileTypeMode?: string; // file 타입 허용 파일 종류 ('doc'|'image'|'video'|'custom')
+  allowedExtensions?: string[]; // file 타입 커스텀 확장자 목록
+  readonly?: boolean; // 읽기 전용 여부
+  /* ── 유효성검사 (input/textarea 공통) ── */
+  minLength?: number;
+  maxLength?: number;
+  showCharCount?: boolean;
+  pattern?: string;
+  patternDesc?: string;
+  /* ── 기본값 ── */
+  defaultValue?: string; // input/textarea 기본 텍스트
+  defaultValueMsgKey?: string; // input/textarea 다국어 기본값 키
+  defaultOptionValue?: string; // select 기본 선택값
+  /* ── date 전용 ── */
+  defaultDateOffset?: number; // 오늘 기준 N일 전 기본값
+  defaultDate?: string; // 기본값 날짜 미리보기 (YYYY-MM-DD)
+  disablePast?: boolean; // 오늘 이전 날짜 비활성화
+  dateSubType?: DateSubType; // 날짜 단독 서브타입 (기본: 'date')
+  defaultToday?: boolean; // 오늘 날짜를 기본값으로 자동 적용
+  /* ── dateRange 전용 ── */
+  label2?: string; // 종료일 라벨
+  label2MsgKey?: string; // 종료일 라벨 다국어 키
+  /** 종료일 저장 Key — 미설정 시 key+'_from'/'_to'로 자동유도.
+   *  entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */
+  key2?: string;
+  defaultStartDateOffset?: number;
+  defaultStartDate?: string;
+  disableStartPast?: boolean;
+  defaultStartToday?: boolean; // 시작일 오늘 날짜 자동 적용 (종료일과 독립)
+  defaultEndDateOffset?: number;
+  defaultEndDate?: string;
+  disableEndPast?: boolean;
+  defaultEndToday?: boolean; // 종료일 오늘 날짜 자동 적용 (시작일과 독립)
+  rangeSubType?: DateSubType; // 날짜 범위 서브타입 (기본: 'date')
+  /* ── action 타입 전용 ── */
+  actions?: ("copy" | "delete")[]; // SubList action 컬럼: copy, delete 가능
+  /* ── select 표시 방식 ── */
+  /** select 표시 방식 — 'selectbox'(기본) | 'autocomplete'(입력형 자동완성) */
+  selectType?: "selectbox" | "autocomplete";
+  /* ── select SLUG 옵션 소스 전용 ── */
+  /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */
+  optionSlug?: string;
+  /** SLUG 데이터에서 select value로 쓸 필드 key (dot notation 지원) */
+  optionValueKey?: string;
+  /** SLUG 데이터에서 select text로 쓸 필드 key (dot notation 지원) */
+  optionTextKey?: string;
+  /** SLUG 데이터 정렬 기준 필드 key */
+  optionOrderKey?: string;
+  /** SLUG 데이터 정렬 방향 (ASC / DESC) */
+  optionOrderDir?: "ASC" | "DESC";
 }
 
 /**
@@ -216,30 +216,30 @@ export interface SubListColumn {
  * Button 위젯과 연결(connectedSlug)하여 저장한다.
  */
 export interface SubListWidget {
-    type: 'sublist';
-    widgetId: string;
-    connectedSlug?: string;       // 저장 시 호출할 API slug (Button 위젯과 연결)
-    contentKey: string;           // 이 SubList 데이터의 식별 키 (영문 필수)
-    title?: string;               // 헤더 타이틀 (예: '코드 상세')
-    titleMsgKey?: string;         // 헤더 타이틀 다국어 키
-    addButtonLabel?: string;      // 추가 버튼 텍스트 (기본 '추가')
-    addButtonLabelMsgKey?: string; // 추가 버튼 다국어 키
-    maxRows?: number;             // 최대 행 수 (0 = 제한 없음)
-    required?: boolean;           // 필수 여부 (true: 행이 1개 이상 있어야 저장 가능)
-    showBorder?: boolean;         // 테두리 표시 여부 (기본 true)
-    columns: SubListColumn[];     // 컬럼 설정 목록
-    /**
-     * 부모 연결 필드 — 이 SubList가 API연동(connType='api') 컨텐츠로 부모 Form과 함께 선택되고
-     * 부모 Form과 다른 connectedSlug(다른 Entity)에 연결된 경우에만 의미가 있다.
-     * 부모 Form 저장 후 생성/수정된 id를 이 SubList 자신(자식 Entity)의 어느 필드에 담아 저장할지
-     * 지정한다(예: 자식 Entity의 FK 필드 key). 빌더에서 이 SubList의 연결 Entity 필드 목록 중 선택.
-     * 값이 없으면 런타임(useWidgetPageState.handleApiCall)이 이 SubList를 저장하지 않고 경고를 띄운다.
-     */
-    parentIdField?: string;
+  type: "sublist";
+  widgetId: string;
+  connectedSlug?: string; // 저장 시 호출할 API slug (Button 위젯과 연결)
+  contentKey: string; // 이 SubList 데이터의 식별 키 (영문 필수)
+  title?: string; // 헤더 타이틀 (예: '코드 상세')
+  titleMsgKey?: string; // 헤더 타이틀 다국어 키
+  addButtonLabel?: string; // 추가 버튼 텍스트 (기본 '추가')
+  addButtonLabelMsgKey?: string; // 추가 버튼 다국어 키
+  maxRows?: number; // 최대 행 수 (0 = 제한 없음)
+  required?: boolean; // 필수 여부 (true: 행이 1개 이상 있어야 저장 가능)
+  showBorder?: boolean; // 테두리 표시 여부 (기본 true)
+  columns: SubListColumn[]; // 컬럼 설정 목록
+  /**
+   * 부모 연결 필드 — 이 SubList가 API연동(connType='api') 컨텐츠로 부모 Form과 함께 선택되고
+   * 부모 Form과 다른 connectedSlug(다른 Entity)에 연결된 경우에만 의미가 있다.
+   * 부모 Form 저장 후 생성/수정된 id를 이 SubList 자신(자식 Entity)의 어느 필드에 담아 저장할지
+   * 지정한다(예: 자식 Entity의 FK 필드 key). 빌더에서 이 SubList의 연결 Entity 필드 목록 중 선택.
+   * 값이 없으면 런타임(useWidgetPageState.handleApiCall)이 이 SubList를 저장하지 않고 경고를 띄운다.
+   */
+  parentIdField?: string;
 }
 
 /** 다중선택 항목별 추가 입력 필드 타입 (FieldRenderer 재사용 대상 타입만) */
-export type MultiSelectExtraFieldType = 'input' | 'select' | 'radio' | 'checkbox' | 'date';
+export type MultiSelectExtraFieldType = "input" | "select" | "radio" | "checkbox" | "date";
 
 /**
  * 다중선택 항목별 추가 입력 필드 정의
@@ -248,18 +248,18 @@ export type MultiSelectExtraFieldType = 'input' | 'select' | 'radio' | 'checkbox
  * - id: DnD 내부 식별자 (uid 자동생성), key: 저장 키 (사용자 입력)
  */
 export interface MultiSelectExtraField {
-    id: string;                       // DnD 내부 식별자 (uid 자동생성)
-    key: string;                      // 저장 키 (dataJson 내 필드명, 사용자 입력)
-    type: MultiSelectExtraFieldType;
-    label: string;
-    labelMsgKey?: string;             // 라벨 다국어 키
-    options?: string[];               // select / radio / checkbox 전용 ("텍스트:값" 형식)
-    codeGroupCode?: string;           // 공통코드 그룹 코드
-    required?: boolean;
-    placeholder?: string;
-    placeholderMsgKey?: string;       // placeholder 다국어 키
-    /** 표시 위치 — 항목명 기준 좌/우 (기본값은 렌더링 시점에 'right'로 처리) */
-    position?: 'left' | 'right';
+  id: string; // DnD 내부 식별자 (uid 자동생성)
+  key: string; // 저장 키 (dataJson 내 필드명, 사용자 입력)
+  type: MultiSelectExtraFieldType;
+  label: string;
+  labelMsgKey?: string; // 라벨 다국어 키
+  options?: string[]; // select / radio / checkbox 전용 ("텍스트:값" 형식)
+  codeGroupCode?: string; // 공통코드 그룹 코드
+  required?: boolean;
+  placeholder?: string;
+  placeholderMsgKey?: string; // placeholder 다국어 키
+  /** 표시 위치 — 항목명 기준 좌/우 (기본값은 렌더링 시점에 'right'로 처리) */
+  position?: "left" | "right";
 }
 
 /**
@@ -272,68 +272,68 @@ export interface MultiSelectExtraField {
  *                  있으면 저장 구조가 number[] → { id, ...필드값 }[] 로 변경
  */
 export interface MultiSelectWidget {
-    type: 'multiselect';
-    widgetId: string;
-    /** dataJson 저장 키 (예: "relatedUsers") */
-    contentKey: string;
-    /** 드롭다운 옵션 목록을 가져올 slug (호출 slug) */
-    sourceSlug: string;
-    /** sourceSlug 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
-     *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
-    sourceFilter?: string;
-    /** 저장 시 연결되는 slug (연결 slug) */
-    connectedSlug?: string;
-    /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
-    labelFields: string;
-    placeholder?: string;
-    placeholderMsgKey?: string;   // placeholder 다국어 키
-    title?: string;
-    titleMsgKey?: string;         // 타이틀 다국어 키
-    description?: string;
-    descriptionMsgKey?: string;   // 설명 다국어 키
-    required?: boolean;           // 필수 여부 (true: 최소 1개 이상 선택해야 저장 가능)
-    showBorder?: boolean;
-    bgColor?: string;
-    /** 선택된 항목마다 인라인으로 표시할 추가 입력 필드 목록 */
-    extraFields?: MultiSelectExtraField[];
+  type: "multiselect";
+  widgetId: string;
+  /** dataJson 저장 키 (예: "relatedUsers") */
+  contentKey: string;
+  /** 드롭다운 옵션 목록을 가져올 slug (호출 slug) */
+  sourceSlug: string;
+  /** sourceSlug 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
+   *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
+  sourceFilter?: string;
+  /** 저장 시 연결되는 slug (연결 slug) */
+  connectedSlug?: string;
+  /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
+  labelFields: string;
+  placeholder?: string;
+  placeholderMsgKey?: string; // placeholder 다국어 키
+  title?: string;
+  titleMsgKey?: string; // 타이틀 다국어 키
+  description?: string;
+  descriptionMsgKey?: string; // 설명 다국어 키
+  required?: boolean; // 필수 여부 (true: 최소 1개 이상 선택해야 저장 가능)
+  showBorder?: boolean;
+  bgColor?: string;
+  /** 선택된 항목마다 인라인으로 표시할 추가 입력 필드 목록 */
+  extraFields?: MultiSelectExtraField[];
 }
 
 /* ── Tab 위젯 타입 ── */
 
 /** 탭 아이템 — 개별 탭 설정 */
 export interface TabItem {
-    /** 고유 ID (자동 생성) */
-    id: string;
-    /** 탭 레이블 */
-    label: string;
-    /** 탭 레이블 다국어 키 */
-    labelMsgKey?: string;
-    /** 연결 페이지 slug */
-    pageSlug?: string;
-    /**
-     * 탭 데이터 네임스페이스 — 같은 slug의 탭끼리 data_json 내 섹션 키를 분리
-     * 예: contentKey="tab_a" → data_json = { tab_a: { ...폼데이터 } }
-     * 같은 slug를 쓰는 탭이 여러 개일 때 반드시 설정
-     */
-    contentKey?: string;
-    /**
-     * 저장 필수 여부 — true 시 이 탭을 저장하지 않으면 다음 탭으로 이동 불가
-     * 빌더에서 첫 번째 탭에만 설정 가능
-     */
-    required?: boolean;
-    /** preview 모드에서 직접 렌더링할 위젯 아이템 목록 */
-    items?: {
-        colSpan: number;
-        rowSpan: number;
-        widget: AnyWidget;
-    }[];
+  /** 고유 ID (자동 생성) */
+  id: string;
+  /** 탭 레이블 */
+  label: string;
+  /** 탭 레이블 다국어 키 */
+  labelMsgKey?: string;
+  /** 연결 페이지 slug */
+  pageSlug?: string;
+  /**
+   * 탭 데이터 네임스페이스 — 같은 slug의 탭끼리 data_json 내 섹션 키를 분리
+   * 예: contentKey="tab_a" → data_json = { tab_a: { ...폼데이터 } }
+   * 같은 slug를 쓰는 탭이 여러 개일 때 반드시 설정
+   */
+  contentKey?: string;
+  /**
+   * 저장 필수 여부 — true 시 이 탭을 저장하지 않으면 다음 탭으로 이동 불가
+   * 빌더에서 첫 번째 탭에만 설정 가능
+   */
+  required?: boolean;
+  /** preview 모드에서 직접 렌더링할 위젯 아이템 목록 */
+  items?: {
+    colSpan: number;
+    rowSpan: number;
+    widget: AnyWidget;
+  }[];
 }
 
 /** 탭 컨텐츠 위젯 */
 export interface TabWidget {
-    type: 'tab';
-    widgetId: string;
-    tabs: TabItem[];
+  type: "tab";
+  widgetId: string;
+  tabs: TabItem[];
 }
 
 /**
@@ -341,35 +341,36 @@ export interface TabWidget {
  * FormWidget, TableWidget은 각 builder 파일에서 import
  */
 export type AnyWidget =
-    | SearchWidget
-    | TableWidget
-    | FormWidget
-    | SpaceWidget
-    | CategoryWidget
-    | SubListWidget
-    | MultiSelectWidget
-    | TabWidget;
+  | SearchWidget
+  | TableWidget
+  | FormWidget
+  | SpaceWidget
+  | CategoryWidget
+  | SubListWidget
+  | MultiSelectWidget
+  | TabWidget;
 
 /* ── 핸들러 타입 ── */
 
 /** 테이블 행 액션 핸들러 (live 모드 전용) */
 export interface TableActionHandlers {
-    onEdit?: (row: Record<string, unknown>) => void;
-    onDetail?: (row: Record<string, unknown>) => void;
-    onDelete?: (id: number) => void;
-    /** 행 복사 — 원본 dataJson을 복제해 신규 레코드로 등록 (live 모드 전용) */
-    onCopy?: (row: Record<string, unknown>) => void;
-    onFileClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
-    /** button 셀 클릭 — 연결 방식(connType)에 따라 페이지 이동/레이어팝업/윈도우팝업 분기 (live 모드 전용) */
-    onButtonClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
-    /** 행 선택 변경 — 선택된 행 ID 배열 전달 (enableRowSelection=true 전용) */
-    onRowsSelect?: (selectedIds: number[]) => void;
-    /** inlineEdit 셀 즉시 수정 — row id, 필드 경로, 새 값 전달 */
-    onInlineEdit?: (id: number, fieldKey: string, value: unknown) => void;
+  onEdit?: (row: Record<string, unknown>) => void;
+  onDetail?: (row: Record<string, unknown>) => void;
+  onDelete?: (id: number) => void;
+  /** 행 복사 — 원본 dataJson을 복제해 신규 레코드로 등록 (live 모드 전용) */
+  onCopy?: (row: Record<string, unknown>) => void;
+  onFileClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
+  /** button 셀 클릭 — 연결 방식(connType)에 따라 페이지 이동/레이어팝업/윈도우팝업 분기 (live 모드 전용) */
+  onButtonClick?: (col: TableColumnConfig, row: Record<string, unknown>) => void;
+  /** 행 선택 변경 — 선택된 행 ID 배열 전달 (enableRowSelection=true 전용) */
+  onRowsSelect?: (selectedIds: number[]) => void;
+  /** inlineEdit 셀 즉시 수정 — 컬럼 설정(저장 경로·리다이렉트 대상)과 행 전체, 새 값 전달.
+   *  onFileClick/onButtonClick과 동일하게 (col, row) 패턴을 따른다 */
+  onInlineEdit?: (col: TableColumnConfig, row: Record<string, unknown>, value: unknown) => void;
 }
 
 /** 검색폼 핸들러 (live 모드 전용) */
 export interface SearchHandlers {
-    onSearch: () => void;
-    onReset: () => void;
+  onSearch: () => void;
+  onReset: () => void;
 }

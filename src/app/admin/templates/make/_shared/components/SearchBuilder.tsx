@@ -44,6 +44,12 @@ export interface SlugRelationOption {
   relationDir?: string;
   slaveType?: string;
   description?: string;
+  /** master(자신)에서 slave와 비교할 필드 경로 (예: id, product.id) — inlineEdit 저장 리다이렉트 시
+   *  slave 레코드의 실제 id를 이 경로로 자신의 행 데이터에서 직접 읽는다 */
+  masterKey?: string;
+  /** EQ: 단순 동등 / ARRAY_CONTAINS: 배열 포함 — ARRAY_CONTAINS는 masterKey가 배열이라
+   *  inlineEdit 저장 리다이렉트 대상에서 제외해야 한다 */
+  joinType?: string;
 }
 
 /* ══════════════════════════════════════════ */

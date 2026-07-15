@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * TableBuilder — 테이블 위젯 컬럼 설정 빌더 공통 컴포넌트
@@ -16,43 +16,43 @@
  *   />
  */
 
-import React, { useState, useEffect } from 'react';
-import { useSlugRelations } from '../../hooks/useSlugRelations';
-import { Plus, Trash2, X, Pencil, GripVertical } from 'lucide-react';
-import { useI18n } from '@/hooks/use-i18n';
-import api from '@/lib/api';
-import { ToggleRow } from './fields/_ToggleRow';
-import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from '../../types';
-import { createIdGenerator } from '../../utils';
-import { buildTableFromEntity } from '../../utils/entityBuild';
-import { EntityBuildButton } from './EntityBuildButton';
-import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
+import React, { useState, useEffect } from "react";
+import { useSlugRelations } from "../../hooks/useSlugRelations";
+import { Plus, Trash2, X, Pencil, GripVertical } from "lucide-react";
+import { useI18n } from "@/hooks/use-i18n";
+import api from "@/lib/api";
+import { ToggleRow } from "./fields/_ToggleRow";
+import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from "../../types";
+import { createIdGenerator } from "../../utils";
+import { buildTableFromEntity } from "../../utils/entityBuild";
+import { EntityBuildButton } from "./EntityBuildButton";
+import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
 import {
-    ColumnBaseField,
-    BadgeOptionsField,
-    TextCodeGroupField,
-    MaskField,
-    BooleanTextField,
-    ActionsField,
-    TableButtonField,
-    SlugSelectField,
-    DateRangeStatusColumnField,
-    InlineEditField,
-} from './fields';
-import type { SlugOption } from './fields';
-import { getConnFieldOptions, type ConnMode } from './connFieldOptions';
-import type { SlugRelationOption } from '../SearchBuilder';
-import { DateFormatField } from './fields/DateFormatField';
+  ColumnBaseField,
+  BadgeOptionsField,
+  TextCodeGroupField,
+  MaskField,
+  BooleanTextField,
+  ActionsField,
+  TableButtonField,
+  SlugSelectField,
+  DateRangeStatusColumnField,
+  InlineEditField,
+} from "./fields";
+import type { SlugOption } from "./fields";
+import { getConnFieldOptions, type ConnMode } from "./connFieldOptions";
+import type { SlugRelationOption } from "../SearchBuilder";
+import { DateFormatField } from "./fields/DateFormatField";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
 import {
-    DndContext, closestCenter, KeyboardSensor, PointerSensor,
-    useSensor, useSensors,
-} from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
-import {
-    arrayMove, SortableContext, sortableKeyboardCoordinates,
-    useSortable, verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
@@ -60,16 +60,16 @@ import { CSS } from '@dnd-kit/utilities';
 
 /** 테이블 위젯 — 데이터 목록 */
 export interface TableWidget {
-    type: 'table';
-    widgetId: string;
-    contentKey: string;
-    columns: TableColumnConfig[];           /* List 빌더와 동일한 컬럼 타입 */
-    connectedSearchIds: string[];           /* 연결된 Search 위젯 widgetId 목록 */
-    connectedSlug?: string;                 /* DB Slug — 데이터 API 호출 대상 */
-    pageSize: number;
-    displayMode: DisplayMode;              /* 표시 방식 (pagination | scroll) */
-    /** 행 다중선택 체크박스 표시 여부 (기본 false) */
-    enableRowSelection?: boolean;
+  type: "table";
+  widgetId: string;
+  contentKey: string;
+  columns: TableColumnConfig[]; /* List 빌더와 동일한 컬럼 타입 */
+  connectedSearchIds: string[]; /* 연결된 Search 위젯 widgetId 목록 */
+  connectedSlug?: string; /* DB Slug — 데이터 API 호출 대상 */
+  pageSize: number;
+  displayMode: DisplayMode; /* 표시 방식 (pagination | scroll) */
+  /** 행 다중선택 체크박스 표시 여부 (기본 false) */
+  enableRowSelection?: boolean;
 }
 
 /* ══════════════════════════════════════════ */
@@ -78,42 +78,42 @@ export interface TableWidget {
 
 /** 셀 타입 메타 (List 빌더와 동일) */
 const CELL_TYPES: { type: CellType; label: string; desc: string }[] = [
-    { type: 'text',             label: 'Text',             desc: '일반 텍스트' },
-    { type: 'badge',            label: 'Badge',            desc: '배지 (아이콘/모양 옵션)' },
-    { type: 'boolean',          label: 'Boolean',          desc: '공개/비공개' },
-    { type: 'actions',          label: 'Actions',          desc: '액션 버튼' },
-    { type: 'date',             label: 'Date',             desc: '날짜/시간 포맷 표시' },
-    { type: 'dateRangeStatus',  label: 'DateRangeStatus',  desc: '날짜 범위 상태 (이전/포함/이후)' },
-    { type: 'inlineEdit',       label: 'InlineEdit',       desc: '즉시 수정 (토글/체크박스/라디오)' },
-    { type: 'button',           label: '버튼',              desc: '클릭 버튼 — 페이지이동/팝업/윈도우팝업' },
+  { type: "text", label: "Text", desc: "일반 텍스트" },
+  { type: "badge", label: "Badge", desc: "배지 (아이콘/모양 옵션)" },
+  { type: "boolean", label: "Boolean", desc: "공개/비공개" },
+  { type: "actions", label: "Actions", desc: "액션 버튼" },
+  { type: "date", label: "Date", desc: "날짜/시간 포맷 표시" },
+  { type: "dateRangeStatus", label: "DateRangeStatus", desc: "날짜 범위 상태 (이전/포함/이후)" },
+  { type: "inlineEdit", label: "InlineEdit", desc: "즉시 수정 (토글/체크박스/라디오)" },
+  { type: "button", label: "버튼", desc: "클릭 버튼 — 페이지이동/팝업/윈도우팝업" },
 ];
 
 /* CUSTOM_ACTION_COLORS — 하위 호환 re-export (TableCellRenderer 등에서 참조 가능) */
-export { CUSTOM_ACTION_COLORS } from './fields/col-types';
+export { CUSTOM_ACTION_COLORS } from "./fields/col-types";
 
-const uid = createIdGenerator('tb'); /* 컬럼 ID 생성기 */
+const uid = createIdGenerator("tb"); /* 컬럼 ID 생성기 */
 
 /* ══════════════════════════════════════════ */
 /*  Props                                     */
 /* ══════════════════════════════════════════ */
 
 interface TableBuilderProps {
-    widget: TableWidget;
-    onChange: (w: TableWidget) => void;
-    /** 연결 가능한 Search 위젯 목록 (widget/page.tsx에서 collectWidgets로 추출 후 전달) */
-    searchWidgets: Array<{ widgetId: string; contentKey: string }>;
-    /** Slug 레지스트리 옵션 — DB Slug 드롭다운에서 사용 */
-    slugOptions: SlugOption[];
-    /** Slug Entity 필드 목록 — "이 위젯만 빌드" 버튼용 (widget 빌더 전용) */
-    slugEntityFields?: SlugEntityFieldItem[];
-    /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
-    connLabel?: string;
-    /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
-    connDefaultSlug?: string;
-    /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
-    connMode?: ConnMode;
-    /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
-    dataEntityOptions?: SlugOption[];
+  widget: TableWidget;
+  onChange: (w: TableWidget) => void;
+  /** 연결 가능한 Search 위젯 목록 (widget/page.tsx에서 collectWidgets로 추출 후 전달) */
+  searchWidgets: Array<{ widgetId: string; contentKey: string }>;
+  /** Slug 레지스트리 옵션 — DB Slug 드롭다운에서 사용 */
+  slugOptions: SlugOption[];
+  /** Slug Entity 필드 목록 — "이 위젯만 빌드" 버튼용 (widget 빌더 전용) */
+  slugEntityFields?: SlugEntityFieldItem[];
+  /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
+  connLabel?: string;
+  /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
+  connDefaultSlug?: string;
+  /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
+  connMode?: ConnMode;
+  /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
+  dataEntityOptions?: SlugOption[];
 }
 
 /* ══════════════════════════════════════════════════════════════ */
@@ -121,80 +121,86 @@ interface TableBuilderProps {
 /* ══════════════════════════════════════════════════════════════ */
 
 function SortableColumnItem({
-    col, isEditing, onToggleEdit, onRemove, children,
+  col,
+  isEditing,
+  onToggleEdit,
+  onRemove,
+  children,
 }: {
-    col: TableColumnConfig;
-    isEditing: boolean;
-    onToggleEdit: () => void;
-    onRemove: () => void;
-    children: React.ReactNode;
+  col: TableColumnConfig;
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  onRemove: () => void;
+  children: React.ReactNode;
 }) {
-    const { t } = useI18n();
-    const {
-        attributes, listeners, setNodeRef, setActivatorNodeRef,
-        transform, transition, isDragging,
-    } = useSortable({ id: col.id });
+  const { t } = useI18n();
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: col.id,
+  });
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
-    /* 셀 타입별 배지 색상 */
-    const typeBadgeCls =
-        col.cellType === 'badge'            ? 'bg-blue-100 text-blue-600' :
-        col.cellType === 'boolean'          ? 'bg-emerald-100 text-emerald-600' :
-        col.cellType === 'actions'          ? 'bg-orange-100 text-orange-600' :
-        col.cellType === 'date'             ? 'bg-violet-100 text-violet-600' :
-        col.cellType === 'dateRangeStatus'  ? 'bg-teal-100 text-teal-600' :
-        col.cellType === 'inlineEdit'       ? 'bg-indigo-100 text-indigo-600' :
-        col.cellType === 'button'           ? 'bg-cyan-100 text-cyan-600' :
-        'bg-slate-200 text-slate-600';
+  /* 셀 타입별 배지 색상 */
+  const typeBadgeCls =
+    col.cellType === "badge"
+      ? "bg-blue-100 text-blue-600"
+      : col.cellType === "boolean"
+        ? "bg-emerald-100 text-emerald-600"
+        : col.cellType === "actions"
+          ? "bg-orange-100 text-orange-600"
+          : col.cellType === "date"
+            ? "bg-violet-100 text-violet-600"
+            : col.cellType === "dateRangeStatus"
+              ? "bg-teal-100 text-teal-600"
+              : col.cellType === "inlineEdit"
+                ? "bg-indigo-100 text-indigo-600"
+                : col.cellType === "button"
+                  ? "bg-cyan-100 text-cyan-600"
+                  : "bg-slate-200 text-slate-600";
 
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className="border border-slate-200 rounded-md overflow-hidden bg-white"
+  return (
+    <div ref={setNodeRef} style={style} className="border border-slate-200 rounded-md overflow-hidden bg-white">
+      {/* 컬럼 헤더 행 */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-slate-100 transition-all">
+        {/* 드래그 핸들 */}
+        <span
+          ref={setActivatorNodeRef}
+          {...listeners}
+          {...attributes}
+          className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors flex-shrink-0"
+          onClick={(e) => e.stopPropagation()}
         >
-            {/* 컬럼 헤더 행 */}
-            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-50 hover:bg-slate-100 transition-all">
-                {/* 드래그 핸들 */}
-                <span
-                    ref={setActivatorNodeRef}
-                    {...listeners}
-                    {...attributes}
-                    className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors flex-shrink-0"
-                    onClick={e => e.stopPropagation()}
-                >
-                    <GripVertical className="w-3.5 h-3.5" />
-                </span>
+          <GripVertical className="w-3.5 h-3.5" />
+        </span>
 
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${typeBadgeCls}`}>
-                    {col.cellType}
-                </span>
-                <span className="text-[10px] text-slate-700 flex-1 truncate font-medium">
-                    {col.headerMsgKey ? t(col.headerMsgKey) : (col.header || (col.cellType === 'actions' ? '액션' : '—'))}
-                </span>
-                <button
-                    onClick={onToggleEdit}
-                    className={`p-1 rounded transition-all flex-shrink-0 ${isEditing ? 'bg-slate-200 text-slate-700' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-600'}`}
-                >
-                    <Pencil className="w-3 h-3" />
-                </button>
-                <button
-                    onClick={onRemove}
-                    className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0"
-                >
-                    <Trash2 className="w-3 h-3" />
-                </button>
-            </div>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${typeBadgeCls}`}>
+          {col.cellType}
+        </span>
+        <span className="text-[10px] text-slate-700 flex-1 truncate font-medium">
+          {col.headerMsgKey ? t(col.headerMsgKey) : col.header || (col.cellType === "actions" ? "액션" : "—")}
+        </span>
+        <button
+          onClick={onToggleEdit}
+          className={`p-1 rounded transition-all flex-shrink-0 ${isEditing ? "bg-slate-200 text-slate-700" : "text-slate-400 hover:bg-slate-200 hover:text-slate-600"}`}
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
+        <button
+          onClick={onRemove}
+          className="p-1 rounded text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
 
-            {/* 컬럼 편집 패널 (아코디언) */}
-            {isEditing && children}
-        </div>
-    );
+      {/* 컬럼 편집 패널 (아코디언) */}
+      {isEditing && children}
+    </div>
+  );
 }
 
 /* ══════════════════════════════════════════ */
@@ -202,417 +208,495 @@ function SortableColumnItem({
 /* ══════════════════════════════════════════ */
 
 /** 테이블 위젯 컬럼 설정 빌더 */
-export function TableBuilder({ widget, onChange, searchWidgets, slugOptions, slugEntityFields, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] }: TableBuilderProps) {
-    /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
-    const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
-    const { t } = useI18n();
-    /* 컬럼 편집 아코디언 상태 */
-    const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+export function TableBuilder({
+  widget,
+  onChange,
+  searchWidgets,
+  slugOptions,
+  slugEntityFields,
+  connLabel,
+  connDefaultSlug,
+  connMode,
+  dataEntityOptions = [],
+}: TableBuilderProps) {
+  /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
+  const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
+  const { t } = useI18n();
+  /* 컬럼 편집 아코디언 상태 */
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
 
-    /**
-     * 컬럼 추가 다이얼로그 상태
-     * - null             → 다이얼로그 닫힘
-     * - {} (cellType 없) → Phase 1: 셀 타입 선택
-     * - { cellType: ... }→ Phase 2: 컬럼 설정 입력
-     */
-    const [pendingCol, setPendingCol] = useState<Partial<TableColumnConfig> | null>(null);
+  /**
+   * 컬럼 추가 다이얼로그 상태
+   * - null             → 다이얼로그 닫힘
+   * - {} (cellType 없) → Phase 1: 셀 타입 선택
+   * - { cellType: ... }→ Phase 2: 컬럼 설정 입력
+   */
+  const [pendingCol, setPendingCol] = useState<Partial<TableColumnConfig> | null>(null);
 
-    /* 공통코드 및 레이어 팝업 템플릿 */
-    const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
-    const [layerTemplates, setLayerTemplates] = useState<TemplateItem[]>([]);
-    const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
+  /* 공통코드 및 레이어 팝업 템플릿 */
+  const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
+  const [layerTemplates, setLayerTemplates] = useState<TemplateItem[]>([]);
+  const [layerTemplatesLoaded, setLayerTemplatesLoaded] = useState(false);
 
-    /* 전체 slug-relation 목록 — 공통 훅으로 fetch */
-    const allSlugRelations = useSlugRelations();
+  /* 전체 slug-relation 목록 — 공통 훅으로 fetch */
+  const allSlugRelations = useSlugRelations();
 
-    /* 드래그 센서 — 3px 이상 이동 시 드래그 시작 (클릭 오인 방지) */
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    );
+  /* 드래그 센서 — 3px 이상 이동 시 드래그 시작 (클릭 오인 방지) */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-    /* 공통코드 로딩 */
-    useEffect(() => {
-        api.get('/codes').then(res => setCodeGroups(res.data || [])).catch(() => {});
-    }, []);
+  /* 공통코드 로딩 */
+  useEffect(() => {
+    api
+      .get("/codes")
+      .then((res) => setCodeGroups(res.data || []))
+      .catch(() => {});
+  }, []);
 
-    /* 전체 템플릿 목록 lazy 로딩 (QUICK_DETAIL · PAGE 등 모든 타입 포함) */
-    const loadLayerTemplates = () => {
-        if (layerTemplatesLoaded) return;
-        api.get('/page-templates')
-            .then(res => {
-                setLayerTemplates(res.data as TemplateItem[]);
-                setLayerTemplatesLoaded(true);
-            })
-            .catch(() => {});
-    };
+  /* 전체 템플릿 목록 lazy 로딩 (QUICK_DETAIL · PAGE 등 모든 타입 포함) */
+  const loadLayerTemplates = () => {
+    if (layerTemplatesLoaded) return;
+    api
+      .get("/page-templates")
+      .then((res) => {
+        setLayerTemplates(res.data as TemplateItem[]);
+        setLayerTemplatesLoaded(true);
+      })
+      .catch(() => {});
+  };
 
-    /* 컬럼 CRUD */
-    const removeColumn = (id: string) =>
-        onChange({ ...widget, columns: widget.columns.filter(c => c.id !== id) });
-    const updateColumn = (id: string, patch: Partial<TableColumnConfig>) =>
-        onChange({ ...widget, columns: widget.columns.map(c => c.id === id ? { ...c, ...patch } : c) });
+  /* 컬럼 CRUD */
+  const removeColumn = (id: string) => onChange({ ...widget, columns: widget.columns.filter((c) => c.id !== id) });
+  const updateColumn = (id: string, patch: Partial<TableColumnConfig>) =>
+    onChange({ ...widget, columns: widget.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
 
-    /* 드래그 종료 — arrayMove로 컬럼 순서 변경 */
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const oldIndex = widget.columns.findIndex(c => c.id === active.id);
-        const newIndex = widget.columns.findIndex(c => c.id === over.id);
-        onChange({ ...widget, columns: arrayMove(widget.columns, oldIndex, newIndex) });
-    };
+  /* 드래그 종료 — arrayMove로 컬럼 순서 변경 */
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = widget.columns.findIndex((c) => c.id === active.id);
+    const newIndex = widget.columns.findIndex((c) => c.id === over.id);
+    onChange({ ...widget, columns: arrayMove(widget.columns, oldIndex, newIndex) });
+  };
 
-    /* Search 연결 토글 */
-    const toggleSearchConn = (searchId: string) => {
-        const ids = widget.connectedSearchIds.includes(searchId)
-            ? widget.connectedSearchIds.filter(id => id !== searchId)
-            : [...widget.connectedSearchIds, searchId];
-        onChange({ ...widget, connectedSearchIds: ids });
-    };
+  /* Search 연결 토글 */
+  const toggleSearchConn = (searchId: string) => {
+    const ids = widget.connectedSearchIds.includes(searchId)
+      ? widget.connectedSearchIds.filter((id) => id !== searchId)
+      : [...widget.connectedSearchIds, searchId];
+    onChange({ ...widget, connectedSearchIds: ids });
+  };
 
-    /** 셀 타입 선택 → pendingCol에 타입별 기본값 세팅 (Phase 2 진입) */
-    const selectCellType = (type: CellType) => {
-        setPendingCol({
-            cellType:       type,
-            header:         '',
-            accessor:       type === 'actions' ? 'actions' : '',
-            trueText:       '공개',
-            falseText:      '비공개',
-            width:          type === 'actions' ? 120 : 150,
-            widthUnit:      'px',
-            align:          type === 'actions' || type === 'button' ? 'center' : 'left',
-            sortable:       type !== 'actions' && type !== 'button',
-            badgeShape:     'round',
-            showIcon:       false,
-            displayAs:      'text',
-            actions:        type === 'actions'    ? ['edit', 'detail', 'delete'] : undefined,
-            cellOptions:    type === 'badge'      ? [{ text: '', value: '', color: 'slate' }] : undefined,
-            inlineEditType: type === 'inlineEdit' ? 'toggle' : undefined,
-            /* button 전용 기본값 */
-            buttonColor:    type === 'button' ? 'slate' : undefined,
-            connType:       type === 'button' ? 'page'  : undefined,
-        });
-        if (type === 'actions' || type === 'button') loadLayerTemplates();
-    };
+  /** 셀 타입 선택 → pendingCol에 타입별 기본값 세팅 (Phase 2 진입) */
+  const selectCellType = (type: CellType) => {
+    setPendingCol({
+      cellType: type,
+      header: "",
+      accessor: type === "actions" ? "actions" : "",
+      trueText: "공개",
+      falseText: "비공개",
+      width: type === "actions" ? 120 : 150,
+      widthUnit: "px",
+      align: type === "actions" || type === "button" ? "center" : "left",
+      sortable: type !== "actions" && type !== "button",
+      badgeShape: "round",
+      showIcon: false,
+      displayAs: "text",
+      actions: type === "actions" ? ["edit", "detail", "delete"] : undefined,
+      cellOptions: type === "badge" ? [{ text: "", value: "", color: "slate" }] : undefined,
+      inlineEditType: type === "inlineEdit" ? "toggle" : undefined,
+      /* button 전용 기본값 */
+      buttonColor: type === "button" ? "slate" : undefined,
+      connType: type === "button" ? "page" : undefined,
+    });
+    if (type === "actions" || type === "button") loadLayerTemplates();
+  };
 
-    /**
-     * 컬럼 설정 유효성 검사 공통 함수
-     * — confirmAddColumn 및 추가 버튼 disabled 양쪽에서 재사용
-     */
-    const isColumnValid = (p: Partial<TableColumnConfig> | null): boolean => {
-        if (!p?.cellType) return false;
-        if (p.cellType === 'actions') return true;
-        if (!p.header?.trim() && !p.headerMsgKey?.trim()) return false;
-        if (!p.accessor?.trim()) return false;
-        /* inlineEdit: 저장 경로 필수 */
-        if (p.cellType === 'inlineEdit' && !p.inlineEditFieldKey?.trim()) return false;
-        /* button: 버튼 라벨 필수 */
-        if (p.cellType === 'button' && !p.buttonLabel?.trim()) return false;
-        return true;
-    };
+  /**
+   * 컬럼 설정 유효성 검사 공통 함수
+   * — confirmAddColumn 및 추가 버튼 disabled 양쪽에서 재사용
+   */
+  const isColumnValid = (p: Partial<TableColumnConfig> | null): boolean => {
+    if (!p?.cellType) return false;
+    if (p.cellType === "actions") return true;
+    if (!p.header?.trim() && !p.headerMsgKey?.trim()) return false;
+    if (!p.accessor?.trim()) return false;
+    /* inlineEdit: 저장 경로 필수 */
+    if (p.cellType === "inlineEdit" && !p.inlineEditFieldKey?.trim()) return false;
+    /* button: 버튼 라벨 필수 */
+    if (p.cellType === "button" && !p.buttonLabel?.trim()) return false;
+    return true;
+  };
 
-    /** pendingCol → 실제 컬럼 추가 확정 */
-    const confirmAddColumn = () => {
-        const p = pendingCol;
-        /* null 체크 먼저 — isColumnValid 통과 후에는 p가 non-null 보장 */
-        if (!p?.cellType || !isColumnValid(p)) return;
+  /** pendingCol → 실제 컬럼 추가 확정 */
+  const confirmAddColumn = () => {
+    const p = pendingCol;
+    /* null 체크 먼저 — isColumnValid 통과 후에는 p가 non-null 보장 */
+    if (!p?.cellType || !isColumnValid(p)) return;
 
-        onChange({
-            ...widget,
-            columns: [...widget.columns, {
-                id:          uid(),
-                header:      p.header?.trim() ?? '',
-                headerMsgKey: p.headerMsgKey?.trim() || undefined,
-                accessor: p.accessor?.trim() || 'actions',
-                width:    p.width,
-                widthUnit: p.widthUnit ?? 'px',
-                align:    p.align ?? 'left',
-                sortable: p.sortable ?? true,
-                cellType: p.cellType,
-                /* badge 전용 */
-                cellOptions: p.cellType === 'badge' ? (p.cellOptions ?? []).filter(o => o.text.trim()) : undefined,
-                badgeShape:  p.cellType === 'badge' ? p.badgeShape : undefined,
-                showIcon:    p.cellType === 'badge' ? p.showIcon   : undefined,
-                /* boolean 전용 */
-                trueText:  p.cellType === 'boolean' ? p.trueText  : undefined,
-                falseText: p.cellType === 'boolean' ? p.falseText : undefined,
-                /* actions 전용 */
-                actions:            p.cellType === 'actions' ? p.actions            : undefined,
-                editPopupSlug:      p.cellType === 'actions' ? p.editPopupSlug      : undefined,
-                detailPopupSlug:    p.cellType === 'actions' ? p.detailPopupSlug    : undefined,
-                editFileLayerSlug:  p.cellType === 'actions' ? p.editFileLayerSlug  : undefined,
-                detailFileLayerSlug:p.cellType === 'actions' ? p.detailFileLayerSlug: undefined,
-                /* text / inlineEdit 공통 — 공통코드 연동 */
-                codeGroupCode: (p.cellType === 'text' || p.cellType === 'inlineEdit') && p.codeGroupCode ? p.codeGroupCode : undefined,
-                displayAs:     p.cellType === 'text' && p.codeGroupCode ? p.displayAs : undefined,
-                /* text 전용 — 마스킹 설정 */
-                maskType:              p.cellType === 'text' ? p.maskType : undefined,
-                maskPattern:           p.cellType === 'text' && p.maskType && p.maskType !== 'custom' ? p.maskPattern : undefined,
-                maskCustomRegex:       p.cellType === 'text' && p.maskType === 'custom' ? p.maskCustomRegex : undefined,
-                maskCustomReplacement: p.cellType === 'text' && p.maskType === 'custom' ? p.maskCustomReplacement : undefined,
-                /* inlineEdit 전용 */
-                inlineEditType:     p.cellType === 'inlineEdit' ? (p.inlineEditType ?? 'toggle') : undefined,
-                options:            p.cellType === 'inlineEdit' ? p.options : undefined,
-                inlineEditFieldKey: p.cellType === 'inlineEdit' ? p.inlineEditFieldKey?.trim() : undefined,
-                /* button 전용 */
-                buttonLabel:       p.cellType === 'button' ? p.buttonLabel?.trim() : undefined,
-                buttonColor:       p.cellType === 'button' ? (p.buttonColor ?? 'slate') : undefined,
-                connType:          p.cellType === 'button' ? (p.connType ?? 'page') : undefined,
-                targetSlug:        p.cellType === 'button' ? p.targetSlug : undefined,
-                conditionParam:    p.cellType === 'button' ? p.conditionParam : undefined,
-                passParam:         p.cellType === 'button' ? p.passParam : undefined,
-                windowPopupOption: p.cellType === 'button' && p.connType === 'windowPopup' ? p.windowPopupOption : undefined,
-            }],
-        });
-        setPendingCol(null);
-    };
+    onChange({
+      ...widget,
+      columns: [
+        ...widget.columns,
+        {
+          id: uid(),
+          header: p.header?.trim() ?? "",
+          headerMsgKey: p.headerMsgKey?.trim() || undefined,
+          accessor: p.accessor?.trim() || "actions",
+          width: p.width,
+          widthUnit: p.widthUnit ?? "px",
+          align: p.align ?? "left",
+          sortable: p.sortable ?? true,
+          cellType: p.cellType,
+          /* badge 전용 */
+          cellOptions: p.cellType === "badge" ? (p.cellOptions ?? []).filter((o) => o.text.trim()) : undefined,
+          badgeShape: p.cellType === "badge" ? p.badgeShape : undefined,
+          showIcon: p.cellType === "badge" ? p.showIcon : undefined,
+          /* boolean 전용 */
+          trueText: p.cellType === "boolean" ? p.trueText : undefined,
+          falseText: p.cellType === "boolean" ? p.falseText : undefined,
+          /* actions 전용 */
+          actions: p.cellType === "actions" ? p.actions : undefined,
+          editPopupSlug: p.cellType === "actions" ? p.editPopupSlug : undefined,
+          detailPopupSlug: p.cellType === "actions" ? p.detailPopupSlug : undefined,
+          editFileLayerSlug: p.cellType === "actions" ? p.editFileLayerSlug : undefined,
+          detailFileLayerSlug: p.cellType === "actions" ? p.detailFileLayerSlug : undefined,
+          /* text / inlineEdit 공통 — 공통코드 연동 */
+          codeGroupCode:
+            (p.cellType === "text" || p.cellType === "inlineEdit") && p.codeGroupCode ? p.codeGroupCode : undefined,
+          displayAs: p.cellType === "text" && p.codeGroupCode ? p.displayAs : undefined,
+          /* text 전용 — 마스킹 설정 */
+          maskType: p.cellType === "text" ? p.maskType : undefined,
+          maskPattern: p.cellType === "text" && p.maskType && p.maskType !== "custom" ? p.maskPattern : undefined,
+          maskCustomRegex: p.cellType === "text" && p.maskType === "custom" ? p.maskCustomRegex : undefined,
+          maskCustomReplacement: p.cellType === "text" && p.maskType === "custom" ? p.maskCustomReplacement : undefined,
+          /* inlineEdit 전용 */
+          inlineEditType: p.cellType === "inlineEdit" ? (p.inlineEditType ?? "toggle") : undefined,
+          options: p.cellType === "inlineEdit" ? p.options : undefined,
+          inlineEditFieldKey: p.cellType === "inlineEdit" ? p.inlineEditFieldKey?.trim() : undefined,
+          inlineEditTrueValue: p.cellType === "inlineEdit" ? p.inlineEditTrueValue?.trim() || undefined : undefined,
+          inlineEditFalseValue: p.cellType === "inlineEdit" ? p.inlineEditFalseValue?.trim() || undefined : undefined,
+          inlineEditRelationSlugId: p.cellType === "inlineEdit" ? p.inlineEditRelationSlugId : undefined,
+          /* button 전용 */
+          buttonLabel: p.cellType === "button" ? p.buttonLabel?.trim() : undefined,
+          buttonColor: p.cellType === "button" ? (p.buttonColor ?? "slate") : undefined,
+          connType: p.cellType === "button" ? (p.connType ?? "page") : undefined,
+          targetSlug: p.cellType === "button" ? p.targetSlug : undefined,
+          conditionParam: p.cellType === "button" ? p.conditionParam : undefined,
+          passParam: p.cellType === "button" ? p.passParam : undefined,
+          windowPopupOption: p.cellType === "button" && p.connType === "windowPopup" ? p.windowPopupOption : undefined,
+        },
+      ],
+    });
+    setPendingCol(null);
+  };
 
-    /**
-     * 컬럼 편집 패널 (아코디언 내부)
-     * — 모든 UI를 fields/ 컴포넌트에 위임, 인라인 HTML 없음
-     */
-    const renderColumnEdit = (col: TableColumnConfig) => {
-        /* 편집 모드 공통 onChange: 해당 컬럼 ID로 부분 업데이트 */
-        const patch = (p: Partial<TableColumnConfig>) => updateColumn(col.id, p);
-        return (
-            <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
-                <ColumnBaseField values={col} onChange={patch} fetchRelations={allSlugRelations.filter(r => r.relationDir === 'FETCH')} />
-                {col.cellType === 'badge'            && <BadgeOptionsField          values={col} onChange={patch} />}
-                {col.cellType === 'text'             && <TextCodeGroupField         values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
-                {col.cellType === 'text'             && <MaskField                  values={col} onChange={patch} />}
-                {col.cellType === 'boolean'          && <BooleanTextField           values={col} onChange={patch} />}
-                {col.cellType === 'actions'          && <ActionsField               values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
-                {col.cellType === 'date'             && <DateFormatField            values={col} onChange={patch} />}
-                {col.cellType === 'dateRangeStatus'  && <DateRangeStatusColumnField values={col} onChange={patch} />}
-                {col.cellType === 'inlineEdit'       && <InlineEditField            values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />}
-                {col.cellType === 'button'           && <TableButtonField           values={col} onChange={patch} layerTemplates={layerTemplates} onRequestLayerTemplates={loadLayerTemplates} />}
-            </div>
-        );
-    };
-
-    /* ── 렌더 ── */
+  /**
+   * 컬럼 편집 패널 (아코디언 내부)
+   * — 모든 UI를 fields/ 컴포넌트에 위임, 인라인 HTML 없음
+   */
+  const renderColumnEdit = (col: TableColumnConfig) => {
+    /* 편집 모드 공통 onChange: 해당 컬럼 ID로 부분 업데이트 */
+    const patch = (p: Partial<TableColumnConfig>) => updateColumn(col.id, p);
     return (
-        <div className="space-y-2 pt-1">
-            {/* 표시 방식 */}
-            <div>
-                <label className="text-[10px] font-medium text-slate-500 mb-1 block">표시 방식</label>
-                <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
-                    {(['pagination', 'scroll'] as const).map(m => (
-                        <button key={m} type="button" onClick={() => onChange({ ...widget, displayMode: m })}
-                            className={`flex-1 py-1.5 text-[10px] font-semibold rounded transition-all ${(widget.displayMode ?? 'pagination') === m ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                            {m === 'pagination' ? '페이지네이션' : '무한 스크롤'}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Key | 연결 Slug — 2열 그리드 */}
-            <div className="grid grid-cols-2 gap-2">
-                <div>
-                    <label className="text-[10px] font-medium text-slate-500 mb-1 block">Key <span className="text-red-400">*</span></label>
-                    <input type="text" value={widget.contentKey} onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                        placeholder="예: boardTable"
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900" />
-                </div>
-                <SlugSelectField
-                    value={widget.connectedSlug ?? connDefaultSlug ?? ''}
-                    onChange={slug => onChange({ ...widget, connectedSlug: slug })}
-                    slugOptions={connFieldOptions.options}
-                    formatDisplay={connFieldOptions.formatDisplay}
-                    label={connLabel}
-                />
-            </div>
-
-            {/* 페이지당 건수 */}
-            <div>
-                <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
-                {(widget.displayMode ?? 'pagination') === 'pagination' ? (
-                    <input type="number" min={5} max={100} value={widget.pageSize}
-                        onChange={e => onChange({ ...widget, pageSize: Number(e.target.value) || 10 })}
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900" />
-                ) : (
-                    <span className="text-[10px] text-slate-400 italic">스크롤 모드</span>
-                )}
-            </div>
-
-            {/* 체크박스 */}
-            <div>
-                <label className="text-[10px] font-medium text-slate-500 mb-1 block">체크박스</label>
-                <ToggleRow
-                    label={widget.enableRowSelection ? '사용' : '미사용'}
-                    value={widget.enableRowSelection ?? false}
-                    onChange={v => onChange({ ...widget, enableRowSelection: v })}
-                />
-            </div>
-
-            {/* 연결된 Search 위젯 */}
-            {searchWidgets.length > 0 && (
-                <div>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">검색 연결</p>
-                    <div className="space-y-0.5">
-                        {searchWidgets.map(sw => (
-                            <label key={sw.widgetId} className="flex items-center gap-1.5 cursor-pointer">
-                                <input type="checkbox" checked={widget.connectedSearchIds.includes(sw.widgetId)}
-                                    onChange={() => toggleSearchConn(sw.widgetId)} className="w-3 h-3 rounded border-slate-300 text-slate-900" />
-                                <span className="text-[10px] text-slate-600">{sw.contentKey || sw.widgetId}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* 테이블 컬럼 목록 (드래그 정렬 + 아코디언) */}
-            <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">테이블 컬럼</p>
-                    <EntityBuildButton
-                        onClick={() => onChange(buildTableFromEntity(widget, slugEntityFields ?? []))}
-                        disabled={!slugEntityFields?.length}
-                        title="Slug Entity 필드로 테이블 컬럼 자동 구성"
-                    />
-                </div>
-
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext
-                        items={widget.columns.map(c => c.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        {widget.columns.map(col => (
-                            <SortableColumnItem
-                                key={col.id}
-                                col={col}
-                                isEditing={editingColumnId === col.id}
-                                onToggleEdit={() => {
-                                    setEditingColumnId(editingColumnId === col.id ? null : col.id);
-                                    if (col.cellType === 'actions' || col.cellType === 'button') loadLayerTemplates();
-                                }}
-                                onRemove={() => removeColumn(col.id)}
-                            >
-                                {renderColumnEdit(col)}
-                            </SortableColumnItem>
-                        ))}
-                    </SortableContext>
-                </DndContext>
-
-                {/* 컬럼 추가 다이얼로그 */}
-                {pendingCol !== null ? (
-                    <div className="border border-slate-200 rounded-md p-2 space-y-1.5">
-                        {!pendingCol.cellType ? (
-                            /* Phase 1: 셀 타입 선택 */
-                            <>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-[10px] font-semibold text-slate-500">셀 타입 선택</span>
-                                    <button onClick={() => setPendingCol(null)} className="text-slate-400 hover:text-slate-600"><X className="w-3 h-3" /></button>
-                                </div>
-                                {CELL_TYPES.map(ct => (
-                                    <button key={ct.type} onClick={() => selectCellType(ct.type)}
-                                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-slate-100 hover:bg-slate-50 text-left transition-all">
-                                        <span className="text-[11px] font-semibold text-slate-700">{ct.label}</span>
-                                        <span className="text-[10px] text-slate-400">{ct.desc}</span>
-                                    </button>
-                                ))}
-                            </>
-                        ) : (
-                            /* Phase 2: 컬럼 설정 입력 — renderColumnEdit과 동일한 컴포넌트 재사용 */
-                            <div className="p-2 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">{pendingCol.cellType}</span>
-                                        <span className="text-[10px] font-semibold text-slate-500">컬럼 설정</span>
-                                    </div>
-                                    <button onClick={() => setPendingCol(prev => ({ ...prev!, cellType: undefined }))} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
-                                </div>
-
-                                {/* edit/add 동일 컴포넌트 재사용 */}
-                                <ColumnBaseField
-                                    values={pendingCol}
-                                    onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                    autoFocus
-                                    fetchRelations={allSlugRelations.filter(r => r.relationDir === 'FETCH')}
-                                />
-                                {pendingCol.cellType === 'badge' && (
-                                    <BadgeOptionsField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'text' && (
-                                    <TextCodeGroupField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                        codeGroups={codeGroups}
-                                        codeGroupsLoading={false}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'text' && (
-                                    <MaskField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'boolean' && (
-                                    <BooleanTextField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'actions' && (
-                                    <ActionsField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                        layerTemplates={layerTemplates}
-                                        onRequestLayerTemplates={loadLayerTemplates}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'date' && (
-                                    <DateFormatField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'dateRangeStatus' && (
-                                    <DateRangeStatusColumnField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'inlineEdit' && (
-                                    <InlineEditField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                        codeGroups={codeGroups}
-                                        codeGroupsLoading={false}
-                                    />
-                                )}
-                                {pendingCol.cellType === 'button' && (
-                                    <TableButtonField
-                                        values={pendingCol}
-                                        onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))}
-                                        layerTemplates={layerTemplates}
-                                        onRequestLayerTemplates={loadLayerTemplates}
-                                    />
-                                )}
-
-                                {/* 추가 확정 버튼 — isColumnValid 공통 함수로 검증 */}
-                                <button onClick={confirmAddColumn}
-                                    disabled={!isColumnValid(pendingCol)}
-                                    className="w-full py-1.5 text-[11px] font-semibold bg-slate-900 text-white rounded hover:bg-slate-700 disabled:opacity-40 transition-all">
-                                    추가
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <button onClick={() => setPendingCol({})}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all">
-                        <Plus className="w-3 h-3" />컬럼 추가
-                    </button>
-                )}
-            </div>
-        </div>
+      <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
+        <ColumnBaseField
+          values={col}
+          onChange={patch}
+          fetchRelations={allSlugRelations.filter((r) => r.relationDir === "FETCH")}
+        />
+        {col.cellType === "badge" && <BadgeOptionsField values={col} onChange={patch} />}
+        {col.cellType === "text" && (
+          <TextCodeGroupField values={col} onChange={patch} codeGroups={codeGroups} codeGroupsLoading={false} />
+        )}
+        {col.cellType === "text" && <MaskField values={col} onChange={patch} />}
+        {col.cellType === "boolean" && <BooleanTextField values={col} onChange={patch} />}
+        {col.cellType === "actions" && (
+          <ActionsField
+            values={col}
+            onChange={patch}
+            layerTemplates={layerTemplates}
+            onRequestLayerTemplates={loadLayerTemplates}
+          />
+        )}
+        {col.cellType === "date" && <DateFormatField values={col} onChange={patch} />}
+        {col.cellType === "dateRangeStatus" && <DateRangeStatusColumnField values={col} onChange={patch} />}
+        {col.cellType === "inlineEdit" && (
+          <InlineEditField
+            values={col}
+            onChange={patch}
+            codeGroups={codeGroups}
+            codeGroupsLoading={false}
+            fetchRelations={allSlugRelations.filter((r) => r.relationDir === "FETCH")}
+          />
+        )}
+        {col.cellType === "button" && (
+          <TableButtonField
+            values={col}
+            onChange={patch}
+            layerTemplates={layerTemplates}
+            onRequestLayerTemplates={loadLayerTemplates}
+          />
+        )}
+      </div>
     );
+  };
+
+  /* ── 렌더 ── */
+  return (
+    <div className="space-y-2 pt-1">
+      {/* 표시 방식 */}
+      <div>
+        <label className="text-[10px] font-medium text-slate-500 mb-1 block">표시 방식</label>
+        <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
+          {(["pagination", "scroll"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => onChange({ ...widget, displayMode: m })}
+              className={`flex-1 py-1.5 text-[10px] font-semibold rounded transition-all ${(widget.displayMode ?? "pagination") === m ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {m === "pagination" ? "페이지네이션" : "무한 스크롤"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Key | 연결 Slug — 2열 그리드 */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+            Key <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={widget.contentKey}
+            onChange={(e) => onChange({ ...widget, contentKey: e.target.value })}
+            placeholder="예: boardTable"
+            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-slate-900"
+          />
+        </div>
+        <SlugSelectField
+          value={widget.connectedSlug ?? connDefaultSlug ?? ""}
+          onChange={(slug) => onChange({ ...widget, connectedSlug: slug })}
+          slugOptions={connFieldOptions.options}
+          formatDisplay={connFieldOptions.formatDisplay}
+          label={connLabel}
+        />
+      </div>
+
+      {/* 페이지당 건수 */}
+      <div>
+        <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
+        {(widget.displayMode ?? "pagination") === "pagination" ? (
+          <input
+            type="number"
+            min={5}
+            max={100}
+            value={widget.pageSize}
+            onChange={(e) => onChange({ ...widget, pageSize: Number(e.target.value) || 10 })}
+            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+          />
+        ) : (
+          <span className="text-[10px] text-slate-400 italic">스크롤 모드</span>
+        )}
+      </div>
+
+      {/* 체크박스 */}
+      <div>
+        <label className="text-[10px] font-medium text-slate-500 mb-1 block">체크박스</label>
+        <ToggleRow
+          label={widget.enableRowSelection ? "사용" : "미사용"}
+          value={widget.enableRowSelection ?? false}
+          onChange={(v) => onChange({ ...widget, enableRowSelection: v })}
+        />
+      </div>
+
+      {/* 연결된 Search 위젯 */}
+      {searchWidgets.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">검색 연결</p>
+          <div className="space-y-0.5">
+            {searchWidgets.map((sw) => (
+              <label key={sw.widgetId} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={widget.connectedSearchIds.includes(sw.widgetId)}
+                  onChange={() => toggleSearchConn(sw.widgetId)}
+                  className="w-3 h-3 rounded border-slate-300 text-slate-900"
+                />
+                <span className="text-[10px] text-slate-600">{sw.contentKey || sw.widgetId}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 테이블 컬럼 목록 (드래그 정렬 + 아코디언) */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">테이블 컬럼</p>
+          <EntityBuildButton
+            onClick={() => onChange(buildTableFromEntity(widget, slugEntityFields ?? []))}
+            disabled={!slugEntityFields?.length}
+            title="Slug Entity 필드로 테이블 컬럼 자동 구성"
+          />
+        </div>
+
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={widget.columns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            {widget.columns.map((col) => (
+              <SortableColumnItem
+                key={col.id}
+                col={col}
+                isEditing={editingColumnId === col.id}
+                onToggleEdit={() => {
+                  setEditingColumnId(editingColumnId === col.id ? null : col.id);
+                  if (col.cellType === "actions" || col.cellType === "button") loadLayerTemplates();
+                }}
+                onRemove={() => removeColumn(col.id)}
+              >
+                {renderColumnEdit(col)}
+              </SortableColumnItem>
+            ))}
+          </SortableContext>
+        </DndContext>
+
+        {/* 컬럼 추가 다이얼로그 */}
+        {pendingCol !== null ? (
+          <div className="border border-slate-200 rounded-md p-2 space-y-1.5">
+            {!pendingCol.cellType ? (
+              /* Phase 1: 셀 타입 선택 */
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-semibold text-slate-500">셀 타입 선택</span>
+                  <button onClick={() => setPendingCol(null)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                {CELL_TYPES.map((ct) => (
+                  <button
+                    key={ct.type}
+                    onClick={() => selectCellType(ct.type)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-slate-100 hover:bg-slate-50 text-left transition-all"
+                  >
+                    <span className="text-[11px] font-semibold text-slate-700">{ct.label}</span>
+                    <span className="text-[10px] text-slate-400">{ct.desc}</span>
+                  </button>
+                ))}
+              </>
+            ) : (
+              /* Phase 2: 컬럼 설정 입력 — renderColumnEdit과 동일한 컴포넌트 재사용 */
+              <div className="p-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">
+                      {pendingCol.cellType}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500">컬럼 설정</span>
+                  </div>
+                  <button
+                    onClick={() => setPendingCol((prev) => ({ ...prev!, cellType: undefined }))}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* edit/add 동일 컴포넌트 재사용 */}
+                <ColumnBaseField
+                  values={pendingCol}
+                  onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                  autoFocus
+                  fetchRelations={allSlugRelations.filter((r) => r.relationDir === "FETCH")}
+                />
+                {pendingCol.cellType === "badge" && (
+                  <BadgeOptionsField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                  />
+                )}
+                {pendingCol.cellType === "text" && (
+                  <TextCodeGroupField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                    codeGroups={codeGroups}
+                    codeGroupsLoading={false}
+                  />
+                )}
+                {pendingCol.cellType === "text" && (
+                  <MaskField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                  />
+                )}
+                {pendingCol.cellType === "boolean" && (
+                  <BooleanTextField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                  />
+                )}
+                {pendingCol.cellType === "actions" && (
+                  <ActionsField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                    layerTemplates={layerTemplates}
+                    onRequestLayerTemplates={loadLayerTemplates}
+                  />
+                )}
+                {pendingCol.cellType === "date" && (
+                  <DateFormatField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                  />
+                )}
+                {pendingCol.cellType === "dateRangeStatus" && (
+                  <DateRangeStatusColumnField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                  />
+                )}
+                {pendingCol.cellType === "inlineEdit" && (
+                  <InlineEditField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                    codeGroups={codeGroups}
+                    codeGroupsLoading={false}
+                    fetchRelations={allSlugRelations.filter((r) => r.relationDir === "FETCH")}
+                  />
+                )}
+                {pendingCol.cellType === "button" && (
+                  <TableButtonField
+                    values={pendingCol}
+                    onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
+                    layerTemplates={layerTemplates}
+                    onRequestLayerTemplates={loadLayerTemplates}
+                  />
+                )}
+
+                {/* 추가 확정 버튼 — isColumnValid 공통 함수로 검증 */}
+                <button
+                  onClick={confirmAddColumn}
+                  disabled={!isColumnValid(pendingCol)}
+                  className="w-full py-1.5 text-[11px] font-semibold bg-slate-900 text-white rounded hover:bg-slate-700 disabled:opacity-40 transition-all"
+                >
+                  추가
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setPendingCol({})}
+            className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
+          >
+            <Plus className="w-3 h-3" />
+            컬럼 추가
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
