@@ -22,8 +22,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { toast } from 'sonner';
-import { useI18n } from '@/hooks/use-i18n';
+import { toast } from "sonner";
+import { useI18n } from "@/hooks/use-i18n";
 import { fetchTemplateConfig } from "../../templateApi";
 import { PageGridRenderer } from "./PageGridRenderer";
 import type { PageWidgetItem } from "./PageGridRenderer";
@@ -60,13 +60,15 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
    */
   const [sharedDataIdMap, setSharedDataIdMap] = useState<Record<string, number>>({});
   /* URL ?id — 수정 진입 시 초기 row id */
-  const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null;
+  const urlId = searchParams.get("id") ? Number(searchParams.get("id")) : null;
 
   /* hideCondition/disableCondition 평가용 URL 파라미터 — id/group_id 제외 */
   const urlParams = useMemo(() => {
-    const SKIP = new Set(['id', 'group_id']);
+    const SKIP = new Set(["id", "group_id"]);
     const map: Record<string, string> = {};
-    searchParams.forEach((value, key) => { if (!SKIP.has(key)) map[key] = value; });
+    searchParams.forEach((value, key) => {
+      if (!SKIP.has(key)) map[key] = value;
+    });
     return map;
   }, [searchParams]);
 
@@ -75,9 +77,7 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
    * - 수정 진입(urlId 있음): 첫 번째 탭(0)을 사전 포함 (이미 저장된 상태)
    * - 신규 진입: 빈 Set → 첫 탭 저장 후 추가
    */
-  const [savedTabSet, setSavedTabSet] = useState<Set<number>>(
-    () => new Set(urlId ? [0] : [])
-  );
+  const [savedTabSet, setSavedTabSet] = useState<Set<number>>(() => new Set(urlId ? [0] : []));
 
   /* 탭 간 공유 데이터생성 자동입력 상태 — fieldId → value (모든 탭 공유) */
   const [crossTabFormValues, setCrossTabFormValues] = useState<Record<string, string>>({});
@@ -87,7 +87,7 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
 
   /* 어느 탭 PageGridRenderer에서도 escalate 될 수 있는 cross-tab 값 업데이트 콜백 */
   const handleCrossTabFormChange = useCallback((fieldId: string, value: string) => {
-    setCrossTabFormValues(prev => ({ ...prev, [fieldId]: value }));
+    setCrossTabFormValues((prev) => ({ ...prev, [fieldId]: value }));
   }, []);
 
   /**
@@ -96,7 +96,7 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
    * - leaveCheck 활성 시 현재 탭에 미저장 변경사항이 있으면 컨펌 후 이동
    */
   function handleTabClick(idx: number) {
-    if (mode !== 'live') {
+    if (mode !== "live") {
       setActiveIdx(idx);
       setMountedTabs((prev) => new Set([...prev, idx]));
       return;
@@ -106,8 +106,10 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
     if (idx > 0) {
       const firstTab = tabs[0];
       if (firstTab?.required && !savedTabSet.has(0)) {
-        const tabLabel = firstTab.labelMsgKey ? t(firstTab.labelMsgKey) : (firstTab.label || t('common.tab.default_label', { n: '1' }));
-        toast.warning(t('common.tab.save_required', { tab: tabLabel }));
+        const tabLabel = firstTab.labelMsgKey
+          ? t(firstTab.labelMsgKey)
+          : firstTab.label || t("common.tab.default_label", { n: "1" });
+        toast.warning(t("common.tab.save_required", { tab: tabLabel }));
         return;
       }
     }
@@ -147,13 +149,14 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            {tab.labelMsgKey ? t(tab.labelMsgKey) : (tab.label || t('common.tab.default_label', { n: String(idx + 1) }))}
+            {tab.labelMsgKey ? t(tab.labelMsgKey) : tab.label || t("common.tab.default_label", { n: String(idx + 1) })}
           </button>
         ))}
       </div>
 
       {/* 탭 패널 — keep-alive: 마운트된 탭은 hidden으로 숨기되 언마운트하지 않음 */}
-      <div className="flex-1 overflow-auto min-h-0">
+      {/* pt-2(8px): 그리드 GAP_SIZE와 동일한 간격으로 탭바~콘텐츠 상단 여백 확보 */}
+      <div className="flex-1 overflow-auto min-h-0 pt-2">
         {tabs.map((tab, idx) => (
           <div key={tab.id} className={idx === activeIdx ? "h-full" : "hidden"}>
             {mountedTabs.has(idx) &&
@@ -170,7 +173,9 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
                   crossTabFormValues={crossTabFormValues}
                   onCrossTabFormChange={handleCrossTabFormChange}
                   leaveCheck={leaveCheck}
-                  onRegisterConfirmLeave={(tabIdx, fn) => { confirmLeaveMap.current[tabIdx] = fn; }}
+                  onRegisterConfirmLeave={(tabIdx, fn) => {
+                    confirmLeaveMap.current[tabIdx] = fn;
+                  }}
                   urlParams={urlParams}
                 />
               ) : (
@@ -257,7 +262,21 @@ interface LiveTabPanelProps {
  * lazy mount + keep-alive 방식으로 탭 전환 시 상태가 유지된다.
  * contentKey가 설정된 탭은 sharedDataId를 통해 같은 row를 GET+merge+PUT 방식으로 저장.
  */
-function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDataIdMap, urlId, onDataIdCreated, onSaved, crossTabFormValues, onCrossTabFormChange, leaveCheck, onRegisterConfirmLeave, urlParams }: LiveTabPanelProps) {
+function LiveTabPanel({
+  tab,
+  tabIdx,
+  pageSlug,
+  parentMainConnectedSlug,
+  sharedDataIdMap,
+  urlId,
+  onDataIdCreated,
+  onSaved,
+  crossTabFormValues,
+  onCrossTabFormChange,
+  leaveCheck,
+  onRegisterConfirmLeave,
+  urlParams,
+}: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const { t } = useI18n();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
@@ -278,8 +297,8 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
   const sharedDataId = useMemo(() => {
     if (!widgetItems.length) return urlId;
     const slugs = flatWidgets(widgetItems)
-      .map(w => {
-        if (w.type === 'form' || w.type === 'sublist' || w.type === 'multiselect') {
+      .map((w) => {
+        if (w.type === "form" || w.type === "sublist" || w.type === "multiselect") {
           return (w as { connectedSlug?: string }).connectedSlug;
         }
         return undefined;
@@ -318,6 +337,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
   /* pageSlug로 widgetItems 로드 — 최초 1회 */
   useEffect(() => {
     if (!tab.pageSlug) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
     setLoading(true);
     fetchTemplateConfig(tab.pageSlug)
       .then((cfg) => {
@@ -334,7 +354,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
   /* pageSlug 없는 탭 */
   if (!tab.pageSlug) {
     return (
-      <div className="h-full flex items-center justify-center text-sm text-slate-400">{t('common.tab.no_page')}</div>
+      <div className="h-full flex items-center justify-center text-sm text-slate-400">{t("common.tab.no_page")}</div>
     );
   }
 
@@ -347,9 +367,7 @@ function LiveTabPanel({ tab, tabIdx, pageSlug, parentMainConnectedSlug, sharedDa
   }
 
   if (failed) {
-    return (
-      <div className="h-full flex items-center justify-center text-sm text-red-400">{t('common.error.load')}</div>
-    );
+    return <div className="h-full flex items-center justify-center text-sm text-red-400">{t("common.error.load")}</div>;
   }
 
   if (!widgetItems.length) return null;

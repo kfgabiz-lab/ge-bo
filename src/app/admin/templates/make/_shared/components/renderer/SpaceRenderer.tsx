@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * SpaceRenderer — 공간영역 위젯 렌더러
@@ -20,112 +20,170 @@
  *   <SpaceRenderer mode="live" items={widget.items} onClose={() => setOpen(false)} />
  */
 
-import { useRouter } from 'next/navigation';
-import { FieldRenderer } from './FieldRenderer';
-import { RendererContainer } from './RendererContainer';
-import type { SearchFieldConfig } from '../../types';
-import type { RendererMode } from './types';
-import { useLeaveCheckStore } from '@/store/use-leave-check-store';
-import { useI18n } from '@/hooks/use-i18n';
+import { useRouter } from "next/navigation";
+import { FieldRenderer } from "./FieldRenderer";
+import { RendererContainer } from "./RendererContainer";
+import type { SearchFieldConfig } from "../../types";
+import type { RendererMode } from "./types";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface SpaceRendererProps {
-    mode: RendererMode;
-    items: SearchFieldConfig[];
-    align?: 'left' | 'center' | 'right';
-    /** 전체 그리드 열 수 — 각 아이템의 colSpan 비율 계산에 사용 (기본 5) */
-    contentColSpan?: number;
-    /** 영역 테두리 표시 여부 (기본 true) */
-    showBorder?: boolean;
-    /** 영역 바탕색 (기본 white) */
-    bgColor?: string;
-    /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction + goBackAfterAction + 위젯별 검증 규칙 ID 전달 */
-    onContentAction?: (connectedContentWidgetIds: string[], action: 'save' | 'delete', goBackAfterAction?: boolean, contentValidationRuleIds?: Record<string, number[]>) => void;
-    /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
-    onClose?: () => void;
-    /** 페이지/팝업/경로 연결 요청 — connType='popup'·'path' 버튼 클릭 시 slug와 파라미터 문자열 전달 */
-    onPopupOpen?: (slug: string, params?: string) => void;
-    /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID + 개인정보 팝업 여부 전달 */
-    onExcelDownload?: (tableWidgetId: string, privacyPopup?: boolean) => void;
-    /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave + 검증 규칙 ID 전달 */
-    onDataSave?: (connectedContentWidgetIds: string[], dataSaveSlug: string, goBackAfterAction?: boolean, paramSave?: string, validationRuleIds?: number[]) => void;
-    /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id(mode2) 또는 undefined(mode1: id 유무 자동 CRUD) + params + 연결 컨텐츠 위젯 ID 배열 전달 (live 전용) */
-    onApiCall?: (apiInfoId: number | undefined, params?: string, connectedContentWidgetIds?: string[]) => void;
+  mode: RendererMode;
+  items: SearchFieldConfig[];
+  align?: "left" | "center" | "right";
+  /** 전체 그리드 열 수 — 각 아이템의 colSpan 비율 계산에 사용 (기본 5) */
+  contentColSpan?: number;
+  /** 영역 테두리 표시 여부 (기본 true) */
+  showBorder?: boolean;
+  /** 영역 바탕색 (기본 white) */
+  bgColor?: string;
+  /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction + goBackAfterAction + 위젯별 검증 규칙 ID 전달 */
+  onContentAction?: (
+    connectedContentWidgetIds: string[],
+    action: "save" | "delete",
+    goBackAfterAction?: boolean,
+    contentValidationRuleIds?: Record<string, number[]>
+  ) => void;
+  /** 닫기 버튼 클릭 시 호출 — LayerPopup에서 전달, 없으면 router.back() */
+  onClose?: () => void;
+  /** 페이지/팝업/경로 연결 요청 — connType='popup'·'path' 버튼 클릭 시 slug와 파라미터 문자열 전달 */
+  onPopupOpen?: (slug: string, params?: string) => void;
+  /** 엑셀 다운로드 요청 — connType='excel' 버튼 클릭 시 테이블 위젯 ID + 개인정보 팝업 여부 + JOIN relation ID 배열 + 추가 컬럼 목록 전달 */
+  onExcelDownload?: (
+    tableWidgetId: string,
+    privacyPopup?: boolean,
+    relationIds?: number[],
+    extraColumns?: SearchFieldConfig["excelExtraColumns"]
+  ) => void;
+  /** 데이터저장 요청 — connType='datasave' 버튼 클릭 시 선택 위젯 ID 배열 + slug + paramSave + 검증 규칙 ID 전달 */
+  onDataSave?: (
+    connectedContentWidgetIds: string[],
+    dataSaveSlug: string,
+    goBackAfterAction?: boolean,
+    paramSave?: string,
+    validationRuleIds?: number[]
+  ) => void;
+  /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id(mode2) 또는 undefined(mode1: id 유무 자동 CRUD) + params + 연결 컨텐츠 위젯 ID 배열 + 파일다운로드 여부 전달 (live 전용) */
+  onApiCall?: (
+    apiInfoId: number | undefined,
+    params?: string,
+    connectedContentWidgetIds?: string[],
+    downloadFile?: boolean
+  ) => void;
 }
 
-export function SpaceRenderer({ mode, items, contentColSpan = 5, showBorder = true, bgColor, onContentAction, onClose, onPopupOpen, onExcelDownload, onDataSave, onApiCall }: SpaceRendererProps) {
-    const router = useRouter();
-    const { t } = useI18n();
-    /* 이탈체크 가드 — leaveCheck 옵션이 켜져 있고 폼이 dirty 상태일 때만 함수가 등록됨 */
-    const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
-    if (!items.length) {
-        return (
-            <RendererContainer showBorder={showBorder} bgColor={bgColor} className="flex items-center justify-center">
-                <span className="text-[10px] text-slate-300 italic text-center p-4">
-                    아이템을 추가하세요
-                </span>
-            </RendererContainer>
-        );
-    }
-
-    /** action-button 클릭 핸들러 — connType에 따라 동작 분기 */
-    const handleButtonClick = (field: SearchFieldConfig) => {
-        // preview 모드에서는 엑셀 다운로드(팝업 UI 미리보기)만 허용
-        if (mode === 'preview') {
-            if (field.connType === 'excel' && onExcelDownload) {
-                onExcelDownload(field.excelTableWidgetId ?? '');
-            }
-            return;
-        }
-        /* 저장 컨펌 토글 활성화 시 — 사용자 확인 후 취소 시 중단 */
-        if (field.saveConfirm && !window.confirm(t('common.confirm.save'))) return;
-        /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
-        if (field.connType === 'content' && field.connectedContentWidgetIds?.length && field.contentAction) {
-            onContentAction?.(field.connectedContentWidgetIds, field.contentAction, field.goBackAfterAction, field.contentValidationRuleIds);
-        } else if (field.connType === 'close') {
-            /* 이탈체크 — 저장되지 않은 변경사항이 있으면 사용자 확인 후 취소 시 닫기 중단 */
-            if (confirmLeave && !confirmLeave()) return;
-            /* LayerPopup이면 onClose(), 상세페이지면 router.back() */
-            if (onClose) {
-                onClose();
-            } else {
-                router.back();
-            }
-        } else if (field.connType === 'popup' && field.popupSlug) {
-            onPopupOpen?.(field.popupSlug, field.params);
-        } else if (field.connType === 'path' && field.fileLayerSlug) {
-            onPopupOpen?.(field.fileLayerSlug, field.params);
-        } else if (field.connType === 'excel' && field.excelTableWidgetId) {
-            onExcelDownload?.(field.excelTableWidgetId, field.excelPrivacyPopup);
-        } else if (field.connType === 'datasave' && field.dataSaveSlug) {
-            /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
-            onDataSave?.(field.connectedContentWidgetIds ?? [], field.dataSaveSlug, field.goBackAfterAction, field.params, field.validationRuleIds);
-        } else if (field.connType === 'api') {
-            /* apiInfoId 미선택(mode1)이면 undefined 그대로 전달 — handleApiCall이 id 유무로 CRUD 직접 처리 */
-            onApiCall?.(field.apiInfoId, field.params, field.connectedContentWidgetIds);
-        }
-    };
-
+export function SpaceRenderer({
+  mode,
+  items,
+  contentColSpan = 5,
+  showBorder = true,
+  bgColor,
+  onContentAction,
+  onClose,
+  onPopupOpen,
+  onExcelDownload,
+  onDataSave,
+  onApiCall,
+}: SpaceRendererProps) {
+  const router = useRouter();
+  const { t } = useI18n();
+  /* 이탈체크 가드 — leaveCheck 옵션이 켜져 있고 폼이 dirty 상태일 때만 함수가 등록됨 */
+  const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
+  if (!items.length) {
     return (
-        /* RendererContainer — grid 배치 공통 처리 (FormRenderer와 동일한 방식) */
-        <RendererContainer showBorder={showBorder} bgColor={bgColor} contentColSpan={contentColSpan}>
-            {/* 각 아이템 — gridColumn/gridRow로 자리만 지정 */}
-            {items.map(field => (
-                <div
-                    key={field.id}
-                    className="flex items-center px-3 min-w-0"
-                    style={{
-                        gridColumn: `span ${Math.min(field.colSpan ?? 1, contentColSpan)}`,
-                        gridRow: `span ${field.rowSpan ?? 1}`,
-                    }}
-                >
-                    <FieldRenderer
-                        mode={mode}
-                        field={field}
-                        value={field.type === 'textarea' ? (field.content ?? '') : undefined}
-                        onButtonClick={field.type === 'action-button' ? () => handleButtonClick(field) : undefined}
-                    />
-                </div>
-            ))}
-        </RendererContainer>
+      <RendererContainer showBorder={showBorder} bgColor={bgColor} className="flex items-center justify-center">
+        <span className="text-[10px] text-slate-300 italic text-center p-4">아이템을 추가하세요</span>
+      </RendererContainer>
     );
+  }
+
+  /** action-button 클릭 핸들러 — connType에 따라 동작 분기 */
+  const handleButtonClick = (field: SearchFieldConfig) => {
+    /* 엑셀 다운로드 방식이 'custom'(사용자정의)일 때만 JOIN relation·컬럼 목록을 요청에 실어 보낸다.
+           'current'(데이터테이블·기본값·하위호환)이면 값이 저장되어 있어도 무시하고 undefined로 넘긴다.
+           ⚠️ excelExtraColumns가 빈 배열이어도 사용자정의 모드면 반드시 배열(??[])로 전달해야 한다 —
+           doExcelDownload는 extraColumns가 undefined인지 여부로 "사용자정의 모드"를 판정하므로,
+           여기서 undefined를 넘기면 "사용자정의+컬럼0개"와 "데이터테이블 모드"가 구분되지 않는다. */
+    const isExcelCustom = (field.excelDownloadMode ?? "current") === "custom";
+    // preview 모드에서는 엑셀 다운로드(팝업 UI 미리보기)만 허용
+    if (mode === "preview") {
+      if (field.connType === "excel" && onExcelDownload) {
+        onExcelDownload(
+          field.excelTableWidgetId ?? "",
+          undefined,
+          isExcelCustom ? field.excelRelationIds : undefined,
+          isExcelCustom ? (field.excelExtraColumns ?? []) : undefined
+        );
+      }
+      return;
+    }
+    /* 저장 컨펌 토글 활성화 시 — 사용자 확인 후 취소 시 중단 */
+    if (field.saveConfirm && !window.confirm(t("common.confirm.save"))) return;
+    /* 컨텐츠 연결 — Form/SubList 위젯 다중 저장/삭제 */
+    if (field.connType === "content" && field.connectedContentWidgetIds?.length && field.contentAction) {
+      onContentAction?.(
+        field.connectedContentWidgetIds,
+        field.contentAction,
+        field.goBackAfterAction,
+        field.contentValidationRuleIds
+      );
+    } else if (field.connType === "close") {
+      /* 이탈체크 — 저장되지 않은 변경사항이 있으면 사용자 확인 후 취소 시 닫기 중단 */
+      if (confirmLeave && !confirmLeave()) return;
+      /* LayerPopup이면 onClose(), 상세페이지면 router.back() */
+      if (onClose) {
+        onClose();
+      } else {
+        router.back();
+      }
+    } else if (field.connType === "popup" && field.popupSlug) {
+      onPopupOpen?.(field.popupSlug, field.params);
+    } else if (field.connType === "path" && field.fileLayerSlug) {
+      onPopupOpen?.(field.fileLayerSlug, field.params);
+    } else if (field.connType === "excel" && field.excelTableWidgetId) {
+      onExcelDownload?.(
+        field.excelTableWidgetId,
+        field.excelPrivacyPopup,
+        isExcelCustom ? field.excelRelationIds : undefined,
+        isExcelCustom ? (field.excelExtraColumns ?? []) : undefined
+      );
+    } else if (field.connType === "datasave" && field.dataSaveSlug) {
+      /* field.params = paramSave 문자열 (e.g. "board-data-table.depth=3,board-data-table.id") */
+      onDataSave?.(
+        field.connectedContentWidgetIds ?? [],
+        field.dataSaveSlug,
+        field.goBackAfterAction,
+        field.params,
+        field.validationRuleIds
+      );
+    } else if (field.connType === "api") {
+      /* apiInfoId 미선택(mode1)이면 undefined 그대로 전달 — handleApiCall이 id 유무로 CRUD 직접 처리 */
+      onApiCall?.(field.apiInfoId, field.params, field.connectedContentWidgetIds, field.apiDownloadFile);
+    }
+  };
+
+  return (
+    /* RendererContainer — grid 배치 공통 처리 (FormRenderer와 동일한 방식) */
+    <RendererContainer showBorder={showBorder} bgColor={bgColor} contentColSpan={contentColSpan}>
+      {/* 각 아이템 — gridColumn/gridRow로 자리만 지정 */}
+      {items.map((field) => (
+        <div
+          key={field.id}
+          className="flex items-center px-3 min-w-0"
+          style={{
+            gridColumn: `span ${Math.min(field.colSpan ?? 1, contentColSpan)}`,
+            gridRow: `span ${field.rowSpan ?? 1}`,
+          }}
+        >
+          <FieldRenderer
+            mode={mode}
+            field={field}
+            value={field.type === "textarea" ? (field.content ?? "") : undefined}
+            onButtonClick={field.type === "action-button" ? () => handleButtonClick(field) : undefined}
+          />
+        </div>
+      ))}
+    </RendererContainer>
+  );
 }

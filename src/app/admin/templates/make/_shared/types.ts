@@ -100,10 +100,20 @@ export interface SearchFieldConfig {
   connectedContentWidgetIds?: string[]; // 연결된 컨텐츠 위젯 ID 배열 (Form+SubList 다중 선택)
   excelTableWidgetId?: string; // 엑셀 다운로드 연결 테이블 위젯 ID (connType='excel' 전용)
   excelPrivacyPopup?: boolean; // 개인정보 다운로드 사유 입력 팝업 사용 여부 (connType='excel' 전용)
+  /** 엑셀 다운로드 방식 — 'current': 데이터테이블(테이블 컬럼 그대로, relation·컬럼목록 미적용)
+   *  / 'custom': 사용자정의(테이블 컬럼을 무시하고 excelExtraColumns만으로 새로 구성)
+   *  (connType='excel' 전용, 미지정 시 기존 저장 템플릿 하위호환을 위해 'current'로 취급) */
+  excelDownloadMode?: "current" | "custom";
+  /** 엑셀 다운로드 시 JOIN할 slug_relation ID 배열 — FETCH 방향만 대상 (connType='excel' 전용) */
+  excelRelationIds?: number[];
+  /** 엑셀 다운로드 사용자정의 컬럼 목록 — excelDownloadMode='custom'일 때 테이블 컬럼을 완전히 대체하여
+   *  이 목록만으로 export를 구성한다(기존 컬럼 뒤에 이어붙이는 것이 아님). (connType='excel' 전용) */
+  excelExtraColumns?: { header: string; headerMsgKey?: string; accessor: string; dateFormat?: string }[];
   contentAction?: "save" | "delete"; // 버튼 클릭 시 컨텐츠 저장/삭제 동작
   goBackAfterAction?: boolean; // 동작 완료 후 이전 페이지 이동 (상세페이지) / 팝업 닫기 (LayerPopup)
   dataSaveSlug?: string; // 데이터저장 연결 slug (connType='datasave' 전용)
   apiInfoId?: number; // API 연동 연결 api_info.id (connType='api' 전용)
+  apiDownloadFile?: boolean; // API 연동 응답을 파일 다운로드로 처리할지 여부 (connType='api' + apiInfoId 선택 시(mode2) 전용)
   saveConfirm?: boolean; // 저장 컨펌 여부 — true 시 버튼 클릭 시 확인창 표시 (action-button 전용)
   validationRuleIds?: number[]; // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
   contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)
@@ -234,6 +244,18 @@ export interface SearchFieldConfig {
   /* ── address 전용 ── */
   /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
   addressLanguage?: "ko" | "en";
+  /* ── date/dateRange 필드간 대소비교 검증 (Form/SubList 전용, Search에서는 사용하지 않음) ──
+   * 콤마(,)로 구분된 조건을 모두 만족해야 저장 가능(AND). 각 조건 문법:
+   *   [part]연산자$대상fieldKey[.part]
+   *   - part(앞, 생략가능): 자신이 dateRange일 때 비교에 쓸 값 — from(시작)|to(종료). 생략 시 date는 그대로, dateRange는 from 기본
+   *   - 연산자: < <= > >=
+   *   - $대상fieldKey: 같은 Form/SubList 내 다른 date/dateRange 필드의 fieldKey ($ 접두사 필수)
+   *   - .part(뒤, 생략가능): 대상이 dateRange일 때 비교에 쓸 값 — from|to. 생략 시 from 기본
+   * @example "<$endDate" — 자신(date) < endDate(date)
+   * @example "<$endDate,<$dueDate" — 자신 < endDate 이면서 자신 < dueDate (AND)
+   * @example "to<$endDate_from" — 자신(dateRange)의 종료일 < endDate(dateRange)의 시작일
+   */
+  compareExpr?: string;
 }
 
 /**

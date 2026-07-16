@@ -283,15 +283,13 @@ async function restoreFormDataFromJson(
       /* entity 모드: file_meta 전용 API 사용 — 응답 필드명이 origName이 아닌 originalName(camelCase)
        * 이라 조회 직후 기존 { id, origName, fileSize } 형태로 맞춰 이후 로직은 공용으로 재사용한다. */
       const metaList = isEntity
-        ? await api
-            .get("/file-meta", { params: { ids: fileIds.join(",") } })
-            .then((r) =>
-              (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[]).map((m) => ({
-                id: m.id,
-                origName: m.originalName,
-                fileSize: m.fileSize,
-              }))
-            )
+        ? await api.get("/file-meta", { params: { ids: fileIds.join(",") } }).then((r) =>
+            (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[]).map((m) => ({
+              id: m.id,
+              origName: m.originalName,
+              fileSize: m.fileSize,
+            }))
+          )
         : await api
             .get("/page-files/meta", { params: { ids: fileIds.join(",") } })
             .then((r) => r.data as { id: number; origName: string; fileSize: number; mimeType: string }[]);
@@ -340,6 +338,25 @@ function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, 
     }
   });
   return result;
+}
+
+/**
+ * Content-Disposition 응답 헤더에서 파일명을 추출한다. — handleApiCall의 파일다운로드(downloadFile) 전용.
+ * `filename*=UTF-8''인코딩값`(RFC 5987) 형태를 우선 확인하고, 없으면 `filename="값"` 형태를 확인한다.
+ * 둘 다 없으면 null을 반환한다(호출부에서 폴백 파일명을 사용).
+ */
+function parseContentDispositionFilename(disposition?: string): string | null {
+  if (!disposition) return null;
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  if (utf8Match) {
+    try {
+      return decodeURIComponent(utf8Match[1].trim());
+    } catch {
+      return utf8Match[1].trim();
+    }
+  }
+  const basicMatch = /filename="?([^";]+)"?/i.exec(disposition);
+  return basicMatch ? basicMatch[1].trim() : null;
 }
 
 export function useWidgetPageState(
@@ -1186,6 +1203,7 @@ export function useWidgetPageState(
         /* 유효성 검사 — cross-form hideCondition 평가를 위해 전체 values/keyToId 통합 구성 */
         const allFormValues = Object.assign({}, ...Object.values(mapToUse)) as Record<string, string>;
         const allFieldKeyToId: Record<string, string> = {};
+        const allFieldLabels: Record<string, string> = {};
         flatWidgets(widgetItems)
           .filter((w) => w.type === "form")
           .forEach((w) => {
@@ -1193,6 +1211,7 @@ export function useWidgetPageState(
             fw.fields?.forEach((f) => {
               if (!f.fieldKey) return;
               allFieldKeyToId[f.fieldKey] = f.id;
+              allFieldLabels[f.fieldKey] = String((f.labelMsgKey && t ? t(f.labelMsgKey) : f.label) || f.fieldKey);
               /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 */
               if (fw.contentKey) allFieldKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
             });
@@ -1223,7 +1242,18 @@ export function useWidgetPageState(
           title?: string;
           columns?: import("../components/renderer/types").SubListColumn[];
         }>;
-        if (!validateSubListRows(subWidgetsForValidation, subListRowsMap, subListFileMap, t)) return;
+        if (
+          !validateSubListRows(
+            subWidgetsForValidation,
+            subListRowsMap,
+            subListFileMap,
+            allFormValues,
+            allFieldKeyToId,
+            allFieldLabels,
+            t
+          )
+        )
+          return;
 
         /* mainConnectedSlug가 있으면 전체 위젯을 하나의 slug로 통합 저장 */
         const slugGroups = options?.mainConnectedSlug
@@ -1733,9 +1763,17 @@ export function useWidgetPageState(
    *   mode2는 Form/SubList/MultiSelect가 대상이지만, mode1은 Form/SubList만 대상으로 삼고
    *   MultiSelect는 그대로 무시한다(§ActionButtonField.tsx apiContentWidgets가 mode1일 때
    *   미리 MultiSelect를 목록에서 제외하므로 선택 자체가 불가능하다).
+   * @param downloadFile  true면 응답을 파일 다운로드로 처리한다(mode2 전용 — apiInfoId 미선택(mode1)은
+   *   항상 entity CRUD라 파일 개념이 없음). blob 응답을 받아 브라우저 다운로드를 트리거하고,
+   *   성공 토스트 대신 다운로드 자체로 완료를 표시한다.
    */
   const handleApiCall = useCallback(
-    async (apiInfoId: number | undefined, paramsStr?: string, connectedContentWidgetIds?: string[]) => {
+    async (
+      apiInfoId: number | undefined,
+      paramsStr?: string,
+      connectedContentWidgetIds?: string[],
+      downloadFile?: boolean
+    ) => {
       /* ── mode1: apiInfoId 미선택 — 선택한 Form(main)/SubList(sub)을 id 유무로 직접 entity CRUD ── */
       if (apiInfoId == null) {
         if (!connectedContentWidgetIds || connectedContentWidgetIds.length === 0) {
@@ -1995,7 +2033,31 @@ export function useWidgetPageState(
       }
 
       try {
-        if (method === "GET" || method === "DELETE") {
+        if (downloadFile) {
+          /* 파일다운로드 모드 — blob 응답으로 받아 성공 토스트 대신 브라우저 다운로드를 트리거한다.
+             (다운로드 트리거 방식은 WidgetRenderer.tsx의 doExcelDownload와 동일한 패턴 재사용) */
+          const res = await api.request({
+            method,
+            url,
+            responseType: "blob",
+            ...(method === "GET" || method === "DELETE"
+              ? { params: restParams }
+              : { data: { ...contentBody, ...restParams } }),
+          });
+
+          /* Content-Disposition 헤더에 파일명이 있으면 그걸 사용, 없으면 apiInfo.name 기반으로 폴백 */
+          const disposition = res.headers?.["content-disposition"] as string | undefined;
+          const filename = parseContentDispositionFilename(disposition) ?? `${apiInfo.name || "download"}.xlsx`;
+
+          const blobUrl = URL.createObjectURL(res.data);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        } else if (method === "GET" || method === "DELETE") {
           await api.request({ method, url, params: restParams });
           toast.success(`${apiInfo.name} 요청이 완료되었습니다.`);
         } else {

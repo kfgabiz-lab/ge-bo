@@ -58,6 +58,7 @@ if (typeof document !== "undefined") {
 import api, { getApiErrorMessage } from "@/lib/api";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
 import { CodeGroupDef } from "../../types";
+import type { SearchFieldConfig } from "../../types";
 import { SearchRenderer } from "./SearchRenderer";
 import { TableRenderer } from "./TableRenderer";
 import { FormRenderer } from "./FormRenderer";
@@ -204,8 +205,13 @@ interface WidgetRendererProps {
     paramSave?: string,
     validationRuleIds?: number[]
   ) => void;
-  /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds), live 모드에서만 호출됨 */
-  onApiCall?: (apiInfoId: number | undefined, params?: string, connectedContentWidgetIds?: string[]) => void;
+  /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds, downloadFile), live 모드에서만 호출됨 */
+  onApiCall?: (
+    apiInfoId: number | undefined,
+    params?: string,
+    connectedContentWidgetIds?: string[],
+    downloadFile?: boolean
+  ) => void;
   /** Space 위젯 닫기 버튼 — 없으면 router.back() */
   onClose?: () => void;
 
@@ -421,6 +427,10 @@ export function WidgetRenderer({
   /* 개인정보 사유 팝업 */
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [pendingTableWidgetId, setPendingTableWidgetId] = useState<string | null>(null);
+  /* 개인정보 팝업 확인 전까지 대기하는 JOIN relation ID 배열 / 추가 컬럼 목록 */
+  const [pendingExcelRelationIds, setPendingExcelRelationIds] = useState<number[] | undefined>(undefined);
+  const [pendingExcelExtraColumns, setPendingExcelExtraColumns] =
+    useState<SearchFieldConfig["excelExtraColumns"]>(undefined);
 
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupCfg, setPopupCfg] = useState<TemplatePopupConfig | null>(null);
@@ -514,31 +524,55 @@ export function WidgetRenderer({
    * 실제 엑셀 다운로드 실행 — reason이 있으면 API에 함께 전송 (개인정보 사유 로깅)
    */
   const doExcelDownload = useCallback(
-    async (tableWidgetId: string, reason?: string) => {
+    async (
+      tableWidgetId: string,
+      reason?: string,
+      relationIds?: number[],
+      extraColumns?: SearchFieldConfig["excelExtraColumns"]
+    ) => {
       const tableWidget = tableWidgetsMap?.[tableWidgetId];
       if (!tableWidget?.connectedSlug) {
         toast.error(t("common.table.no_table_info"));
         return;
       }
       try {
-        /* actions 타입 컬럼 제외 — 데이터 컬럼만 추출 */
-        const validCols = tableWidget.columns.filter((c) => c.cellType !== "actions");
-        /* headerMsgKey가 있으면 번역 텍스트 사용 — header가 빈 문자열일 때 Java split trailing 제거 방지 */
-        const headers = validCols.map((c) => (c.headerMsgKey ? t(c.headerMsgKey) : c.header)).join(",");
-        const keys = validCols.map((c) => c.accessor).join(",");
-        /* 날짜 포맷 — 포맷 없는 컬럼은 빈 문자열, keys 순서와 일치 */
-        const dateFormats = validCols.map((c) => c.dateFormat ?? "").join(",");
+        /* 사용자정의 모드 여부 — extraColumns가 undefined가 아니면(빈 배열 포함) 사용자정의 모드로 간주.
+               사용자정의 모드는 "기존 테이블 컬럼 뒤에 이어붙이는 것"이 아니라 "새로 판을 짜는 것"이므로
+               테이블 컬럼(validCols)을 완전히 무시하고 extraColumns만으로 export를 구성한다.
+               (extraColumns가 빈 배열이면 컬럼 0개로 export — 테이블 컬럼으로 폴백하지 않는다) */
+        const isCustomMode = extraColumns !== undefined;
 
+        let headers = "";
+        let keys = "";
+        let dateFormats = "";
         /* 공통코드 연동 컬럼 → 엑셀 export용 코드값→라벨 딕셔너리 구성
                (accessor를 key로, 해당 공통코드 그룹의 details 전체를 code→label 사전으로 매핑 —
                 화면(TableCellRenderer/FieldRenderer)과 동일한 라벨 산출 규칙(codeDetailToLabel)을 그대로 재사용) */
         const codeMaps: Record<string, Record<string, string>> = {};
-        validCols.forEach((c) => {
-          if (!c.codeGroupCode || c.displayAs === "value") return;
-          const details = codeGroups.find((g) => g.groupCode === c.codeGroupCode)?.details ?? [];
-          if (details.length === 0) return;
-          codeMaps[c.accessor] = Object.fromEntries(details.map((d) => [d.code, codeDetailToLabel(d, t)]));
-        });
+
+        if (isCustomMode) {
+          /* 사용자정의 모드 — extraColumns만으로 headers/keys/dateFormats 구성 (테이블 컬럼 무시) */
+          headers = extraColumns.map((c) => (c.headerMsgKey ? t(c.headerMsgKey) : c.header)).join(",");
+          keys = extraColumns.map((c) => c.accessor).join(",");
+          dateFormats = extraColumns.map((c) => c.dateFormat ?? "").join(",");
+          /* 사용자정의 컬럼 목록에는 codeGroupCode 개념 자체가 없으므로 codeMaps는 항상 빈 객체 */
+        } else {
+          /* 데이터테이블 모드 — 기존과 동일하게 테이블 컬럼(validCols) 그대로 사용 */
+          /* actions 타입 컬럼 제외 — 데이터 컬럼만 추출 */
+          const validCols = tableWidget.columns.filter((c) => c.cellType !== "actions");
+          /* headerMsgKey가 있으면 번역 텍스트 사용 — header가 빈 문자열일 때 Java split trailing 제거 방지 */
+          headers = validCols.map((c) => (c.headerMsgKey ? t(c.headerMsgKey) : c.header)).join(",");
+          keys = validCols.map((c) => c.accessor).join(",");
+          /* 날짜 포맷 — 포맷 없는 컬럼은 빈 문자열, keys 순서와 일치 */
+          dateFormats = validCols.map((c) => c.dateFormat ?? "").join(",");
+
+          validCols.forEach((c) => {
+            if (!c.codeGroupCode || c.displayAs === "value") return;
+            const details = codeGroups.find((g) => g.groupCode === c.codeGroupCode)?.details ?? [];
+            if (details.length === 0) return;
+            codeMaps[c.accessor] = Object.fromEntries(details.map((d) => [d.code, codeDetailToLabel(d, t)]));
+          });
+        }
 
         /* 현재 검색 조건 포함 — page/size 제외 (export는 전체 데이터) */
         const searchQuery = { ...currentSearchParams };
@@ -562,6 +596,8 @@ export function WidgetRenderer({
             ...(reason ? { reason } : {}),
             /* 공통코드 매핑이 있는 컬럼이 하나도 없으면 파라미터 자체를 생략 */
             ...(Object.keys(codeMaps).length ? { codeMaps: JSON.stringify(codeMaps) } : {}),
+            /* JOIN relation ID — entity 모드는 page_data 전용 기능이라 제외 */
+            ...(!isEntity && relationIds?.length ? { relationIds: relationIds.join(",") } : {}),
             ...searchQuery,
           },
           responseType: "blob",
@@ -589,13 +625,20 @@ export function WidgetRenderer({
    * - privacyPopup=false/undefined 시 바로 다운로드
    */
   const handleExcelDownload = useCallback(
-    (tableWidgetId: string, privacyPopup?: boolean) => {
+    (
+      tableWidgetId: string,
+      privacyPopup?: boolean,
+      relationIds?: number[],
+      extraColumns?: SearchFieldConfig["excelExtraColumns"]
+    ) => {
       if (privacyPopup) {
         setPendingTableWidgetId(tableWidgetId);
+        setPendingExcelRelationIds(relationIds);
+        setPendingExcelExtraColumns(extraColumns);
         setShowPrivacyModal(true);
         return;
       }
-      doExcelDownload(tableWidgetId);
+      doExcelDownload(tableWidgetId, undefined, relationIds, extraColumns);
     },
     [doExcelDownload]
   );
@@ -605,11 +648,13 @@ export function WidgetRenderer({
     async (reason: string) => {
       setShowPrivacyModal(false);
       if (pendingTableWidgetId) {
-        await doExcelDownload(pendingTableWidgetId, reason);
+        await doExcelDownload(pendingTableWidgetId, reason, pendingExcelRelationIds, pendingExcelExtraColumns);
         setPendingTableWidgetId(null);
+        setPendingExcelRelationIds(undefined);
+        setPendingExcelExtraColumns(undefined);
       }
     },
-    [pendingTableWidgetId, doExcelDownload]
+    [pendingTableWidgetId, pendingExcelRelationIds, pendingExcelExtraColumns, doExcelDownload]
   );
 
   /* ── 팝업 닫기 ── */
@@ -1039,11 +1084,13 @@ export function WidgetRenderer({
       /* 유효성 검사 — cross-form hideCondition 평가를 위해 팝업 내 통합 values/keyToId 구성 */
       const popupAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
       const popupAllKeyToId: Record<string, string> = {};
+      const popupAllFieldLabels: Record<string, string> = {};
       saveFormContents.forEach((fc) => {
         const fw = fc.widget as unknown as import("../builder/FormBuilder").FormWidget;
         (fw?.fields ?? []).forEach((f) => {
           if (!f.fieldKey) return;
           popupAllKeyToId[f.fieldKey] = f.id;
+          popupAllFieldLabels[f.fieldKey] = String((f.labelMsgKey && t ? t(f.labelMsgKey) : f.label) || f.fieldKey);
           /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 */
           if (fw.contentKey) popupAllKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
         });
@@ -1076,7 +1123,18 @@ export function WidgetRenderer({
         title?: string;
         columns?: import("./types").SubListColumn[];
       }>;
-      if (!validateSubListRows(subWidgetsForValidation, popupSubListRowsMap, popupSubListFileMap, t)) return;
+      if (
+        !validateSubListRows(
+          subWidgetsForValidation,
+          popupSubListRowsMap,
+          popupSubListFileMap,
+          popupAllFormValues,
+          popupAllKeyToId,
+          popupAllFieldLabels,
+          t
+        )
+      )
+        return;
 
       setPopupSaving(true);
       try {

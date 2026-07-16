@@ -208,6 +208,10 @@ export interface SubListColumn {
   optionOrderKey?: string;
   /** SLUG 데이터 정렬 방향 (ASC / DESC) */
   optionOrderDir?: "ASC" | "DESC";
+  /* ── date/dateRange 필드간 대소비교 검증 — 콤마구분 단일 표현식 (types.ts SearchFieldConfig.compareExpr와 동일 문법) ──
+   *   [part]연산자$대상fieldKey[_from|_to] 를 콤마(,)로 나열(AND)
+   * @example "<$endDate,<$dueDate" / "to<$endDate_from" */
+  compareExpr?: string;
 }
 
 /**

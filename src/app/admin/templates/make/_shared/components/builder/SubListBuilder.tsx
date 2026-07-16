@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * SubListBuilder — 서브 목록(SubList) 위젯 설정 빌더 공통 컴포넌트
@@ -15,71 +15,78 @@
  *   <SubListBuilder widget={subListWidget} onChange={setSubListWidget} />
  */
 
-import React, { useState, useEffect } from 'react';
-import api from '@/lib/api';
-import type { CodeGroupDef, TableColumnConfig } from '../../types';
-import { Plus, GripVertical, Pencil, X } from 'lucide-react';
-import { MessageKeySelector } from '@/components/i18n/message-key-selector';
-import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
-import { useI18n } from '@/hooks/use-i18n';
+import React, { useState, useEffect } from "react";
+import api from "@/lib/api";
+import type { CodeGroupDef, TableColumnConfig } from "../../types";
+import { Plus, GripVertical, Pencil, X } from "lucide-react";
+import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { useBuilderI18nMode } from "../../contexts/BuilderI18nModeContext";
+import { useI18n } from "@/hooks/use-i18n";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
 import {
-    DndContext, closestCenter, KeyboardSensor, PointerSensor,
-    useSensor, useSensors,
-} from '@dnd-kit/core';
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { LABEL_CLS, INPUT_CLS } from "./fields/_FieldBase";
+import { ToggleRow } from "./fields/_ToggleRow";
+import { FieldPickerTypeList, FieldTypeItem } from "../FieldPickerTypeList";
 import {
-    arrayMove, SortableContext, sortableKeyboardCoordinates,
-    useSortable, verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { LABEL_CLS, INPUT_CLS } from './fields/_FieldBase';
-import { ToggleRow } from './fields/_ToggleRow';
-import { FieldPickerTypeList, FieldTypeItem } from '../FieldPickerTypeList';
-import {
-    InputField, SelectField, RadioField, CheckboxField,
-    DateField, DateRangeField,
-    FormTextareaField, FileField, ImageField,
-    SlugSelectField,
-} from './fields';
-import { ActionsField } from './fields/ActionsField';
-import type { FieldEditValues } from './fields/types';
-import type { SlugOption } from './fields';
-import { createIdGenerator } from '../../utils';
-import type { SubListWidget, SubListColumn, SubListColumnType } from '../renderer/types';
-import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
-import { getConnFieldOptions, resolveEntityId, type ConnMode } from './connFieldOptions';
-import { useEntityFields } from '../../hooks/useEntityFields';
+  InputField,
+  SelectField,
+  RadioField,
+  CheckboxField,
+  DateField,
+  DateRangeField,
+  FormTextareaField,
+  FileField,
+  ImageField,
+  SlugSelectField,
+} from "./fields";
+import { ActionsField } from "./fields/ActionsField";
+import type { FieldEditValues } from "./fields/types";
+import type { SlugOption } from "./fields";
+import { createIdGenerator } from "../../utils";
+import type { SubListWidget, SubListColumn, SubListColumnType } from "../renderer/types";
+import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
+import { getConnFieldOptions, resolveEntityId, type ConnMode } from "./connFieldOptions";
+import { useEntityFields } from "../../hooks/useEntityFields";
 
-const uid = createIdGenerator('slc');
+const uid = createIdGenerator("slc");
 
 /* ── FieldPickerTypeList에 전달할 컬럼 타입 목록 ── */
 const SUBLIST_COLUMN_TYPES: FieldTypeItem[] = [
-    { type: 'input',     label: 'Input',      desc: '텍스트 입력' },
-    { type: 'select',    label: 'Select',     desc: '셀렉트 박스' },
-    { type: 'radio',     label: 'Radio',      desc: '라디오 단일선택' },
-    { type: 'checkbox',  label: 'Checkbox',   desc: '체크박스 복수선택' },
-    { type: 'date',      label: 'Date',       desc: '날짜 단독' },
-    { type: 'dateRange', label: 'Date Range', desc: '날짜 범위 (from~to)' },
-    { type: 'textarea',  label: 'Textarea',   desc: '여러 줄 텍스트' },
-    { type: 'file',      label: 'File',       desc: '파일 첨부' },
-    { type: 'image',     label: 'Image',      desc: '이미지 업로드' },
-    { type: 'action',    label: 'Action',     desc: '액션 버튼 (복사)' },
+  { type: "input", label: "Input", desc: "텍스트 입력" },
+  { type: "select", label: "Select", desc: "셀렉트 박스" },
+  { type: "radio", label: "Radio", desc: "라디오 단일선택" },
+  { type: "checkbox", label: "Checkbox", desc: "체크박스 복수선택" },
+  { type: "date", label: "Date", desc: "날짜 단독" },
+  { type: "dateRange", label: "Date Range", desc: "날짜 범위 (from~to)" },
+  { type: "textarea", label: "Textarea", desc: "여러 줄 텍스트" },
+  { type: "file", label: "File", desc: "파일 첨부" },
+  { type: "image", label: "Image", desc: "이미지 업로드" },
+  { type: "action", label: "Action", desc: "액션 버튼 (복사)" },
 ];
 
 interface SubListBuilderProps {
-    widget: SubListWidget;
-    onChange: (w: SubListWidget) => void;
-    slugOptions: SlugOption[];
-    /** @deprecated 더 이상 SubListBuilder 내부에서 직접 사용하지 않음 — widget.connectedSlug(이 SubList의 연결 Entity) 기준으로
-     *  useEntityFields 훅을 통해 자체적으로 재조회한다(contentEntityFields). CommonBuilderDispatcher 호환을 위해 타입만 유지. */
-    slugEntityFields?: SlugEntityFieldItem[];
-    /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
-    connLabel?: string;
-    /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
-    connDefaultSlug?: string;
-    /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
-    connMode?: ConnMode;
-    /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
-    dataEntityOptions?: SlugOption[];
+  widget: SubListWidget;
+  onChange: (w: SubListWidget) => void;
+  slugOptions: SlugOption[];
+  /** @deprecated 더 이상 SubListBuilder 내부에서 직접 사용하지 않음 — widget.connectedSlug(이 SubList의 연결 Entity) 기준으로
+   *  useEntityFields 훅을 통해 자체적으로 재조회한다(contentEntityFields). CommonBuilderDispatcher 호환을 위해 타입만 유지. */
+  slugEntityFields?: SlugEntityFieldItem[];
+  /** "연결 Slug" 필드의 라벨 override — entity/data 연결 모드일 때 "연결 Entity"로 표시 */
+  connLabel?: string;
+  /** "연결 Slug" 필드의 기본값 — entity/data 연결 모드일 때 선택된 연결 Entity(slug) 값 */
+  connDefaultSlug?: string;
+  /** "연결 Slug" 필드가 따를 연결 모드 — 'entity'면 entity 연결된 slug만, 'data'면 dataEntityOptions를 옵션으로 사용 */
+  connMode?: ConnMode;
+  /** Data Entity 타입 전용 — connMode==='data'일 때 "연결 Slug" 옵션 소스 */
+  dataEntityOptions?: SlugOption[];
 }
 
 /* ══════════════════════════════════════════════════════════════ */
@@ -92,67 +99,69 @@ interface SubListBuilderProps {
  * colSpan/rowSpan은 SubList에 개념이 없어 더미값(1) 전달.
  */
 function toFieldValues(col: SubListColumn): FieldEditValues {
-    return {
-        label:            col.label,
-        labelMsgKey:      col.labelMsgKey,
-        label2:           col.label2,
-        label2MsgKey:     col.label2MsgKey,
-        fieldKey:         col.key,
-        fieldKey2:        col.key2,
-        colSpan:          1,
-        rowSpan:          1,
-        placeholder:      col.placeholder,
-        placeholderMsgKey: col.placeholderMsgKey,
-        description:      col.description,
-        descriptionMsgKey: col.descriptionMsgKey,
-        required:         col.required,
-        readonly:         col.readonly,
-        options:          col.options,
-        codeGroupCode:    col.codeGroup,
-        displayAs:        col.displayAs,
-        /* 파일 */
-        maxFileCount:     col.maxFileCount,
-        maxFileSizeMB:    col.maxFileSizeMB,
-        maxTotalSizeMB:   col.maxTotalSizeMB,
-        fileTypeMode:     col.fileTypeMode as FieldEditValues['fileTypeMode'],
-        allowedExtensions: col.allowedExtensions,
-        /* 유효성검사 */
-        minLength:        col.minLength,
-        maxLength:        col.maxLength,
-        showCharCount:    col.showCharCount,
-        pattern:          col.pattern,
-        patternDesc:      col.patternDesc,
-        /* 기본값 */
-        defaultValue:       col.defaultValue,
-        defaultValueMsgKey: col.defaultValueMsgKey,
-        defaultOptionValue: col.defaultOptionValue,
-        /* date */
-        defaultDateOffset: col.defaultDateOffset,
-        defaultDate:       col.defaultDate,
-        disablePast:       col.disablePast,
-        defaultToday:      col.defaultToday,
-        dateSubType:       col.dateSubType,
-        /* dateRange */
-        defaultStartDateOffset: col.defaultStartDateOffset,
-        defaultStartDate:       col.defaultStartDate,
-        disableStartPast:       col.disableStartPast,
-        defaultStartToday:      col.defaultStartToday,
-        defaultEndDateOffset:   col.defaultEndDateOffset,
-        defaultEndDate:         col.defaultEndDate,
-        disableEndPast:         col.disableEndPast,
-        defaultEndToday:        col.defaultEndToday,
-        rangeSubType:           col.rangeSubType,
-        /* action */
-        actions: col.actions as FieldEditValues['actions'],
-        /* select 표시 방식 */
-        selectType:      col.selectType,
-        /* select SLUG 옵션 소스 */
-        optionSlug:      col.optionSlug,
-        optionValueKey:  col.optionValueKey,
-        optionTextKey:   col.optionTextKey,
-        optionOrderKey:  col.optionOrderKey,
-        optionOrderDir:  col.optionOrderDir,
-    };
+  return {
+    label: col.label,
+    labelMsgKey: col.labelMsgKey,
+    label2: col.label2,
+    label2MsgKey: col.label2MsgKey,
+    fieldKey: col.key,
+    fieldKey2: col.key2,
+    colSpan: 1,
+    rowSpan: 1,
+    placeholder: col.placeholder,
+    placeholderMsgKey: col.placeholderMsgKey,
+    description: col.description,
+    descriptionMsgKey: col.descriptionMsgKey,
+    required: col.required,
+    readonly: col.readonly,
+    options: col.options,
+    codeGroupCode: col.codeGroup,
+    displayAs: col.displayAs,
+    /* 파일 */
+    maxFileCount: col.maxFileCount,
+    maxFileSizeMB: col.maxFileSizeMB,
+    maxTotalSizeMB: col.maxTotalSizeMB,
+    fileTypeMode: col.fileTypeMode as FieldEditValues["fileTypeMode"],
+    allowedExtensions: col.allowedExtensions,
+    /* 유효성검사 */
+    minLength: col.minLength,
+    maxLength: col.maxLength,
+    showCharCount: col.showCharCount,
+    pattern: col.pattern,
+    patternDesc: col.patternDesc,
+    /* 기본값 */
+    defaultValue: col.defaultValue,
+    defaultValueMsgKey: col.defaultValueMsgKey,
+    defaultOptionValue: col.defaultOptionValue,
+    /* date */
+    defaultDateOffset: col.defaultDateOffset,
+    defaultDate: col.defaultDate,
+    disablePast: col.disablePast,
+    defaultToday: col.defaultToday,
+    dateSubType: col.dateSubType,
+    /* dateRange */
+    defaultStartDateOffset: col.defaultStartDateOffset,
+    defaultStartDate: col.defaultStartDate,
+    disableStartPast: col.disableStartPast,
+    defaultStartToday: col.defaultStartToday,
+    defaultEndDateOffset: col.defaultEndDateOffset,
+    defaultEndDate: col.defaultEndDate,
+    disableEndPast: col.disableEndPast,
+    defaultEndToday: col.defaultEndToday,
+    rangeSubType: col.rangeSubType,
+    /* action */
+    actions: col.actions as FieldEditValues["actions"],
+    /* select 표시 방식 */
+    selectType: col.selectType,
+    /* select SLUG 옵션 소스 */
+    optionSlug: col.optionSlug,
+    optionValueKey: col.optionValueKey,
+    optionTextKey: col.optionTextKey,
+    optionOrderKey: col.optionOrderKey,
+    optionOrderDir: col.optionOrderDir,
+    /* date/dateRange 필드간 대소비교 검증 (콤마구분 단일 표현식) */
+    compareExpr: col.compareExpr,
+  };
 }
 
 /**
@@ -161,65 +170,68 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
  * colSpan/rowSpan 변경은 SubList에 적용 없으므로 무시.
  */
 function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColumn> {
-    const patch: Partial<SubListColumn> = {};
-    if (updates.label             !== undefined) patch.label             = updates.label;
-    if (updates.labelMsgKey       !== undefined) patch.labelMsgKey       = updates.labelMsgKey;
-    if (updates.label2            !== undefined) patch.label2            = updates.label2;
-    if (updates.label2MsgKey      !== undefined) patch.label2MsgKey      = updates.label2MsgKey;
-    if (updates.fieldKey          !== undefined) patch.key               = updates.fieldKey;
-    if (updates.fieldKey2         !== undefined) patch.key2              = updates.fieldKey2;
-    if (updates.placeholder       !== undefined) patch.placeholder       = updates.placeholder;
-    if (updates.placeholderMsgKey !== undefined) patch.placeholderMsgKey = updates.placeholderMsgKey;
-    if (updates.description       !== undefined) patch.description       = updates.description;
-    if (updates.descriptionMsgKey !== undefined) patch.descriptionMsgKey = updates.descriptionMsgKey;
-    if (updates.required          !== undefined) patch.required          = updates.required;
-    if (updates.readonly          !== undefined) patch.readonly          = updates.readonly;
-    if (updates.options           !== undefined) patch.options           = updates.options;
-    if (updates.codeGroupCode     !== undefined) patch.codeGroup         = updates.codeGroupCode;
-    if (updates.displayAs         !== undefined) patch.displayAs         = updates.displayAs;
-    /* 파일 */
-    if (updates.maxFileCount      !== undefined) patch.maxFileCount      = updates.maxFileCount;
-    if (updates.maxFileSizeMB     !== undefined) patch.maxFileSizeMB     = updates.maxFileSizeMB;
-    if (updates.maxTotalSizeMB    !== undefined) patch.maxTotalSizeMB    = updates.maxTotalSizeMB;
-    if (updates.fileTypeMode      !== undefined) patch.fileTypeMode      = updates.fileTypeMode;
-    if (updates.allowedExtensions !== undefined) patch.allowedExtensions = updates.allowedExtensions;
-    /* 유효성검사 */
-    if (updates.minLength         !== undefined) patch.minLength         = updates.minLength;
-    if (updates.maxLength         !== undefined) patch.maxLength         = updates.maxLength;
-    if (updates.showCharCount     !== undefined) patch.showCharCount     = updates.showCharCount;
-    if (updates.pattern           !== undefined) patch.pattern           = updates.pattern;
-    if (updates.patternDesc       !== undefined) patch.patternDesc       = updates.patternDesc;
-    /* 기본값 */
-    if (updates.defaultValue       !== undefined) patch.defaultValue       = updates.defaultValue;
-    if (updates.defaultValueMsgKey !== undefined) patch.defaultValueMsgKey = updates.defaultValueMsgKey;
-    if (updates.defaultOptionValue !== undefined) patch.defaultOptionValue = updates.defaultOptionValue;
-    /* date */
-    if (updates.defaultDateOffset  !== undefined) patch.defaultDateOffset  = updates.defaultDateOffset;
-    if (updates.defaultDate        !== undefined) patch.defaultDate        = updates.defaultDate;
-    if (updates.disablePast        !== undefined) patch.disablePast        = updates.disablePast;
-    if (updates.defaultToday       !== undefined) patch.defaultToday       = updates.defaultToday;
-    if (updates.dateSubType        !== undefined) patch.dateSubType        = updates.dateSubType;
-    /* dateRange */
-    if (updates.defaultStartDateOffset !== undefined) patch.defaultStartDateOffset = updates.defaultStartDateOffset;
-    if (updates.defaultStartDate       !== undefined) patch.defaultStartDate       = updates.defaultStartDate;
-    if (updates.disableStartPast       !== undefined) patch.disableStartPast       = updates.disableStartPast;
-    if (updates.defaultStartToday      !== undefined) patch.defaultStartToday      = updates.defaultStartToday;
-    if (updates.defaultEndDateOffset   !== undefined) patch.defaultEndDateOffset   = updates.defaultEndDateOffset;
-    if (updates.defaultEndDate         !== undefined) patch.defaultEndDate         = updates.defaultEndDate;
-    if (updates.disableEndPast         !== undefined) patch.disableEndPast         = updates.disableEndPast;
-    if (updates.defaultEndToday        !== undefined) patch.defaultEndToday        = updates.defaultEndToday;
-    if (updates.rangeSubType           !== undefined) patch.rangeSubType           = updates.rangeSubType;
-    /* action */
-    if (updates.actions                !== undefined) patch.actions                = updates.actions as ('copy')[];
-    /* select 표시 방식 */
-    if (updates.selectType             !== undefined) patch.selectType             = updates.selectType;
-    /* select SLUG 옵션 소스 */
-    if (updates.optionSlug             !== undefined) patch.optionSlug             = updates.optionSlug;
-    if (updates.optionValueKey         !== undefined) patch.optionValueKey         = updates.optionValueKey;
-    if (updates.optionTextKey          !== undefined) patch.optionTextKey          = updates.optionTextKey;
-    if (updates.optionOrderKey         !== undefined) patch.optionOrderKey         = updates.optionOrderKey;
-    if (updates.optionOrderDir         !== undefined) patch.optionOrderDir         = updates.optionOrderDir;
-    return patch;
+  const patch: Partial<SubListColumn> = {};
+  if (updates.label !== undefined) patch.label = updates.label;
+  if (updates.labelMsgKey !== undefined) patch.labelMsgKey = updates.labelMsgKey;
+  if (updates.label2 !== undefined) patch.label2 = updates.label2;
+  if (updates.label2MsgKey !== undefined) patch.label2MsgKey = updates.label2MsgKey;
+  if (updates.fieldKey !== undefined) patch.key = updates.fieldKey;
+  if (updates.fieldKey2 !== undefined) patch.key2 = updates.fieldKey2;
+  if (updates.placeholder !== undefined) patch.placeholder = updates.placeholder;
+  if (updates.placeholderMsgKey !== undefined) patch.placeholderMsgKey = updates.placeholderMsgKey;
+  if (updates.description !== undefined) patch.description = updates.description;
+  if (updates.descriptionMsgKey !== undefined) patch.descriptionMsgKey = updates.descriptionMsgKey;
+  if (updates.required !== undefined) patch.required = updates.required;
+  if (updates.readonly !== undefined) patch.readonly = updates.readonly;
+  if (updates.options !== undefined) patch.options = updates.options;
+  if (updates.codeGroupCode !== undefined) patch.codeGroup = updates.codeGroupCode;
+  if (updates.displayAs !== undefined) patch.displayAs = updates.displayAs;
+  /* 파일 */
+  if (updates.maxFileCount !== undefined) patch.maxFileCount = updates.maxFileCount;
+  if (updates.maxFileSizeMB !== undefined) patch.maxFileSizeMB = updates.maxFileSizeMB;
+  if (updates.maxTotalSizeMB !== undefined) patch.maxTotalSizeMB = updates.maxTotalSizeMB;
+  if (updates.fileTypeMode !== undefined) patch.fileTypeMode = updates.fileTypeMode;
+  if (updates.allowedExtensions !== undefined) patch.allowedExtensions = updates.allowedExtensions;
+  /* 유효성검사 */
+  if (updates.minLength !== undefined) patch.minLength = updates.minLength;
+  if (updates.maxLength !== undefined) patch.maxLength = updates.maxLength;
+  if (updates.showCharCount !== undefined) patch.showCharCount = updates.showCharCount;
+  if (updates.pattern !== undefined) patch.pattern = updates.pattern;
+  if (updates.patternDesc !== undefined) patch.patternDesc = updates.patternDesc;
+  /* 기본값 */
+  if (updates.defaultValue !== undefined) patch.defaultValue = updates.defaultValue;
+  if (updates.defaultValueMsgKey !== undefined) patch.defaultValueMsgKey = updates.defaultValueMsgKey;
+  if (updates.defaultOptionValue !== undefined) patch.defaultOptionValue = updates.defaultOptionValue;
+  /* date */
+  if (updates.defaultDateOffset !== undefined) patch.defaultDateOffset = updates.defaultDateOffset;
+  if (updates.defaultDate !== undefined) patch.defaultDate = updates.defaultDate;
+  if (updates.disablePast !== undefined) patch.disablePast = updates.disablePast;
+  if (updates.defaultToday !== undefined) patch.defaultToday = updates.defaultToday;
+  if (updates.dateSubType !== undefined) patch.dateSubType = updates.dateSubType;
+  /* dateRange */
+  if (updates.defaultStartDateOffset !== undefined) patch.defaultStartDateOffset = updates.defaultStartDateOffset;
+  if (updates.defaultStartDate !== undefined) patch.defaultStartDate = updates.defaultStartDate;
+  if (updates.disableStartPast !== undefined) patch.disableStartPast = updates.disableStartPast;
+  if (updates.defaultStartToday !== undefined) patch.defaultStartToday = updates.defaultStartToday;
+  if (updates.defaultEndDateOffset !== undefined) patch.defaultEndDateOffset = updates.defaultEndDateOffset;
+  if (updates.defaultEndDate !== undefined) patch.defaultEndDate = updates.defaultEndDate;
+  if (updates.disableEndPast !== undefined) patch.disableEndPast = updates.disableEndPast;
+  if (updates.defaultEndToday !== undefined) patch.defaultEndToday = updates.defaultEndToday;
+  if (updates.rangeSubType !== undefined) patch.rangeSubType = updates.rangeSubType;
+  /* action */
+  if (updates.actions !== undefined) patch.actions = updates.actions as "copy"[];
+  /* select 표시 방식 */
+  if (updates.selectType !== undefined) patch.selectType = updates.selectType;
+  /* select SLUG 옵션 소스 */
+  if (updates.optionSlug !== undefined) patch.optionSlug = updates.optionSlug;
+  if (updates.optionValueKey !== undefined) patch.optionValueKey = updates.optionValueKey;
+  if (updates.optionTextKey !== undefined) patch.optionTextKey = updates.optionTextKey;
+  if (updates.optionOrderKey !== undefined) patch.optionOrderKey = updates.optionOrderKey;
+  if (updates.optionOrderDir !== undefined) patch.optionOrderDir = updates.optionOrderDir;
+  /* date/dateRange 필드간 대소비교 검증 — 입력값을 비우면(빈 문자열) 명시적으로 undefined를 보내 초기화해야 하므로
+       다른 항목과 달리 `!== undefined` 대신 `in` 체크로 "값이 아예 안 왔는지"만 구분한다 */
+  if ("compareExpr" in updates) patch.compareExpr = updates.compareExpr;
+  return patch;
 }
 
 /* ══════════════════════════════════════════ */
@@ -227,97 +239,96 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
 /* ══════════════════════════════════════════ */
 
 function SortableColumnItem({
-    col, idx, isEditing, onToggleEdit, onRemove, children,
+  col,
+  idx,
+  isEditing,
+  onToggleEdit,
+  onRemove,
+  children,
 }: {
-    col: SubListColumn;
-    idx: number;
-    isEditing: boolean;
-    onToggleEdit: () => void;
-    onRemove: () => void;
-    children: React.ReactNode;
+  col: SubListColumn;
+  idx: number;
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  onRemove: () => void;
+  children: React.ReactNode;
 }) {
-    const {
-        attributes, listeners, setNodeRef, setActivatorNodeRef,
-        transform, transition, isDragging,
-    } = useSortable({ id: col.id });
-    const { t } = useI18n();
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: col.id,
+  });
+  const { t } = useI18n();
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
-    /* 컬럼 타입별 배지 색상 */
-    const typeBadgeCls: Record<SubListColumnType, string> = {
-        input:     'bg-blue-50 text-blue-600',
-        select:    'bg-purple-50 text-purple-600',
-        radio:     'bg-indigo-50 text-indigo-600',
-        checkbox:  'bg-cyan-50 text-cyan-600',
-        date:      'bg-green-50 text-green-600',
-        dateRange: 'bg-teal-50 text-teal-600',
-        textarea:  'bg-amber-50 text-amber-600',
-        file:      'bg-orange-50 text-orange-600',
-        image:     'bg-pink-50 text-pink-600',
-        action:    'bg-slate-100 text-slate-600',
-    };
+  /* 컬럼 타입별 배지 색상 */
+  const typeBadgeCls: Record<SubListColumnType, string> = {
+    input: "bg-blue-50 text-blue-600",
+    select: "bg-purple-50 text-purple-600",
+    radio: "bg-indigo-50 text-indigo-600",
+    checkbox: "bg-cyan-50 text-cyan-600",
+    date: "bg-green-50 text-green-600",
+    dateRange: "bg-teal-50 text-teal-600",
+    textarea: "bg-amber-50 text-amber-600",
+    file: "bg-orange-50 text-orange-600",
+    image: "bg-pink-50 text-pink-600",
+    action: "bg-slate-100 text-slate-600",
+  };
 
-    return (
-        <div
-            ref={setNodeRef} style={style}
-            className={`border rounded-md overflow-hidden bg-white transition-all ${isEditing ? 'border-slate-900 shadow-md' : 'border-slate-200'}`}
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`border rounded-md overflow-hidden bg-white transition-all ${isEditing ? "border-slate-900 shadow-md" : "border-slate-200"}`}
+    >
+      {/* 컬럼 헤더 */}
+      <div
+        className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none bg-slate-50"
+        onClick={onToggleEdit}
+      >
+        {/* 드래그 핸들 */}
+        <span
+          ref={setActivatorNodeRef}
+          {...listeners}
+          {...attributes}
+          className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors p-1"
+          onClick={(e) => e.stopPropagation()}
         >
-            {/* 컬럼 헤더 */}
-            <div
-                className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none bg-slate-50"
-                onClick={onToggleEdit}
-            >
-                {/* 드래그 핸들 */}
-                <span
-                    ref={setActivatorNodeRef}
-                    {...listeners}
-                    {...attributes}
-                    className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors p-1"
-                    onClick={e => e.stopPropagation()}
-                >
-                    <GripVertical className="w-3.5 h-3.5" />
-                </span>
+          <GripVertical className="w-3.5 h-3.5" />
+        </span>
 
-                {/* 순번 + 타입 배지 + 라벨(key) */}
-                <span className="text-[10px] text-slate-400 font-medium w-4">{idx + 1}</span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${typeBadgeCls[col.type]}`}>
-                    {col.type}
-                </span>
-                <span className="text-xs text-slate-700 flex-1 truncate">
-                    {col.labelMsgKey ? t(col.labelMsgKey) : (col.label || <span className="text-slate-300 italic">라벨 없음</span>)}
-                    {col.key && <span className="ml-1.5 text-[10px] text-slate-400">({col.key})</span>}
-                </span>
+        {/* 순번 + 타입 배지 + 라벨(key) */}
+        <span className="text-[10px] text-slate-400 font-medium w-4">{idx + 1}</span>
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${typeBadgeCls[col.type]}`}>{col.type}</span>
+        <span className="text-xs text-slate-700 flex-1 truncate">
+          {col.labelMsgKey ? t(col.labelMsgKey) : col.label || <span className="text-slate-300 italic">라벨 없음</span>}
+          {col.key && <span className="ml-1.5 text-[10px] text-slate-400">({col.key})</span>}
+        </span>
 
-                {/* 편집·삭제 버튼 */}
-                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                    <button
-                        onClick={onToggleEdit}
-                        className={`p-1 rounded transition-colors ${isEditing ? 'text-slate-900 bg-white/50' : 'text-slate-400 hover:text-blue-500'}`}
-                    >
-                        <Pencil className="w-3 h-3" />
-                    </button>
-                    <button
-                        onClick={onRemove}
-                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
-                    >
-                        <X className="w-3 h-3" />
-                    </button>
-                </div>
-            </div>
-
-            {/* 편집 패널 (Accordion) */}
-            {isEditing && (
-                <div className="p-3 border-t border-slate-100 space-y-3">
-                    {children}
-                </div>
-            )}
+        {/* 편집·삭제 버튼 */}
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={onToggleEdit}
+            className={`p-1 rounded transition-colors ${isEditing ? "text-slate-900 bg-white/50" : "text-slate-400 hover:text-blue-500"}`}
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onRemove}
+            className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
-    );
+      </div>
+
+      {/* 편집 패널 (Accordion) */}
+      {isEditing && <div className="p-3 border-t border-slate-100 space-y-3">{children}</div>}
+    </div>
+  );
 }
 
 /* ══════════════════════════════════════════ */
@@ -325,295 +336,325 @@ function SortableColumnItem({
 /* ══════════════════════════════════════════ */
 
 function ColumnEditPanel({
-    col, onChange, codeGroups, codeGroupsLoading, slugOptions, slugEntityFields,
+  col,
+  columns,
+  onChange,
+  codeGroups,
+  codeGroupsLoading,
+  slugOptions,
+  slugEntityFields,
 }: {
-    col: SubListColumn;
-    onChange: (patch: Partial<SubListColumn>) => void;
-    codeGroups: CodeGroupDef[];
-    codeGroupsLoading: boolean;
-    /** SLUG 옵션 소스 목록 — select 컬럼의 SLUG 탭 옵션 선택에 사용 */
-    slugOptions: { id: number; slug: string; name: string }[];
-    /** Slug Entity 필드 목록 — 있으면 컬럼 Key 입력이 selectbox로 전환됨 (widget 빌더 전용) */
-    slugEntityFields?: SlugEntityFieldItem[];
+  col: SubListColumn;
+  /** 이 SubList의 전체 컬럼 목록 — date/dateRange "필드간 검증" 대상 후보 계산에 사용 */
+  columns: SubListColumn[];
+  onChange: (patch: Partial<SubListColumn>) => void;
+  codeGroups: CodeGroupDef[];
+  codeGroupsLoading: boolean;
+  /** SLUG 옵션 소스 목록 — select 컬럼의 SLUG 탭 옵션 선택에 사용 */
+  slugOptions: { id: number; slug: string; name: string }[];
+  /** Slug Entity 필드 목록 — 있으면 컬럼 Key 입력이 selectbox로 전환됨 (widget 빌더 전용) */
+  slugEntityFields?: SlugEntityFieldItem[];
 }) {
-    const values = toFieldValues(col);
-    const handleChange = (updates: Partial<FieldEditValues>) =>
-        onChange(fromFieldValues(updates));
+  const values = toFieldValues(col);
+  const handleChange = (updates: Partial<FieldEditValues>) => onChange(fromFieldValues(updates));
 
-    /* 모든 공통 필드 컴포넌트에 전달하는 공통 props */
-    const commonProps = {
-        values,
-        onChange: handleChange,
-        colSpanMode: { type: 'input' as const, min: 1, max: 12 },
-        codeGroups,
-        codeGroupsLoading,
-        hideColSpan: true,           // SubList 컬럼은 colSpan 개념 없음 — ColSpan 입력란 숨김
-        hideConditionFields: true,   // SubList 렌더러는 동적 조건 미지원 — HIDE/Disable 조건 입력란 숨김
-        slugEntityFields,            // Key 입력 selectbox 전환 (_FieldBase가 자동 처리)
-    };
+  /* date/dateRange 필드간 검증(compareExpr) 대상 후보 존재 여부 — "필드간 검증" 입력란 노출 여부에만 사용
+       (compareExpr은 자유 텍스트 입력이라 select는 없음, 같은 SubList 내 자기 자신을 제외한 date·dateRange 컬럼이 하나라도 있는지 확인) */
+  const hasCompareCandidates = columns.some(
+    (other) => other.id !== col.id && other.key && (other.type === "date" || other.type === "dateRange")
+  );
 
-    return (
-        <div className="space-y-3">
-            {/* 타입별 공통 필드 컴포넌트 */}
-            {col.type === 'input'     && <InputField        {...commonProps} />}
-            {/* slugOptions: SLUG 탭 옵션 소스 선택에 사용 */}
-            {col.type === 'select'    && <SelectField       {...commonProps} slugOptions={slugOptions} />}
-            {col.type === 'radio'     && <RadioField        {...commonProps} />}
-            {col.type === 'checkbox'  && <CheckboxField     {...commonProps} />}
-            {col.type === 'date'      && <DateField         {...commonProps} />}
-            {col.type === 'dateRange' && <DateRangeField    {...commonProps} />}
-            {col.type === 'textarea'  && <FormTextareaField {...commonProps} />}
-            {col.type === 'file'      && <FileField         {...commonProps} />}
-            {col.type === 'image'     && <ImageField        {...commonProps} />}
-            {/* action 타입 — SubList는 수정만 비활성, 삭제/복사 체크 가능 */}
-            {col.type === 'action'    && (
-                <ActionsField
-                    values={{ actions: col.actions }}
-                    /* TableColumnConfig.connType(버튼 필드컴포넌트 전용, STEP2 추가)와 FieldEditValues.connType(action-button 전용)
+  /* 모든 공통 필드 컴포넌트에 전달하는 공통 props */
+  const commonProps = {
+    values,
+    onChange: handleChange,
+    colSpanMode: { type: "input" as const, min: 1, max: 12 },
+    codeGroups,
+    codeGroupsLoading,
+    hideColSpan: true, // SubList 컬럼은 colSpan 개념 없음 — ColSpan 입력란 숨김
+    hideConditionFields: true, // SubList 렌더러는 동적 조건 미지원 — HIDE/Disable 조건 입력란 숨김
+    slugEntityFields, // Key 입력 selectbox 전환 (_FieldBase가 자동 처리)
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* 타입별 공통 필드 컴포넌트 */}
+      {col.type === "input" && <InputField {...commonProps} />}
+      {/* slugOptions: SLUG 탭 옵션 소스 선택에 사용 */}
+      {col.type === "select" && <SelectField {...commonProps} slugOptions={slugOptions} />}
+      {col.type === "radio" && <RadioField {...commonProps} />}
+      {col.type === "checkbox" && <CheckboxField {...commonProps} />}
+      {/* hasCompareCandidates: 같은 SubList 내 다른 date/dateRange 컬럼 존재 여부 — "필드간 검증" 섹션 노출에 사용 */}
+      {col.type === "date" && <DateField {...commonProps} hasCompareCandidates={hasCompareCandidates} />}
+      {col.type === "dateRange" && <DateRangeField {...commonProps} hasCompareCandidates={hasCompareCandidates} />}
+      {col.type === "textarea" && <FormTextareaField {...commonProps} />}
+      {col.type === "file" && <FileField {...commonProps} />}
+      {col.type === "image" && <ImageField {...commonProps} />}
+      {/* action 타입 — SubList는 수정만 비활성, 삭제/복사 체크 가능 */}
+      {col.type === "action" && (
+        <ActionsField
+          values={{ actions: col.actions }}
+          /* TableColumnConfig.connType(버튼 필드컴포넌트 전용, STEP2 추가)와 FieldEditValues.connType(action-button 전용)
                        이름이 겹쳐 구조적 타입이 달라지므로, 여기서는 실제로 actions/editPageRules만 오가는 patch임을 명시적으로 캐스팅한다. */
-                    onChange={(patch: Partial<TableColumnConfig>) => onChange(fromFieldValues(patch as Partial<FieldEditValues>))}
-                    layerTemplates={[]}
-                    onRequestLayerTemplates={() => {}}
-                    disabledActions={['edit']}
-                />
-            )}
-
-        </div>
-    );
+          onChange={(patch: Partial<TableColumnConfig>) => onChange(fromFieldValues(patch as Partial<FieldEditValues>))}
+          layerTemplates={[]}
+          onRequestLayerTemplates={() => {}}
+          disabledActions={["edit"]}
+        />
+      )}
+    </div>
+  );
 }
 
 /* ══════════════════════════════════════════ */
 /*  메인 컴포넌트                               */
 /* ══════════════════════════════════════════ */
 
-export function SubListBuilder({ widget, onChange, slugOptions, connLabel, connDefaultSlug, connMode, dataEntityOptions = [] }: SubListBuilderProps) {
-    /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
-    const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
+export function SubListBuilder({
+  widget,
+  onChange,
+  slugOptions,
+  connLabel,
+  connDefaultSlug,
+  connMode,
+  dataEntityOptions = [],
+}: SubListBuilderProps) {
+  /* "연결 Slug" 필드 옵션·표시 포맷 — entity/data/none 3-way 공통 헬퍼로 계산 */
+  const connFieldOptions = getConnFieldOptions(connMode, slugOptions, dataEntityOptions);
 
-    /* ── 이 컨텐츠(SubList)가 실제로 연결된 Entity 기준 필드 목록 ──
+  /* ── 이 컨텐츠(SubList)가 실제로 연결된 Entity 기준 필드 목록 ──
        widget.connectedSlug(이 SubList 자체의 연결 Entity)가 없으면 위젯 최상위 연결 Entity(connDefaultSlug)로 자연 폴백한다.
        컬럼 Key selectbox 옵션은 위젯 최상위가 아니라 이 값을 기준으로 구성해야 한다. */
-    const effectiveSlug = widget.connectedSlug || connDefaultSlug;
-    const entityId = resolveEntityId(effectiveSlug, connMode, slugOptions, dataEntityOptions);
-    const contentEntityFields = useEntityFields(entityId);
+  const effectiveSlug = widget.connectedSlug || connDefaultSlug;
+  const entityId = resolveEntityId(effectiveSlug, connMode, slugOptions, dataEntityOptions);
+  const contentEntityFields = useEntityFields(entityId);
 
-    const { i18nMode } = useBuilderI18nMode();
-    const [editingColId, setEditingColId] = useState<string | null>(null);
-    const [showPicker, setShowPicker] = useState(false);
+  const { i18nMode } = useBuilderI18nMode();
+  const [editingColId, setEditingColId] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
-    /* 공통코드 목록 — FormBuilder와 동일한 패턴 */
-    const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
-    const [codeGroupsLoading, setCodeGroupsLoading] = useState(false);
-    useEffect(() => {
-        setCodeGroupsLoading(true);
-        api.get('/codes')
-            .then(res => setCodeGroups(res.data || []))
-            .catch(() => {})
-            .finally(() => setCodeGroupsLoading(false));
-    }, []);
+  /* 공통코드 목록 — FormBuilder와 동일한 패턴 */
+  const [codeGroups, setCodeGroups] = useState<CodeGroupDef[]>([]);
+  /* 초기값을 true로 둬서 effect 안에서 동기 setState를 안 해도 되게 함(react-hooks/set-state-in-effect) */
+  const [codeGroupsLoading, setCodeGroupsLoading] = useState(true);
+  useEffect(() => {
+    api
+      .get("/codes")
+      .then((res) => setCodeGroups(res.data || []))
+      .catch(() => {})
+      .finally(() => setCodeGroupsLoading(false));
+  }, []);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    );
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-    /* ── 타입 선택 후 컬럼 추가 ── */
-    const addColumn = (type: SubListColumnType) => {
-        const newCol: SubListColumn = {
-            id: uid(),
-            key:   type === 'action' ? 'action' : '',
-            label: type === 'action' ? '관리'   : '',
-            type,
-            required: false,
-        };
-        onChange({ ...widget, columns: [...widget.columns, newCol] });
-        setEditingColId(newCol.id);
-        setShowPicker(false);
+  /* ── 타입 선택 후 컬럼 추가 ── */
+  const addColumn = (type: SubListColumnType) => {
+    const newCol: SubListColumn = {
+      id: uid(),
+      key: type === "action" ? "action" : "",
+      label: type === "action" ? "관리" : "",
+      type,
+      required: false,
     };
+    onChange({ ...widget, columns: [...widget.columns, newCol] });
+    setEditingColId(newCol.id);
+    setShowPicker(false);
+  };
 
-    /* ── 컬럼 삭제 ── */
-    const removeColumn = (id: string) =>
-        onChange({ ...widget, columns: widget.columns.filter(c => c.id !== id) });
+  /* ── 컬럼 삭제 ── */
+  const removeColumn = (id: string) => onChange({ ...widget, columns: widget.columns.filter((c) => c.id !== id) });
 
-    /* ── 컬럼 수정 ── */
-    const updateColumn = (id: string, patch: Partial<SubListColumn>) =>
-        onChange({ ...widget, columns: widget.columns.map(c => c.id === id ? { ...c, ...patch } : c) });
+  /* ── 컬럼 수정 ── */
+  const updateColumn = (id: string, patch: Partial<SubListColumn>) =>
+    onChange({ ...widget, columns: widget.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
 
-    /* ── DnD 재정렬 ── */
-    const handleDragEnd = (event: any) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        const oldIdx = widget.columns.findIndex(c => c.id === active.id);
-        const newIdx = widget.columns.findIndex(c => c.id === over.id);
-        onChange({ ...widget, columns: arrayMove(widget.columns, oldIdx, newIdx) });
-    };
+  /* ── DnD 재정렬 ── */
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = widget.columns.findIndex((c) => c.id === active.id);
+    const newIdx = widget.columns.findIndex((c) => c.id === over.id);
+    onChange({ ...widget, columns: arrayMove(widget.columns, oldIdx, newIdx) });
+  };
 
-    return (
-        <div className="space-y-5 pt-1">
+  return (
+    <div className="space-y-5 pt-1">
+      {/* ── 위젯 기본 설정 ── */}
+      <section className="space-y-3">
+        <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">기본 설정</h4>
 
-            {/* ── 위젯 기본 설정 ── */}
-            <section className="space-y-3">
-                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">기본 설정</h4>
+        {/* Key * | 연결 slug — 2열 그리드 */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>
+              Key <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={widget.contentKey}
+              onChange={(e) => onChange({ ...widget, contentKey: e.target.value })}
+              placeholder="예: subList1 (페이지 내 고유)"
+              className={INPUT_CLS}
+            />
+          </div>
+          <SlugSelectField
+            value={widget.connectedSlug ?? connDefaultSlug ?? ""}
+            onChange={(slug) => onChange({ ...widget, connectedSlug: slug || undefined })}
+            slugOptions={connFieldOptions.options}
+            formatDisplay={connFieldOptions.formatDisplay}
+            label={connLabel}
+          />
+        </div>
 
-                {/* Key * | 연결 slug — 2열 그리드 */}
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                        <input
-                            type="text"
-                            value={widget.contentKey}
-                            onChange={e => onChange({ ...widget, contentKey: e.target.value })}
-                            placeholder="예: subList1 (페이지 내 고유)"
-                            className={INPUT_CLS}
-                        />
-                    </div>
-                    <SlugSelectField
-                        value={widget.connectedSlug ?? connDefaultSlug ?? ''}
-                        onChange={slug => onChange({ ...widget, connectedSlug: slug || undefined })}
-                        slugOptions={connFieldOptions.options}
-                        formatDisplay={connFieldOptions.formatDisplay}
-                        label={connLabel}
-                    />
-                </div>
-
-                {/* 부모 연결 필드 — 이 SubList가 부모 Form과 다른 Entity에 연결되어 있고(API연동 컨텐츠),
+        {/* 부모 연결 필드 — 이 SubList가 부모 Form과 다른 Entity에 연결되어 있고(API연동 컨텐츠),
                     그 Entity의 필드 목록을 조회할 수 있을 때만 노출. 부모 Form 저장 후 생성된 id를
                     이 필드(자식 Entity의 FK 필드)에 담아 자식 행을 저장한다. */}
-                {contentEntityFields.length > 0 && (
-                    <div>
-                        <label className={LABEL_CLS}>
-                            부모 연결 필드 <span className="text-slate-300 font-normal">(API연동 시 자식 Entity 저장에 사용, 선택)</span>
-                        </label>
-                        <select
-                            value={widget.parentIdField ?? ''}
-                            onChange={e => onChange({ ...widget, parentIdField: e.target.value || undefined })}
-                            className={`${INPUT_CLS} font-mono`}
-                        >
-                            <option value="">— 선택없음 —</option>
-                            {contentEntityFields.filter(f => f.key).map(f => (
-                                <option key={f.key} value={f.key!}>{f.key} ({f.label})</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
+        {contentEntityFields.length > 0 && (
+          <div>
+            <label className={LABEL_CLS}>
+              부모 연결 필드{" "}
+              <span className="text-slate-300 font-normal">(API연동 시 자식 Entity 저장에 사용, 선택)</span>
+            </label>
+            <select
+              value={widget.parentIdField ?? ""}
+              onChange={(e) => onChange({ ...widget, parentIdField: e.target.value || undefined })}
+              className={`${INPUT_CLS} font-mono`}
+            >
+              <option value="">— 선택없음 —</option>
+              {contentEntityFields
+                .filter((f) => f.key)
+                .map((f) => (
+                  <option key={f.key} value={f.key!}>
+                    {f.key} ({f.label})
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
-                {/* title / addButtonLabel */}
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className={LABEL_CLS}>헤더 타이틀</label>
-                        {i18nMode ? (
-                            <MessageKeySelector
-                                value={widget.titleMsgKey ?? ''}
-                                onChange={key => onChange({ ...widget, titleMsgKey: key || undefined })}
-                                resourceType="WORD"
-                                size="sm"
-                            />
-                        ) : (
-                            <input
-                                type="text"
-                                value={widget.title ?? ''}
-                                onChange={e => onChange({ ...widget, title: e.target.value || undefined })}
-                                placeholder="예: 코드 상세"
-                                className={INPUT_CLS}
-                            />
-                        )}
-                    </div>
-                    <div>
-                        <label className={LABEL_CLS}>추가 버튼 텍스트</label>
-                        {i18nMode ? (
-                            <MessageKeySelector
-                                value={widget.addButtonLabelMsgKey ?? ''}
-                                onChange={key => onChange({ ...widget, addButtonLabelMsgKey: key || undefined })}
-                                resourceType="WORD"
-                                size="sm"
-                            />
-                        ) : (
-                            <input
-                                type="text"
-                                value={widget.addButtonLabel ?? ''}
-                                onChange={e => onChange({ ...widget, addButtonLabel: e.target.value || undefined })}
-                                placeholder="+ 추가"
-                                className={INPUT_CLS}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* maxRows */}
-                <div>
-                    <label className={LABEL_CLS}>최대 행 수 (0=제한없음)</label>
-                    <input
-                        type="number" min={0}
-                        value={widget.maxRows ?? 0}
-                        onChange={e => onChange({ ...widget, maxRows: Number(e.target.value) })}
-                        className={INPUT_CLS}
-                    />
-                </div>
-
-                {/* showBorder */}
-                <div>
-                    <label className={LABEL_CLS}>테두리</label>
-                    <ToggleRow
-                        label={widget.showBorder !== false ? '표시' : '숨김'}
-                        value={widget.showBorder !== false}
-                        onChange={v => onChange({ ...widget, showBorder: v })}
-                    />
-                </div>
-            </section>
-
-            {/* ── 컬럼 목록 ── */}
-            <section className="space-y-2">
-                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                    컬럼 목록 ({widget.columns.length}개)
-                </h4>
-
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={widget.columns.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-1">
-                            {widget.columns.map((col, idx) => (
-                                <SortableColumnItem
-                                    key={col.id}
-                                    col={col}
-                                    idx={idx}
-                                    isEditing={editingColId === col.id}
-                                    onToggleEdit={() => setEditingColId(editingColId === col.id ? null : col.id)}
-                                    onRemove={() => removeColumn(col.id)}
-                                >
-                                    <ColumnEditPanel
-                                        col={col}
-                                        onChange={patch => updateColumn(col.id, patch)}
-                                        codeGroups={codeGroups}
-                                        codeGroupsLoading={codeGroupsLoading}
-                                        /* slugOptions: select 컬럼의 SLUG 탭 옵션 소스 선택에 사용 */
-                                        slugOptions={slugOptions}
-                                        /* slugEntityFields: 있으면 컬럼 Key 입력이 selectbox로 전환됨 — 이 SubList의 연결 Entity 기준 */
-                                        slugEntityFields={contentEntityFields}
-                                    />
-                                </SortableColumnItem>
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
-
-                {/* 컬럼 추가 — FieldPickerTypeList 사용 (FormBuilder 동일 패턴) */}
-                {showPicker ? (
-                    <div className="border border-slate-200 rounded-md p-2 bg-slate-50/50">
-                        <FieldPickerTypeList
-                            types={SUBLIST_COLUMN_TYPES}
-                            onSelect={type => addColumn(type as SubListColumnType)}
-                            onCancel={() => setShowPicker(false)}
-                        />
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setShowPicker(true)}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-blue-200 rounded text-[10px] text-blue-500 hover:border-blue-400 hover:bg-blue-50 transition-all font-medium"
-                    >
-                        <Plus className="w-3 h-3" />컬럼 추가
-                    </button>
-                )}
-            </section>
-
+        {/* title / addButtonLabel */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>헤더 타이틀</label>
+            {i18nMode ? (
+              <MessageKeySelector
+                value={widget.titleMsgKey ?? ""}
+                onChange={(key) => onChange({ ...widget, titleMsgKey: key || undefined })}
+                resourceType="WORD"
+                size="sm"
+              />
+            ) : (
+              <input
+                type="text"
+                value={widget.title ?? ""}
+                onChange={(e) => onChange({ ...widget, title: e.target.value || undefined })}
+                placeholder="예: 코드 상세"
+                className={INPUT_CLS}
+              />
+            )}
+          </div>
+          <div>
+            <label className={LABEL_CLS}>추가 버튼 텍스트</label>
+            {i18nMode ? (
+              <MessageKeySelector
+                value={widget.addButtonLabelMsgKey ?? ""}
+                onChange={(key) => onChange({ ...widget, addButtonLabelMsgKey: key || undefined })}
+                resourceType="WORD"
+                size="sm"
+              />
+            ) : (
+              <input
+                type="text"
+                value={widget.addButtonLabel ?? ""}
+                onChange={(e) => onChange({ ...widget, addButtonLabel: e.target.value || undefined })}
+                placeholder="+ 추가"
+                className={INPUT_CLS}
+              />
+            )}
+          </div>
         </div>
-    );
+
+        {/* maxRows */}
+        <div>
+          <label className={LABEL_CLS}>최대 행 수 (0=제한없음)</label>
+          <input
+            type="number"
+            min={0}
+            value={widget.maxRows ?? 0}
+            onChange={(e) => onChange({ ...widget, maxRows: Number(e.target.value) })}
+            className={INPUT_CLS}
+          />
+        </div>
+
+        {/* showBorder */}
+        <div>
+          <label className={LABEL_CLS}>테두리</label>
+          <ToggleRow
+            label={widget.showBorder !== false ? "표시" : "숨김"}
+            value={widget.showBorder !== false}
+            onChange={(v) => onChange({ ...widget, showBorder: v })}
+          />
+        </div>
+      </section>
+
+      {/* ── 컬럼 목록 ── */}
+      <section className="space-y-2">
+        <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+          컬럼 목록 ({widget.columns.length}개)
+        </h4>
+
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={widget.columns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1">
+              {widget.columns.map((col, idx) => (
+                <SortableColumnItem
+                  key={col.id}
+                  col={col}
+                  idx={idx}
+                  isEditing={editingColId === col.id}
+                  onToggleEdit={() => setEditingColId(editingColId === col.id ? null : col.id)}
+                  onRemove={() => removeColumn(col.id)}
+                >
+                  <ColumnEditPanel
+                    col={col}
+                    /* columns: date/dateRange "필드간 검증" 대상 후보 계산에 사용되는 전체 컬럼 목록 */
+                    columns={widget.columns}
+                    onChange={(patch) => updateColumn(col.id, patch)}
+                    codeGroups={codeGroups}
+                    codeGroupsLoading={codeGroupsLoading}
+                    /* slugOptions: select 컬럼의 SLUG 탭 옵션 소스 선택에 사용 */
+                    slugOptions={slugOptions}
+                    /* slugEntityFields: 있으면 컬럼 Key 입력이 selectbox로 전환됨 — 이 SubList의 연결 Entity 기준 */
+                    slugEntityFields={contentEntityFields}
+                  />
+                </SortableColumnItem>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        {/* 컬럼 추가 — FieldPickerTypeList 사용 (FormBuilder 동일 패턴) */}
+        {showPicker ? (
+          <div className="border border-slate-200 rounded-md p-2 bg-slate-50/50">
+            <FieldPickerTypeList
+              types={SUBLIST_COLUMN_TYPES}
+              onSelect={(type) => addColumn(type as SubListColumnType)}
+              onCancel={() => setShowPicker(false)}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowPicker(true)}
+            className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-blue-200 rounded text-[10px] text-blue-500 hover:border-blue-400 hover:bg-blue-50 transition-all font-medium"
+          >
+            <Plus className="w-3 h-3" />
+            컬럼 추가
+          </button>
+        )}
+      </section>
+    </div>
+  );
 }
