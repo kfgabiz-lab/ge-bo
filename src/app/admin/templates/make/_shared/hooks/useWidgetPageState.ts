@@ -292,10 +292,15 @@ async function restoreFormDataFromJson(
           if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
           const ids = section[f.fieldKey];
           if (!Array.isArray(ids)) return;
-          metaByFieldId[f.id] = (ids as number[]).map((id) => {
-            const m = metaList.find((m) => m.id === id);
-            return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : { id, origName: "", fileSize: 0 };
-          });
+          /* 배치 메타 조회(/page-files/meta 또는 /file-meta) 응답에 없는 id는 서버에 실제로
+           * 존재하지 않는 레코드(예: 저장 전 삭제된 파일의 dangling 참조) — 유령 placeholder를
+           * 만들지 않고 건너뛴다. */
+          metaByFieldId[f.id] = (ids as number[])
+            .map((id) => {
+              const m = metaList.find((m) => m.id === id);
+              return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : null;
+            })
+            .filter((m): m is { id: number; origName: string; fileSize: number } => m !== null);
           if (f.type === "image" || f.type === "video" || f.type === "media") {
             (ids as number[]).forEach((id) => {
               const blobReq = isEntity
@@ -398,6 +403,12 @@ export function useWidgetPageState(
   const [imgBlobUrls, setImgBlobUrls] = useState<Record<number, string>>({});
   /** SubList 파일 — widgetId → rowId → colId → 새로 선택한 파일 목록 */
   const [subListFileMap, setSubListFileMap] = useState<Record<string, Record<string, Record<string, File[]>>>>({});
+  /**
+   * 삭제 대기 중인 기존 파일 ID 모음(X 버튼 클릭 시점에는 서버에서 즉시 삭제하지 않고 보류) —
+   * handleContentAction 저장 성공 시점에 일괄 커밋(DELETE)한다. 저장하지 않고 이탈하면
+   * 서버 파일은 그대로 유지된다. useCallback 클로저의 stale 값 문제를 피하기 위해 ref로 관리.
+   */
+  const pendingDeleteFileIdsRef = useRef<Set<number>>(new Set());
 
   /* 멀티셀렉트 */
   const [multiSelectValuesMap, setMultiSelectValuesMap] = useState<Record<string, number[]>>({});
@@ -1020,33 +1031,29 @@ export function useWidgetPageState(
     [markDirty]
   );
 
-  /** 기존 파일 삭제 — API 호출 후 existingFileMetaMap 및 imgBlobUrls 갱신 */
+  /**
+   * 기존 파일 삭제 — 서버 DELETE는 저장 성공 시점까지 보류(pendingDeleteFileIdsRef)하고
+   * 여기서는 로컬 상태(existingFileMetaMap/imgBlobUrls)만 즉시 갱신한다.
+   * 실제 삭제 커밋은 handleContentAction의 슬러그 그룹 저장 반복이 모두 끝난 직후 1회 수행된다.
+   */
   const handleRemoveExisting = useCallback(
-    async (widgetId: string, fieldId: string, fileId: number) => {
-      try {
-        /* entity 모드: file_meta 전용 삭제 API 사용, page_data 모드: 기존 page-files API 유지 */
-        if (pageIsEntity) {
-          await api.delete(`/file-meta/${fileId}`);
-        } else {
-          await api.delete(`/page-files/${fileId}`);
-        }
-        setExistingFileMetaMap((prev) => ({
-          ...prev,
-          [widgetId]: {
-            ...(prev[widgetId] ?? {}),
-            [fieldId]: (prev[widgetId]?.[fieldId] ?? []).filter((f) => f.id !== fileId),
-          },
-        }));
-        setImgBlobUrls((prev) => {
-          const next = { ...prev };
-          delete next[fileId];
-          return next;
-        });
-      } catch {
-        toast.error(t("common.error.file_delete"));
-      }
+    (widgetId: string, fieldId: string, fileId: number) => {
+      pendingDeleteFileIdsRef.current.add(fileId);
+      setExistingFileMetaMap((prev) => ({
+        ...prev,
+        [widgetId]: {
+          ...(prev[widgetId] ?? {}),
+          [fieldId]: (prev[widgetId]?.[fieldId] ?? []).filter((f) => f.id !== fileId),
+        },
+      }));
+      setImgBlobUrls((prev) => {
+        const next = { ...prev };
+        delete next[fileId];
+        return next;
+      });
+      markDirty();
     },
-    [t, pageIsEntity]
+    [markDirty]
   );
 
   /**
@@ -1459,12 +1466,14 @@ export function useWidgetPageState(
                   if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
                   const ids = section[f.fieldKey];
                   if (!Array.isArray(ids)) return;
-                  metaByFieldId[f.id] = (ids as number[]).map((id) => {
-                    const m = metaList.find((m) => m.id === id);
-                    return m
-                      ? { id: m.id, origName: m.origName, fileSize: m.fileSize }
-                      : { id, origName: "", fileSize: 0 };
-                  });
+                  /* 배치 메타 조회 응답에 없는 id는 실제로 존재하지 않는 레코드 — 유령 placeholder를
+                   * 만들지 않고 건너뛴다(restoreFormDataFromJson과 동일 정책). */
+                  metaByFieldId[f.id] = (ids as number[])
+                    .map((id) => {
+                      const m = metaList.find((m) => m.id === id);
+                      return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : null;
+                    })
+                    .filter((m): m is { id: number; origName: string; fileSize: number } => m !== null);
                   /* 이미지/동영상/미디어 타입은 blob URL 생성 */
                   if (imageFieldIds.has(f.id) || f.type === "video" || f.type === "media") {
                     (ids as number[]).forEach((id) => {
@@ -1490,6 +1499,24 @@ export function useWidgetPageState(
             /* 파일 메타 갱신 실패는 조용히 처리 */
           }
         } /* slug 그룹 반복 끝 */
+
+        /* 삭제 대기 중이던 기존 파일 일괄 커밋 — 모든 slug 그룹 저장이 끝난 뒤 1회만 실행.
+         * 개별 파일 삭제 실패는 로그만 남기고 저장 자체(성공 toast)에는 영향을 주지 않는다. */
+        if (pendingDeleteFileIdsRef.current.size > 0) {
+          const fileIdsToDelete = Array.from(pendingDeleteFileIdsRef.current);
+          for (const fileId of fileIdsToDelete) {
+            try {
+              if (pageIsEntity) {
+                await api.delete(`/file-meta/${fileId}`);
+              } else {
+                await api.delete(`/page-files/${fileId}`);
+              }
+            } catch {
+              console.error(`[handleContentAction] 삭제 대기 파일 커밋 실패: fileId=${fileId}`);
+            }
+          }
+          pendingDeleteFileIdsRef.current.clear();
+        }
 
         toast.success(isUpdate ? t("common.updated") : t("common.saved"));
         markClean();
