@@ -90,6 +90,9 @@ import {
   processFormFilesAndSubList,
   codeDetailToLabel,
   resolveAccessor,
+  buildSearchFieldsMap,
+  buildSearchQueryParams,
+  validateSearchDateRange,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -460,6 +463,8 @@ export function WidgetRenderer({
   >({});
   /* 팝업 내 MultiSelect 선택 ID — widgetId → number[] */
   const [popupMultiSelectValuesMap, setPopupMultiSelectValuesMap] = useState<Record<string, number[]>>({});
+  /* 팝업 내 Search 위젯 값 — widgetId → { fieldId: 값 } (page 모드 searchValues와 달리 위젯별로 분리 보관) */
+  const [popupSearchValuesMap, setPopupSearchValuesMap] = useState<Record<string, Record<string, string>>>({});
   /* 팝업 기존 파일 메타 — widgetId → { fieldId: meta[] } (page 모드 existingFileMetaMap과 동일 구조) */
   const [popupExistingMetaMap, setPopupExistingMetaMap] = useState<
     Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>
@@ -666,6 +671,7 @@ export function WidgetRenderer({
     setPopupMultiSelectValuesMap({});
     setPopupTableSelectedRowsMap({});
     setPopupParamSaveExtras({});
+    setPopupSearchValuesMap({});
   }, []);
 
   /**
@@ -704,6 +710,7 @@ export function WidgetRenderer({
       setPopupSortKeyMap({});
       setPopupSortDirMap({});
       setPopupTableSelectedRowsMap({});
+      setPopupSearchValuesMap({});
 
       try {
         /* 1단계: 팝업 템플릿 설정 조회 (공통 유틸) */
@@ -919,9 +926,13 @@ export function WidgetRenderer({
    * SpaceRenderer의 connType='content' 버튼이 팝업 WidgetRenderer를 통해 호출
    * widgetIds 배열의 첫 번째 Form 위젯을 기준으로 동작 (팝업 내부 단순화)
    */
-  /* 팝업 내 테이블 페이지 변경 핸들러 */
+  /**
+   * 팝업 내 테이블 페이지 변경 핸들러
+   * @param overrideSearchValues 검색 초기화(reset) 직후처럼 최신 popupSearchValuesMap 상태 반영 전에
+   *   즉시 재조회해야 할 때 사용하는 값 — 미전달 시 popupSearchValuesMap을 그대로 사용한다.
+   */
   const handlePopupPageChange = useCallback(
-    async (widgetId: string, page: number) => {
+    async (widgetId: string, page: number, overrideSearchValues?: Record<string, string>) => {
       const tw = popupCfg?.widgetItems
         .flatMap((item) => item.contents)
         .find((c) => (c.widget as { widgetId?: string })?.widgetId === widgetId && c.widget?.type === "table")
@@ -930,6 +941,14 @@ export function WidgetRenderer({
       const pageSize = tw.pageSize || 10;
       const sk = popupSortKeyMap[widgetId];
       const sd = popupSortDirMap[widgetId] ?? "asc";
+      /* 이 테이블에 연결된 검색 위젯(connectedSearchIds)의 필드 정의 + 값 → API 쿼리 파라미터
+       * (page 레벨 useWidgetPageState.fetchTableData와 동일한 공용 함수로 변환 규칙 공유) */
+      const fieldsMap = buildSearchFieldsMap(
+        (popupCfg?.widgetItems ?? []) as unknown as import("./PageGridRenderer").PageWidgetItem[]
+      );
+      const searchFields = tw.connectedSearchIds.flatMap((sid) => fieldsMap[sid] ?? []);
+      const sv =
+        overrideSearchValues ?? (Object.assign({}, ...Object.values(popupSearchValuesMap)) as Record<string, string>);
       setPopupTableDataMap((prev) => ({
         ...prev,
         [widgetId]: {
@@ -949,6 +968,7 @@ export function WidgetRenderer({
       try {
         const reqParams: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) reqParams.sort = `${sk},${sd}`;
+        Object.assign(reqParams, buildSearchQueryParams(searchFields, sv));
         const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
         const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
         setPopupTableDataMap((prev) => ({
@@ -982,7 +1002,50 @@ export function WidgetRenderer({
         }));
       }
     },
-    [popupCfg, popupSortKeyMap, popupSortDirMap]
+    [popupCfg, popupSortKeyMap, popupSortDirMap, popupSearchValuesMap]
+  );
+
+  /**
+   * 팝업 내 검색 실행 핸들러 — searchWidgetId에 연결된(connectedSearchIds) 테이블들을 0페이지부터 재조회
+   * (page 레벨 useWidgetPageState.handleSearch와 동일 패턴 — dateRange 최대 조회기간 검증도 동일하게 적용)
+   */
+  const handlePopupSearch = useCallback(
+    (searchWidgetId: string) => {
+      if (!popupCfg) return;
+      const fieldsMap = buildSearchFieldsMap(
+        (popupCfg.widgetItems ?? []) as unknown as import("./PageGridRenderer").PageWidgetItem[]
+      );
+      const sv = Object.assign({}, ...Object.values(popupSearchValuesMap)) as Record<string, string>;
+      /* dateRange 최대 조회 기간 검증 — 초과 시 API 호출 차단 (page 레벨 handleSearch와 동일) */
+      const searchFields = fieldsMap[searchWidgetId] ?? [];
+      if (!validateSearchDateRange(searchFields, sv, t)) return;
+
+      popupCfg.widgetItems
+        .flatMap((item) => item.contents)
+        .map((c) => c.widget)
+        .filter((w) => w.type === "table" && (w as unknown as TableWidget).connectedSearchIds.includes(searchWidgetId))
+        .forEach((w) => handlePopupPageChange((w as unknown as TableWidget).widgetId, 0));
+    },
+    [popupCfg, handlePopupPageChange, popupSearchValuesMap, t]
+  );
+
+  /**
+   * 팝업 내 검색 초기화 핸들러 — 해당 검색 위젯(widgetId)의 popupSearchValuesMap 항목만 초기화 후
+   * 연결된 테이블들을 재조회 (state 갱신은 비동기이므로 최신 값을 overrideSearchValues로 즉시 전달)
+   */
+  const handlePopupReset = useCallback(
+    (searchWidgetId: string) => {
+      const nextMap = { ...popupSearchValuesMap, [searchWidgetId]: {} };
+      setPopupSearchValuesMap(nextMap);
+      if (!popupCfg) return;
+      const overrideSv = Object.assign({}, ...Object.values(nextMap)) as Record<string, string>;
+      popupCfg.widgetItems
+        .flatMap((item) => item.contents)
+        .map((c) => c.widget)
+        .filter((w) => w.type === "table" && (w as unknown as TableWidget).connectedSearchIds.includes(searchWidgetId))
+        .forEach((w) => handlePopupPageChange((w as unknown as TableWidget).widgetId, 0, overrideSv));
+    },
+    [popupSearchValuesMap, popupCfg, handlePopupPageChange]
   );
 
   /* 팝업 내 테이블 정렬 변경 핸들러 */
@@ -996,6 +1059,12 @@ export function WidgetRenderer({
         ?.widget as (TableWidget & { connectedSlug?: string }) | undefined;
       if (!tw?.connectedSlug) return;
       const pageSize = tw.pageSize || 10;
+      /* 정렬 변경 시에도 현재 검색 조건은 그대로 유지 (page 레벨 handleSortChange와 동일 패턴) */
+      const fieldsMap = buildSearchFieldsMap(
+        (popupCfg?.widgetItems ?? []) as unknown as import("./PageGridRenderer").PageWidgetItem[]
+      );
+      const searchFields = tw.connectedSearchIds.flatMap((sid) => fieldsMap[sid] ?? []);
+      const sv = Object.assign({}, ...Object.values(popupSearchValuesMap)) as Record<string, string>;
       setPopupTableDataMap((prev) => ({
         ...prev,
         [widgetId]: {
@@ -1015,6 +1084,7 @@ export function WidgetRenderer({
       try {
         const reqParams: Record<string, string> = { page: "0", size: String(pageSize) };
         if (dir && accessor) reqParams.sort = `${accessor},${dir}`;
+        Object.assign(reqParams, buildSearchQueryParams(searchFields, sv));
         const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
         const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
         setPopupTableDataMap((prev) => ({
@@ -1048,7 +1118,7 @@ export function WidgetRenderer({
         }));
       }
     },
-    [popupCfg]
+    [popupCfg, popupSearchValuesMap]
   );
 
   const handlePopupContentAction = useCallback(
@@ -1456,6 +1526,25 @@ export function WidgetRenderer({
             mode="live"
             widgetItems={popupCfg.widgetItems as unknown as import("./PageGridRenderer").PageWidgetItem[]}
             codeGroups={codeGroups}
+            /* 검색 — popupSearchValuesMap(위젯Id별)을 flatten해서 전달 (다른 popupXxxMap과 동일한 flatten 패턴,
+             * popupAllFormValues 구성 방식과 동일) */
+            searchValues={Object.assign({}, ...Object.values(popupSearchValuesMap)) as Record<string, string>}
+            onSearchChange={(fieldId, value) => {
+              /* fieldId가 어느 검색 위젯 소속인지 popupCfg에서 역탐색 후 해당 위젯 항목에만 반영 */
+              const fieldsMap = buildSearchFieldsMap(
+                (popupCfg?.widgetItems ?? []) as unknown as import("./PageGridRenderer").PageWidgetItem[]
+              );
+              const ownerWidgetId = Object.entries(fieldsMap).find(([, fields]) =>
+                fields.some((f) => f.id === fieldId)
+              )?.[0];
+              if (!ownerWidgetId) return;
+              setPopupSearchValuesMap((prev) => ({
+                ...prev,
+                [ownerWidgetId]: { ...(prev[ownerWidgetId] ?? {}), [fieldId]: value },
+              }));
+            }}
+            onSearch={handlePopupSearch}
+            onReset={handlePopupReset}
             /* 폼 — widgetId별 구조 직접 전달 (page 모드와 동일) */
             formValuesMap={popupFormValuesMap}
             onFormValuesChange={(wid, fieldId, value) =>

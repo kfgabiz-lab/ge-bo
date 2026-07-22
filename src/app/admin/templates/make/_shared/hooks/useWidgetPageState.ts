@@ -33,9 +33,10 @@ import {
   validateDataSaveWidgets,
   saveTableRows,
   processFormFilesAndSubList,
-  evalFieldCondition,
   validateSearchDateRange,
   parseActionParams,
+  buildSearchFieldsMap,
+  buildSearchQueryParams,
 } from "../utils";
 import {
   entityApiPath,
@@ -97,16 +98,7 @@ export function stampConnectedSlug<
   })) as T[];
 }
 
-/** Search 위젯 widgetId → 필드 목록 맵 */
-function buildSearchFieldsMap(items: PageWidgetItem[]): Record<string, SearchFieldConfig[]> {
-  const map: Record<string, SearchFieldConfig[]> = {};
-  flatWidgets(items).forEach((w) => {
-    if (w.type === "search") {
-      map[w.widgetId] = w.rows.flatMap((r: { fields: SearchFieldConfig[] }) => r.fields);
-    }
-  });
-  return map;
-}
+/* buildSearchFieldsMap — utils.ts로 이동(공용 함수, 팝업 레벨과 공유). 위 import 참조 */
 
 /** 훅 옵션 */
 interface UseWidgetPageStateOptions {
@@ -485,76 +477,11 @@ export function useWidgetPageState(
         if (sk) params.sort = `${sk},${sd}`;
 
         /* entity API는 검색조건 파라미터를 지원하지 않으므로 page/size/sort만 전송한다.
-         * (page_data 전용 검색 파라미터 구성은 entity 모드에서는 건너뛴다) */
+         * (page_data 전용 검색 파라미터 구성은 entity 모드에서는 건너뛴다)
+         * 검색 필드 → API 파라미터 변환 규칙은 공용 함수(buildSearchQueryParams)로 관리 —
+         * 팝업 레벨(WidgetRenderer)도 동일 함수를 사용해 동일한 변환 규칙을 공유한다. */
         if (!isEntity) {
-          /* fieldKey → fieldId 역매핑 — hideCondition 평가용 */
-          const keyToId: Record<string, string> = {};
-          searchFields.forEach((f) => {
-            if (f.fieldKey) keyToId[f.fieldKey] = f.id;
-          });
-          searchFields.forEach((f) => {
-            /* 검색제외 필드는 API 파라미터에서 제외 */
-            if (f.excludeFromSearch) return;
-            /* hideCondition 충족 시 API 파라미터 제외 */
-            const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, sv) : false;
-            if (f.hideCondition && hideResult) return;
-            /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
-            if (f.type === "dateRange" || f.type === "yearMonthRange") {
-              const paramKey = f.fieldKey || f.label;
-              const from = sv[f.id + "_from"];
-              const to = sv[f.id + "_to"];
-              if (paramKey) {
-                /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
-                if (f.singleDateRange) {
-                  if (from?.trim()) params[`${paramKey}_gte`] = from;
-                  if (to?.trim()) params[`${paramKey}_lte`] = to;
-                } else if (f.fieldKey2) {
-                  /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
-                  if (from?.trim()) params[paramKey] = from;
-                  if (to?.trim()) params[f.fieldKey2] = to;
-                } else {
-                  if (from?.trim()) params[`${paramKey}_from`] = from;
-                  if (to?.trim()) params[`${paramKey}_to`] = to;
-                }
-              }
-              return;
-            }
-            const val = sv[f.id];
-            if (!val || !val.trim()) return;
-            /* category + relationSlugId: FILTER slug_relation 파라미터 */
-            if (f.type === "category" && f.relationSlugId) {
-              params[`rel_${f.relationSlugId}`] = val;
-              return;
-            }
-            /* select/input + joinRelationSlugId: 조인 검색 연동 파라미터 — 연결된 slug의 필드 값으로 다른 목록을 필터링
-               연산자는 필드 타입으로 자동 결정: select → EQ(정확일치), input → ILIKE(부분일치, joink_ 값 앞에 '~' 마커 부여) */
-            if ((f.type === "select" || f.type === "input") && f.joinRelationSlugId && f.joinSlaveKey) {
-              const joinParamKey = f.fieldKey || f.label;
-              if (joinParamKey) {
-                params[`joinr_${joinParamKey}`] = String(f.joinRelationSlugId);
-                params[`joink_${joinParamKey}`] = f.type === "input" ? `~${f.joinSlaveKey}` : f.joinSlaveKey;
-                params[`joinv_${joinParamKey}`] = val;
-              }
-              return;
-            }
-            /* select + data(조건식 "cond?트루텍스트:펄스텍스트"): evalConditionExpr 문법 재사용 —
-               condexpr_{fieldKey}=조건식 원문 + condval_{fieldKey}=선택값 그대로 전송, 필드명 파싱은 서버가 담당 */
-            if (f.type === "select" && f.data?.includes("?")) {
-              const paramKey = f.fieldKey || f.label;
-              if (paramKey) {
-                params[`condexpr_${paramKey}`] = f.data;
-                params[`condval_${paramKey}`] = val;
-              }
-              return;
-            }
-            /* dateRangeStatus: drs_{linkedDateRangeKey}=before|in_range|after 형식으로 변환 */
-            if (f.type === "dateRangeStatus" && f.linkedDateRangeKey) {
-              params[`drs_${f.linkedDateRangeKey}`] = val;
-            } else {
-              const paramKey = f.fieldKey || f.label;
-              if (paramKey) params[paramKey] = val;
-            }
-          });
+          Object.assign(params, buildSearchQueryParams(searchFields, sv));
         }
 
         /* entity 모드: /api/v1/{slug} (Slug Entity 코드생성 REST API) — 그 외: 기존 page_data API */
@@ -2131,70 +2058,13 @@ export function useWidgetPageState(
     setCategorySelections((prev) => ({ ...prev, [widgetId]: selectedId }));
   }, []);
 
-  /* 엑셀 다운로드용 현재 검색 파라미터 — hideCondition 충족 필드 제외 */
+  /* 엑셀 다운로드용 현재 검색 파라미터 — hideCondition 충족 필드 제외
+   * fetchTableData와 동일한 공용 함수(buildSearchQueryParams)로 변환 규칙 통일
+   * (BE PageDataService.exportAll도 search()와 동일한 appendWhereConditions/bindSearchParams를
+   *  공유하므로 condexpr_/condval_ 등 모든 파라미터를 동일하게 지원 — 별도 BE 대응 불필요) */
   const currentSearchParams = useMemo(() => {
     const fieldsMap = buildSearchFieldsMap(widgetItems);
-    const keyToId: Record<string, string> = {};
-    Object.values(fieldsMap)
-      .flat()
-      .forEach((f) => {
-        if (f.fieldKey) keyToId[f.fieldKey] = f.id;
-      });
-    const params: Record<string, string> = {};
-    Object.values(fieldsMap)
-      .flat()
-      .forEach((f) => {
-        /* 검색제외 필드는 엑셀다운로드 파라미터에서도 제외 */
-        if (f.excludeFromSearch) return;
-        const hideResult = f.hideCondition ? evalFieldCondition(f.hideCondition, keyToId, searchValues) : false;
-        if (f.hideCondition && hideResult) return;
-        /* dateRange/yearMonthRange: from/to 분리 저장이므로 각각 파라미터로 전송 */
-        if (f.type === "dateRange" || f.type === "yearMonthRange") {
-          const paramKey = f.fieldKey || f.label;
-          const from = searchValues[f.id + "_from"];
-          const to = searchValues[f.id + "_to"];
-          if (paramKey) {
-            /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
-            if (f.singleDateRange) {
-              if (from?.trim()) params[`${paramKey}_gte`] = from;
-              if (to?.trim()) params[`${paramKey}_lte`] = to;
-            } else if (f.fieldKey2) {
-              /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
-              if (from?.trim()) params[paramKey] = from;
-              if (to?.trim()) params[f.fieldKey2] = to;
-            } else {
-              if (from?.trim()) params[`${paramKey}_from`] = from;
-              if (to?.trim()) params[`${paramKey}_to`] = to;
-            }
-          }
-          return;
-        }
-        const val = searchValues[f.id];
-        if (!val || !val.trim()) return;
-        /* category + relationSlugId: FILTER slug_relation 파라미터 */
-        if (f.type === "category" && f.relationSlugId) {
-          params[`rel_${f.relationSlugId}`] = val;
-          return;
-        }
-        /* select/input + joinRelationSlugId: 조인 검색 연동 파라미터 — 연결된 slug의 필드 값으로 다른 목록을 필터링
-         연산자는 필드 타입으로 자동 결정: select → EQ(정확일치), input → ILIKE(부분일치, joink_ 값 앞에 '~' 마커 부여) */
-        if ((f.type === "select" || f.type === "input") && f.joinRelationSlugId && f.joinSlaveKey) {
-          const joinParamKey = f.fieldKey || f.label;
-          if (joinParamKey) {
-            params[`joinr_${joinParamKey}`] = String(f.joinRelationSlugId);
-            params[`joink_${joinParamKey}`] = f.type === "input" ? `~${f.joinSlaveKey}` : f.joinSlaveKey;
-            params[`joinv_${joinParamKey}`] = val;
-          }
-          return;
-        }
-        if (f.type === "dateRangeStatus" && f.linkedDateRangeKey) {
-          params[`drs_${f.linkedDateRangeKey}`] = val;
-        } else {
-          const paramKey = f.fieldKey || f.label;
-          if (paramKey) params[paramKey] = val;
-        }
-      });
-    return params;
+    return buildSearchQueryParams(Object.values(fieldsMap).flat(), searchValues);
   }, [searchValues, widgetItems]);
 
   /* PageGridRenderer에 바로 spread할 수 있도록 묶어서 반환 */
