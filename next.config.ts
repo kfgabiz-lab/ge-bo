@@ -32,7 +32,8 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          // 유튜브, 구글맵 사용으로 보안점검 예외 등록 필요.
+          // { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
         ],
       },
     ];
