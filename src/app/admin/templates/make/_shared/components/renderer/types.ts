@@ -280,14 +280,25 @@ export interface MultiSelectWidget {
   widgetId: string;
   /** dataJson 저장 키 (예: "relatedUsers") */
   contentKey: string;
-  /** 드롭다운 옵션 목록을 가져올 slug (호출 slug) */
+  /** 드롭다운 옵션 목록을 가져올 slug (호출 slug) — sourceMode가 'relation'이면 사용하지 않음 */
   sourceSlug: string;
   /** sourceSlug 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
    *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
   sourceFilter?: string;
+  /** 옵션 소스 모드 — 'call'(기본): sourceSlug 호출 slug에서 직접 조회 (기존 동작)
+   *  'relation': sourceRelationSlugId로 지정한 slug-relation(FETCH)을 통해 연동 조회
+   *  미설정 시(레거시 데이터) 'call'로 취급 — 기존 저장 데이터는 수정 없이 그대로 동작 */
+  sourceMode?: "call" | "relation";
+  /** sourceMode='relation' 전용 — 옵션 목록을 가져올 slug-relation ID
+   *  후보는 relationDir='FETCH'인 relation (useSlugRelations 훅으로 조회)
+   *  relation.masterSlug가 실제 조회 대상 slug가 되고, 각 행의 표시 라벨은 relation이 이미 병합해 준
+   *  `_fetchedRel{sourceRelationSlugId}` 값(카테고리 계층 relation이면 BE가 categoryDepth/categoryDepthFrom 기준으로
+   *  " > "로 합쳐서 내려준 문자열)을 그대로 사용한다 */
+  sourceRelationSlugId?: number;
   /** 저장 시 연결되는 slug (연결 slug) */
   connectedSlug?: string;
-  /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept") */
+  /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept")
+   *  sourceMode='relation'일 때는 사용하지 않음 — 라벨은 _fetchedRel{id} 값으로 자동 구성됨 */
   labelFields: string;
   placeholder?: string;
   placeholderMsgKey?: string; // placeholder 다국어 키
