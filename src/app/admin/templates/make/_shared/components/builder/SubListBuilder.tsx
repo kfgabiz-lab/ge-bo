@@ -123,6 +123,10 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
     maxTotalSizeMB: col.maxTotalSizeMB,
     fileTypeMode: col.fileTypeMode as FieldEditValues["fileTypeMode"],
     allowedExtensions: col.allowedExtensions,
+    /* 이미지 업로드 밸리데이션 (image 타입 전용) */
+    imageMaxWidthPx: col.imageMaxWidthPx,
+    imageMaxHeightPx: col.imageMaxHeightPx,
+    maxFileSizeUnit: col.maxFileSizeUnit,
     /* 유효성검사 */
     minLength: col.minLength,
     maxLength: col.maxLength,
@@ -192,6 +196,10 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
   if (updates.maxTotalSizeMB !== undefined) patch.maxTotalSizeMB = updates.maxTotalSizeMB;
   if (updates.fileTypeMode !== undefined) patch.fileTypeMode = updates.fileTypeMode;
   if (updates.allowedExtensions !== undefined) patch.allowedExtensions = updates.allowedExtensions;
+  /* 이미지 업로드 밸리데이션 (image 타입 전용) */
+  if (updates.imageMaxWidthPx !== undefined) patch.imageMaxWidthPx = updates.imageMaxWidthPx;
+  if (updates.imageMaxHeightPx !== undefined) patch.imageMaxHeightPx = updates.imageMaxHeightPx;
+  if (updates.maxFileSizeUnit !== undefined) patch.maxFileSizeUnit = updates.maxFileSizeUnit;
   /* 유효성검사 */
   if (updates.minLength !== undefined) patch.minLength = updates.minLength;
   if (updates.maxLength !== undefined) patch.maxLength = updates.maxLength;

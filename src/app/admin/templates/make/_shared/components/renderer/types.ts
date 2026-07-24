@@ -160,6 +160,10 @@ export interface SubListColumn {
   maxTotalSizeMB?: number; // file 타입 전체 최대 용량 (MB)
   fileTypeMode?: string; // file 타입 허용 파일 종류 ('doc'|'image'|'video'|'custom')
   allowedExtensions?: string[]; // file 타입 커스텀 확장자 목록
+  /* ── 이미지 업로드 밸리데이션 (image 타입 전용) — live 업로드 시점에만 차단, 저장 시점 재검증 없음 ── */
+  imageMaxWidthPx?: number; // 이미지 가로 최대(px) — 미설정 시 제한 없음
+  imageMaxHeightPx?: number; // 이미지 세로 최대(px) — 미설정 시 제한 없음
+  maxFileSizeUnit?: "KB" | "MB"; // maxFileSizeMB 값의 단위 — 미설정 시 'MB'로 취급(하위호환)
   readonly?: boolean; // 읽기 전용 여부
   /* ── 유효성검사 (input/textarea 공통) ── */
   minLength?: number;

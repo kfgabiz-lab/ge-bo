@@ -46,6 +46,9 @@ import {
   formatNowBySubType,
   resolveCodeLabel,
   debounce,
+  getImageNaturalSize,
+  unitToBytes,
+  checkImagePixelLimit,
 } from "../../utils";
 import { searchAddressPredictions, getAddressDetail, type AddressPrediction } from "../../utils/googlePlaces";
 import type { RendererMode } from "./types";
@@ -738,12 +741,13 @@ function SlugOptionSelect({
 
   /* optionSlug 변경 시에만 API 재조회 — optionFilter/rowData 변경은 재조회 없이 useMemo에서만 재계산 */
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
     if (!field.optionSlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
       setRawRows([]);
       return;
     }
     /* fetch 시작 시 먼저 비움 — 비동기 응답 대기 중 이전 slug의 데이터로 새 필터가 적용되는 stale 현상 방지 */
+
     setRawRows([]);
     api
       .get(`/page-data/${field.optionSlug}`, { params: { size: "9999" } })
@@ -823,12 +827,13 @@ function SlugAutocompleteInput({
 
   /* optionSlug 변경 시에만 API 재조회 — optionFilter/rowData 변경은 재조회 없이 useMemo에서만 재계산 */
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
     if (!field.optionSlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
       setRawRows([]);
       return;
     }
     /* fetch 시작 시 먼저 비움 — 비동기 응답 대기 중 이전 slug의 데이터로 새 필터가 적용되는 stale 현상 방지 */
+
     setRawRows([]);
     api
       .get(`/page-data/${field.optionSlug}`, { params: { size: "9999" } })
@@ -1704,11 +1709,46 @@ export function FieldRenderer({
       /* preview에서는 canAdd=false → pointer-events-none, file input 미렌더 */
       const canAdd = !isPreview && !isReadOnly && currentCount < maxCount;
 
-      /* 이미지 파일 선택 후 공통 처리 */
-      const handleImgSelect = (selected: File[]) => {
+      /* 이미지 파일 선택 후 공통 처리 — 확장자 → 용량 → 가로/세로(px) 순으로 검증 후 통과 파일만 반영 */
+      const handleImgSelect = async (selected: File[]) => {
         const { valid, rejected } = filterByAccept(selected, FILE_TYPE_PRESETS.image);
         if (rejected.length > 0) alert(`${t("common.field.invalid_file_type")}\n${rejected.join("\n")}`);
-        if (valid.length > 0) onFileChange?.([...(fileList ?? []), ...valid].slice(0, maxCount));
+        if (valid.length === 0) return;
+
+        /* 용량 제한 — maxFileSizeUnit 미설정 시 'MB'로 취급(하위호환) */
+        const sizeUnit = field.maxFileSizeUnit ?? "MB";
+        const maxSizeValue = field.maxFileSizeMB;
+        const maxSizeBytes = maxSizeValue ? maxSizeValue * unitToBytes(sizeUnit) : undefined;
+
+        const passed: File[] = [];
+        for (const file of valid) {
+          /* 용량 검증 */
+          if (maxSizeBytes && file.size > maxSizeBytes) {
+            toast.warning(
+              t("common.field.file_size_limit", { type: t("common.label.image"), mb: `${maxSizeValue}${sizeUnit}` })
+            );
+            continue;
+          }
+          /* 가로/세로(px) 검증 — 디코딩 실패(null) 시 픽셀 검증은 건너뛰고 통과 처리(fail-open) */
+          if (field.imageMaxWidthPx || field.imageMaxHeightPx) {
+            const naturalSize = await getImageNaturalSize(file);
+            const violation = checkImagePixelLimit(naturalSize, field.imageMaxWidthPx, field.imageMaxHeightPx);
+            if (violation === "width") {
+              toast.warning(
+                t("common.field.image_width_limit", { label: file.name, px: String(field.imageMaxWidthPx) })
+              );
+              continue;
+            }
+            if (violation === "height") {
+              toast.warning(
+                t("common.field.image_height_limit", { label: file.name, px: String(field.imageMaxHeightPx) })
+              );
+              continue;
+            }
+          }
+          passed.push(file);
+        }
+        if (passed.length > 0) onFileChange?.([...(fileList ?? []), ...passed].slice(0, maxCount));
       };
 
       return (
@@ -2150,6 +2190,8 @@ export function FieldRenderer({
       const vidExts = FILE_TYPE_PRESETS.video.split(",");
       const imgMaxMB = field.mediaImageMaxSizeMB ?? 5;
       const vidMaxMB = field.mediaVideoMaxSizeMB ?? 20;
+      /* 이미지 용량 단위 — mediaImageMaxSizeUnit 미설정 시 'MB'로 취급(하위호환). 동영상은 단위 선택 UI가 없어 항상 MB 고정 */
+      const imgSizeUnit = field.mediaImageMaxSizeUnit ?? "MB";
       /* UI 안내 텍스트용 레이블 */
       const imgLabel = FILE_TYPE_LABELS.image;
       const vidLabel = FILE_TYPE_LABELS.video;
@@ -2212,7 +2254,7 @@ export function FieldRenderer({
           <span className="text-xs font-medium">{t("common.field.media_upload")}</span>
           {/* 형식·용량 안내 텍스트 */}
           <div className="text-[10px] text-center leading-relaxed">
-            <p>{t("common.field.media_image_info", { label: imgLabel, mb: String(imgMaxMB) })}</p>
+            <p>{t("common.field.media_image_info", { label: imgLabel, size: `${imgMaxMB}${imgSizeUnit}` })}</p>
             <p>{t("common.field.media_video_info", { label: vidLabel, mb: String(vidMaxMB) })}</p>
           </div>
         </div>
@@ -2291,23 +2333,42 @@ export function FieldRenderer({
       const canAdd = !isReadOnly && mediaFiles.length === 0 && !existingMedia;
       const mediaAccept = toAccept([...imgExts, ...vidExts]);
 
-      /* 파일 선택 처리 — 확장자 체크 + 이미지/동영상 크기 개별 검증 */
-      const handleMediaSelect = (selected: File[]) => {
+      /* 파일 선택 처리 — 확장자 체크 + 이미지/동영상 크기 개별 검증 (+이미지는 가로/세로(px) 검증 추가) */
+      const handleMediaSelect = async (selected: File[]) => {
         const { valid, rejected } = filterByAccept(selected, mediaAccept);
         if (rejected.length > 0) alert(`${t("common.field.invalid_file_type")}\n${rejected.join("\n")}`);
         if (valid.length === 0) return;
 
         const file = valid[0];
         const isImg = isImageFile(file.name, imgExts);
+        /* 용량 단위 — 이미지는 mediaImageMaxSizeUnit 반영, 동영상은 단위 선택 UI가 없어 항상 MB */
         const maxMB = isImg ? imgMaxMB : vidMaxMB;
-        if (file.size > maxMB * 1024 * 1024) {
+        const unit = isImg ? imgSizeUnit : "MB";
+        const maxBytes = maxMB * unitToBytes(unit);
+        if (file.size > maxBytes) {
           toast.warning(
             t("common.field.file_size_limit", {
               type: isImg ? t("common.label.image") : t("common.label.video"),
-              mb: String(maxMB),
+              mb: `${maxMB}${unit}`,
             })
           );
           return;
+        }
+
+        /* 이미지일 때만 가로/세로(px) 검증 — 디코딩 실패(null) 시 픽셀 검증은 건너뛰고 통과 처리(fail-open) */
+        if (isImg && (field.imageMaxWidthPx || field.imageMaxHeightPx)) {
+          const naturalSize = await getImageNaturalSize(file);
+          const violation = checkImagePixelLimit(naturalSize, field.imageMaxWidthPx, field.imageMaxHeightPx);
+          if (violation === "width") {
+            toast.warning(t("common.field.image_width_limit", { label: file.name, px: String(field.imageMaxWidthPx) }));
+            return;
+          }
+          if (violation === "height") {
+            toast.warning(
+              t("common.field.image_height_limit", { label: file.name, px: String(field.imageMaxHeightPx) })
+            );
+            return;
+          }
         }
         onFileChange?.([file]);
       };

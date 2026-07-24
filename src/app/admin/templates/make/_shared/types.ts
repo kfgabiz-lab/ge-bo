@@ -129,6 +129,13 @@ export interface SearchFieldConfig {
   /* ── media 전용 ── */
   mediaImageMaxSizeMB?: number; // 이미지 최대 크기 MB (기본: 5)
   mediaVideoMaxSizeMB?: number; // 동영상 최대 크기 MB (기본: 20)
+  /* ── 이미지 업로드 밸리데이션 (ImageField[image] + MediaField 이미지부분 공용) ──
+   *  live 업로드 시점에 실제 이미지 픽셀 크기를 판독해 초과 파일을 즉시 차단한다 (저장 시점 재검증 없음) */
+  imageMaxWidthPx?: number; // 이미지 가로 최대(px) — 미설정 시 제한 없음
+  imageMaxHeightPx?: number; // 이미지 세로 최대(px) — 미설정 시 제한 없음
+  /* ── 용량 제한 단위 (기존 숫자 필드와 짝) — 미설정 시 'MB'로 취급(하위호환) ── */
+  maxFileSizeUnit?: "KB" | "MB"; // maxFileSizeMB 값의 단위 (ImageField 전용 노출 — File/Video는 UI 미노출)
+  mediaImageMaxSizeUnit?: "KB" | "MB"; // mediaImageMaxSizeMB 값의 단위 (MediaField 이미지부분 전용)
   /* ── 기본값 설정 ── */
   defaultValue?: string; // 직접 텍스트 기본값 (hidden·input·textarea·editor 전용)
   defaultValueMsgKey?: string; // 다국어 기본값 키 (input·textarea·editor 전용)

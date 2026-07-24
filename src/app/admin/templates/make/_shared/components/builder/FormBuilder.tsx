@@ -366,6 +366,11 @@ export function FormBuilder({
         videoMode: f.videoMode,
         mediaImageMaxSizeMB: f.mediaImageMaxSizeMB,
         mediaVideoMaxSizeMB: f.mediaVideoMaxSizeMB,
+        /* ── 이미지 업로드 밸리데이션 (image/media 이미지부분 공용) ── */
+        imageMaxWidthPx: f.imageMaxWidthPx,
+        imageMaxHeightPx: f.imageMaxHeightPx,
+        maxFileSizeUnit: f.maxFileSizeUnit,
+        mediaImageMaxSizeUnit: f.mediaImageMaxSizeUnit,
         defaultValue: f.defaultValue,
         defaultValueMsgKey: f.defaultValueMsgKey,
         defaultOptionValue: f.defaultOptionValue,

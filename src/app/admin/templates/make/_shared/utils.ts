@@ -505,12 +505,16 @@ export const validateFormFields = (
       return false;
     }
     if (FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number]) && f.maxFileSizeMB) {
-      const over = (fileValues[f.id] || []).find((file) => file.size > f.maxFileSizeMB! * 1024 * 1024);
+      /* 단위 인지형 환산 — maxFileSizeUnit 미설정 시 기존과 동일하게 MB로 취급(하위호환) */
+      const unitBytes = unitToBytes(f.maxFileSizeUnit);
+      const over = (fileValues[f.id] || []).find((file) => file.size > f.maxFileSizeMB! * unitBytes);
       if (over) {
+        /* toast 표시 문구도 실제 단위(KB/MB)를 반영 — 임계 판정(unitBytes)은 위와 동일하게 유지 */
+        const sizeWithUnit = `${f.maxFileSizeMB}${f.maxFileSizeUnit ?? "MB"}`;
         toast.warning(
           t
-            ? t("common.validation.max_file_size", { label: String(label), size: String(f.maxFileSizeMB) })
-            : `'${label}' 파일은 개당 최대 ${f.maxFileSizeMB}MB까지 허용됩니다.`
+            ? t("common.validation.max_file_size", { label: String(label), size: sizeWithUnit })
+            : `'${label}' 파일은 개당 최대 ${sizeWithUnit}까지 허용됩니다.`
         );
         return false;
       }
@@ -671,18 +675,21 @@ export const validateSubListRows = (
             );
             return false;
           }
-          /* 파일 개당 최대 용량 검사 (신규 파일만) */
+          /* 파일 개당 최대 용량 검사 (신규 파일만) — maxFileSizeUnit 미설정 시 기존과 동일하게 MB로 취급(하위호환) */
           if (col.maxFileSizeMB) {
-            const over = newFiles.find((file) => file.size > col.maxFileSizeMB! * 1024 * 1024);
+            const unitBytes = unitToBytes(col.maxFileSizeUnit);
+            const over = newFiles.find((file) => file.size > col.maxFileSizeMB! * unitBytes);
             if (over) {
+              /* toast 표시 문구도 실제 단위(KB/MB)를 반영 — 임계 판정(unitBytes)은 위와 동일하게 유지 */
+              const sizeWithUnit = `${col.maxFileSizeMB}${col.maxFileSizeUnit ?? "MB"}`;
               toast.warning(
                 t
                   ? t("common.validation.row_max_file_size", {
                       label: String(label),
                       row: String(i + 1),
-                      size: String(col.maxFileSizeMB),
+                      size: sizeWithUnit,
                     })
-                  : `'${label}' 항목은 ${i + 1}번째 행의 파일이 개당 최대 ${col.maxFileSizeMB}MB까지 허용됩니다.`
+                  : `'${label}' 항목은 ${i + 1}번째 행의 파일이 개당 최대 ${sizeWithUnit}까지 허용됩니다.`
               );
               return false;
             }
@@ -1707,6 +1714,62 @@ export const getAcceptString = (mode: string, customExts: string[] = []): string
   if (mode === "video") return ".mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v";
   if (mode === "custom" && customExts.length > 0) return customExts.join(",");
   return "";
+};
+
+/**
+ * 이미지 파일의 실제 가로/세로(px) 크기를 판독한다.
+ * - ImageField(type=image)와 MediaField(이미지부분) 양쪽의 업로드 밸리데이션에서 공용으로 사용
+ * - `URL.createObjectURL` + `Image` 디코딩으로 실제 픽셀 크기를 읽고, 완료 즉시 objectURL을 해제한다
+ * - 디코딩 실패(손상 파일 등)면 null을 반환한다 — 호출부는 픽셀 검증을 건너뛰고
+ *   확장자·용량 검증 결과만으로 통과 여부를 결정한다(fail-open 정책)
+ * @example const size = await getImageNaturalSize(file); // { width: 1920, height: 1080 } | null
+ */
+export const getImageNaturalSize = (file: File): Promise<{ width: number; height: number } | null> => {
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.onerror = () => {
+      resolve(null);
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.src = objectUrl;
+  });
+};
+
+/**
+ * 용량 단위(KB/MB) → 바이트 배수 변환 공통 헬퍼
+ * - unit 미설정 시 기존과 동일하게 'MB'로 취급(하위호환)
+ * - 업로드 시점(handleImgSelect/handleMediaSelect)과 저장 시점(validateFormFields/validateSubListRows)
+ *   4개 환산지점에서 동일 리터럴이 중복되던 것을 공통화 — 임계 판정값은 리팩터 전후 동일
+ * @example unitToBytes('KB') // 1024
+ * @example unitToBytes()    // 1024 * 1024 (MB 폴백)
+ */
+export const unitToBytes = (unit?: "KB" | "MB"): number => (unit === "KB" ? 1024 : 1024 * 1024);
+
+/**
+ * 이미지 가로/세로(px) 제한 위반 여부만 판정하는 순수 함수.
+ * - handleImgSelect(반복문 continue)·handleMediaSelect(단일 파일 return)는 위반 시 처리 흐름(continue/return)이
+ *   서로 달라 판정부만 분리하고 차단 흐름은 각 호출부가 그대로 유지한다
+ * - naturalSize가 null(디코딩 실패)이면 위반 없음으로 간주(fail-open) — getImageNaturalSize와 동일 정책
+ * @returns 위반 시 'width' | 'height', 위반 없으면 null
+ * @example
+ *   const naturalSize = await getImageNaturalSize(file);
+ *   const violation = checkImagePixelLimit(naturalSize, field.imageMaxWidthPx, field.imageMaxHeightPx);
+ *   if (violation === 'width') { toast.warning(...); continue; }
+ */
+export const checkImagePixelLimit = (
+  naturalSize: { width: number; height: number } | null,
+  maxWidthPx?: number,
+  maxHeightPx?: number
+): "width" | "height" | null => {
+  if (!naturalSize) return null;
+  if (maxWidthPx && naturalSize.width > maxWidthPx) return "width";
+  if (maxHeightPx && naturalSize.height > maxHeightPx) return "height";
+  return null;
 };
 
 /**
