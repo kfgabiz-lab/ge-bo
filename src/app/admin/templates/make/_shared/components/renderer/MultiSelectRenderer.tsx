@@ -98,19 +98,32 @@ type SourceRow = { dataJson: Record<string, unknown> };
  */
 const inFlightSourceRequests = new Map<string, Promise<SourceRow[]>>();
 
-function fetchSourceRows(slug: string): Promise<SourceRow[]> {
-  const cached = inFlightSourceRequests.get(slug);
+/**
+ * 옵션 소스 목록 조회
+ * - depthGte/depthLte 지정 시 depth_gte/depth_lte 쿼리파라미터를 추가한다.
+ *   서버(PageDataService)가 category/product 등 1단계 중첩 객체까지 자동으로 찾아
+ *   범위조건을 걸어주므로, FE는 depth 값을 직접 읽거나 판별할 필요가 없다.
+ * - 캐시 키에 depth 범위를 포함시켜, 같은 slug라도 depth 조건이 다른 위젯끼리
+ *   요청/응답이 섞이지 않도록 한다.
+ */
+function fetchSourceRows(slug: string, depthGte?: number, depthLte?: number): Promise<SourceRow[]> {
+  const cacheKey = `${slug}|${depthGte ?? ""}|${depthLte ?? ""}`;
+  const cached = inFlightSourceRequests.get(cacheKey);
   if (cached) return cached;
 
+  const params: Record<string, number> = { size: 9999 };
+  if (depthGte !== undefined) params.depth_gte = depthGte;
+  if (depthLte !== undefined) params.depth_lte = depthLte;
+
   const request = api
-    .get(`/page-data/${slug}`, { params: { size: 9999 } })
+    .get(`/page-data/${slug}`, { params })
     .then((res) => (res.data.content ?? []) as SourceRow[])
     .finally(() => {
       /* 성공/실패 무관하게 캐시 제거 — 다음 호출은 항상 새 요청을 보낸다 */
-      inFlightSourceRequests.delete(slug);
+      inFlightSourceRequests.delete(cacheKey);
     });
 
-  inFlightSourceRequests.set(slug, request);
+  inFlightSourceRequests.set(cacheKey, request);
   return request;
 }
 
@@ -232,7 +245,7 @@ export function MultiSelectRenderer({
            FETCH relation을 자동 병합(_fetchedRel{id})해 내려주므로 조회 로직 자체는 동일하다
            동일 slug를 쓰는 다른 위젯 인스턴스와 요청 자체는 fetchSourceRows에서 공유하되,
            필터링(sourceFilter)은 아래에서 이 인스턴스가 개별적으로 수행한다 */
-    fetchSourceRows(effectiveSourceSlug)
+    fetchSourceRows(effectiveSourceSlug, widget.sourceDepthGte, widget.sourceDepthLte)
       .then((rows) => {
         if (cancelled) return;
         /* flattenPageDataItem으로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */
@@ -254,7 +267,7 @@ export function MultiSelectRenderer({
     return () => {
       cancelled = true;
     };
-  }, [isPreview, effectiveSourceSlug, widget.sourceFilter]);
+  }, [isPreview, effectiveSourceSlug, widget.sourceFilter, widget.sourceDepthGte, widget.sourceDepthLte]);
 
   /* ── live: 외부 selectedIds 동기화 ── */
   useEffect(() => {

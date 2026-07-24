@@ -299,6 +299,12 @@ export interface MultiSelectWidget {
    *  `_fetchedRel{sourceRelationSlugId}` 값(카테고리 계층 relation이면 BE가 categoryDepth/categoryDepthFrom 기준으로
    *  " > "로 합쳐서 내려준 문자열)을 그대로 사용한다 */
   sourceRelationSlugId?: number;
+  /** 옵션 목록 조회 시 적용할 최소 depth (예: category-data의 depth 컬럼 기준)
+   *  미설정 시 depth 제한 없이 전체 옵션 노출 (기존 동작과 동일) */
+  sourceDepthGte?: number;
+  /** 옵션 목록 조회 시 적용할 최대 depth
+   *  미설정 시 depth 제한 없이 전체 옵션 노출 (기존 동작과 동일) */
+  sourceDepthLte?: number;
   /** 저장 시 연결되는 slug (연결 slug) */
   connectedSlug?: string;
   /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept")

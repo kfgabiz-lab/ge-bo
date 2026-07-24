@@ -432,6 +432,38 @@ export function MultiSelectBuilder({
           />
         </div>
 
+        {/* 옵션 최소/최대 Depth — 서버(depth_gte/depth_lte)가 옵션 목록 범위를 제한 (선택) */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>
+              옵션 최소 Depth <span className="text-slate-300 font-normal">(선택)</span>
+            </label>
+            <input
+              type="number"
+              value={widget.sourceDepthGte ?? ""}
+              onChange={(e) =>
+                onChange({ ...widget, sourceDepthGte: e.target.value === "" ? undefined : Number(e.target.value) })
+              }
+              placeholder="예: 1"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>
+              옵션 최대 Depth <span className="text-slate-300 font-normal">(선택)</span>
+            </label>
+            <input
+              type="number"
+              value={widget.sourceDepthLte ?? ""}
+              onChange={(e) =>
+                onChange({ ...widget, sourceDepthLte: e.target.value === "" ? undefined : Number(e.target.value) })
+              }
+              placeholder="예: 2"
+              className={INPUT_CLS}
+            />
+          </div>
+        </div>
+
         {/* 표시 필드 — 연동 모드에서는 라벨이 _fetchedRel{id} 값으로 자동 결정되므로 숨김 */}
         {(widget.sourceMode ?? "call") === "call" && (
           <div>
