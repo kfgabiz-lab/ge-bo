@@ -384,9 +384,12 @@ export function TableBuilder({
           buttonColor: p.cellType === "button" ? (p.buttonColor ?? "slate") : undefined,
           connType: p.cellType === "button" ? (p.connType ?? "page") : undefined,
           targetSlug: p.cellType === "button" ? p.targetSlug : undefined,
+          targetType: p.cellType === "button" ? p.targetType : undefined,
+          externalUrl: p.cellType === "button" && p.targetType === "url" ? p.externalUrl : undefined,
           conditionParam: p.cellType === "button" ? p.conditionParam : undefined,
           passParam: p.cellType === "button" ? p.passParam : undefined,
           windowPopupOption: p.cellType === "button" && p.connType === "windowPopup" ? p.windowPopupOption : undefined,
+          usePreviewToken: p.cellType === "button" && p.targetType === "url" ? p.usePreviewToken : undefined,
         },
       ],
     });

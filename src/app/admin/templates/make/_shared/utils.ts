@@ -1040,6 +1040,7 @@ export function flattenPageDataItem(item: {
   createdBy?: string | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
+  count?: number | string | null;
 }): Record<string, unknown> {
   /* dataJson.id를 제거하지 않고 유지 — params에서 id로 접근 가능하도록 */
   const restDataJson = item.dataJson ?? {};
@@ -1109,6 +1110,7 @@ export function flattenPageDataItem(item: {
     createdBy: item.createdBy ?? null,
     updatedAt: item.updatedAt ?? null,
     updatedBy: item.updatedBy ?? null,
+    count: item.count ?? null,
   };
 }
 

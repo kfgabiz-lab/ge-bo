@@ -451,6 +451,8 @@ export interface TableColumnConfig {
     width?: number; // 창 너비(px)
     height?: number; // 창 높이(px)
   };
+  /** connType='windowPopup' && targetType='url' 전용 — 켜면 클릭 시 미리보기 토큰을 발급받아 FO /preview 라우트로 이동(비공개 컨텐츠 담당자 미리보기용). 꺼져있으면 기존처럼 externalUrl로 바로 이동 */
+  usePreviewToken?: boolean;
 }
 
 /** 불러오기 목록 아이템 */

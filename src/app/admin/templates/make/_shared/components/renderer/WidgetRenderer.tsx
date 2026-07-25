@@ -1840,6 +1840,37 @@ export function WidgetRenderer({
           return;
         }
 
+        /* 미리보기 토큰 버튼 — 비공개 컨텐츠를 FO에서 담당자만 미리보기(신규).
+         * 팝업 차단 회피: 클릭 즉시(동기) 빈 창을 선점(popup) → 토큰 발급(비동기) 완료 후 popup.location 이동.
+         * noopener를 안 쓰는 이유: 선점 단계에서 popup 핸들이 필요해서다(noopener면 open()이 null 반환).
+         * 대신 FO 응답 헤더의 Cross-Origin-Opener-Policy: same-origin 이 페이지 로드 시점에 opener 관계를 끊어준다. */
+        if (col.usePreviewToken && (col.targetType ?? "slug") === "url" && col.externalUrl) {
+          const width = col.windowPopupOption?.width ?? 800;
+          const height = col.windowPopupOption?.height ?? 600;
+          const popup = window.open("", "_blank", `width=${width},height=${height}`);
+          if (!popup) {
+            toast.error("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.");
+            return;
+          }
+          const recordId = String(row._id ?? "");
+          (async () => {
+            try {
+              const res = await api.post<{ token: string }>("/preview-tokens", {
+                slug: connectedSlug,
+                recordId,
+              });
+              const normalizedBase = normalizeExternalUrl(col.externalUrl as string).replace(/\/$/, "");
+              const detailUrl = new URL(`${normalizedBase}/${recordId}`);
+              const finalUrl = `${detailUrl.origin}/preview?token=${encodeURIComponent(res.data.token)}&redirect=${encodeURIComponent(detailUrl.pathname)}`;
+              popup.location.href = finalUrl;
+            } catch {
+              popup.close();
+              toast.error("미리보기 토큰 발급에 실패했습니다.");
+            }
+          })();
+          return;
+        }
+
         /* 외부 URL 이동 — page/windowPopup 공통, targetType='url'일 때만 동작 */
         if ((col.targetType ?? "slug") === "url" && col.externalUrl) {
           const normalizedUrl = normalizeExternalUrl(col.externalUrl);
