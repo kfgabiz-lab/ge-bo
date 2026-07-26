@@ -37,6 +37,26 @@ const TIMEZONE_OPTIONS = [
   "UTC+0000 UTC:UTC",
 ];
 
+/* 로케일(locale) select 옵션 — "라벨:값(BCP47)" 형식, TIMEZONE_OPTIONS와 동일한 도시/국가 기준으로 큐레이션 */
+const LOCALE_OPTIONS = [
+  "Korean (Korea):ko-KR",
+  "Japanese (Japan):ja-JP",
+  "Chinese (China):zh-CN",
+  "Chinese (Hong Kong):zh-HK",
+  "English (Singapore):en-SG",
+  "Thai (Thailand):th-TH",
+  "Indonesian (Indonesia):id-ID",
+  "Vietnamese (Vietnam):vi-VN",
+  "English (India):en-IN",
+  "Arabic (UAE):ar-AE",
+  "English (UK):en-GB",
+  "French (France):fr-FR",
+  "German (Germany):de-DE",
+  "English (US):en-US",
+  "English (Australia):en-AU",
+  "English (New Zealand):en-NZ",
+];
+
 /* ── 페이지 컴포넌트 ── */
 export default function SiteDetailPage() {
   const params = useParams();
@@ -56,6 +76,7 @@ export default function SiteDetailPage() {
     domain: "",
     isActive: "true",
     timezone: "",
+    locale: "",
   });
 
   /* 공간영역 — 취소 / 저장 */
@@ -129,6 +150,16 @@ export default function SiteDetailPage() {
           options: TIMEZONE_OPTIONS,
         },
         {
+          id: "locale",
+          type: "select",
+          label: t("site.label.locale"),
+          colSpan: 4,
+          rowSpan: 1,
+          required: false,
+          fieldKey: "locale",
+          options: LOCALE_OPTIONS,
+        },
+        {
           id: "domain",
           type: "input",
           label: t("common.label.domain"),
@@ -168,6 +199,7 @@ export default function SiteDetailPage() {
           domain: site.domain ?? "",
           isActive: String(site.isActive),
           timezone: site.timezone ?? "",
+          locale: site.locale ?? "",
         });
       } catch {
         toast.error(t("site.load_error"));
@@ -202,6 +234,7 @@ export default function SiteDetailPage() {
           domain: formValues.domain?.trim() || undefined,
           isActive: formValues.isActive === "true",
           timezone: formValues.timezone || undefined,
+          locale: formValues.locale || undefined,
         };
 
         if (isNew) {

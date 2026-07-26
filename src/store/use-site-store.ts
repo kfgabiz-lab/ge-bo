@@ -10,6 +10,7 @@ export interface Site {
   domain: string | null;
   isActive: boolean;
   timezone?: string; // IANA 시간대 (예: Asia/Seoul) — STEP2에서 실제 저장/로드 연동 예정
+  locale?: string; // BCP47 로케일 (예: en-US)
   createdBy: string;
   createdAt: string;
   updatedBy: string;
@@ -22,6 +23,7 @@ export interface SiteCreateRequest {
   domain?: string;
   isActive: boolean;
   timezone?: string; // IANA 시간대 (예: Asia/Seoul) — STEP2에서 실제 저장/로드 연동 예정
+  locale?: string; // BCP47 로케일 (예: en-US)
 }
 
 export interface SiteUpdateRequest {
@@ -30,6 +32,7 @@ export interface SiteUpdateRequest {
   domain?: string;
   isActive: boolean;
   timezone?: string; // IANA 시간대 (예: Asia/Seoul) — STEP2에서 실제 저장/로드 연동 예정
+  locale?: string; // BCP47 로케일 (예: en-US)
 }
 
 interface SiteState {

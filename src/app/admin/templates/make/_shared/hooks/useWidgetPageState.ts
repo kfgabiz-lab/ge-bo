@@ -136,6 +136,13 @@ interface UseWidgetPageStateOptions {
    * 'none' | 'slug' | 미설정이면 기존과 동일하게 page_data API(/page-data/{slug})로 조회한다.
    */
   connectedType?: ConnectedType;
+  /**
+   * entity 모드(connectedType='data')에서도 검색 파라미터를 서버로 전송할지 여부
+   * - 기본(false/미설정): entity 모드는 검색 파라미터를 전송하지 않음(codegen 엔티티 API는 검색 미지원 가정)
+   * - true: 이 화면만 opt-in — Slug Entity 경로 위에 수제 컨트롤러를 얹어 검색 파라미터를
+   *   정식 지원하는 경우(예: training-registrations) 사용. 다른 entity 화면 동작에는 영향 없음.
+   */
+  entitySearchEnabled?: boolean;
 }
 
 /**
@@ -487,11 +494,13 @@ export function useWidgetPageState(
         const params: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) params.sort = `${sk},${sd}`;
 
-        /* entity API는 검색조건 파라미터를 지원하지 않으므로 page/size/sort만 전송한다.
+        /* entity API는 기본적으로 검색조건 파라미터를 지원하지 않으므로 page/size/sort만 전송한다.
          * (page_data 전용 검색 파라미터 구성은 entity 모드에서는 건너뛴다)
+         * 단, entitySearchEnabled(opt-in) 옵션이 켜진 화면은 entity 모드여도 검색 파라미터를 그대로 전송한다 —
+         * Slug Entity 경로 위에 검색을 정식 지원하는 수제 컨트롤러를 얹은 화면 전용(다른 entity 화면은 영향 없음).
          * 검색 필드 → API 파라미터 변환 규칙은 공용 함수(buildSearchQueryParams)로 관리 —
          * 팝업 레벨(WidgetRenderer)도 동일 함수를 사용해 동일한 변환 규칙을 공유한다. */
-        if (!isEntity) {
+        if (!isEntity || options?.entitySearchEnabled) {
           Object.assign(params, buildSearchQueryParams(searchFields, sv));
         }
 
