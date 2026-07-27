@@ -32,8 +32,8 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-          /* require-corp는 유튜브/구글맵/구글루커 임베드를 깨뜨려 credentialless로 완화 적용 (자격증명 없는 교차출처 리소스는 허용) */
-          { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+          // require-corp, credentialless 둘 다 구글 루커 스튜디오 임베드가 거부되어 COEP 적용 보류. 보안점검 예외 등록 필요.
+          // { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
         ],
       },
     ];
