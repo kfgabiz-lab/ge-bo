@@ -217,11 +217,20 @@ export function MultiSelectRenderer({
   const sourceMode = widget.sourceMode ?? "call";
   /* 연동 모드일 때만 relation 목록 조회 (호출 모드/미리보기에서는 불필요한 API 호출 방지) */
   const relations = useSlugRelations(!isPreview && sourceMode === "relation");
+  /* 연동 모드에서 선택된 relation 객체 — masterSlug뿐 아니라 옵션 조회 depth 범위(categoryDepthFrom/categoryDepth)도
+     이 relation이 이미 갖고 있으므로(BE SlugRelationResponse) 위젯에 별도 depth 입력을 두지 않고 여기서 그대로 가져와 쓴다 */
+  const selectedRelation =
+    sourceMode === "relation" ? relations.find((r) => r.id === widget.sourceRelationSlugId) : undefined;
   /* 실제 조회할 slug — 연동 모드면 선택된 relation의 masterSlug, 호출 모드면 기존 sourceSlug */
-  const effectiveSourceSlug =
-    sourceMode === "relation"
-      ? relations.find((r) => r.id === widget.sourceRelationSlugId)?.masterSlug
-      : widget.sourceSlug;
+  const effectiveSourceSlug = sourceMode === "relation" ? selectedRelation?.masterSlug : widget.sourceSlug;
+  /* 옵션 조회 depth — 연동 모드에서는 relation의 categoryDepth(타겟 depth) "한 값"만으로 옵션 목록을 제한한다.
+     categoryDepthFrom(라벨 시작 depth)~categoryDepth(라벨 끝 depth) 범위는 BE가 각 행의 라벨(breadcrumb)을
+     만들 때만 쓰는 값이라, 옵션 목록 자체를 그 범위로 걸면 categoryDepthFrom에 해당하는 상위 depth 행(예:
+     depth1 대분류)까지 별도 옵션으로 섞여 나온다 — 옵션은 항상 타겟 depth(예: depth2)만, 라벨은 상위 depth까지
+     포함한 breadcrumb("대분류 > 소분류")로 나와야 하므로 gte/lte를 동일하게 categoryDepth로 고정한다.
+     호출 모드는 depth 자동 적용 대상이 아니므로 항상 undefined(기존 동작 그대로 유지) */
+  const depthGte = sourceMode === "relation" ? selectedRelation?.categoryDepth : undefined;
+  const depthLte = sourceMode === "relation" ? selectedRelation?.categoryDepth : undefined;
 
   /* ── 상태 ── */
   const [liveOptions, setOptions] = useState<OptionItem[]>([]);
@@ -245,7 +254,7 @@ export function MultiSelectRenderer({
            FETCH relation을 자동 병합(_fetchedRel{id})해 내려주므로 조회 로직 자체는 동일하다
            동일 slug를 쓰는 다른 위젯 인스턴스와 요청 자체는 fetchSourceRows에서 공유하되,
            필터링(sourceFilter)은 아래에서 이 인스턴스가 개별적으로 수행한다 */
-    fetchSourceRows(effectiveSourceSlug, widget.sourceDepthGte, widget.sourceDepthLte)
+    fetchSourceRows(effectiveSourceSlug, depthGte, depthLte)
       .then((rows) => {
         if (cancelled) return;
         /* flattenPageDataItem으로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */
@@ -256,7 +265,13 @@ export function MultiSelectRenderer({
               evalConditionExpr(widget.sourceFilter!, (key) => (key in row ? String(row[key] ?? "") : undefined))
             )
           : flatRows;
-        setOptions(filteredRows.map((row) => ({ ...row, id: Number(row._id ?? 0) })));
+        /* 연동 모드에서 _fetchedRel{id}가 없는 행은 옵션에서 제외 — BE가 조상 체인이 끊긴(자기 depth만큼
+           부모를 다 못 찾은) 행은 일부러 이 키를 만들지 않으므로, 그 판단을 그대로 따라 화면에서도 숨긴다 */
+        const validRows =
+          sourceMode === "relation" && widget.sourceRelationSlugId
+            ? filteredRows.filter((row) => row[`_fetchedRel${widget.sourceRelationSlugId}`] !== undefined)
+            : filteredRows;
+        setOptions(validRows.map((row) => ({ ...row, id: Number(row._id ?? 0) })));
       })
       .catch((err) => {
         /* 침묵 대신 콘솔 경고만 남김 — 옵션 목록은 빈 상태로 유지(기존 동작과 동일) */
@@ -267,7 +282,7 @@ export function MultiSelectRenderer({
     return () => {
       cancelled = true;
     };
-  }, [isPreview, effectiveSourceSlug, widget.sourceFilter, widget.sourceDepthGte, widget.sourceDepthLte]);
+  }, [isPreview, effectiveSourceSlug, widget.sourceFilter, depthGte, depthLte]);
 
   /* ── live: 외부 selectedIds 동기화 ── */
   useEffect(() => {
@@ -394,52 +409,58 @@ export function MultiSelectRenderer({
           </PortalDropdown>
         </div>
 
-        {/* 선택된 항목 목록 — [좌측 필드][항목명][우측 필드][X버튼] 1줄 배치 */}
+        {/* 선택된 항목 목록 — [좌측 필드][항목명][우측 필드][X버튼] 1줄 배치
+             선택 개수가 늘어나면 위젯이 놓인 그리드 셀 높이를 넘어서서 잘리므로(그리드 셀 자체엔 스크롤이 없음),
+             바깥 wrapper에만 높이 제한 + 세로 스크롤을 둔다.
+             (flex-col 컨테이너 자체에 max-height를 주면 그 자식 row들이 flex-shrink로 찌그러지므로,
+              반드시 별도 block 레벨 wrapper로 감싸서 안쪽 flex-col은 원래 크기 그대로 유지시킨다) */}
         {selectedOptions.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            {selectedOptions.map((opt) => {
-              const extraFields = widget.extraFields ?? [];
-              /* position='left'인 필드만 좌측 그룹, 그 외(right 및 미설정)는 우측 그룹 */
-              const leftFields = extraFields.filter((ef) => ef.position === "left");
-              const rightFields = extraFields.filter((ef) => ef.position !== "left");
-              const itemVals = extraFieldValues[opt.id] ?? {};
+          <div className="max-h-56 overflow-y-auto">
+            <div className="flex flex-col gap-1.5">
+              {selectedOptions.map((opt) => {
+                const extraFields = widget.extraFields ?? [];
+                /* position='left'인 필드만 좌측 그룹, 그 외(right 및 미설정)는 우측 그룹 */
+                const leftFields = extraFields.filter((ef) => ef.position === "left");
+                const rightFields = extraFields.filter((ef) => ef.position !== "left");
+                const itemVals = extraFieldValues[opt.id] ?? {};
 
-              return (
-                <div
-                  key={opt.id}
-                  className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
-                >
-                  {/* 좌측 추가 입력 필드 */}
-                  {leftFields.length > 0 &&
-                    renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
-
-                  {/* 좌측 필드 ↔ 항목명 구분선 */}
-                  {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
-
-                  {/* 항목명 — 고정 너비로 잘림 방지 */}
-                  <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
-                    {buildLabel(opt, widget)}
-                  </span>
-
-                  {/* 항목명 ↔ 우측 필드 구분선 */}
-                  {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
-
-                  {/* 우측 추가 입력 필드 */}
-                  {rightFields.length > 0 &&
-                    renderExtraFieldGroup(rightFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
-
-                  {/* X버튼 — 오른쪽 끝 고정 */}
-                  <button
-                    type="button"
-                    disabled={isPreview}
-                    onClick={() => removeItem(opt.id)}
-                    className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
+                return (
+                  <div
+                    key={opt.id}
+                    className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+                    {/* 좌측 추가 입력 필드 */}
+                    {leftFields.length > 0 &&
+                      renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
+
+                    {/* 좌측 필드 ↔ 항목명 구분선 */}
+                    {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
+
+                    {/* 항목명 — 고정 너비로 잘림 방지 */}
+                    <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
+                      {buildLabel(opt, widget)}
+                    </span>
+
+                    {/* 항목명 ↔ 우측 필드 구분선 */}
+                    {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
+
+                    {/* 우측 추가 입력 필드 */}
+                    {rightFields.length > 0 &&
+                      renderExtraFieldGroup(rightFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
+
+                    {/* X버튼 — 오른쪽 끝 고정 */}
+                    <button
+                      type="button"
+                      disabled={isPreview}
+                      onClick={() => removeItem(opt.id)}
+                      className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

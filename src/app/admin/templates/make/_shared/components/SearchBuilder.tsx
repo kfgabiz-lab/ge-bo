@@ -50,6 +50,10 @@ export interface SlugRelationOption {
   /** EQ: 단순 동등 / ARRAY_CONTAINS: 배열 포함 — ARRAY_CONTAINS는 masterKey가 배열이라
    *  inlineEdit 저장 리다이렉트 대상에서 제외해야 한다 */
   joinType?: string;
+  /** 카테고리 계층 relation 전용 — 연동 대상 옵션 조회 시 적용할 최대 depth (BE SlugRelationResponse.categoryDepth) */
+  categoryDepth?: number;
+  /** 카테고리 계층 relation 전용 — 연동 대상 옵션 조회 시 적용할 최소 depth (BE SlugRelationResponse.categoryDepthFrom) */
+  categoryDepthFrom?: number;
 }
 
 /* ══════════════════════════════════════════ */
