@@ -1,219 +1,297 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import PageLayout from '@/components/layout/page-layout';
-import { GridCell } from '@/components/layout/grid-cell';
-import { ToggleSwitch } from '@/components/ui/toggle-switch';
-import api from '@/lib/api';
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import PageLayout from "@/components/layout/page-layout";
+import { GridCell } from "@/components/layout/grid-cell";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { useCodeStore } from "@/store/use-code-store";
+import api from "@/lib/api";
 
-/* ── 검색텍스트 단건 타입 ── */
+/* 분류(page_section) 옵션을 가져올 공통코드 그룹 코드 — 코드값/라벨은 DB(code_detail)에서만 가져온다 */
+const PAGE_SECTION_GROUP_CODE = "PAGE_SECTION";
+
+/* ── 검색텍스트 단건 타입 ──
+   title 은 뒤늦게 추가된 선택 항목이라 기존 데이터는 NULL 로 내려온다 */
 interface SearchTextEntry {
-    id: number;
-    text: string;
-    createdAt: string;
+  id: number;
+  title: string | null;
+  text: string;
+  createdAt: string;
 }
 
 /* ── 검색관리 단건 상세 응답 타입 ── */
 interface SearchMgmtDetail {
-    id: number;
-    url: string;
-    active: boolean;
-    texts: SearchTextEntry[];
+  id: number;
+  url: string;
+  active: boolean;
+  /* 분류 — code_detail(group_code='PAGE_SECTION')의 코드값. 선택 입력이라 미지정이면 null */
+  pageSection: string | null;
+  texts: SearchTextEntry[];
 }
+
+/* ── API 응답의 검색텍스트를 화면 표시용으로 변환 (등록/수정/조회 3곳 공통) ── */
+const toTextEntry = (t: SearchTextEntry): SearchTextEntry => ({
+  id: t.id,
+  title: t.title ?? null,
+  text: t.text,
+  createdAt: t.createdAt.slice(0, 19).replace("T", " "),
+});
 
 /* ── 검색관리 등록/수정 통합 페이지 (id === 'new'이면 신규 등록) ── */
 export default function SearchMgmtDetailPage() {
-    const params = useParams();
-    const router = useRouter();
-    const routeId = params.id as string;
-    const isNew = routeId === 'new';
+  const params = useParams();
+  const router = useRouter();
+  const routeId = params.id as string;
+  const isNew = routeId === "new";
 
-    /* 실제 저장된 부모 id — 신규 등록 전에는 null */
-    const [savedId, setSavedId] = useState<number | null>(isNew ? null : Number(routeId));
+  /* 실제 저장된 부모 id — 신규 등록 전에는 null */
+  const [savedId, setSavedId] = useState<number | null>(isNew ? null : Number(routeId));
 
-    const [url, setUrl] = useState('');
-    const [isActive, setIsActive] = useState(true);
-    const [textInput, setTextInput] = useState('');
-    const [textList, setTextList] = useState<SearchTextEntry[]>([]);
-    const [loading, setLoading] = useState(!isNew);
-    const [saving, setSaving] = useState(false);
+  const [url, setUrl] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  /* 분류(page_section) — 선택 입력. 빈 문자열이면 "선택 안 함" */
+  const [pageSection, setPageSection] = useState("");
+  /* 검색텍스트 제목 — 선택 입력(미입력 시 전송하지 않음) */
+  const [titleInput, setTitleInput] = useState("");
+  const [textInput, setTextInput] = useState("");
+  const [textList, setTextList] = useState<SearchTextEntry[]>([]);
+  const [loading, setLoading] = useState(!isNew);
+  const [saving, setSaving] = useState(false);
 
-    /* 수정 모드 — 실제 데이터 로드 */
-    useEffect(() => {
-        if (isNew) return;
-        const load = async () => {
-            setLoading(true);
-            try {
-                const res = await api.get<SearchMgmtDetail>(`/search-manage/${routeId}`);
-                setUrl(res.data.url);
-                setIsActive(res.data.active);
-                setTextList(res.data.texts.map(t => ({
-                    id: t.id,
-                    text: t.text,
-                    createdAt: t.createdAt.slice(0, 19).replace('T', ' '),
-                })));
-            } catch {
-                toast.error('데이터를 찾을 수 없습니다.');
-                router.back();
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
-    }, [routeId, isNew, router]);
+  /* 공통코드 스토어 — BO 전역 공통 패턴(useCodeStore + GET /codes) 재사용 */
+  const { groups: codeGroups, fetchGroups } = useCodeStore();
 
-    /* 등록 — 화면 전체(URL/사용여부 + 입력 중인 검색텍스트) 한 번에 저장
+  useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
+  /* 분류 셀렉트 옵션 — PAGE_SECTION 그룹의 활성 코드를 sortOrder 순으로 노출 */
+  const pageSectionOptions = useMemo(
+    () =>
+      (codeGroups.find((g) => g.groupCode === PAGE_SECTION_GROUP_CODE)?.details ?? [])
+        .filter((d) => d.active)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    [codeGroups]
+  );
+
+  /* 수정 모드 — 실제 데이터 로드 */
+  useEffect(() => {
+    if (isNew) return;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get<SearchMgmtDetail>(`/search-manage/${routeId}`);
+        setUrl(res.data.url);
+        setIsActive(res.data.active);
+        /* 저장된 분류 복원 — 미지정(null)이면 "선택 안 함"으로 */
+        setPageSection(res.data.pageSection ?? "");
+        setTextList(res.data.texts.map(toTextEntry));
+      } catch {
+        toast.error("데이터를 찾을 수 없습니다.");
+        router.back();
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [routeId, isNew, router]);
+
+  /* 등록 — 화면 전체(URL/분류/사용여부 + 입력 중인 검색텍스트) 한 번에 저장
        신규면 생성 후 해당 id로 URL만 교체(화면 이동 없음), 기존이면 그대로 갱신 */
-    const handleRegister = useCallback(async () => {
-        if (!url.trim()) {
-            toast.error('URL을 입력해주세요.');
-            return;
-        }
-        setSaving(true);
-        try {
-            const trimmedText = textInput.trim();
-
-            if (savedId) {
-                await api.put(`/search-manage/${savedId}`, { url: url.trim(), active: isActive });
-                if (trimmedText) {
-                    const res = await api.post<SearchMgmtDetail>(`/search-manage/${savedId}/texts`, { text: trimmedText });
-                    setTextList(res.data.texts.map(t => ({
-                        id: t.id,
-                        text: t.text,
-                        createdAt: t.createdAt.slice(0, 19).replace('T', ' '),
-                    })));
-                    setTextInput('');
-                }
-                toast.success('저장되었습니다.');
-                return;
-            }
-
-            const created = await api.post<SearchMgmtDetail>('/search-manage', { url: url.trim(), active: isActive });
-            const newId = created.data.id;
-            let latestTexts = created.data.texts;
-
-            if (trimmedText) {
-                const res = await api.post<SearchMgmtDetail>(`/search-manage/${newId}/texts`, { text: trimmedText });
-                latestTexts = res.data.texts;
-                setTextInput('');
-            }
-
-            setSavedId(newId);
-            setTextList(latestTexts.map(t => ({
-                id: t.id,
-                text: t.text,
-                createdAt: t.createdAt.slice(0, 19).replace('T', ' '),
-            })));
-            toast.success('등록되었습니다.');
-            router.replace(`/admin/manage/search/${newId}`);
-        } catch {
-            toast.error('저장에 실패했습니다.');
-        } finally {
-            setSaving(false);
-        }
-    }, [url, isActive, textInput, savedId, router]);
-
-    /* 검색텍스트 삭제 — 브라우저 기본 confirm으로 확인 후 실행 */
-    const handleDeleteText = useCallback(async (entryId: number) => {
-        if (!savedId) return;
-        if (!confirm('이 검색텍스트를 삭제하시겠습니까?')) return;
-        try {
-            await api.delete(`/search-manage/${savedId}/texts/${entryId}`);
-            setTextList(prev => prev.filter(e => e.id !== entryId));
-        } catch {
-            toast.error('검색텍스트 삭제에 실패했습니다.');
-        }
-    }, [savedId]);
-
-    if (loading) {
-        return (
-            <div className="flex h-64 items-center justify-center">
-                <span className="text-sm text-slate-400">불러오는 중...</span>
-            </div>
-        );
+  const handleRegister = useCallback(async () => {
+    if (!url.trim()) {
+      toast.error("URL을 입력해주세요.");
+      return;
     }
+    setSaving(true);
+    try {
+      const trimmedText = textInput.trim();
+      /* 제목은 선택 입력 — 미입력이면 null 로 보내 서버에서 NULL 로 저장되게 한다 */
+      const trimmedTitle = titleInput.trim();
+      const textPayload = { title: trimmedTitle || null, text: trimmedText };
 
+      /* 분류는 미선택 시 빈 문자열로 보낸다.
+               서버는 pageSection 이 null 이면 "필드 미전달 = 기존 값 유지"로 해석하므로,
+               null 을 보내면 선택 해제가 저장되지 않는다. 빈 문자열은 서버에서 NULL 로 정규화된다. */
+      const sectionPayload = pageSection.trim();
+
+      if (savedId) {
+        await api.put(`/search-manage/${savedId}`, {
+          url: url.trim(),
+          active: isActive,
+          pageSection: sectionPayload,
+        });
+        if (trimmedText) {
+          const res = await api.post<SearchMgmtDetail>(`/search-manage/${savedId}/texts`, textPayload);
+          setTextList(res.data.texts.map(toTextEntry));
+          setTitleInput("");
+          setTextInput("");
+        }
+        toast.success("저장되었습니다.");
+        return;
+      }
+
+      const created = await api.post<SearchMgmtDetail>("/search-manage", {
+        url: url.trim(),
+        active: isActive,
+        pageSection: sectionPayload,
+      });
+      const newId = created.data.id;
+      let latestTexts = created.data.texts;
+
+      if (trimmedText) {
+        const res = await api.post<SearchMgmtDetail>(`/search-manage/${newId}/texts`, textPayload);
+        latestTexts = res.data.texts;
+        setTitleInput("");
+        setTextInput("");
+      }
+
+      setSavedId(newId);
+      setTextList(latestTexts.map(toTextEntry));
+      toast.success("등록되었습니다.");
+      router.replace(`/admin/manage/search/${newId}`);
+    } catch {
+      toast.error("저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }, [url, isActive, pageSection, titleInput, textInput, savedId, router]);
+
+  /* 검색텍스트 삭제 — 브라우저 기본 confirm으로 확인 후 실행 */
+  const handleDeleteText = useCallback(
+    async (entryId: number) => {
+      if (!savedId) return;
+      if (!confirm("이 검색텍스트를 삭제하시겠습니까?")) return;
+      try {
+        await api.delete(`/search-manage/${savedId}/texts/${entryId}`);
+        setTextList((prev) => prev.filter((e) => e.id !== entryId));
+      } catch {
+        toast.error("검색텍스트 삭제에 실패했습니다.");
+      }
+    },
+    [savedId]
+  );
+
+  if (loading) {
     return (
-        <PageLayout mode="live">
-            {/* URL + 사용여부 */}
-            <GridCell colSpan={12} rowSpan={2}>
-                <div className="h-full space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-                    <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">URL</label>
-                        <input
-                            type="text"
-                            value={url}
-                            onChange={e => setUrl(e.target.value)}
-                            placeholder="URL 입력"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-700">사용여부</span>
-                        <ToggleSwitch checked={isActive} onChange={setIsActive} />
-                    </div>
-                </div>
-            </GridCell>
-
-            {/* 검색텍스트 등록 */}
-            <GridCell colSpan={12} rowSpan={3}>
-                <div className="h-full space-y-2 rounded-lg border border-slate-200 bg-white p-5">
-                    <label className="block text-sm font-medium text-slate-700">검색텍스트</label>
-                    <textarea
-                        value={textInput}
-                        onChange={e => setTextInput(e.target.value)}
-                        placeholder="검색용 텍스트를 입력하세요."
-                        rows={3}
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-                    />
-                    <div className="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={() => router.push('/admin/manage/search')}
-                            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                            목록
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleRegister}
-                            disabled={saving}
-                            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            등록
-                        </button>
-                    </div>
-                </div>
-            </GridCell>
-
-            {/* 등록된 검색텍스트 목록 — 최신순, 넘치면 내부 스크롤 */}
-            <GridCell colSpan={12} rowSpan={9}>
-                <div className="h-full space-y-2 overflow-y-auto pr-1">
-                    {textList.length === 0 && (
-                        <p className="p-4 text-center text-sm text-slate-400">등록된 검색텍스트가 없습니다.</p>
-                    )}
-                    {textList.map(entry => (
-                        <div
-                            key={entry.id}
-                            className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3"
-                        >
-                            <div>
-                                <p className="whitespace-pre-wrap text-sm text-slate-800">{entry.text}</p>
-                                <p className="mt-1 text-xs text-slate-400">{entry.createdAt}</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => handleDeleteText(entry.id)}
-                                className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                            >
-                                삭제
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </GridCell>
-        </PageLayout>
+      <div className="flex h-64 items-center justify-center">
+        <span className="text-sm text-slate-400">불러오는 중...</span>
+      </div>
     );
+  }
+
+  return (
+    <PageLayout mode="live">
+      {/* URL + 분류 + 사용여부 — 분류 입력이 추가되어 rowSpan 을 1 늘리고, 아래 목록에서 1 줄인다(전체 높이 유지) */}
+      <GridCell colSpan={12} rowSpan={3}>
+        <div className="h-full space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">URL</label>
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="URL 입력"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+          </div>
+          {/* 분류 — URL(=search_manage) 단위 속성. 선택 입력이라 "선택 안 함" 허용 */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">분류</label>
+            <select
+              value={pageSection}
+              onChange={(e) => setPageSection(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            >
+              <option value="">선택 안 함</option>
+              {pageSectionOptions.map((d) => (
+                <option key={d.code} value={d.code}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">사용여부</span>
+            <ToggleSwitch checked={isActive} onChange={setIsActive} />
+          </div>
+        </div>
+      </GridCell>
+
+      {/* 검색텍스트 등록 — 제목 입력이 추가되어 rowSpan 을 1 늘리고, 아래 목록에서 1 줄인다(전체 높이 유지) */}
+      <GridCell colSpan={12} rowSpan={4}>
+        <div className="h-full space-y-2 rounded-lg border border-slate-200 bg-white p-5">
+          {/* 제목 — 선택 입력, 미입력 시 FO 검색결과에서 URL 이 대신 노출된다 */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">제목</label>
+            <input
+              type="text"
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              placeholder="제목 입력"
+              maxLength={200}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+          </div>
+          <label className="block text-sm font-medium text-slate-700">검색텍스트</label>
+          <textarea
+            value={textInput}
+            onChange={(e) => setTextInput(e.target.value)}
+            placeholder="검색용 텍스트를 입력하세요."
+            rows={3}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/admin/manage/search")}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              목록
+            </button>
+            <button
+              type="button"
+              onClick={handleRegister}
+              disabled={saving}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              등록
+            </button>
+          </div>
+        </div>
+      </GridCell>
+
+      {/* 등록된 검색텍스트 목록 — 최신순, 넘치면 내부 스크롤
+                (위 카드들이 rowSpan 을 늘린 만큼 여기서 줄여 전체 높이 14를 유지한다) */}
+      <GridCell colSpan={12} rowSpan={7}>
+        <div className="h-full space-y-2 overflow-y-auto pr-1">
+          {textList.length === 0 && (
+            <p className="p-4 text-center text-sm text-slate-400">등록된 검색텍스트가 없습니다.</p>
+          )}
+          {textList.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3"
+            >
+              <div>
+                {/* 제목 — 없는 기존 데이터는 아예 렌더링하지 않는다 */}
+                {entry.title && <p className="mb-1 block text-sm font-medium text-slate-700">{entry.title}</p>}
+                <p className="whitespace-pre-wrap text-sm text-slate-800">{entry.text}</p>
+                <p className="mt-1 text-xs text-slate-400">{entry.createdAt}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDeleteText(entry.id)}
+                className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                삭제
+              </button>
+            </div>
+          ))}
+        </div>
+      </GridCell>
+    </PageLayout>
+  );
 }
