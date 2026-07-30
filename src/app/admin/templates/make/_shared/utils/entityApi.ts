@@ -15,11 +15,11 @@
  *   const rows = (envelope.content as Record<string, unknown>[]).map(normalizeEntityRow);
  */
 
-import { flattenPageDataItem } from '../utils';
-import { getCasingAliases, toCamelCase } from './entityBuild';
-import type { DateSubType } from '../types';
-import type { FormFieldItem } from '../components/builder/FormBuilder';
-import type { SubListColumn } from '../components/renderer/types';
+import { flattenPageDataItem } from "../utils";
+import { getCasingAliases, toCamelCase } from "./entityBuild";
+import type { DateSubType } from "../types";
+import type { FormFieldItem } from "../components/builder/FormBuilder";
+import type { SubListColumn } from "../components/renderer/types";
 
 /**
  * entity slug → api.get()에 넘길 상대경로 변환
@@ -31,7 +31,7 @@ import type { SubListColumn } from '../components/renderer/types';
  * @example entityApiPath('hero-data') // '/hero-data'
  */
 export function entityApiPath(slug: string): string {
-    return `/${slug}`;
+  return `/${slug}`;
 }
 
 /**
@@ -52,26 +52,26 @@ export function entityApiPath(slug: string): string {
  * // → { _id: 1, titleText: 'A', title_text: 'A', createdAt: '2026-01-01', createdBy: 'admin', ... }
  */
 export function normalizeEntityRow(raw: Record<string, unknown>): Record<string, unknown> {
-    const { id, createdAt, createdBy, updatedAt, updatedBy, ...fields } = raw;
+  const { id, createdAt, createdBy, updatedAt, updatedBy, ...fields } = raw;
 
-    /* id/감사컬럼 분리 후 나머지 필드만 dataJson으로 감싸 기존 공통 함수(flattenPageDataItem)에 통과 */
-    const flat = flattenPageDataItem({
-        id: Number(id ?? 0),
-        dataJson: fields,
-        createdAt: (createdAt as string | null | undefined) ?? null,
-        createdBy: (createdBy as string | null | undefined) ?? null,
-        updatedAt: (updatedAt as string | null | undefined) ?? null,
-        updatedBy: (updatedBy as string | null | undefined) ?? null,
+  /* id/감사컬럼 분리 후 나머지 필드만 dataJson으로 감싸 기존 공통 함수(flattenPageDataItem)에 통과 */
+  const flat = flattenPageDataItem({
+    id: Number(id ?? 0),
+    dataJson: fields,
+    createdAt: (createdAt as string | null | undefined) ?? null,
+    createdBy: (createdBy as string | null | undefined) ?? null,
+    updatedAt: (updatedAt as string | null | undefined) ?? null,
+    updatedBy: (updatedBy as string | null | undefined) ?? null,
+  });
+
+  /* accessor 케이싱 불일치 방어 — 필드별 snake/camel 별칭을 추가로 얹는다(기존 키는 덮어쓰지 않음) */
+  Object.entries(fields).forEach(([key, value]) => {
+    getCasingAliases(key).forEach((alias) => {
+      if (!(alias in flat)) flat[alias] = value;
     });
+  });
 
-    /* accessor 케이싱 불일치 방어 — 필드별 snake/camel 별칭을 추가로 얹는다(기존 키는 덮어쓰지 않음) */
-    Object.entries(fields).forEach(([key, value]) => {
-        getCasingAliases(key).forEach((alias) => {
-            if (!(alias in flat)) flat[alias] = value;
-        });
-    });
-
-    return flat;
+  return flat;
 }
 
 /**
@@ -87,20 +87,21 @@ export function normalizeEntityRow(raw: Record<string, unknown>): Record<string,
  * // → { page: 0, content: [...], totalElements: 3, totalPages: 1, last: true }
  */
 export function normalizeEntityPageEnvelope(raw: {
-    number: number;
-    content: unknown[];
-    totalElements: number;
-    totalPages: number;
-    last: boolean;
-    [k: string]: unknown;
+  number?: number;
+  page?: number;
+  content: unknown[];
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+  [k: string]: unknown;
 }): { page: number; content: unknown[]; totalElements: number; totalPages: number; last: boolean } {
-    return {
-        page: raw.number,
-        content: raw.content,
-        totalElements: raw.totalElements,
-        totalPages: raw.totalPages,
-        last: raw.last,
-    };
+  return {
+    page: raw.number ?? raw.page ?? 0,
+    content: raw.content,
+    totalElements: raw.totalElements,
+    totalPages: raw.totalPages,
+    last: raw.last,
+  };
 }
 
 /* ══════════════════════════════════════════════════════════════════ */
@@ -128,8 +129,8 @@ export function normalizeEntityPageEnvelope(raw: {
  *   또는 rangeSubType(range) 값을 그대로 담는다
  */
 export interface EntityDateFieldMeta {
-    isRange: boolean;
-    subType: DateSubType;
+  isRange: boolean;
+  subType: DateSubType;
 }
 
 /**
@@ -148,29 +149,29 @@ export interface EntityDateFieldMeta {
  * // Map { 'post_date_from' => {isRange:true, subType:'date'}, 'post_date_to' => {isRange:true, subType:'date'} }
  */
 export function buildEntityDateFieldMeta(fields: FormFieldItem[]): Map<string, EntityDateFieldMeta> {
-    const map = new Map<string, EntityDateFieldMeta>();
-    fields.forEach((f) => {
-        if (!f.fieldKey) return;
-        if (f.type === 'date' || f.type === 'yearMonth') {
-            map.set(f.fieldKey, {
-                isRange: false,
-                subType: f.dateSubType ?? (f.type === 'yearMonth' ? 'yearMonth' : 'date'),
-            });
-        } else if (f.type === 'dateRange' || f.type === 'yearMonthRange') {
-            const subType = f.rangeSubType ?? (f.type === 'yearMonthRange' ? 'yearMonth' : 'date');
-            /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키 그대로 등록(buildDataJson과 동일 규칙),
+  const map = new Map<string, EntityDateFieldMeta>();
+  fields.forEach((f) => {
+    if (!f.fieldKey) return;
+    if (f.type === "date" || f.type === "yearMonth") {
+      map.set(f.fieldKey, {
+        isRange: false,
+        subType: f.dateSubType ?? (f.type === "yearMonth" ? "yearMonth" : "date"),
+      });
+    } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
+      const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
+      /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키 그대로 등록(buildDataJson과 동일 규칙),
                미지정 시 기존처럼 `${fieldKey}_from`/`_to` 키로 등록 — entity 컬럼이 dispFrom/dispTo처럼
                완전히 독립된 이름일 때 `${fieldKey}_from` 같은 존재하지 않는 필드명을 만들지 않기 위함 */
-            if (f.fieldKey2) {
-                map.set(f.fieldKey, { isRange: true, subType });
-                map.set(f.fieldKey2, { isRange: true, subType });
-            } else {
-                map.set(`${f.fieldKey}_from`, { isRange: true, subType });
-                map.set(`${f.fieldKey}_to`, { isRange: true, subType });
-            }
-        }
-    });
-    return map;
+      if (f.fieldKey2) {
+        map.set(f.fieldKey, { isRange: true, subType });
+        map.set(f.fieldKey2, { isRange: true, subType });
+      } else {
+        map.set(`${f.fieldKey}_from`, { isRange: true, subType });
+        map.set(`${f.fieldKey}_to`, { isRange: true, subType });
+      }
+    }
+  });
+  return map;
 }
 
 /**
@@ -191,28 +192,28 @@ export function buildEntityDateFieldMeta(fields: FormFieldItem[]): Map<string, E
  *   const rowBody = buildEntityRequestBody(row, dateFieldMeta);
  */
 export function buildSubListEntityDateFieldMeta(columns: SubListColumn[]): Map<string, EntityDateFieldMeta> {
-    const map = new Map<string, EntityDateFieldMeta>();
-    columns.forEach((col) => {
-        if (!col.key) return;
-        if (col.type === 'date') {
-            map.set(col.key, { isRange: false, subType: col.dateSubType ?? 'date' });
-        } else if (col.type === 'dateRange') {
-            const subType = col.rangeSubType ?? 'date';
-            /* key2 지정 시 시작=col.key/종료=col.key2 키 그대로 등록(SubListRenderer의 rangeStartKey/rangeEndKey와
+  const map = new Map<string, EntityDateFieldMeta>();
+  columns.forEach((col) => {
+    if (!col.key) return;
+    if (col.type === "date") {
+      map.set(col.key, { isRange: false, subType: col.dateSubType ?? "date" });
+    } else if (col.type === "dateRange") {
+      const subType = col.rangeSubType ?? "date";
+      /* key2 지정 시 시작=col.key/종료=col.key2 키 그대로 등록(SubListRenderer의 rangeStartKey/rangeEndKey와
                동일 규칙), 미지정 시 기존처럼 `${col.key}_from`/`_to` 키로 등록 — entity 컬럼이 dispFrom/dispTo처럼
                완전히 독립된 이름일 때 `${col.key}_from` 같은 존재하지 않는 필드명을 만들지 않기 위함
                (실사례: SubList 컬럼 key='dispFrom'일 때 자동유도된 'dispFrom_from'이 camelCase 변환되어
                'dispFromFrom'이라는 존재하지 않는 entity 필드명이 되어 400 오류가 났던 문제) */
-            if (col.key2) {
-                map.set(col.key, { isRange: true, subType });
-                map.set(col.key2, { isRange: true, subType });
-            } else {
-                map.set(`${col.key}_from`, { isRange: true, subType });
-                map.set(`${col.key}_to`, { isRange: true, subType });
-            }
-        }
-    });
-    return map;
+      if (col.key2) {
+        map.set(col.key, { isRange: true, subType });
+        map.set(col.key2, { isRange: true, subType });
+      } else {
+        map.set(`${col.key}_from`, { isRange: true, subType });
+        map.set(`${col.key}_to`, { isRange: true, subType });
+      }
+    }
+  });
+  return map;
 }
 
 /**
@@ -221,12 +222,12 @@ export function buildSubListEntityDateFieldMeta(columns: SubListColumn[]): Map<s
  * - d를 인자로 받는 이유: 변환하려는 날짜 시점 기준으로 오프셋을 계산해야 하기 때문(서머타임이 있는 지역 대비 — 프로젝트는 한국 고정이라 결과는 항상 +09:00)
  */
 function getLocalIsoOffset(d: Date = new Date()): string {
-    const offsetMinutes = -d.getTimezoneOffset();
-    const sign = offsetMinutes >= 0 ? '+' : '-';
-    const abs = Math.abs(offsetMinutes);
-    const hh = String(Math.floor(abs / 60)).padStart(2, '0');
-    const mm = String(abs % 60).padStart(2, '0');
-    return `${sign}${hh}:${mm}`;
+  const offsetMinutes = -d.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMinutes);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
 }
 
 /**
@@ -244,24 +245,24 @@ function getLocalIsoOffset(d: Date = new Date()): string {
  * @example toEntityDateString('', 'date')                    // null
  */
 export function toEntityDateString(local: string, subType: DateSubType): string | null {
-    if (!local) return null;
+  if (!local) return null;
 
-    if (subType === 'yearMonth') return `${local}-01`;
-    if (subType === 'date') return local;
+  if (subType === "yearMonth") return `${local}-01`;
+  if (subType === "date") return local;
 
-    if (subType === 'datetime') {
-        /* datetime-local input은 초 단위 step을 켜지 않는 한 'YYYY-MM-DDTHH:mm'까지만 준다 — 초 보정 */
-        const withSeconds = local.length === 16 ? `${local}:00` : local;
-        /* 오프셋은 변환 대상 날짜 자체를 기준으로 계산(서머타임 지역 대비 방어적 처리) */
-        const m = withSeconds.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/);
-        const refDate = m
-            ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]))
-            : new Date();
-        return `${withSeconds}${getLocalIsoOffset(refDate)}`;
-    }
+  if (subType === "datetime") {
+    /* datetime-local input은 초 단위 step을 켜지 않는 한 'YYYY-MM-DDTHH:mm'까지만 준다 — 초 보정 */
+    const withSeconds = local.length === 16 ? `${local}:00` : local;
+    /* 오프셋은 변환 대상 날짜 자체를 기준으로 계산(서머타임 지역 대비 방어적 처리) */
+    const m = withSeconds.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/);
+    const refDate = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]))
+      : new Date();
+    return `${withSeconds}${getLocalIsoOffset(refDate)}`;
+  }
 
-    /* time/timeSec — 대응 entity 컬럼 타입이 없으므로 값 변환 없이 그대로 통과 */
-    return local;
+  /* time/timeSec — 대응 entity 컬럼 타입이 없으므로 값 변환 없이 그대로 통과 */
+  return local;
 }
 
 /**
@@ -276,23 +277,23 @@ export function toEntityDateString(local: string, subType: DateSubType): string 
  * @example fromEntityDateString('', 'date')                              // ''
  */
 export function fromEntityDateString(iso: string, subType: DateSubType): string {
-    if (!iso) return '';
-    if (subType === 'time' || subType === 'timeSec') return iso; // 대응 entity 컬럼 타입이 없어 그대로 통과
+  if (!iso) return "";
+  if (subType === "time" || subType === "timeSec") return iso; // 대응 entity 컬럼 타입이 없어 그대로 통과
 
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return ''; // 파싱 실패 시 빈 값(잘못된 값을 input에 억지로 채우지 않는다)
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return ""; // 파싱 실패 시 빈 값(잘못된 값을 input에 억지로 채우지 않는다)
 
-    const yyyy = String(d.getFullYear()).padStart(4, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = String(d.getFullYear()).padStart(4, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
 
-    if (subType === 'yearMonth') return `${yyyy}-${mm}`;
-    if (subType === 'date') return `${yyyy}-${mm}-${dd}`;
+  if (subType === "yearMonth") return `${yyyy}-${mm}`;
+  if (subType === "date") return `${yyyy}-${mm}-${dd}`;
 
-    /* datetime */
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  /* datetime */
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
 
 /**
@@ -316,21 +317,21 @@ export function fromEntityDateString(iso: string, subType: DateSubType): string 
  * // → { postDateFrom: '...', postDateTo: '...', post_date_from: '2026-01-01', post_date_to: '2026-01-31' }
  */
 export function restoreEntityDateFields(
-    row: Record<string, unknown>,
-    dateFieldMeta: Map<string, EntityDateFieldMeta>,
+  row: Record<string, unknown>,
+  dateFieldMeta: Map<string, EntityDateFieldMeta>
 ): Record<string, unknown> {
-    const result: Record<string, unknown> = { ...row };
+  const result: Record<string, unknown> = { ...row };
 
-    dateFieldMeta.forEach((meta, fieldKey) => {
-        /* normalizeEntityRow가 이미 얹어둔 camelCase/snake_case 별칭 중 값이 있는 것을 찾는다 */
-        const rawValue = getCasingAliases(fieldKey)
-            .map((alias) => row[alias])
-            .find((v): v is string => typeof v === 'string' && v !== '');
+  dateFieldMeta.forEach((meta, fieldKey) => {
+    /* normalizeEntityRow가 이미 얹어둔 camelCase/snake_case 별칭 중 값이 있는 것을 찾는다 */
+    const rawValue = getCasingAliases(fieldKey)
+      .map((alias) => row[alias])
+      .find((v): v is string => typeof v === "string" && v !== "");
 
-        result[fieldKey] = rawValue ? fromEntityDateString(rawValue, meta.subType) : '';
-    });
+    result[fieldKey] = rawValue ? fromEntityDateString(rawValue, meta.subType) : "";
+  });
 
-    return result;
+  return result;
 }
 
 /* ══════════════════════════════════════════════════════════════════ */
@@ -357,7 +358,7 @@ export function restoreEntityDateFields(
  * @example toEntityFieldName('image')      // 'image' (이미 camelCase면 변화 없음)
  */
 export function toEntityFieldName(fieldKey: string): string {
-    return toCamelCase(fieldKey);
+  return toCamelCase(fieldKey);
 }
 
 /**
@@ -398,26 +399,26 @@ export function toEntityFieldName(fieldKey: string): string {
  * // → { titleText: '제목', postDateFrom: '2026-01-01', postDateTo: '2026-01-31' }
  */
 export function buildEntityRequestBody(
-    section: Record<string, unknown>,
-    dateFieldMeta?: Map<string, EntityDateFieldMeta>,
+  section: Record<string, unknown>,
+  dateFieldMeta?: Map<string, EntityDateFieldMeta>
 ): Record<string, unknown> {
-    const body: Record<string, unknown> = {};
+  const body: Record<string, unknown> = {};
 
-    /** section 값이 문자열이 아니면(숫자 등 실수 유입 방어) 문자열로 변환 — toEntityDateString은 문자열만 받는다 */
-    const toStr = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v));
+  /** section 값이 문자열이 아니면(숫자 등 실수 유입 방어) 문자열로 변환 — toEntityDateString은 문자열만 받는다 */
+  const toStr = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
 
-    Object.entries(section).forEach(([key, value]) => {
-        /* contentKey 하위 섹션 / _rel 같은 중첩 객체(plain object)는 entity flat DTO에 대응 필드가
-         * 없으므로 제외한다. 배열은 스칼라 값 취급으로 통과시킨다(FILE 필드 number[] 포함 — 미처리). */
-        if (value !== null && typeof value === 'object' && !Array.isArray(value)) return;
+  Object.entries(section).forEach(([key, value]) => {
+    /* contentKey 하위 섹션 / _rel 같은 중첩 객체(plain object)는 entity flat DTO에 대응 필드가
+     * 없으므로 제외한다. 배열은 스칼라 값 취급으로 통과시킨다(FILE 필드 number[] 포함 — 미처리). */
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) return;
 
-        /* dateRange/yearMonthRange는 병합하지 않고 _from/_to 각각 독립 entity 필드로 변환해서 보낸다.
-         * 날짜/일시 필드는 entity가 요구하는 오프셋/day 보정 문자열로 변환(빈 값은 null) */
-        const meta = dateFieldMeta?.get(key);
-        body[toEntityFieldName(key)] = meta ? toEntityDateString(toStr(value), meta.subType) : value;
-    });
+    /* dateRange/yearMonthRange는 병합하지 않고 _from/_to 각각 독립 entity 필드로 변환해서 보낸다.
+     * 날짜/일시 필드는 entity가 요구하는 오프셋/day 보정 문자열로 변환(빈 값은 null) */
+    const meta = dateFieldMeta?.get(key);
+    body[toEntityFieldName(key)] = meta ? toEntityDateString(toStr(value), meta.subType) : value;
+  });
 
-    return body;
+  return body;
 }
 
 /**
@@ -428,5 +429,5 @@ export function buildEntityRequestBody(
  * @example entityItemPath('hero-data', 3) // '/hero-data/3'
  */
 export function entityItemPath(slug: string, id: number | string): string {
-    return `${entityApiPath(slug)}/${id}`;
+  return `${entityApiPath(slug)}/${id}`;
 }
