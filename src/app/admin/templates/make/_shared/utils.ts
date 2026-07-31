@@ -9,7 +9,7 @@ import { useSiteStore } from "@/store/use-site-store";
 import { FILE_FIELD_TYPES } from "./constants";
 import type { DateSubType, CodeGroupDef } from "./types";
 
-/** formatNowBySubType 내부에서 사용하는 "지금" 시각의 연/월/일/시/분/초 문자열 조각 */
+/** getDateParts가 반환하는 시각의 연/월/일/시/분/초 문자열 조각 */
 interface NowParts {
   YYYY: string;
   MM: string;
@@ -33,14 +33,13 @@ function getActiveSiteTimezone(): string | undefined {
 }
 
 /**
- * 현재 시각을 "활성 사이트의 timezone" 기준 연/월/일/시/분/초 문자열로 분해
+ * 임의의 시각(Date)을 "활성 사이트의 timezone" 기준 연/월/일/시/분/초 문자열로 분해
  * - 활성 사이트 timezone이 없거나(로드 전 등) Intl 변환에 실패하면(잘못된 timezone 문자열 등)
- *   기존 동작과 동일하게 브라우저 로컬 시각(new Date()의 로컬 getter)으로 폴백 — 절대 예외를 던지지 않음
+ *   기존 동작과 동일하게 브라우저 로컬 시각(Date의 로컬 getter)으로 폴백 — 절대 예외를 던지지 않음
  * - en-CA 로케일 + formatToParts는 다른 로케일의 자릿수/구분자 표기 차이 없이 항상 4자리 연도·2자리 월일시분초를
  *   안정적으로 뽑아낼 수 있어 문자열 파싱 없이 그대로 조립 가능
  */
-function getNowParts(): NowParts {
-  const now = new Date();
+function getDateParts(date: Date): NowParts {
   const zone = getActiveSiteTimezone();
   if (zone) {
     try {
@@ -53,7 +52,7 @@ function getNowParts(): NowParts {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-      }).formatToParts(now);
+      }).formatToParts(date);
       const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
       /* 일부 브라우저는 hour12:false에서 자정을 "24"로 표기 — input[type=time] 등은 00~23 범위만 허용하므로 보정 */
       const hh = get("hour") === "24" ? "00" : get("hour");
@@ -64,14 +63,35 @@ function getNowParts(): NowParts {
   }
   const pad = (n: number) => String(n).padStart(2, "0");
   return {
-    YYYY: String(now.getFullYear()),
-    MM: pad(now.getMonth() + 1),
-    DD: pad(now.getDate()),
-    hh: pad(now.getHours()),
-    mm: pad(now.getMinutes()),
-    ss: pad(now.getSeconds()),
+    YYYY: String(date.getFullYear()),
+    MM: pad(date.getMonth() + 1),
+    DD: pad(date.getDate()),
+    hh: pad(date.getHours()),
+    mm: pad(date.getMinutes()),
+    ss: pad(date.getSeconds()),
   };
 }
+
+/** 현재 시각을 "활성 사이트의 timezone" 기준 연/월/일/시/분/초 문자열로 분해 (getDateParts 참고) */
+function getNowParts(): NowParts {
+  return getDateParts(new Date());
+}
+
+/**
+ * 서버(bo-api) 응답의 OffsetDateTime ISO 문자열 → 화면 표시용 "YYYY-MM-DD HH:mm:ss" 문자열 변환
+ * - 기준 시간대는 활성 사이트(useSiteStore)의 timezone, 없으면 브라우저 로컬 시각으로 폴백(getDateParts와 동일 규칙)
+ *   ⚠️ ISO 문자열을 slice(0,19)로 그대로 자르면 안 된다 — bo-api Jackson은 OffsetDateTime을 UTC("...Z")로
+ *   직렬화하므로, 자른 문자열은 KST보다 9시간 이른 UTC 시각이 그대로 화면에 노출된다.
+ * - 값이 없거나 파싱 불가한 문자열이면 '-' 반환 (목록/상세 공통 표기)
+ * @example formatIsoDateTime('2026-07-28T03:10:15Z') // "2026-07-28 12:10:15" (Asia/Seoul)
+ */
+export const formatIsoDateTime = (iso: string | null | undefined): string => {
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  const { YYYY, MM, DD, hh, mm, ss } = getDateParts(date);
+  return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
+};
 
 /**
  * 현재 시각을 date/dateRange 서브타입에 맞는 문자열로 변환
