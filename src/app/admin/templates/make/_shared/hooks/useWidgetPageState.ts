@@ -1709,6 +1709,15 @@ export function useWidgetPageState(
     ]
   );
 
+  /* 엑셀 다운로드/API 연동 검색조건 포함 옵션 공용 — hideCondition 충족 필드 제외
+   * fetchTableData와 동일한 공용 함수(buildSearchQueryParams)로 변환 규칙 통일
+   * (BE PageDataService.exportAll도 search()와 동일한 appendWhereConditions/bindSearchParams를
+   *  공유하므로 condexpr_/condval_ 등 모든 파라미터를 동일하게 지원 — 별도 BE 대응 불필요) */
+  const currentSearchParams = useMemo(() => {
+    const fieldsMap = buildSearchFieldsMap(widgetItems);
+    return buildSearchQueryParams(Object.values(fieldsMap).flat(), searchValues);
+  }, [searchValues, widgetItems]);
+
   /**
    * API 연동 실행 핸들러 — connType='api' 전용 (live 모드 전용, preview에서는 절대 호출 금지)
    *
@@ -1729,13 +1738,16 @@ export function useWidgetPageState(
    * @param downloadFile  true면 응답을 파일 다운로드로 처리한다(mode2 전용 — apiInfoId 미선택(mode1)은
    *   항상 entity CRUD라 파일 개념이 없음). blob 응답을 받아 브라우저 다운로드를 트리거하고,
    *   성공 토스트 대신 다운로드 자체로 완료를 표시한다.
+   * @param includeSearchParams  true면 현재 화면 검색조건(currentSearchParams)을 요청 params에 병합한다
+   *   (mode2 전용). 동일 키는 고정 params(restParams)가 검색조건을 덮어쓴다.
    */
   const handleApiCall = useCallback(
     async (
       apiInfoId: number | undefined,
       paramsStr?: string,
       connectedContentWidgetIds?: string[],
-      downloadFile?: boolean
+      downloadFile?: boolean,
+      includeSearchParams?: boolean
     ) => {
       /* ── mode1: apiInfoId 미선택 — 선택한 Form(main)/SubList(sub)을 id 유무로 직접 entity CRUD ── */
       if (apiInfoId == null) {
@@ -1907,6 +1919,11 @@ export function useWidgetPageState(
         return encodeURIComponent(val);
       });
 
+      /* 검색조건 포함 옵션 — 고정 params(restParams)가 우선, 동일 키는 고정값이 검색조건을 덮어씀 */
+      const finalParams: Record<string, string> = includeSearchParams
+        ? { ...currentSearchParams, ...restParams }
+        : restParams;
+
       const method = (apiInfo.method || "GET").toUpperCase();
       const isBodyMethod = method === "POST" || method === "PUT" || method === "PATCH";
 
@@ -2004,8 +2021,8 @@ export function useWidgetPageState(
             url,
             responseType: "blob",
             ...(method === "GET" || method === "DELETE"
-              ? { params: restParams }
-              : { data: { ...contentBody, ...restParams } }),
+              ? { params: finalParams }
+              : { data: { ...contentBody, ...finalParams } }),
           });
 
           /* Content-Disposition 헤더에 파일명이 있으면 그걸 사용, 없으면 apiInfo.name 기반으로 폴백 */
@@ -2021,11 +2038,11 @@ export function useWidgetPageState(
           document.body.removeChild(a);
           URL.revokeObjectURL(blobUrl);
         } else if (method === "GET" || method === "DELETE") {
-          await api.request({ method, url, params: restParams });
+          await api.request({ method, url, params: finalParams });
           toast.success(`${apiInfo.name} 요청이 완료되었습니다.`);
         } else {
           /* 위젯 데이터(contentBody)가 base, 고정 params(restParams)가 오버레이 */
-          await api.request({ method, url, data: { ...contentBody, ...restParams } });
+          await api.request({ method, url, data: { ...contentBody, ...finalParams } });
           toast.success(`${apiInfo.name} 요청이 완료되었습니다.`);
         }
       } catch (err) {
@@ -2046,6 +2063,7 @@ export function useWidgetPageState(
       options,
       searchParams,
       currentGroupId,
+      currentSearchParams,
       markClean,
       t,
     ]
@@ -2093,15 +2111,6 @@ export function useWidgetPageState(
   const handleCategorySelect = useCallback((widgetId: string, selectedId: number | null) => {
     setCategorySelections((prev) => ({ ...prev, [widgetId]: selectedId }));
   }, []);
-
-  /* 엑셀 다운로드용 현재 검색 파라미터 — hideCondition 충족 필드 제외
-   * fetchTableData와 동일한 공용 함수(buildSearchQueryParams)로 변환 규칙 통일
-   * (BE PageDataService.exportAll도 search()와 동일한 appendWhereConditions/bindSearchParams를
-   *  공유하므로 condexpr_/condval_ 등 모든 파라미터를 동일하게 지원 — 별도 BE 대응 불필요) */
-  const currentSearchParams = useMemo(() => {
-    const fieldsMap = buildSearchFieldsMap(widgetItems);
-    return buildSearchQueryParams(Object.values(fieldsMap).flat(), searchValues);
-  }, [searchValues, widgetItems]);
 
   /* PageGridRenderer에 바로 spread할 수 있도록 묶어서 반환 */
   const gridProps = {

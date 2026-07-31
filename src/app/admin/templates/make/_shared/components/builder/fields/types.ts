@@ -90,6 +90,7 @@ export interface FieldEditValues {
   dataSaveSlug?: string; // 데이터저장 연결 slug (connType='datasave' 전용)
   apiInfoId?: number; // API 연동 연결 api_info.id (connType='api' 전용)
   apiDownloadFile?: boolean; // API 연동 응답을 파일 다운로드로 처리할지 여부 (connType='api' + apiInfoId 선택 시(mode2) 전용)
+  apiIncludeSearchParams?: boolean; // 현재 화면 검색조건을 API 요청 params에 포함할지 여부 (connType='api' + apiInfoId 선택 시(mode2) 전용)
   saveConfirm?: boolean; // 저장 컨펌 — true 시 live 모드 버튼 클릭 시 확인창 표시 (action-button 전용)
   validationRuleIds?: number[]; // 데이터저장 시 적용할 검증 규칙 ID 목록 (connType='datasave' 전용)
   contentValidationRuleIds?: Record<string, number[]>; // 컨텐츠 저장 시 위젯별 적용할 검증 규칙 ID 목록 (connType='content' 전용, key=위젯ID)

@@ -95,12 +95,13 @@ interface PageGridRendererProps {
     paramSave?: string,
     validationRuleIds?: number[]
   ) => void;
-  /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds, downloadFile) */
+  /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds, downloadFile, includeSearchParams) */
   onApiCall?: (
     apiInfoId: number | undefined,
     params?: string,
     connectedContentWidgetIds?: string[],
-    downloadFile?: boolean
+    downloadFile?: boolean,
+    includeSearchParams?: boolean
   ) => void;
 
   /* live 모드 전용 — 테이블 */
