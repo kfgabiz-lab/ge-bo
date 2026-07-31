@@ -208,12 +208,13 @@ interface WidgetRendererProps {
     paramSave?: string,
     validationRuleIds?: number[]
   ) => void;
-  /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds, downloadFile), live 모드에서만 호출됨 */
+  /** Space 위젯 버튼 클릭 시 API 연동 실행 — connType='api' 전용 (apiInfoId(mode2)/undefined(mode1), params, connectedContentWidgetIds, downloadFile, includeSearchParams), live 모드에서만 호출됨 */
   onApiCall?: (
     apiInfoId: number | undefined,
     params?: string,
     connectedContentWidgetIds?: string[],
-    downloadFile?: boolean
+    downloadFile?: boolean,
+    includeSearchParams?: boolean
   ) => void;
   /** Space 위젯 닫기 버튼 — 없으면 router.back() */
   onClose?: () => void;

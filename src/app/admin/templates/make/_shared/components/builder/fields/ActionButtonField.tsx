@@ -92,11 +92,10 @@ function ValidationRuleMultiSelect({
 
   /* slugRegistryId 변경 시 해당 slug의 검증 규칙 목록 조회 */
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
     if (!slugRegistryId) {
-      setRules([]);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
     setIsLoading(true);
     api
       .get("/validation-rules", { params: { slugRegistryId } })
@@ -105,9 +104,12 @@ function ValidationRuleMultiSelect({
       .finally(() => setIsLoading(false));
   }, [slugRegistryId]);
 
+  const effectiveRules = slugRegistryId ? rules : [];
+
   if (!slugRegistryId) return null;
   if (isLoading) return <p className="text-[10px] text-slate-400 px-1">검증 규칙 불러오는 중...</p>;
-  if (rules.length === 0) return <p className="text-[10px] text-slate-400 italic px-1">등록된 검증 규칙이 없습니다.</p>;
+  if (effectiveRules.length === 0)
+    return <p className="text-[10px] text-slate-400 italic px-1">등록된 검증 규칙이 없습니다.</p>;
 
   const toggle = (id: number) => {
     onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
@@ -176,6 +178,7 @@ export function ActionButtonField({
       contentValidationRuleIds: undefined,
       apiInfoId: undefined,
       apiDownloadFile: undefined,
+      apiIncludeSearchParams: undefined,
     });
   };
 
@@ -649,6 +652,19 @@ export function ActionButtonField({
                         className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
                       />
                       <span className="text-xs text-slate-700">파일다운로드</span>
+                    </label>
+                  )}
+                  {/* 검색조건 포함 — apiInfoId가 선택된 경우(mode2)에만 의미 있음.
+                                    체크 시 화면의 현재 검색조건(buildSearchQueryParams 결과)을 요청 params에 병합한다(고정 params 우선). */}
+                  {values.apiInfoId && (
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={values.apiIncludeSearchParams ?? false}
+                        onChange={(e) => onChange({ apiIncludeSearchParams: e.target.checked || undefined })}
+                        className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                      />
+                      <span className="text-xs text-slate-700">검색조건 포함</span>
                     </label>
                   )}
                   {showContentWidgets && (

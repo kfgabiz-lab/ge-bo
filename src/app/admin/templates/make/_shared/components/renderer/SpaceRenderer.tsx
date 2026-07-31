@@ -64,12 +64,13 @@ interface SpaceRendererProps {
     paramSave?: string,
     validationRuleIds?: number[]
   ) => void;
-  /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id(mode2) 또는 undefined(mode1: id 유무 자동 CRUD) + params + 연결 컨텐츠 위젯 ID 배열 + 파일다운로드 여부 전달 (live 전용) */
+  /** API 연동 요청 — connType='api' 버튼 클릭 시 api_info.id(mode2) 또는 undefined(mode1: id 유무 자동 CRUD) + params + 연결 컨텐츠 위젯 ID 배열 + 파일다운로드 여부 + 검색조건 포함 여부 전달 (live 전용) */
   onApiCall?: (
     apiInfoId: number | undefined,
     params?: string,
     connectedContentWidgetIds?: string[],
-    downloadFile?: boolean
+    downloadFile?: boolean,
+    includeSearchParams?: boolean
   ) => void;
 }
 
@@ -159,7 +160,13 @@ export function SpaceRenderer({
       );
     } else if (field.connType === "api") {
       /* apiInfoId 미선택(mode1)이면 undefined 그대로 전달 — handleApiCall이 id 유무로 CRUD 직접 처리 */
-      onApiCall?.(field.apiInfoId, field.params, field.connectedContentWidgetIds, field.apiDownloadFile);
+      onApiCall?.(
+        field.apiInfoId,
+        field.params,
+        field.connectedContentWidgetIds,
+        field.apiDownloadFile,
+        field.apiIncludeSearchParams
+      );
     }
   };
 
