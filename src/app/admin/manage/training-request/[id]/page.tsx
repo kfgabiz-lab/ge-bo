@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import PageLayout from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { formatIsoDateTime } from "@/app/admin/templates/make/_shared/utils";
+import { useCodeStore } from "@/store/use-code-store";
 import api from "@/lib/api";
 
 /* 목록 경로 — router.back()은 목록을 거치지 않고 진입(새로고침/URL 직접 입력)한 경우 엉뚱한 화면으로 되돌아가므로 명시 이동한다 */
@@ -17,8 +18,6 @@ const LIST_PATH = "/admin/manage/training-request";
 interface TrainingRequestDetail {
   id: number;
   trainingTrack: string | null;
-  curriculumTitle: string | null;
-  sessionTitle: string | null;
   firstName: string;
   lastName: string | null;
   company: string;
@@ -57,6 +56,35 @@ interface TrainingRequestDetail {
   createdAt: string;
 }
 
+interface TrainingRegistrationDetail {
+  id: number;
+  curriculumId: number | null;
+  sessionId: number | null;
+  trainingScheduleType: string;
+  trainingType: string | null;
+  trainingCourse: string | null;
+  curriculumTitle: string | null;
+  title: string | null;
+  trainingDateFrom: string | null;
+  trainingDateTo: string | null;
+  createdAt: string;
+  email: string;
+  applicant: string;
+  jobTitle: string | null;
+  phone: string | null;
+  companyName: string | null;
+  eventDate: string | null;
+  streetAddress: string | null;
+  address2: string | null;
+  apartment: string | null;
+  city: string | null;
+  stateProvince: string | null;
+  zipCode: string | null;
+  typeOfBusiness: string | null;
+  privacyConsentFlag: boolean | null;
+  createdIp: string | null;
+}
+
 function joinOrDash(values: string[] | null | undefined): string {
   return values && values.length > 0 ? values.join(", ") : "-";
 }
@@ -64,57 +92,101 @@ function joinOrDash(values: string[] | null | undefined): string {
 export default function TrainingRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const scheduleType = searchParams.get("type") ?? "02";
+
+  const { groups: codeGroups, fetchGroups } = useCodeStore();
 
   const [loading, setLoading] = useState(true);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    fetchGroups();
+  }, [fetchGroups]);
+
+  useEffect(() => {
+    const loadRegular = async () => {
+      const res = await api.get<TrainingRegistrationDetail>(`/training-registrations/${id}`);
+      const d = res.data;
+      setFormValues({
+        createdAt: formatIsoDateTime(d.createdAt),
+        trainingScheduleType: d.trainingScheduleType ?? "-",
+        trainingCourse: d.trainingCourse ?? "-",
+        trainingType: d.trainingType ?? "-",
+        curriculumTitle: d.curriculumTitle ?? "-",
+        sessionTitle: d.title ?? "-",
+        trainingDateFrom: d.trainingDateFrom ?? "-",
+        trainingDateTo: d.trainingDateTo ?? "-",
+        eventDate: d.eventDate ?? "-",
+        applicant: d.applicant,
+        email: d.email,
+        jobTitle: d.jobTitle ?? "-",
+        phone: d.phone ?? "-",
+        companyName: d.companyName ?? "-",
+        streetAddress: d.streetAddress ?? "-",
+        address2: d.address2 ?? "-",
+        apartment: d.apartment ?? "-",
+        city: d.city ?? "-",
+        stateProvince: d.stateProvince ?? "-",
+        zipCode: d.zipCode ?? "-",
+        typeOfBusiness: d.typeOfBusiness ?? "-",
+        privacyConsentFlag: d.privacyConsentFlag ? "동의" : "미동의",
+        createdIp: d.createdIp ?? "-",
+      });
+    };
+
+    const loadIrregular = async () => {
+      const res = await api.get<TrainingRequestDetail>(`/training-requests/${id}`);
+      const d = res.data;
+      setFormValues({
+        createdAt: formatIsoDateTime(d.createdAt),
+        trainingTrack: d.trainingTrack ?? "-",
+        firstName: d.firstName,
+        lastName: d.lastName ?? "-",
+        company: d.company,
+        streetAddress: d.streetAddress,
+        address2: d.address2 ?? "-",
+        city: d.city,
+        state: d.state,
+        zip: d.zip,
+        phone: d.phone,
+        email: d.email,
+        title: d.title ?? "-",
+        cellPhone: d.cellPhone ?? "-",
+        salesContact: d.salesContact ?? "-",
+        sessionCount: d.sessionCount,
+        sessionDays: d.sessionDays,
+        scheduleStart: d.scheduleStart,
+        scheduleEnd: d.scheduleEnd,
+        studentCount: d.studentCount,
+        trainingFormat: d.trainingFormat,
+        locationName: d.locationName ?? "-",
+        locationStreetAddress: d.locationStreetAddress ?? "-",
+        locationAddress2: d.locationAddress2 ?? "-",
+        locationCity: d.locationCity ?? "-",
+        locationState: d.locationState ?? "-",
+        locationZip: d.locationZip ?? "-",
+        contactPerson: d.contactPerson ?? "-",
+        contactDetails: d.contactDetails ?? "-",
+        selectedProductNames: joinOrDash(d.selectedProductNames),
+        jobTitles: joinOrDash(d.jobTitles),
+        studentInvolvement: joinOrDash(d.studentInvolvement),
+        vfdUnderstanding: d.vfdUnderstanding ?? "-",
+        vfdUnderstandingTopics: joinOrDash(d.vfdUnderstandingTopics),
+        comments: d.comments ?? "-",
+        consentChecked: d.consentChecked ? "동의" : "미동의",
+        createdIp: d.createdIp ?? "-",
+      });
+    };
+
     const load = async () => {
       try {
-        const res = await api.get<TrainingRequestDetail>(`/training-requests/${id}`);
-        const d = res.data;
-        setFormValues({
-          createdAt: formatIsoDateTime(d.createdAt),
-          trainingTrack: d.trainingTrack ?? "-",
-          curriculumTitle: d.curriculumTitle ?? "-",
-          sessionTitle: d.sessionTitle ?? "-",
-          firstName: d.firstName,
-          lastName: d.lastName ?? "-",
-          company: d.company,
-          streetAddress: d.streetAddress,
-          address2: d.address2 ?? "-",
-          city: d.city,
-          state: d.state,
-          zip: d.zip,
-          phone: d.phone,
-          email: d.email,
-          title: d.title ?? "-",
-          cellPhone: d.cellPhone ?? "-",
-          salesContact: d.salesContact ?? "-",
-          sessionCount: d.sessionCount,
-          sessionDays: d.sessionDays,
-          scheduleStart: d.scheduleStart,
-          scheduleEnd: d.scheduleEnd,
-          studentCount: d.studentCount,
-          trainingFormat: d.trainingFormat,
-          locationName: d.locationName ?? "-",
-          locationStreetAddress: d.locationStreetAddress ?? "-",
-          locationAddress2: d.locationAddress2 ?? "-",
-          locationCity: d.locationCity ?? "-",
-          locationState: d.locationState ?? "-",
-          locationZip: d.locationZip ?? "-",
-          contactPerson: d.contactPerson ?? "-",
-          contactDetails: d.contactDetails ?? "-",
-          selectedProductNames: joinOrDash(d.selectedProductNames),
-          jobTitles: joinOrDash(d.jobTitles),
-          studentInvolvement: joinOrDash(d.studentInvolvement),
-          vfdUnderstanding: d.vfdUnderstanding ?? "-",
-          vfdUnderstandingTopics: joinOrDash(d.vfdUnderstandingTopics),
-          comments: d.comments ?? "-",
-          consentChecked: d.consentChecked ? "동의" : "미동의",
-          createdIp: d.createdIp ?? "-",
-        });
+        if (scheduleType === "01") {
+          await loadRegular();
+        } else {
+          await loadIrregular();
+        }
       } catch {
         router.push(LIST_PATH);
       } finally {
@@ -122,7 +194,7 @@ export default function TrainingRequestDetailPage() {
       }
     };
     load();
-  }, [id, router]);
+  }, [id, scheduleType, router]);
 
   /* Step1: 기본 정보 */
   const STEP1_FORM_WIDGET: FormWidget = useMemo(
@@ -149,24 +221,6 @@ export default function TrainingRequestDetailPage() {
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "trainingTrack",
-          readonly: true,
-        },
-        {
-          id: "curriculumTitle",
-          type: "input",
-          label: "Course명",
-          colSpan: 6,
-          rowSpan: 1,
-          fieldKey: "curriculumTitle",
-          readonly: true,
-        },
-        {
-          id: "sessionTitle",
-          type: "input",
-          label: "제목",
-          colSpan: 6,
-          rowSpan: 1,
-          fieldKey: "sessionTitle",
           readonly: true,
         },
         {
@@ -468,6 +522,202 @@ export default function TrainingRequestDetailPage() {
     []
   );
 
+  const REGULAR_FORM_WIDGET: FormWidget = useMemo(
+    () => ({
+      type: "form",
+      widgetId: "training-registration-form",
+      contentKey: "trainingRegistrationForm",
+      title: "Training Registration Detail",
+      showBorder: true,
+      fields: [
+        {
+          id: "createdAt",
+          type: "input",
+          label: "접수일시",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "createdAt",
+          readonly: true,
+        },
+        {
+          id: "trainingScheduleType",
+          type: "input",
+          label: "구분",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "trainingScheduleType",
+          readonly: true,
+          codeGroupCode: "TRAININGSCHEDULETYPE",
+          displayAs: "text",
+        },
+        {
+          id: "trainingCourse",
+          type: "input",
+          label: "Training",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "trainingCourse",
+          readonly: true,
+          codeGroupCode: "TRAININGCOURSE",
+          displayAs: "text",
+        },
+        {
+          id: "trainingType",
+          type: "input",
+          label: "Training Type",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "trainingType",
+          readonly: true,
+          codeGroupCode: "TRAININGTYPE",
+          displayAs: "text",
+        },
+        {
+          id: "curriculumTitle",
+          type: "input",
+          label: "Course명",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "curriculumTitle",
+          readonly: true,
+        },
+        {
+          id: "sessionTitle",
+          type: "input",
+          label: "제목",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "sessionTitle",
+          readonly: true,
+        },
+        {
+          id: "trainingDateFrom",
+          type: "input",
+          label: "교육 시작일",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "trainingDateFrom",
+          readonly: true,
+        },
+        {
+          id: "trainingDateTo",
+          type: "input",
+          label: "교육 종료일",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "trainingDateTo",
+          readonly: true,
+        },
+        {
+          id: "eventDate",
+          type: "input",
+          label: "참석 이벤트 일자",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "eventDate",
+          readonly: true,
+        },
+        {
+          id: "applicant",
+          type: "input",
+          label: "신청자",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "applicant",
+          readonly: true,
+        },
+        { id: "email", type: "input", label: "이메일", colSpan: 6, rowSpan: 1, fieldKey: "email", readonly: true },
+        { id: "jobTitle", type: "input", label: "직함", colSpan: 6, rowSpan: 1, fieldKey: "jobTitle", readonly: true },
+        { id: "phone", type: "input", label: "전화번호", colSpan: 6, rowSpan: 1, fieldKey: "phone", readonly: true },
+        {
+          id: "companyName",
+          type: "input",
+          label: "회사명",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "companyName",
+          readonly: true,
+        },
+        {
+          id: "streetAddress",
+          type: "input",
+          label: "도로명 주소",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "streetAddress",
+          readonly: true,
+        },
+        {
+          id: "address2",
+          type: "input",
+          label: "상세 주소",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "address2",
+          readonly: true,
+        },
+        {
+          id: "apartment",
+          type: "input",
+          label: "아파트/호수",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "apartment",
+          readonly: true,
+        },
+        { id: "city", type: "input", label: "도시", colSpan: 4, rowSpan: 1, fieldKey: "city", readonly: true },
+        {
+          id: "stateProvince",
+          type: "input",
+          label: "주/도",
+          colSpan: 4,
+          rowSpan: 1,
+          fieldKey: "stateProvince",
+          readonly: true,
+        },
+        {
+          id: "zipCode",
+          type: "input",
+          label: "우편번호",
+          colSpan: 4,
+          rowSpan: 1,
+          fieldKey: "zipCode",
+          readonly: true,
+        },
+        {
+          id: "typeOfBusiness",
+          type: "input",
+          label: "비즈니스 유형",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "typeOfBusiness",
+          readonly: true,
+          codeGroupCode: "BUSINESSTYPE",
+          displayAs: "text",
+        },
+        {
+          id: "privacyConsentFlag",
+          type: "input",
+          label: "개인정보 동의",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "privacyConsentFlag",
+          readonly: true,
+        },
+        {
+          id: "createdIp",
+          type: "input",
+          label: "요청자 IP",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "createdIp",
+          readonly: true,
+        },
+      ],
+    }),
+    []
+  );
+
   const SPACE_WIDGET: SpaceWidget = useMemo(
     () => ({
       type: "space",
@@ -492,42 +742,57 @@ export default function TrainingRequestDetailPage() {
 
   return (
     <PageLayout mode="live">
-      <GridCell colSpan={12} rowSpan={9}>
-        <WidgetRenderer
-          mode="live"
-          widget={STEP1_FORM_WIDGET}
-          contentColSpan={12}
-          formValues={formValues}
-          onFormValuesChange={() => {}}
-        />
-      </GridCell>
-      <GridCell colSpan={12} rowSpan={3}>
-        <WidgetRenderer
-          mode="live"
-          widget={STEP2_FORM_WIDGET}
-          contentColSpan={12}
-          formValues={formValues}
-          onFormValuesChange={() => {}}
-        />
-      </GridCell>
-      <GridCell colSpan={12} rowSpan={5}>
-        <WidgetRenderer
-          mode="live"
-          widget={STEP3_FORM_WIDGET}
-          contentColSpan={12}
-          formValues={formValues}
-          onFormValuesChange={() => {}}
-        />
-      </GridCell>
-      <GridCell colSpan={12} rowSpan={7}>
-        <WidgetRenderer
-          mode="live"
-          widget={STEP4_FORM_WIDGET}
-          contentColSpan={12}
-          formValues={formValues}
-          onFormValuesChange={() => {}}
-        />
-      </GridCell>
+      {scheduleType === "01" ? (
+        <GridCell colSpan={12} rowSpan={12}>
+          <WidgetRenderer
+            mode="live"
+            widget={REGULAR_FORM_WIDGET}
+            contentColSpan={12}
+            formValues={formValues}
+            onFormValuesChange={() => {}}
+            codeGroups={codeGroups}
+          />
+        </GridCell>
+      ) : (
+        <>
+          <GridCell colSpan={12} rowSpan={9}>
+            <WidgetRenderer
+              mode="live"
+              widget={STEP1_FORM_WIDGET}
+              contentColSpan={12}
+              formValues={formValues}
+              onFormValuesChange={() => {}}
+            />
+          </GridCell>
+          <GridCell colSpan={12} rowSpan={3}>
+            <WidgetRenderer
+              mode="live"
+              widget={STEP2_FORM_WIDGET}
+              contentColSpan={12}
+              formValues={formValues}
+              onFormValuesChange={() => {}}
+            />
+          </GridCell>
+          <GridCell colSpan={12} rowSpan={5}>
+            <WidgetRenderer
+              mode="live"
+              widget={STEP3_FORM_WIDGET}
+              contentColSpan={12}
+              formValues={formValues}
+              onFormValuesChange={() => {}}
+            />
+          </GridCell>
+          <GridCell colSpan={12} rowSpan={7}>
+            <WidgetRenderer
+              mode="live"
+              widget={STEP4_FORM_WIDGET}
+              contentColSpan={12}
+              formValues={formValues}
+              onFormValuesChange={() => {}}
+            />
+          </GridCell>
+        </>
+      )}
 
       <GridCell colSpan={12} rowSpan={1}>
         <WidgetRenderer mode="live" widget={SPACE_WIDGET} contentColSpan={12} onClose={() => router.push(LIST_PATH)} />

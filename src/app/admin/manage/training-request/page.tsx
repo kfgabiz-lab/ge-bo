@@ -12,34 +12,31 @@ import { formatIsoDateTime } from "@/app/admin/templates/make/_shared/utils";
 import { useCodeStore } from "@/store/use-code-store";
 import api from "@/lib/api";
 
-/* ── Training Request(비정기 교육 신청) 목록 단건 타입 ── */
-interface TrainingRequestItem {
+interface TrainingApplicationItem {
+  rowKey: string;
   id: number;
-  trainingTrack: string | null;
-  firstName: string;
-  lastName: string | null;
-  company: string;
-  email: string;
-  phone: string;
-  trainingFormat: string;
+  scheduleType: string;
+  trainingCourse: string | null;
+  trainingType: string | null;
   curriculumTitle: string | null;
   sessionTitle: string | null;
-  scheduleStart: string | null;
-  scheduleEnd: string | null;
-  studentCount: string;
+  dateFrom: string | null;
+  dateTo: string | null;
   createdAt: string;
+  email: string;
+  applicant: string;
 }
 
-/* ── Spring Page 응답 타입 ── */
 interface PageResponse {
-  content: TrainingRequestItem[];
+  content: TrainingApplicationItem[];
   totalElements: number;
   totalPages: number;
   number: number;
 }
 
 const PAGE_SIZE = 20;
-const ENTITY_SLUG = "training-requests";
+const LIST_API_PATH = "training-applications";
+const CSV_CONNECTED_SLUG = "training-requests";
 
 function toStartIso(dateStr: string): string {
   return `${dateStr}T00:00:00+09:00`;
@@ -48,22 +45,31 @@ function toEndIso(dateStr: string): string {
   return `${dateStr}T23:59:59+09:00`;
 }
 
-/* 검색기간구분(SEARCHPERIODTYPE) 코드별 dateRange 필드 id */
 const PERIOD_FIELD_BY_TYPE: Record<string, string> = {
   "01": "createdRange",
   "02": "scheduleStartRange",
   "03": "scheduleEndRange",
 };
 
-/* Training(training_track) 옵션 — FO 신청폼의 트랙 원본 저장값(engineering/sales) 기준.
-   별도 공통코드 그룹이 없어 화면 표시 라벨은 이 목록으로 고정한다. */
-const TRAINING_TRACK_OPTIONS = ["Engineering:engineering", "Sales:sales"];
-
-/* 목록 셀 표시용 training_track 코드 → 라벨 (검색 select 라벨과 동일 규칙 유지) */
-const TRAINING_TRACK_LABELS: Record<string, string> = {
-  engineering: "Engineering",
-  sales: "Sales",
+const TRAINING_TRACK_REVERSE_MAP: Record<string, string> = {
+  "01": "engineering",
+  "02": "service",
+  "03": "sales",
 };
+
+const TRAINING_FORMAT_REVERSE_MAP: Record<string, string> = {
+  "001": "In-Person",
+  "002": "Virtual",
+};
+
+const CSV_EXTRA_COLUMNS: { header: string; accessor: string }[] = [
+  { header: "Training", accessor: "trainingTrack" },
+  { header: "Training Type", accessor: "trainingFormat" },
+  { header: "시작일", accessor: "scheduleStart" },
+  { header: "종료일", accessor: "scheduleEnd" },
+  { header: "신청 일시", accessor: "createdAt" },
+  { header: "발송 대상", accessor: "email" },
+];
 
 const EMPTY_SEARCH: Record<string, string> = {
   periodType: "01",
@@ -75,7 +81,7 @@ const EMPTY_SEARCH: Record<string, string> = {
   scheduleEndRange_to: "",
   trainingScheduleType: "",
   trainingFormat: "",
-  trainingTrack: "",
+  trainingCourse: "",
   curriculumTitle: "",
   sessionTitle: "",
 };
@@ -84,7 +90,7 @@ export default function TrainingRequestListPage() {
   const router = useRouter();
   const { groups: codeGroups, fetchGroups } = useCodeStore();
 
-  const [items, setItems] = useState<TrainingRequestItem[]>([]);
+  const [items, setItems] = useState<TrainingApplicationItem[]>([]);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -107,8 +113,8 @@ export default function TrainingRequestListPage() {
       sort: sk && sd ? `${sk},${sd}` : "createdAt,desc",
     };
     if (search.trainingScheduleType) params.trainingScheduleType = search.trainingScheduleType;
-    if (search.trainingFormat) params.trainingFormat = search.trainingFormat;
-    if (search.trainingTrack) params.trainingTrack = search.trainingTrack;
+    if (search.trainingFormat) params.trainingType = search.trainingFormat;
+    if (search.trainingCourse) params.trainingCourse = search.trainingCourse;
     if (search.curriculumTitle) params.curriculumTitle = search.curriculumTitle;
     if (search.sessionTitle) params.sessionTitle = search.sessionTitle;
 
@@ -123,6 +129,34 @@ export default function TrainingRequestListPage() {
     return params;
   }, []);
 
+  const buildCsvExportParams = useCallback((search: Record<string, string>) => {
+    const params: Record<string, string> = {};
+
+    const track = TRAINING_TRACK_REVERSE_MAP[search.trainingCourse];
+    if (track) params.trainingTrack = track;
+
+    const format = TRAINING_FORMAT_REVERSE_MAP[search.trainingFormat];
+    if (format) params.trainingFormat = format;
+
+    const periodType = search.periodType || "01";
+    const fieldId = PERIOD_FIELD_BY_TYPE[periodType] ?? "createdRange";
+    const from = search[`${fieldId}_from`];
+    const to = search[`${fieldId}_to`];
+
+    if (periodType === "02") {
+      if (from) params.scheduleStartFrom = from;
+      if (to) params.scheduleStartTo = to;
+    } else if (periodType === "03") {
+      if (from) params.scheduleEndFrom = from;
+      if (to) params.scheduleEndTo = to;
+    } else {
+      if (from) params.createdAtFrom = toStartIso(from);
+      if (to) params.createdAtTo = toEndIso(to);
+    }
+
+    return params;
+  }, []);
+
   const fetchList = useCallback(
     async (page = 0, search = appliedSearch, sk = sortKey, sd = sortDir) => {
       setLoading(true);
@@ -133,7 +167,7 @@ export default function TrainingRequestListPage() {
           size: String(PAGE_SIZE),
         };
 
-        const res = await api.get<PageResponse>(`/${ENTITY_SLUG}`, { params });
+        const res = await api.get<PageResponse>(`/${LIST_API_PATH}`, { params });
         setItems(res.data.content);
         setTotalElements(res.data.totalElements);
         const safePages =
@@ -154,8 +188,8 @@ export default function TrainingRequestListPage() {
   }, []);
 
   const goDetail = useCallback(
-    (id: number) => {
-      router.push(`/admin/manage/training-request/${id}`);
+    (id: number, scheduleType: string) => {
+      router.push(`/admin/manage/training-request/${id}?type=${scheduleType}`);
     },
     [router]
   );
@@ -238,13 +272,14 @@ export default function TrainingRequestListPage() {
               codeGroupCode: "TRAININGTYPE",
             },
             {
-              id: "trainingTrack",
+              id: "trainingCourse",
               type: "select",
               label: "Training",
-              fieldKey: "trainingTrack",
+              fieldKey: "trainingCourse",
               colSpan: 1,
               placeholder: "전체",
-              options: TRAINING_TRACK_OPTIONS,
+              options: ["Engineering Training:01", "Service Training:02", "Sales Training:03"],
+              codeGroupCode: "TRAININGCOURSE",
             },
           ],
         },
@@ -283,34 +318,37 @@ export default function TrainingRequestListPage() {
       displayMode: "pagination",
       pageSize: PAGE_SIZE,
       connectedSearchIds: ["training-request-search"],
-      connectedSlug: ENTITY_SLUG,
+      connectedSlug: CSV_CONNECTED_SLUG,
       columns: [
         {
           id: "c1",
           header: "분류",
-          accessor: "trainingScheduleType",
+          accessor: "scheduleType",
           cellType: "text",
           align: "center",
           sortable: false,
           width: 120,
+          codeGroupCode: "TRAININGSCHEDULETYPE",
         },
         {
           id: "c2",
           header: "Training Type",
-          accessor: "trainingFormat",
+          accessor: "trainingType",
           cellType: "text",
           align: "center",
           sortable: true,
           width: 100,
+          codeGroupCode: "TRAININGTYPE",
         },
         {
           id: "c3",
           header: "Training",
-          accessor: "trainingTrack",
+          accessor: "trainingCourse",
           cellType: "text",
           align: "center",
           sortable: true,
           width: 110,
+          codeGroupCode: "TRAININGCOURSE",
         },
         {
           id: "c4",
@@ -333,7 +371,7 @@ export default function TrainingRequestListPage() {
         {
           id: "c6",
           header: "시작일",
-          accessor: "scheduleStart",
+          accessor: "dateFrom",
           cellType: "text",
           align: "center",
           sortable: true,
@@ -342,7 +380,7 @@ export default function TrainingRequestListPage() {
         {
           id: "c7",
           header: "종료일",
-          accessor: "scheduleEnd",
+          accessor: "dateTo",
           cellType: "text",
           align: "center",
           sortable: true,
@@ -372,7 +410,7 @@ export default function TrainingRequestListPage() {
         {
           id: "c10",
           header: "신청자",
-          accessor: "name",
+          accessor: "applicant",
           cellType: "text",
           align: "left",
           sortable: false,
@@ -413,6 +451,8 @@ export default function TrainingRequestListPage() {
           connType: "excel",
           excelTableWidgetId: "training-request-table",
           excelPrivacyPopup: true,
+          excelDownloadMode: "custom",
+          excelExtraColumns: CSV_EXTRA_COLUMNS,
         },
       ],
       align: "right",
@@ -461,8 +501,9 @@ export default function TrainingRequestListPage() {
   const handlers: TableActionHandlers = useMemo(
     () => ({
       onEdit: (row) => {
-        const id = row._id as number;
-        if (id) goDetail(id);
+        const id = row._numericId as number;
+        const scheduleType = row._scheduleType as string;
+        if (id) goDetail(id, scheduleType);
       },
     }),
     [goDetail]
@@ -471,26 +512,24 @@ export default function TrainingRequestListPage() {
   const tableData = useMemo(
     () =>
       items.map((item) => ({
-        _id: item.id,
-        /* training_request는 항상 비정기 신청만 존재(설계서 4절) — 정기/비정기 select 필터와 동일하게 고정값 표시 */
-        trainingScheduleType: "비정기 Training",
+        _id: item.rowKey,
+        _numericId: item.id,
+        _scheduleType: item.scheduleType,
+        scheduleType: item.scheduleType,
         createdAt: formatIsoDateTime(item.createdAt),
-        name: [item.firstName, item.lastName].filter(Boolean).join(" "),
+        applicant: item.applicant,
         email: item.email,
-        trainingTrack: item.trainingTrack ? (TRAINING_TRACK_LABELS[item.trainingTrack] ?? item.trainingTrack) : "-",
-        trainingFormat: item.trainingFormat,
+        trainingCourse: item.trainingCourse ?? "-",
+        trainingType: item.trainingType ?? "-",
         curriculumTitle: item.curriculumTitle || "-",
         sessionTitle: item.sessionTitle || "-",
-        scheduleStart: item.scheduleStart || "-",
-        scheduleEnd: item.scheduleEnd || "-",
+        dateFrom: item.dateFrom || "-",
+        dateTo: item.dateTo || "-",
       })) as unknown as Record<string, unknown>[],
     [items]
   );
 
-  const currentSearchParams = useMemo(
-    () => buildApiParams(appliedSearch, sortKey, sortDir),
-    [appliedSearch, sortKey, sortDir, buildApiParams]
-  );
+  const csvSearchParams = useMemo(() => buildCsvExportParams(appliedSearch), [appliedSearch, buildCsvExportParams]);
   const tableWidgetsMap = useMemo(() => ({ [TABLE_WIDGET.widgetId]: TABLE_WIDGET }), [TABLE_WIDGET]);
 
   return (
@@ -515,7 +554,7 @@ export default function TrainingRequestListPage() {
           contentColSpan={2}
           codeGroups={codeGroups}
           tableWidgetsMap={tableWidgetsMap}
-          currentSearchParams={currentSearchParams}
+          currentSearchParams={csvSearchParams}
           isEntity
         />
       </GridCell>
@@ -535,6 +574,7 @@ export default function TrainingRequestListPage() {
           sortKey={sortKey}
           sortDir={sortDir}
           onSort={handleSort}
+          codeGroups={codeGroups}
         />
       </GridCell>
     </PageLayout>
