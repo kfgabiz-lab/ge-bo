@@ -36,13 +36,19 @@ interface PageResponse {
 
 const PAGE_SIZE = 20;
 const LIST_API_PATH = "training-applications";
-const CSV_CONNECTED_SLUG = "training-requests";
+const CSV_CONNECTED_SLUG = "training-applications";
 
 function toStartIso(dateStr: string): string {
   return `${dateStr}T00:00:00+09:00`;
 }
 function toEndIso(dateStr: string): string {
   return `${dateStr}T23:59:59+09:00`;
+}
+function formatDateInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 const PERIOD_FIELD_BY_TYPE: Record<string, string> = {
@@ -51,25 +57,17 @@ const PERIOD_FIELD_BY_TYPE: Record<string, string> = {
   "03": "scheduleEndRange",
 };
 
-const TRAINING_TRACK_REVERSE_MAP: Record<string, string> = {
-  "01": "engineering",
-  "02": "service",
-  "03": "sales",
-};
+const MAX_SEARCH_RANGE_DAYS = 31;
 
-const TRAINING_FORMAT_REVERSE_MAP: Record<string, string> = {
-  "001": "In-Person",
-  "002": "Virtual",
-};
-
-const CSV_EXTRA_COLUMNS: { header: string; accessor: string }[] = [
-  { header: "Training", accessor: "trainingTrack" },
-  { header: "Training Type", accessor: "trainingFormat" },
-  { header: "시작일", accessor: "scheduleStart" },
-  { header: "종료일", accessor: "scheduleEnd" },
-  { header: "신청 일시", accessor: "createdAt" },
-  { header: "발송 대상", accessor: "email" },
-];
+function resolvePeriodRange(search: Record<string, string>) {
+  const periodType = search.periodType || "01";
+  const fieldId = PERIOD_FIELD_BY_TYPE[periodType] ?? "createdRange";
+  return {
+    periodType,
+    from: search[`${fieldId}_from`],
+    to: search[`${fieldId}_to`],
+  };
+}
 
 const EMPTY_SEARCH: Record<string, string> = {
   periodType: "01",
@@ -86,6 +84,17 @@ const EMPTY_SEARCH: Record<string, string> = {
   sessionTitle: "",
 };
 
+function getDefaultSearch(): Record<string, string> {
+  const today = new Date();
+  const oneMonthAgo = new Date(today);
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  return {
+    ...EMPTY_SEARCH,
+    createdRange_from: formatDateInput(oneMonthAgo),
+    createdRange_to: formatDateInput(today),
+  };
+}
+
 export default function TrainingRequestListPage() {
   const router = useRouter();
   const { groups: codeGroups, fetchGroups } = useCodeStore();
@@ -96,8 +105,8 @@ export default function TrainingRequestListPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [searchValues, setSearchValues] = useState<Record<string, string>>({ ...EMPTY_SEARCH });
-  const [appliedSearch, setAppliedSearch] = useState<Record<string, string>>({ ...EMPTY_SEARCH });
+  const [searchValues, setSearchValues] = useState<Record<string, string>>(() => getDefaultSearch());
+  const [appliedSearch, setAppliedSearch] = useState<Record<string, string>>(() => getDefaultSearch());
 
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc" | undefined>(undefined);
@@ -118,41 +127,10 @@ export default function TrainingRequestListPage() {
     if (search.curriculumTitle) params.curriculumTitle = search.curriculumTitle;
     if (search.sessionTitle) params.sessionTitle = search.sessionTitle;
 
-    const periodType = search.periodType || "01";
-    const fieldId = PERIOD_FIELD_BY_TYPE[periodType] ?? "createdRange";
-    const from = search[`${fieldId}_from`];
-    const to = search[`${fieldId}_to`];
+    const { periodType, from, to } = resolvePeriodRange(search);
     params.searchPeriodType = periodType;
     if (from) params.startDate = toStartIso(from);
     if (to) params.endDate = toEndIso(to);
-
-    return params;
-  }, []);
-
-  const buildCsvExportParams = useCallback((search: Record<string, string>) => {
-    const params: Record<string, string> = {};
-
-    const track = TRAINING_TRACK_REVERSE_MAP[search.trainingCourse];
-    if (track) params.trainingTrack = track;
-
-    const format = TRAINING_FORMAT_REVERSE_MAP[search.trainingFormat];
-    if (format) params.trainingFormat = format;
-
-    const periodType = search.periodType || "01";
-    const fieldId = PERIOD_FIELD_BY_TYPE[periodType] ?? "createdRange";
-    const from = search[`${fieldId}_from`];
-    const to = search[`${fieldId}_to`];
-
-    if (periodType === "02") {
-      if (from) params.scheduleStartFrom = from;
-      if (to) params.scheduleStartTo = to;
-    } else if (periodType === "03") {
-      if (from) params.scheduleEndFrom = from;
-      if (to) params.scheduleEndTo = to;
-    } else {
-      if (from) params.createdAtFrom = toStartIso(from);
-      if (to) params.createdAtTo = toEndIso(to);
-    }
 
     return params;
   }, []);
@@ -182,7 +160,7 @@ export default function TrainingRequestListPage() {
   );
 
   useEffect(() => {
-    fetchList(0, EMPTY_SEARCH, null, undefined);
+    fetchList(0, appliedSearch, null, undefined);
     // 마운트 시 1회만 실행
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -394,6 +372,7 @@ export default function TrainingRequestListPage() {
           align: "center",
           sortable: true,
           width: 150,
+          dateFormat: "YYYY-MM-DD HH:mm:ss",
         },
         {
           id: "c9",
@@ -451,8 +430,6 @@ export default function TrainingRequestListPage() {
           connType: "excel",
           excelTableWidgetId: "training-request-table",
           excelPrivacyPopup: true,
-          excelDownloadMode: "custom",
-          excelExtraColumns: CSV_EXTRA_COLUMNS,
         },
       ],
       align: "right",
@@ -467,17 +444,27 @@ export default function TrainingRequestListPage() {
 
   const handleSearch = useCallback(() => {
     const nextSearch = { ...searchValues };
+
+    const { from, to } = resolvePeriodRange(nextSearch);
+    if (from && to) {
+      const diffDays = (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays > MAX_SEARCH_RANGE_DAYS) {
+        alert("한달 이내의 기간 검색 가능합니다.");
+        return;
+      }
+    }
+
     setAppliedSearch(nextSearch);
     fetchList(0, nextSearch, sortKey, sortDir);
   }, [searchValues, sortKey, sortDir, fetchList]);
 
   const handleReset = useCallback(() => {
-    const empty = { ...EMPTY_SEARCH };
-    setSearchValues(empty);
-    setAppliedSearch(empty);
+    const defaults = getDefaultSearch();
+    setSearchValues(defaults);
+    setAppliedSearch(defaults);
     setSortKey(null);
     setSortDir(undefined);
-    fetchList(0, empty, null, undefined);
+    fetchList(0, defaults, null, undefined);
   }, [fetchList]);
 
   const handlePageChange = useCallback(
@@ -529,7 +516,10 @@ export default function TrainingRequestListPage() {
     [items]
   );
 
-  const csvSearchParams = useMemo(() => buildCsvExportParams(appliedSearch), [appliedSearch, buildCsvExportParams]);
+  const csvSearchParams = useMemo(
+    () => buildApiParams(appliedSearch, sortKey, sortDir),
+    [appliedSearch, sortKey, sortDir, buildApiParams]
+  );
   const tableWidgetsMap = useMemo(() => ({ [TABLE_WIDGET.widgetId]: TABLE_WIDGET }), [TABLE_WIDGET]);
 
   return (
