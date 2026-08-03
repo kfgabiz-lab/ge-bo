@@ -112,6 +112,27 @@ export const formatNowBySubType = (subType: DateSubType): string => {
   return `${YYYY}-${MM}-${DD}`;
 };
 
+/**
+ * 오늘 기준 offset(일수)만큼 이전/이후 날짜를 subType 포맷으로 계산 (offset=0이면 오늘)
+ * - "오늘"의 기준은 활성 사이트(useSiteStore)의 timezone — 사이트 timezone이 없으면 브라우저 로컬 시각으로 폴백(getNowParts 참고)
+ * - 사이트 timezone 기준 오늘 연/월/일을 UTC로 앵커링한 뒤 setUTCDate로 offset을 적용해 DST·월말 경계에서도 안전
+ *   ⚠️ new Date().toISOString() + setDate 조합은 UTC 기준이라 사용 금지 — 시차만큼(KST는 9시간) 어긋난 날짜가 나올 수 있다.
+ * - time·timeSec은 날짜 offset 개념이 없어 빈 문자열 반환
+ * @example calcDateOffset(1, 'date') // 활성 사이트 기준 어제 날짜 "2026-07-02"
+ */
+export function calcDateOffset(offset: number, subType: string = "date"): string {
+  if (subType === "time" || subType === "timeSec") return "";
+  const { YYYY, MM, DD, hh, mm } = getNowParts();
+  const base = new Date(Date.UTC(Number(YYYY), Number(MM) - 1, Number(DD)));
+  base.setUTCDate(base.getUTCDate() - offset);
+  const y = base.getUTCFullYear();
+  const mo = String(base.getUTCMonth() + 1).padStart(2, "0");
+  const da = String(base.getUTCDate()).padStart(2, "0");
+  if (subType === "yearMonth") return `${y}-${mo}`;
+  if (subType === "datetime") return `${y}-${mo}-${da}T${hh}:${mm}`;
+  return `${y}-${mo}-${da}`;
+}
+
 /** 조건식 함수토큰 레지스트리 — subType은 상대 피연산자 값에서 추론되어 주입됨. 향후 now()/yesterday() 확장 */
 const FUNCTION_TOKENS: Record<string, (subType: DateSubType) => string> = {
   "today()": (subType) => formatNowBySubType(subType),

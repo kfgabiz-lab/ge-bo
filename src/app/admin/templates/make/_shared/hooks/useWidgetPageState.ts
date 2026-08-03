@@ -31,6 +31,8 @@ import {
   applySortChange,
   initFormDefaultValues,
   computeFieldDefaultValue,
+  formatNowBySubType,
+  calcDateOffset,
   validateDataSaveWidgets,
   saveTableRows,
   processFormFilesAndSubList,
@@ -610,53 +612,36 @@ export function useWidgetPageState(
           ) {
             /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
             const subType = f.type === "yearMonth" ? "yearMonth" : (f.dateSubType ?? "date");
-            const calcDateBySubType = (offset: number): string => {
-              const d = new Date();
-              d.setDate(d.getDate() - offset);
-              const iso = d.toISOString();
-              if (subType === "yearMonth") return iso.slice(0, 7);
-              if (subType === "datetime") return iso.slice(0, 16);
-              return iso.slice(0, 10);
-            };
             let val = "";
             if (f.defaultToday) {
-              /* 오늘날짜 ON: 오늘 날짜를 subType 포맷으로 반환 */
-              const iso = new Date().toISOString();
-              if (subType === "yearMonth") val = iso.slice(0, 7);
-              else if (subType === "datetime") val = iso.slice(0, 16);
-              else val = iso.slice(0, 10);
+              /* 오늘날짜 ON: 활성 사이트 timezone 기준 오늘 날짜를 subType 포맷으로 반환 */
+              val = formatNowBySubType(subType);
             } else {
               val =
                 f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0
-                  ? calcDateBySubType(f.defaultDateOffset)
+                  ? calcDateOffset(f.defaultDateOffset, subType)
                   : (f.defaultDate ?? "");
             }
             if (val) initVals[f.id] = val;
           } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
             /* rangeSubType에 따라 날짜 포맷 분기 */
             const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
-            const calcRangeDate = (offset: number): string => {
-              const d = new Date();
-              d.setDate(d.getDate() - offset);
-              const iso = d.toISOString();
-              const pad = (n: number) => String(n).padStart(2, "0");
-              if (subType === "yearMonth") return iso.slice(0, 7);
-              if (subType === "datetime") return iso.slice(0, 16);
-              if (subType === "time") return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-              if (subType === "timeSec") return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-              return iso.slice(0, 10);
-            };
-            /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 오늘 날짜(offset 0)로 대체 */
+            const isRangeTimeBased = subType === "time" || subType === "timeSec";
+            /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 활성 사이트 timezone 기준 오늘 값으로 대체 */
             const start = f.defaultStartToday
-              ? calcRangeDate(0)
-              : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
-                ? calcRangeDate(f.defaultStartDateOffset)
-                : (f.defaultStartDate ?? "");
+              ? formatNowBySubType(subType)
+              : isRangeTimeBased
+                ? (f.defaultStartDate ?? "")
+                : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
+                  ? calcDateOffset(f.defaultStartDateOffset, subType)
+                  : (f.defaultStartDate ?? "");
             const end = f.defaultEndToday
-              ? calcRangeDate(0)
-              : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
-                ? calcRangeDate(f.defaultEndDateOffset)
-                : (f.defaultEndDate ?? "");
+              ? formatNowBySubType(subType)
+              : isRangeTimeBased
+                ? (f.defaultEndDate ?? "")
+                : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
+                  ? calcDateOffset(f.defaultEndDateOffset, subType)
+                  : (f.defaultEndDate ?? "");
             /* dateRange/yearMonthRange: from/to 분리 저장 */
             if (start) initVals[f.id + "_from"] = start;
             if (end) initVals[f.id + "_to"] = end;

@@ -95,6 +95,7 @@ import {
   validateSearchDateRange,
   extractSubListRows,
   extractMultiSelectSelection,
+  computeFieldDefaultValue,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -102,6 +103,7 @@ import { useSlugRelations } from "../../hooks/useSlugRelations";
 /**
  * 팝업 폼 필드에 기존 DB 데이터를 매핑하는 내부 유틸
  * - editId가 있으면 slug+id로 dataJson 조회 후 fieldKey 기준 매핑
+ * - editId가 없으면(신규등록) DB 조회값이 없으므로 필드별 기본값(computeFieldDefaultValue)을 채움
  * - contentKey가 있으면 dataJson[contentKey] 섹션에서 읽음 (중첩 저장 구조 대응)
  * - initialValues가 있으면 fieldKey 기준으로 덮어씀 (우선순위 최상위)
  */
@@ -110,7 +112,8 @@ async function fetchAndMapFieldValues(
   editId: number | null,
   fields: FormFieldItem[],
   initialValues?: Record<string, string>,
-  contentKey?: string
+  contentKey?: string,
+  t?: (key: string) => string
 ): Promise<{
   values: Record<string, string>;
   existingFileIds: Record<string, number[]>;
@@ -152,10 +155,16 @@ async function fetchAndMapFieldValues(
     } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
       const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
       const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
-      if (fromVal !== undefined) values[f.id + "_from"] = String(fromVal ?? "");
-      if (toVal !== undefined) values[f.id + "_to"] = String(toVal ?? "");
+      if (fromVal === undefined && toVal === undefined) {
+        Object.assign(values, computeFieldDefaultValue(f, t));
+      } else {
+        if (fromVal !== undefined) values[f.id + "_from"] = String(fromVal ?? "");
+        if (toVal !== undefined) values[f.id + "_to"] = String(toVal ?? "");
+      }
     } else if (section[key] !== undefined) {
       values[f.id] = String(section[key]);
+    } else {
+      Object.assign(values, computeFieldDefaultValue(f, t));
     }
     if (initialValues && key) {
       /* contentKey.fieldKey 형태 우선 매칭, 없으면 fieldKey 단독 매칭 */
@@ -801,7 +810,7 @@ export function WidgetRenderer({
             values: fwValues,
             existingFileIds: fwIds,
             sourceData: sd,
-          } = await fetchAndMapFieldValues(formConnectedSlug, editId ?? null, fwFields, initialValues, fwContentKey);
+          } = await fetchAndMapFieldValues(formConnectedSlug, editId ?? null, fwFields, initialValues, fwContentKey, t);
           formValuesAccum[fwWidgetId] = fwValues;
           fileIdsAccum[fwWidgetId] = fwIds;
           allFields.push(...fwFields);
