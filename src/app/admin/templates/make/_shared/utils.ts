@@ -1696,7 +1696,7 @@ export function extractSubListRows(
   dataJson: Record<string, unknown>,
   contentKey: string | undefined
 ): import("./components/renderer/SubListRenderer").SubListRow[] {
-  const raw = contentKey ? dataJson[contentKey] : null;
+  const raw = contentKey ? dataJson[contentKey] : dataJson.rows;
   const rawRows = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
   return rawRows.map((r, i) => ({
     _rowId: (r.id as string) ?? `row-${i}`,
@@ -1957,12 +1957,15 @@ export function computeFieldDefaultValue(
   const calcDate = (offset: number, subType: string = "date") => {
     /* 시간 계열은 날짜 offset 계산 불가 */
     if (subType === "time" || subType === "timeSec") return "";
-    const d = new Date();
-    d.setDate(d.getDate() - offset);
-    const iso = d.toISOString();
-    if (subType === "yearMonth") return iso.slice(0, 7);
-    if (subType === "datetime") return iso.slice(0, 16);
-    return iso.slice(0, 10);
+    const { YYYY, MM, DD, hh, mm } = getNowParts();
+    const base = new Date(Date.UTC(Number(YYYY), Number(MM) - 1, Number(DD)));
+    base.setUTCDate(base.getUTCDate() - offset);
+    const y = base.getUTCFullYear();
+    const mo = String(base.getUTCMonth() + 1).padStart(2, "0");
+    const da = String(base.getUTCDate()).padStart(2, "0");
+    if (subType === "yearMonth") return `${y}-${mo}`;
+    if (subType === "datetime") return `${y}-${mo}-${da}T${hh}:${mm}`;
+    return `${y}-${mo}-${da}`;
   };
 
   const vals: Record<string, string> = {};
@@ -1971,14 +1974,7 @@ export function computeFieldDefaultValue(
     const dateSubType = f.dateSubType ?? "date";
     const isDateTimeBased = dateSubType === "time" || dateSubType === "timeSec";
     if (f.defaultToday) {
-      /* 오늘날짜 ON: dateSubType에 맞는 포맷으로 오늘 날짜/시간 반환 */
-      const iso = new Date().toISOString();
-      const d = new Date();
-      if (dateSubType === "yearMonth") dateVal = iso.slice(0, 7);
-      else if (dateSubType === "datetime") dateVal = iso.slice(0, 16);
-      else if (dateSubType === "time") dateVal = d.toTimeString().slice(0, 5);
-      else if (dateSubType === "timeSec") dateVal = d.toTimeString().slice(0, 8);
-      else dateVal = iso.slice(0, 10);
+      dateVal = formatNowBySubType(dateSubType);
     } else if (isDateTimeBased) {
       /* 시간 계열: offset 무의미 — defaultDate 직접 사용 */
       dateVal = f.defaultDate ?? "";
