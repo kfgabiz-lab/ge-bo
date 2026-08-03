@@ -44,6 +44,7 @@ import {
   evalConditionExpr,
   formatFetchedRelValue,
   formatNowBySubType,
+  calcDateOffset,
   resolveCodeLabel,
   debounce,
   getImageNaturalSize,
@@ -1154,26 +1155,11 @@ export function FieldRenderer({
               : "date";
       /* offset 기반 기본값 계산 — 서브타입별 포맷 */
       const calcDateDefault = (offset?: number, date?: string): string => {
-        /* defaultToday ON 시 오늘 날짜 최우선 반환 */
-        if (field.defaultToday) {
-          const iso = new Date().toISOString();
-          const d = new Date();
-          if (dateSubType === "yearMonth") return iso.slice(0, 7);
-          if (dateSubType === "datetime") return iso.slice(0, 16);
-          if (dateSubType === "time") return d.toTimeString().slice(0, 5);
-          if (dateSubType === "timeSec") return d.toTimeString().slice(0, 8);
-          return iso.slice(0, 10);
-        }
+        /* defaultToday ON 시 활성 사이트 timezone 기준 오늘 날짜 최우선 반환 */
+        if (field.defaultToday) return formatNowBySubType(dateSubType);
         /* 시간 계열은 offset 날짜 계산 불가 — defaultDate 직접 사용 */
         if (dateSubType === "time" || dateSubType === "timeSec") return date ?? "";
-        if (offset !== undefined && offset !== 0) {
-          const d = new Date();
-          d.setDate(d.getDate() - offset);
-          const iso = d.toISOString();
-          if (dateSubType === "yearMonth") return iso.slice(0, 7);
-          if (dateSubType === "datetime") return iso.slice(0, 16);
-          return iso.slice(0, 10);
-        }
+        if (offset !== undefined && offset !== 0) return calcDateOffset(offset, dateSubType);
         return date ?? "";
       };
       const dateDefault = calcDateDefault(field.defaultDateOffset, field.defaultDate);

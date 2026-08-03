@@ -113,6 +113,27 @@ export const formatNowBySubType = (subType: DateSubType): string => {
   return `${YYYY}-${MM}-${DD}`;
 };
 
+/**
+ * 오늘 기준 offset(일수)만큼 이전/이후 날짜를 subType 포맷으로 계산 (offset=0이면 오늘)
+ * - "오늘"의 기준은 활성 사이트(useSiteStore)의 timezone — 사이트 timezone이 없으면 브라우저 로컬 시각으로 폴백(getNowParts 참고)
+ * - 사이트 timezone 기준 오늘 연/월/일을 UTC로 앵커링한 뒤 setUTCDate로 offset을 적용해 DST·월말 경계에서도 안전
+ *   ⚠️ new Date().toISOString() + setDate 조합은 UTC 기준이라 사용 금지 — 시차만큼(KST는 9시간) 어긋난 날짜가 나올 수 있다.
+ * - time·timeSec은 날짜 offset 개념이 없어 빈 문자열 반환
+ * @example calcDateOffset(1, 'date') // 활성 사이트 기준 어제 날짜 "2026-07-02"
+ */
+export function calcDateOffset(offset: number, subType: string = "date"): string {
+  if (subType === "time" || subType === "timeSec") return "";
+  const { YYYY, MM, DD, hh, mm } = getNowParts();
+  const base = new Date(Date.UTC(Number(YYYY), Number(MM) - 1, Number(DD)));
+  base.setUTCDate(base.getUTCDate() - offset);
+  const y = base.getUTCFullYear();
+  const mo = String(base.getUTCMonth() + 1).padStart(2, "0");
+  const da = String(base.getUTCDate()).padStart(2, "0");
+  if (subType === "yearMonth") return `${y}-${mo}`;
+  if (subType === "datetime") return `${y}-${mo}-${da}T${hh}:${mm}`;
+  return `${y}-${mo}-${da}`;
+}
+
 /** 조건식 함수토큰 레지스트리 — subType은 상대 피연산자 값에서 추론되어 주입됨. 향후 now()/yesterday() 확장 */
 const FUNCTION_TOKENS: Record<string, (subType: DateSubType) => string> = {
   "today()": (subType) => formatNowBySubType(subType),
@@ -1729,14 +1750,54 @@ export function buildDataSavePayload(params: {
   pkKeys: string[];
   templateSlug?: string;
   validationRuleIds?: number[];
+  groupId?: string;
 }): Record<string, unknown> {
-  const { dataJson, pkKeys, templateSlug, validationRuleIds } = params;
+  const { dataJson, pkKeys, templateSlug, validationRuleIds, groupId } = params;
   return {
     dataJson,
     ...(pkKeys.length > 0 && { pkKeys }),
+    ...(groupId && { groupId }),
     ...(templateSlug && { templateSlug }),
     ...(validationRuleIds && validationRuleIds.length > 0 && { validationRuleIds }),
   };
+}
+
+export function extractSubListRows(
+  dataJson: Record<string, unknown>,
+  contentKey: string | undefined
+): import("./components/renderer/SubListRenderer").SubListRow[] {
+  const raw = contentKey ? dataJson[contentKey] : dataJson.rows;
+  const rawRows = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
+  return rawRows.map((r, i) => ({
+    _rowId: (r.id as string) ?? `row-${i}`,
+    ...r,
+  }));
+}
+
+export type MultiSelectSelectionResult =
+  | { kind: "objects"; ids: number[]; extraFieldValues: Record<number, Record<string, string>> }
+  | { kind: "ids"; ids: number[] }
+  | { kind: "none" };
+
+export function extractMultiSelectSelection(
+  dataJson: Record<string, unknown>,
+  contentKey: string | undefined,
+  connectedSlug: string | undefined
+): MultiSelectSelectionResult {
+  if (!contentKey) return { kind: "none" };
+  const rel = dataJson["_rel"] as Record<string, unknown> | undefined;
+  const raw = (connectedSlug ? rel?.[connectedSlug] : undefined) ?? dataJson[contentKey];
+  if (!Array.isArray(raw)) return { kind: "none" };
+  if (raw.length > 0 && typeof raw[0] === "object" && raw[0] !== null && "id" in (raw[0] as object)) {
+    const items = raw as { id: number; [key: string]: unknown }[];
+    const extraFieldValues: Record<number, Record<string, string>> = {};
+    items.forEach((item) => {
+      const { id, ...fields } = item;
+      extraFieldValues[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? "")]));
+    });
+    return { kind: "objects", ids: items.map((i) => i.id), extraFieldValues };
+  }
+  return { kind: "ids", ids: (raw as unknown[]).filter((x) => typeof x === "number") as number[] };
 }
 
 /**
@@ -1945,11 +2006,88 @@ export function applySortChange(
 }
 
 /**
- * Form 위젯 필드 기본값 초기화 — widgetSub(신규 모드)·useWidgetPageState 공통 사용
+ * 필드 1개의 기본값(defaultValue 계열)을 계산 — initFormDefaultValues·restoreFormDataFromJson 공통 사용
  * - date              : defaultDateOffset(오늘 기준) 또는 defaultDate(고정일)
  * - dateRange         : defaultStart/EndDateOffset 또는 defaultStart/EndDate
  * - select/radio/checkbox : defaultOptionValue
  * - 그 외             : defaultValueMsgKey(다국어) 또는 defaultValue(고정 텍스트)
+ *
+ * @param f 기본값을 계산할 필드
+ * @param t 다국어 번역 함수 — defaultValueMsgKey 처리용 (선택)
+ * @returns { fieldId(+_from/_to): 값 } — 계산된 기본값이 없으면 빈 객체
+ *
+ * 사용법:
+ *   Object.assign(vals, computeFieldDefaultValue(f, t));
+ */
+export function computeFieldDefaultValue(
+  f: import("./components/builder/FormBuilder").FormFieldItem,
+  t?: (key: string) => string
+): Record<string, string> {
+  /* subType에 따라 날짜 포맷 분기 (date/yearMonth/datetime/time/timeSec) */
+  const calcDate = (offset: number, subType: string = "date") => {
+    /* 시간 계열은 날짜 offset 계산 불가 */
+    if (subType === "time" || subType === "timeSec") return "";
+    const { YYYY, MM, DD, hh, mm } = getNowParts();
+    const base = new Date(Date.UTC(Number(YYYY), Number(MM) - 1, Number(DD)));
+    base.setUTCDate(base.getUTCDate() - offset);
+    const y = base.getUTCFullYear();
+    const mo = String(base.getUTCMonth() + 1).padStart(2, "0");
+    const da = String(base.getUTCDate()).padStart(2, "0");
+    if (subType === "yearMonth") return `${y}-${mo}`;
+    if (subType === "datetime") return `${y}-${mo}-${da}T${hh}:${mm}`;
+    return `${y}-${mo}-${da}`;
+  };
+
+  const vals: Record<string, string> = {};
+  if (f.type === "date" && (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)) {
+    let dateVal = "";
+    const dateSubType = f.dateSubType ?? "date";
+    const isDateTimeBased = dateSubType === "time" || dateSubType === "timeSec";
+    if (f.defaultToday) {
+      dateVal = formatNowBySubType(dateSubType);
+    } else if (isDateTimeBased) {
+      /* 시간 계열: offset 무의미 — defaultDate 직접 사용 */
+      dateVal = f.defaultDate ?? "";
+    } else if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
+      dateVal = calcDate(f.defaultDateOffset, dateSubType);
+    } else if (f.defaultDate) {
+      dateVal = f.defaultDate;
+    }
+    if (dateVal) vals[f.id] = dateVal;
+  } else if (f.type === "dateRange") {
+    const subType = f.rangeSubType ?? "date";
+    const isRangeTimeBased = subType === "time" || subType === "timeSec";
+    /* 오늘날짜는 시작·종료 각각 독립 토글 — formatNowBySubType 공통함수로 오늘 값 계산 */
+    const start = f.defaultStartToday
+      ? formatNowBySubType(subType)
+      : isRangeTimeBased
+        ? (f.defaultStartDate ?? "")
+        : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
+          ? calcDate(f.defaultStartDateOffset, subType)
+          : (f.defaultStartDate ?? "");
+    const end = f.defaultEndToday
+      ? formatNowBySubType(subType)
+      : isRangeTimeBased
+        ? (f.defaultEndDate ?? "")
+        : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
+          ? calcDate(f.defaultEndDateOffset, subType)
+          : (f.defaultEndDate ?? "");
+    /* dateRange: _from/_to 분리 키로 초기값 저장 */
+    if (start) vals[f.id + "_from"] = start;
+    if (end) vals[f.id + "_to"] = end;
+  } else if (f.defaultOptionValue && (f.type === "select" || f.type === "radio" || f.type === "checkbox")) {
+    vals[f.id] = f.defaultOptionValue;
+  } else if (f.defaultValueMsgKey && t) {
+    vals[f.id] = t(f.defaultValueMsgKey);
+  } else if (f.defaultValue) {
+    vals[f.id] = f.defaultValue;
+  }
+  return vals;
+}
+
+/**
+ * Form 위젯 필드 기본값 초기화 — widgetSub(신규 모드)·useWidgetPageState 공통 사용
+ * 필드별 기본값 계산은 computeFieldDefaultValue에 위임한다.
  *
  * @param formWidgets 기본값을 초기화할 Form 위젯 배열
  * @param t           다국어 번역 함수 — defaultValueMsgKey 처리용 (선택)
@@ -1963,72 +2101,11 @@ export function initFormDefaultValues(
   formWidgets: import("./components/builder/FormBuilder").FormWidget[],
   t?: (key: string) => string
 ): Record<string, Record<string, string>> {
-  /* subType에 따라 날짜 포맷 분기 (date/yearMonth/datetime/time/timeSec) */
-  const calcDate = (offset: number, subType: string = "date") => {
-    /* 시간 계열은 날짜 offset 계산 불가 */
-    if (subType === "time" || subType === "timeSec") return "";
-    const d = new Date();
-    d.setDate(d.getDate() - offset);
-    const iso = d.toISOString();
-    if (subType === "yearMonth") return iso.slice(0, 7);
-    if (subType === "datetime") return iso.slice(0, 16);
-    return iso.slice(0, 10);
-  };
-
   const result: Record<string, Record<string, string>> = {};
   formWidgets.forEach((fw) => {
     const vals: Record<string, string> = {};
     fw.fields.forEach((f) => {
-      if (f.type === "date" && (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)) {
-        let dateVal = "";
-        const dateSubType = f.dateSubType ?? "date";
-        const isDateTimeBased = dateSubType === "time" || dateSubType === "timeSec";
-        if (f.defaultToday) {
-          /* 오늘날짜 ON: dateSubType에 맞는 포맷으로 오늘 날짜/시간 반환 */
-          const iso = new Date().toISOString();
-          const d = new Date();
-          if (dateSubType === "yearMonth") dateVal = iso.slice(0, 7);
-          else if (dateSubType === "datetime") dateVal = iso.slice(0, 16);
-          else if (dateSubType === "time") dateVal = d.toTimeString().slice(0, 5);
-          else if (dateSubType === "timeSec") dateVal = d.toTimeString().slice(0, 8);
-          else dateVal = iso.slice(0, 10);
-        } else if (isDateTimeBased) {
-          /* 시간 계열: offset 무의미 — defaultDate 직접 사용 */
-          dateVal = f.defaultDate ?? "";
-        } else if (f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0) {
-          dateVal = calcDate(f.defaultDateOffset, dateSubType);
-        } else if (f.defaultDate) {
-          dateVal = f.defaultDate;
-        }
-        if (dateVal) vals[f.id] = dateVal;
-      } else if (f.type === "dateRange") {
-        const subType = f.rangeSubType ?? "date";
-        const isRangeTimeBased = subType === "time" || subType === "timeSec";
-        /* 오늘날짜는 시작·종료 각각 독립 토글 — formatNowBySubType 공통함수로 오늘 값 계산 */
-        const start = f.defaultStartToday
-          ? formatNowBySubType(subType)
-          : isRangeTimeBased
-            ? (f.defaultStartDate ?? "")
-            : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
-              ? calcDate(f.defaultStartDateOffset, subType)
-              : (f.defaultStartDate ?? "");
-        const end = f.defaultEndToday
-          ? formatNowBySubType(subType)
-          : isRangeTimeBased
-            ? (f.defaultEndDate ?? "")
-            : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
-              ? calcDate(f.defaultEndDateOffset, subType)
-              : (f.defaultEndDate ?? "");
-        /* dateRange: _from/_to 분리 키로 초기값 저장 */
-        if (start) vals[f.id + "_from"] = start;
-        if (end) vals[f.id + "_to"] = end;
-      } else if (f.defaultOptionValue && (f.type === "select" || f.type === "radio" || f.type === "checkbox")) {
-        vals[f.id] = f.defaultOptionValue;
-      } else if (f.defaultValueMsgKey && t) {
-        vals[f.id] = t(f.defaultValueMsgKey);
-      } else if (f.defaultValue) {
-        vals[f.id] = f.defaultValue;
-      }
+      Object.assign(vals, computeFieldDefaultValue(f, t));
     });
     result[fw.widgetId] = vals;
   });

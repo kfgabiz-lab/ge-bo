@@ -21,6 +21,7 @@ import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
+import { useSiteStore } from "@/store/use-site-store";
 import {
   buildDataJson,
   buildDataSavePayload,
@@ -30,6 +31,9 @@ import {
   flattenPageDataItem,
   applySortChange,
   initFormDefaultValues,
+  computeFieldDefaultValue,
+  formatNowBySubType,
+  calcDateOffset,
   validateDataSaveWidgets,
   saveTableRows,
   processFormFilesAndSubList,
@@ -37,6 +41,8 @@ import {
   parseActionParams,
   buildSearchFieldsMap,
   buildSearchQueryParams,
+  extractSubListRows,
+  extractMultiSelectSelection,
 } from "../utils";
 import {
   entityApiPath,
@@ -176,7 +182,7 @@ function findSection(dataJson: Record<string, unknown>, contentKey: string | und
  *   await restoreFormDataFromJson(dataJson, forms, sublists, multiSels,
  *     setFormValuesMap, setSubListRowsMap,
  *     setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
- *     setExistingFileMetaMap, setImgBlobUrls, isEntity);
+ *     setExistingFileMetaMap, setImgBlobUrls, isEntity, t);
  *
  * @param isEntity  true면 entity 연결 페이지 — 파일 메타/blob 조회를 page_file 시스템
  *                  (/page-files/meta, /page-files/{id}) 대신 file_meta 시스템
@@ -198,32 +204,43 @@ async function restoreFormDataFromJson(
     React.SetStateAction<Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>>
   >,
   setImgBlobUrls: React.Dispatch<React.SetStateAction<Record<number, string>>>,
-  isEntity?: boolean
+  isEntity?: boolean,
+  t?: (key: string) => string
 ): Promise<void> {
-  /* 폼 필드 값 복원 */
   forms.forEach((fw) => {
     const section = findSection(dataJson, fw.contentKey);
     const vals: Record<string, string> = {};
     fw.fields.forEach((f) => {
-      if (!f.fieldKey) return;
+      const key = f.fieldKey || f.label;
+      if (!key) return;
       if (f.type === "dateRange" || f.type === "yearMonthRange") {
         /* dateRange/yearMonthRange 복원 키 — fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키로 복원,
            미지정 시 기존처럼 dataJson에서 _from/_to 분리 키로 복원(buildDataJson과 대칭) */
-        const fromVal = f.fieldKey2 ? section[f.fieldKey] : section[f.fieldKey + "_from"];
-        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[f.fieldKey + "_to"];
-        if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
-        if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
+        const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
+        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
+        if (fromVal === undefined && toVal === undefined) {
+          Object.assign(vals, computeFieldDefaultValue(f, t));
+        } else {
+          if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
+          if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
+        }
       } else if (f.type === "address") {
         /* address(주소검색) 복원 — buildDataJson과 대칭: fieldKey/fieldKey_lat/fieldKey_lng 3개
            flat 키에서 각각 복원한다 (dateRange의 _from/_to 복원과 동일한 패턴) */
-        if (section[f.fieldKey] !== undefined) vals[f.id] = String(section[f.fieldKey] ?? "");
-        if (section[f.fieldKey + "_lat"] !== undefined)
-          vals[f.id + "_lat"] = String(section[f.fieldKey + "_lat"] ?? "");
-        if (section[f.fieldKey + "_lng"] !== undefined)
-          vals[f.id + "_lng"] = String(section[f.fieldKey + "_lng"] ?? "");
-      } else if (section[f.fieldKey] !== undefined) {
-        const raw = section[f.fieldKey];
+        const hasAddressVal =
+          section[key] !== undefined || section[key + "_lat"] !== undefined || section[key + "_lng"] !== undefined;
+        if (!hasAddressVal) {
+          Object.assign(vals, computeFieldDefaultValue(f, t));
+        } else {
+          if (section[key] !== undefined) vals[f.id] = String(section[key] ?? "");
+          if (section[key + "_lat"] !== undefined) vals[f.id + "_lat"] = String(section[key + "_lat"] ?? "");
+          if (section[key + "_lng"] !== undefined) vals[f.id + "_lng"] = String(section[key + "_lng"] ?? "");
+        }
+      } else if (section[key] !== undefined) {
+        const raw = section[key];
         if (!Array.isArray(raw)) vals[f.id] = String(raw ?? "");
+      } else {
+        Object.assign(vals, computeFieldDefaultValue(f, t));
       }
     });
     setFormValuesMap((prev) => ({ ...prev, [fw.widgetId]: vals }));
@@ -231,39 +248,17 @@ async function restoreFormDataFromJson(
 
   /* SubList 행 복원 */
   sublists.forEach((sw) => {
-    const raw = sw.contentKey ? dataJson[sw.contentKey] : null;
-    /* { rows } 래핑 제거 후 배열 직접 저장 방식 */
-    const rawRows = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
-    setSubListRowsMap((prev) => ({
-      ...prev,
-      [sw.widgetId]: rawRows.map((r, i) => ({
-        _rowId: (r.id as string) ?? `row-${i}`,
-        ...r,
-      })),
-    }));
+    const rows = extractSubListRows(dataJson, sw.contentKey);
+    setSubListRowsMap((prev) => ({ ...prev, [sw.widgetId]: rows }));
   });
 
   /* MultiSelect 값 복원 */
   multiSels.forEach((mw) => {
-    if (!mw.contentKey) return;
-    /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
-    const rel = dataJson["_rel"] as Record<string, unknown> | undefined;
-    const raw = (mw.connectedSlug ? rel?.[mw.connectedSlug] : undefined) ?? dataJson[mw.contentKey];
-    if (!Array.isArray(raw)) return;
-    if (raw.length > 0 && typeof raw[0] === "object" && raw[0] !== null && "id" in (raw[0] as object)) {
-      const items = raw as { id: number; [key: string]: unknown }[];
-      setMultiSelectValuesMap((prev) => ({ ...prev, [mw.widgetId]: items.map((i) => i.id) }));
-      const extraVals: Record<number, Record<string, string>> = {};
-      items.forEach((item) => {
-        const { id, ...fields } = item;
-        extraVals[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? "")]));
-      });
-      setMultiSelectExtraFieldValuesMap((prev) => ({ ...prev, [mw.widgetId]: extraVals }));
-    } else {
-      setMultiSelectValuesMap((prev) => ({
-        ...prev,
-        [mw.widgetId]: (raw as unknown[]).filter((x) => typeof x === "number") as number[],
-      }));
+    const result = extractMultiSelectSelection(dataJson, mw.contentKey, mw.connectedSlug);
+    if (result.kind === "none") return;
+    setMultiSelectValuesMap((prev) => ({ ...prev, [mw.widgetId]: result.ids }));
+    if (result.kind === "objects") {
+      setMultiSelectExtraFieldValuesMap((prev) => ({ ...prev, [mw.widgetId]: result.extraFieldValues }));
     }
   });
 
@@ -378,6 +373,9 @@ export function useWidgetPageState(
   /* 페이지 레벨 메인 연결이 Slug Entity API(/api/v1/{slug})를 가리키는지 여부 —
    * connectedType이 'data'면 Table 위젯이 entity REST API로 데이터를 조회한다. */
   const pageIsEntity = options?.connectedType === "data";
+
+  /* 사이트 시간대 로드 완료 여부 — 날짜 기본값 계산은 이 값이 true가 될 때까지 대기 */
+  const sitesLoaded = useSiteStore((s) => s.sitesLoaded);
 
   /* 검색 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>({});
@@ -606,6 +604,7 @@ export function useWidgetPageState(
   /* Search 위젯 날짜·옵션 기본값 초기화 — widgetSub 페이지 패턴 지원 */
   useEffect(() => {
     if (!widgetItems.length) return;
+    if (!sitesLoaded) return;
     const initVals: Record<string, string> = {};
     flatWidgets(widgetItems).forEach((w) => {
       if (w.type !== "search") return;
@@ -618,53 +617,36 @@ export function useWidgetPageState(
           ) {
             /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
             const subType = f.type === "yearMonth" ? "yearMonth" : (f.dateSubType ?? "date");
-            const calcDateBySubType = (offset: number): string => {
-              const d = new Date();
-              d.setDate(d.getDate() - offset);
-              const iso = d.toISOString();
-              if (subType === "yearMonth") return iso.slice(0, 7);
-              if (subType === "datetime") return iso.slice(0, 16);
-              return iso.slice(0, 10);
-            };
             let val = "";
             if (f.defaultToday) {
-              /* 오늘날짜 ON: 오늘 날짜를 subType 포맷으로 반환 */
-              const iso = new Date().toISOString();
-              if (subType === "yearMonth") val = iso.slice(0, 7);
-              else if (subType === "datetime") val = iso.slice(0, 16);
-              else val = iso.slice(0, 10);
+              /* 오늘날짜 ON: 활성 사이트 timezone 기준 오늘 날짜를 subType 포맷으로 반환 */
+              val = formatNowBySubType(subType);
             } else {
               val =
                 f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0
-                  ? calcDateBySubType(f.defaultDateOffset)
+                  ? calcDateOffset(f.defaultDateOffset, subType)
                   : (f.defaultDate ?? "");
             }
             if (val) initVals[f.id] = val;
           } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
             /* rangeSubType에 따라 날짜 포맷 분기 */
             const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
-            const calcRangeDate = (offset: number): string => {
-              const d = new Date();
-              d.setDate(d.getDate() - offset);
-              const iso = d.toISOString();
-              const pad = (n: number) => String(n).padStart(2, "0");
-              if (subType === "yearMonth") return iso.slice(0, 7);
-              if (subType === "datetime") return iso.slice(0, 16);
-              if (subType === "time") return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-              if (subType === "timeSec") return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-              return iso.slice(0, 10);
-            };
-            /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 오늘 날짜(offset 0)로 대체 */
+            const isRangeTimeBased = subType === "time" || subType === "timeSec";
+            /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 활성 사이트 timezone 기준 오늘 값으로 대체 */
             const start = f.defaultStartToday
-              ? calcRangeDate(0)
-              : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
-                ? calcRangeDate(f.defaultStartDateOffset)
-                : (f.defaultStartDate ?? "");
+              ? formatNowBySubType(subType)
+              : isRangeTimeBased
+                ? (f.defaultStartDate ?? "")
+                : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
+                  ? calcDateOffset(f.defaultStartDateOffset, subType)
+                  : (f.defaultStartDate ?? "");
             const end = f.defaultEndToday
-              ? calcRangeDate(0)
-              : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
-                ? calcRangeDate(f.defaultEndDateOffset)
-                : (f.defaultEndDate ?? "");
+              ? formatNowBySubType(subType)
+              : isRangeTimeBased
+                ? (f.defaultEndDate ?? "")
+                : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
+                  ? calcDateOffset(f.defaultEndDateOffset, subType)
+                  : (f.defaultEndDate ?? "");
             /* dateRange/yearMonthRange: from/to 분리 저장 */
             if (start) initVals[f.id + "_from"] = start;
             if (end) initVals[f.id + "_to"] = end;
@@ -679,7 +661,7 @@ export function useWidgetPageState(
       setSearchValues((prev) => ({ ...initVals, ...prev }));
       searchValuesRef.current = { ...initVals, ...searchValuesRef.current };
     }
-  }, [widgetItems]);
+  }, [widgetItems, sitesLoaded]);
 
   /* URL ?id / ?group_id 기반 수정 모드 — enableUrlEditMode: true 시 동작 */
   useEffect(() => {
@@ -776,7 +758,8 @@ export function useWidgetPageState(
               setMultiSelectExtraFieldValuesMap,
               setExistingFileMetaMap,
               setImgBlobUrls,
-              pageIsEntity
+              pageIsEntity,
+              t
             );
             applyUrlParams();
           })
@@ -809,7 +792,8 @@ export function useWidgetPageState(
               setMultiSelectExtraFieldValuesMap,
               setExistingFileMetaMap,
               setImgBlobUrls,
-              pageIsEntity
+              pageIsEntity,
+              t
             );
             // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
             const fetchRelData = extractFetchRelData(dataJson);
@@ -823,14 +807,15 @@ export function useWidgetPageState(
           .catch(() => toast.error(t("common.error.load_existing_data")));
       }
     } else {
-      /* 신규 모드 — 기본값 초기화 */
+      /* 신규 모드 — 기본값 초기화 (사이트 시간대 로드 완료 후에만 계산) */
+      if (!sitesLoaded) return;
       setCurrentGroupId(null);
       setMultiSelectValuesMap({});
       setFormValuesMap(initFormDefaultValues(formWidgets, t));
       applyUrlParams();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgetItems, searchParams, options?.enableUrlEditMode]);
+  }, [widgetItems, searchParams, options?.enableUrlEditMode, sitesLoaded]);
 
   /* 수정 모드 초기 데이터 로드 — sharedDataId(탭 공유 row id) 있을 때
    * Form/SubList/MultiSelect 모두 restoreFormDataFromJson 공통 함수로 복원
@@ -871,7 +856,8 @@ export function useWidgetPageState(
           setMultiSelectExtraFieldValuesMap,
           setExistingFileMetaMap,
           setImgBlobUrls,
-          pageIsEntity
+          pageIsEntity,
+          t
         );
         // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
         const fetchRelData = extractFetchRelData(rawDataJson);
@@ -1388,20 +1374,27 @@ export function useWidgetPageState(
             }
 
             if (slugStoredId) {
-              await api.put(`/page-data/${connectedSlug}/${slugStoredId}`, {
-                dataJson: finalDataJson,
-                ...(pageSlug && { templateSlug: pageSlug }),
-                ...(groupValidationRuleIds.length > 0 && { validationRuleIds: groupValidationRuleIds }),
-              });
+              await api.put(
+                `/page-data/${connectedSlug}/${slugStoredId}`,
+                buildDataSavePayload({
+                  dataJson: finalDataJson,
+                  pkKeys: [],
+                  templateSlug: pageSlug,
+                  validationRuleIds: groupValidationRuleIds,
+                })
+              );
               savedDataId = slugStoredId;
             } else {
-              const res = await api.post(`/page-data/${connectedSlug}`, {
-                dataJson: finalDataJson,
-                ...(pkKeys.length > 0 && { pkKeys }),
-                ...(groupId && { groupId }),
-                ...(pageSlug && { templateSlug: pageSlug }),
-                ...(groupValidationRuleIds.length > 0 && { validationRuleIds: groupValidationRuleIds }),
-              });
+              const res = await api.post(
+                `/page-data/${connectedSlug}`,
+                buildDataSavePayload({
+                  dataJson: finalDataJson,
+                  pkKeys,
+                  groupId,
+                  templateSlug: pageSlug,
+                  validationRuleIds: groupValidationRuleIds,
+                })
+              );
               savedDataId = res.data.id;
               /* group_id가 새로 생성된 경우 상태에 저장 */
               if (groupId && !storedGroupId) setCurrentGroupId(groupId);
