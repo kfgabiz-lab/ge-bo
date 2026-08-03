@@ -390,6 +390,8 @@ export function TableBuilder({
           passParam: p.cellType === "button" ? p.passParam : undefined,
           windowPopupOption: p.cellType === "button" && p.connType === "windowPopup" ? p.windowPopupOption : undefined,
           usePreviewToken: p.cellType === "button" && p.targetType === "url" ? p.usePreviewToken : undefined,
+          relationSlugId: p.relationSlugId,
+          relationSlugIds: p.relationSlugIds,
         },
       ],
     });

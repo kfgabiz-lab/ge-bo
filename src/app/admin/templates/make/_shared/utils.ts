@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { useSiteStore } from "@/store/use-site-store";
 import { FILE_FIELD_TYPES } from "./constants";
 import type { DateSubType, CodeGroupDef } from "./types";
+import { buildFetchKey } from "./components/builder/fields/utils";
 
 /** getDateParts가 반환하는 시각의 연/월/일/시/분/초 문자열 조각 */
 interface NowParts {
@@ -1151,6 +1152,16 @@ export function resolveFetchSeparator(rowData: Record<string, unknown>, relation
   return typeof sep === "string" && sep !== "" ? sep : DEFAULT_SEP;
 }
 
+function recordsToDisplayItems(records: Record<string, unknown>[], dataExpr: string | undefined): string[] {
+  const expr = dataExpr && dataExpr.trim() ? dataExpr : "id";
+  return records
+    .map((record) => {
+      const flat = flattenPageDataItem({ id: Number((record as Record<string, unknown>).id ?? 0), dataJson: record });
+      return evalColumnDataExpr(expr, flat);
+    })
+    .filter((v) => v !== "");
+}
+
 /**
  * ARRAY_CONTAINS 연결 Slug 다건 매칭 결과 배열 → 표시용 문자열 변환
  * 매칭된 slave 레코드마다 flattenPageDataItem으로 평탄화 후 data 표현식(evalColumnDataExpr)을 반복 평가.
@@ -1169,13 +1180,7 @@ export function formatFetchedRelArray(
   separator = ","
 ): string {
   if (!Array.isArray(records) || records.length === 0) return "";
-  const expr = dataExpr && dataExpr.trim() ? dataExpr : "id";
-  const values = records
-    .map((record) => {
-      const flat = flattenPageDataItem({ id: Number((record as Record<string, unknown>).id ?? 0), dataJson: record });
-      return evalColumnDataExpr(expr, flat);
-    })
-    .filter((v) => v !== "");
+  const values = recordsToDisplayItems(records, dataExpr);
   if (values.length === 0) return "";
   return mode === "MULTI_LINE" ? values.join("\n") : values.join(`${separator} `);
 }
@@ -1209,6 +1214,50 @@ export function formatFetchedRelValue(
     return mode === "MULTI_LINE" ? (fetched as string[]).join("\n") : (fetched as string[]).join(sep);
   }
   return formatFetchedRelArray(fetched as Record<string, unknown>[], dataExpr, mode);
+}
+
+export function extractFetchedRelItems(
+  row: Record<string, unknown>,
+  relationId: number,
+  dataExpr: string | undefined
+): string[] {
+  const raw = row[buildFetchKey(relationId)];
+  if (raw === null || raw === undefined) return [];
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return [];
+    if (typeof raw[0] === "object" && raw[0] !== null) {
+      return recordsToDisplayItems(raw as Record<string, unknown>[], dataExpr);
+    }
+    return (raw as unknown[]).map((v) => String(v ?? "")).filter((v) => v !== "");
+  }
+  if (typeof raw === "object") {
+    return recordsToDisplayItems([raw as Record<string, unknown>], dataExpr);
+  }
+  const strVal = String(raw);
+  return strVal !== "" ? [strVal] : [];
+}
+
+export function formatFetchedRelMulti(
+  row: Record<string, unknown>,
+  relationIds: number[],
+  dataExpr: string | undefined,
+  mode: "ONE_LINE" | "MULTI_LINE" = "ONE_LINE"
+): string {
+  const items = relationIds.flatMap((id) => extractFetchedRelItems(row, id, dataExpr));
+  if (items.length === 0) return "";
+  return mode === "MULTI_LINE" ? items.join("\n") : items.join(", ");
+}
+
+export function getColumnRelationIds(col: { relationSlugId?: number; relationSlugIds?: number[] }): number[] {
+  const source = Array.isArray(col.relationSlugIds) ? col.relationSlugIds : [col.relationSlugId];
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (const id of source) {
+    if (typeof id !== "number" || !Number.isFinite(id) || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
 }
 
 /**

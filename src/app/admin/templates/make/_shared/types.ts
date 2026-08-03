@@ -416,6 +416,7 @@ export interface TableColumnConfig {
   afterText?: string; // 날짜 이후 표시 텍스트 (예: '종료')
   afterTextMsgKey?: string; // 이후 텍스트 다국어 키
   relationSlugId?: number; // 연동 slug-relation ID (FETCH 카테고리 연동)
+  relationSlugIds?: number[];
   /* ── inlineEdit 전용 ── */
   inlineEditType?: "toggle" | "checkbox" | "radio"; // 즉시 수정 UI 타입
   options?: string[]; // 수동 입력 옵션 목록 ("텍스트|값" 형식, radio/checkbox 전용)

@@ -24,9 +24,11 @@ import type { RendererMode, TableActionHandlers } from "./types";
 import {
   evalColumnDataExpr,
   formatFetchedRelValue,
+  formatFetchedRelMulti,
   formatNowBySubType,
   resolveCodeLabel,
   applyMask,
+  getColumnRelationIds,
 } from "../../utils";
 import { CUSTOM_ACTION_COLORS } from "../builder/fields/col-types";
 
@@ -445,6 +447,24 @@ export function TableCellRenderer({
       if (isPreview) {
         return <span className="text-slate-400 text-sm">샘플 텍스트</span>;
       }
+      const relIds = getColumnRelationIds(col);
+      if (!isPreview && relIds.length > 1) {
+        const multiFormatted = formatFetchedRelMulti(row, relIds, col.data, col.fetchDisplayMode ?? "ONE_LINE");
+        if (!multiFormatted) return <span className="text-sm text-slate-400">-</span>;
+        if (col.fetchDisplayMode === "MULTI_LINE") {
+          return (
+            <span className="text-sm text-slate-700 whitespace-pre-wrap block" title={multiFormatted}>
+              {multiFormatted}
+            </span>
+          );
+        }
+        return (
+          <span className="text-sm text-slate-700 truncate block" title={multiFormatted}>
+            {multiFormatted}
+          </span>
+        );
+      }
+
       /* 연결 Slug(FETCH) 다건 매칭 배열 — col.relationSlugId가 있는 컬럼만 해당(회귀 방지 가드).
                relationSlugId 없이 배열이 온 경우(체크박스 다중선택 string[], multiSelect number[] 등)는
                이 분기를 타지 않고 아래 공통 로직(typeof === 'object' → 빈값)으로 처리한다 */

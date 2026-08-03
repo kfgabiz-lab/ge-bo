@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * ColumnBaseField — 컬럼 기본 설정 (헤더명, Key, 너비, 정렬, 정렬활성화)
@@ -13,146 +13,145 @@
  *   <ColumnBaseField values={pendingCol} onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))} autoFocus />
  */
 
-import React from 'react';
-import { ColEditProps } from './col-types';
-import { INPUT_CLS, LABEL_CLS } from './_FieldBase';
-import { SlugSelectField } from './SlugSelectField';
-import { FetchDisplayField } from './FetchDisplayField';
-import { buildFetchKey } from './utils';
-import { MessageKeySelector } from '@/components/i18n/message-key-selector';
-import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
-import type { SlugRelationOption } from '../../SearchBuilder';
+import React from "react";
+import { ColEditProps } from "./col-types";
+import { INPUT_CLS, LABEL_CLS } from "./_FieldBase";
+import { RelationMultiSelectField } from "./RelationMultiSelectField";
+import { FetchDisplayField } from "./FetchDisplayField";
+import { buildFetchKey } from "./utils";
+import { getColumnRelationIds } from "../../../utils";
+import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { useBuilderI18nMode } from "../../../contexts/BuilderI18nModeContext";
+import type { SlugRelationOption } from "../../SearchBuilder";
 
 interface ColumnBaseFieldProps extends ColEditProps {
-    /** 추가 모드: 헤더명 input 자동 포커스 */
-    autoFocus?: boolean;
-    /** 연결 가능한 FETCH 슬러그 목록 (TableBuilder에서 connectedSlug 기준으로 필터링하여 전달) */
-    fetchRelations?: SlugRelationOption[];
+  /** 추가 모드: 헤더명 input 자동 포커스 */
+  autoFocus?: boolean;
+  /** 연결 가능한 FETCH 슬러그 목록 (TableBuilder에서 connectedSlug 기준으로 필터링하여 전달) */
+  fetchRelations?: SlugRelationOption[];
 }
 
 export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = [] }: ColumnBaseFieldProps) {
-    const isActions = values.cellType === 'actions';
-    const { i18nMode } = useBuilderI18nMode();
+  const isActions = values.cellType === "actions";
+  const { i18nMode } = useBuilderI18nMode();
 
-    return (
-        <div className="space-y-2">
-            {/* 헤더명 | 연결Slug — 2열 그리드 (actions 타입 제외) */}
-            {!isActions && (
-                <>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className={LABEL_CLS}>헤더명 <span className="text-red-400">*</span></label>
-                            {i18nMode ? (
-                                <MessageKeySelector
-                                    value={values.headerMsgKey ?? ''}
-                                    onChange={key => onChange({ headerMsgKey: key })}
-                                    resourceType="WORD"
-                                    size="sm"
-                                />
-                            ) : (
-                                <input
-                                    type="text"
-                                    value={values.header ?? ''}
-                                    autoFocus={autoFocus}
-                                    onChange={e => onChange({ header: e.target.value })}
-                                    className={INPUT_CLS}
-                                />
-                            )}
-                        </div>
-                        <div>
-                            <SlugSelectField
-                                label="연결 Slug"
-                                value={String(values.relationSlugId ?? '')}
-                                onChange={slug => {
-                                    if (slug) {
-                                        const id = Number(slug);
-                                        const selected = fetchRelations.find(r => r.id === id);
-                                        onChange({
-                                            relationSlugId: id,
-                                            accessor: selected ? buildFetchKey(selected.id) : values.accessor,
-                                        });
-                                    } else {
-                                        onChange({ relationSlugId: undefined });
-                                    }
-                                }}
-                                slugOptions={fetchRelations.map(r => ({
-                                    id: r.id,
-                                    slug: String(r.id),
-                                    name: r.description
-                                        ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
-                                        : `${r.masterSlug} → ${r.slaveSlug}`,
-                                }))}
-                                formatDisplay={opt => opt.name}
-                                emptyLabel="연동 없음"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Key — 단독 row */}
-                    <div>
-                        <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                        <input
-                            type="text"
-                            value={values.accessor ?? ''}
-                            onChange={e => onChange({ accessor: e.target.value })}
-                            className={`${INPUT_CLS} font-mono`}
-                        />
-                    </div>
-
-                    {/* 출력방식 | Data — 3:7 비율 (다건 매칭 시 표시 방식 + 반복 평가할 표현식) */}
-                    <FetchDisplayField
-                        fetchDisplayMode={values.fetchDisplayMode}
-                        data={values.data}
-                        onChange={patch => onChange(patch)}
-                    />
-                </>
-            )}
-
-            {/* 너비(+단위) / 정렬 — 2열 그리드 */}
-            <div className="grid grid-cols-2 gap-2">
-                <div>
-                    <label className={LABEL_CLS}>너비</label>
-                    <div className="flex">
-                        <input
-                            type="number"
-                            value={values.width ?? ''}
-                            onChange={e => onChange({ width: Number(e.target.value) || undefined })}
-                            className="flex-1 min-w-0 border border-slate-200 rounded-l px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
-                        />
-                        <select
-                            value={values.widthUnit ?? 'px'}
-                            onChange={e => onChange({ widthUnit: e.target.value as 'px' | '%' })}
-                            className="border border-l-0 border-slate-200 rounded-r px-1 py-1.5 text-xs bg-slate-50 focus:outline-none focus:border-slate-900"
-                        >
-                            <option value="px">px</option>
-                            <option value="%">%</option>
-                        </select>
-                    </div>
-                </div>
-                <div>
-                    <label className={LABEL_CLS}>정렬</label>
-                    <select
-                        value={values.align ?? 'left'}
-                        onChange={e => onChange({ align: e.target.value as 'left' | 'center' | 'right' })}
-                        className={INPUT_CLS}
-                    >
-                        <option value="left">좌측</option>
-                        <option value="center">중앙</option>
-                        <option value="right">우측</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* 정렬 활성화 체크박스 */}
-            <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                    type="checkbox"
-                    checked={values.sortable ?? true}
-                    onChange={e => onChange({ sortable: e.target.checked })}
-                    className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900"
-                />
-                <span className="text-[11px] text-slate-600">정렬 활성화</span>
+  return (
+    <div className="space-y-2">
+      {!isActions && (
+        <>
+          <div>
+            <label className={LABEL_CLS}>
+              헤더명 <span className="text-red-400">*</span>
             </label>
+            {i18nMode ? (
+              <MessageKeySelector
+                value={values.headerMsgKey ?? ""}
+                onChange={(key) => onChange({ headerMsgKey: key })}
+                resourceType="WORD"
+                size="sm"
+              />
+            ) : (
+              <input
+                type="text"
+                value={values.header ?? ""}
+                autoFocus={autoFocus}
+                onChange={(e) => onChange({ header: e.target.value })}
+                className={INPUT_CLS}
+              />
+            )}
+          </div>
+
+          <RelationMultiSelectField
+            label="연결 Slug"
+            value={getColumnRelationIds(values)}
+            onChange={(ids) => {
+              const prevIds = getColumnRelationIds(values);
+              if (ids.length === 0) {
+                onChange({ relationSlugIds: undefined, relationSlugId: undefined });
+                return;
+              }
+              const patch: { relationSlugIds: number[]; relationSlugId: number; accessor?: string } = {
+                relationSlugIds: ids,
+                relationSlugId: ids[0],
+              };
+              if (prevIds.length === 0) {
+                patch.accessor = buildFetchKey(ids[0]);
+              } else if (prevIds[0] !== ids[0] && values.accessor === buildFetchKey(prevIds[0])) {
+                patch.accessor = buildFetchKey(ids[0]);
+              }
+              onChange(patch);
+            }}
+            relations={fetchRelations}
+            emptyLabel="연동 없음"
+          />
+
+          {/* Key — 단독 row */}
+          <div>
+            <label className={LABEL_CLS}>
+              Key <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              value={values.accessor ?? ""}
+              onChange={(e) => onChange({ accessor: e.target.value })}
+              className={`${INPUT_CLS} font-mono`}
+            />
+          </div>
+
+          {/* 출력방식 | Data — 3:7 비율 (다건 매칭 시 표시 방식 + 반복 평가할 표현식) */}
+          <FetchDisplayField
+            fetchDisplayMode={values.fetchDisplayMode}
+            data={values.data}
+            onChange={(patch) => onChange(patch)}
+          />
+        </>
+      )}
+
+      {/* 너비(+단위) / 정렬 — 2열 그리드 */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={LABEL_CLS}>너비</label>
+          <div className="flex">
+            <input
+              type="number"
+              value={values.width ?? ""}
+              onChange={(e) => onChange({ width: Number(e.target.value) || undefined })}
+              className="flex-1 min-w-0 border border-slate-200 rounded-l px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
+            />
+            <select
+              value={values.widthUnit ?? "px"}
+              onChange={(e) => onChange({ widthUnit: e.target.value as "px" | "%" })}
+              className="border border-l-0 border-slate-200 rounded-r px-1 py-1.5 text-xs bg-slate-50 focus:outline-none focus:border-slate-900"
+            >
+              <option value="px">px</option>
+              <option value="%">%</option>
+            </select>
+          </div>
         </div>
-    );
+        <div>
+          <label className={LABEL_CLS}>정렬</label>
+          <select
+            value={values.align ?? "left"}
+            onChange={(e) => onChange({ align: e.target.value as "left" | "center" | "right" })}
+            className={INPUT_CLS}
+          >
+            <option value="left">좌측</option>
+            <option value="center">중앙</option>
+            <option value="right">우측</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 정렬 활성화 체크박스 */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={values.sortable ?? true}
+          onChange={(e) => onChange({ sortable: e.target.checked })}
+          className="w-3.5 h-3.5 rounded border-slate-400 text-slate-900"
+        />
+        <span className="text-[11px] text-slate-600">정렬 활성화</span>
+      </label>
+    </div>
+  );
 }
