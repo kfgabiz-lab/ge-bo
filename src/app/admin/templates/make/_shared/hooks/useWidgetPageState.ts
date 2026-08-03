@@ -30,6 +30,7 @@ import {
   flattenPageDataItem,
   applySortChange,
   initFormDefaultValues,
+  computeFieldDefaultValue,
   validateDataSaveWidgets,
   saveTableRows,
   processFormFilesAndSubList,
@@ -37,6 +38,8 @@ import {
   parseActionParams,
   buildSearchFieldsMap,
   buildSearchQueryParams,
+  extractSubListRows,
+  extractMultiSelectSelection,
 } from "../utils";
 import {
   entityApiPath,
@@ -176,7 +179,7 @@ function findSection(dataJson: Record<string, unknown>, contentKey: string | und
  *   await restoreFormDataFromJson(dataJson, forms, sublists, multiSels,
  *     setFormValuesMap, setSubListRowsMap,
  *     setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
- *     setExistingFileMetaMap, setImgBlobUrls, isEntity);
+ *     setExistingFileMetaMap, setImgBlobUrls, isEntity, t);
  *
  * @param isEntity  true면 entity 연결 페이지 — 파일 메타/blob 조회를 page_file 시스템
  *                  (/page-files/meta, /page-files/{id}) 대신 file_meta 시스템
@@ -198,32 +201,43 @@ async function restoreFormDataFromJson(
     React.SetStateAction<Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>>
   >,
   setImgBlobUrls: React.Dispatch<React.SetStateAction<Record<number, string>>>,
-  isEntity?: boolean
+  isEntity?: boolean,
+  t?: (key: string) => string
 ): Promise<void> {
-  /* 폼 필드 값 복원 */
   forms.forEach((fw) => {
     const section = findSection(dataJson, fw.contentKey);
     const vals: Record<string, string> = {};
     fw.fields.forEach((f) => {
-      if (!f.fieldKey) return;
+      const key = f.fieldKey || f.label;
+      if (!key) return;
       if (f.type === "dateRange" || f.type === "yearMonthRange") {
         /* dateRange/yearMonthRange 복원 키 — fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키로 복원,
            미지정 시 기존처럼 dataJson에서 _from/_to 분리 키로 복원(buildDataJson과 대칭) */
-        const fromVal = f.fieldKey2 ? section[f.fieldKey] : section[f.fieldKey + "_from"];
-        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[f.fieldKey + "_to"];
-        if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
-        if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
+        const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
+        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
+        if (fromVal === undefined && toVal === undefined) {
+          Object.assign(vals, computeFieldDefaultValue(f, t));
+        } else {
+          if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
+          if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
+        }
       } else if (f.type === "address") {
         /* address(주소검색) 복원 — buildDataJson과 대칭: fieldKey/fieldKey_lat/fieldKey_lng 3개
            flat 키에서 각각 복원한다 (dateRange의 _from/_to 복원과 동일한 패턴) */
-        if (section[f.fieldKey] !== undefined) vals[f.id] = String(section[f.fieldKey] ?? "");
-        if (section[f.fieldKey + "_lat"] !== undefined)
-          vals[f.id + "_lat"] = String(section[f.fieldKey + "_lat"] ?? "");
-        if (section[f.fieldKey + "_lng"] !== undefined)
-          vals[f.id + "_lng"] = String(section[f.fieldKey + "_lng"] ?? "");
-      } else if (section[f.fieldKey] !== undefined) {
-        const raw = section[f.fieldKey];
+        const hasAddressVal =
+          section[key] !== undefined || section[key + "_lat"] !== undefined || section[key + "_lng"] !== undefined;
+        if (!hasAddressVal) {
+          Object.assign(vals, computeFieldDefaultValue(f, t));
+        } else {
+          if (section[key] !== undefined) vals[f.id] = String(section[key] ?? "");
+          if (section[key + "_lat"] !== undefined) vals[f.id + "_lat"] = String(section[key + "_lat"] ?? "");
+          if (section[key + "_lng"] !== undefined) vals[f.id + "_lng"] = String(section[key + "_lng"] ?? "");
+        }
+      } else if (section[key] !== undefined) {
+        const raw = section[key];
         if (!Array.isArray(raw)) vals[f.id] = String(raw ?? "");
+      } else {
+        Object.assign(vals, computeFieldDefaultValue(f, t));
       }
     });
     setFormValuesMap((prev) => ({ ...prev, [fw.widgetId]: vals }));
@@ -231,39 +245,17 @@ async function restoreFormDataFromJson(
 
   /* SubList 행 복원 */
   sublists.forEach((sw) => {
-    const raw = sw.contentKey ? dataJson[sw.contentKey] : null;
-    /* { rows } 래핑 제거 후 배열 직접 저장 방식 */
-    const rawRows = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : [];
-    setSubListRowsMap((prev) => ({
-      ...prev,
-      [sw.widgetId]: rawRows.map((r, i) => ({
-        _rowId: (r.id as string) ?? `row-${i}`,
-        ...r,
-      })),
-    }));
+    const rows = extractSubListRows(dataJson, sw.contentKey);
+    setSubListRowsMap((prev) => ({ ...prev, [sw.widgetId]: rows }));
   });
 
   /* MultiSelect 값 복원 */
   multiSels.forEach((mw) => {
-    if (!mw.contentKey) return;
-    /* _rel[connectedSlug] 우선 확인 — mainConnectedSlug 설정 시 해당 경로에 저장됨 */
-    const rel = dataJson["_rel"] as Record<string, unknown> | undefined;
-    const raw = (mw.connectedSlug ? rel?.[mw.connectedSlug] : undefined) ?? dataJson[mw.contentKey];
-    if (!Array.isArray(raw)) return;
-    if (raw.length > 0 && typeof raw[0] === "object" && raw[0] !== null && "id" in (raw[0] as object)) {
-      const items = raw as { id: number; [key: string]: unknown }[];
-      setMultiSelectValuesMap((prev) => ({ ...prev, [mw.widgetId]: items.map((i) => i.id) }));
-      const extraVals: Record<number, Record<string, string>> = {};
-      items.forEach((item) => {
-        const { id, ...fields } = item;
-        extraVals[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? "")]));
-      });
-      setMultiSelectExtraFieldValuesMap((prev) => ({ ...prev, [mw.widgetId]: extraVals }));
-    } else {
-      setMultiSelectValuesMap((prev) => ({
-        ...prev,
-        [mw.widgetId]: (raw as unknown[]).filter((x) => typeof x === "number") as number[],
-      }));
+    const result = extractMultiSelectSelection(dataJson, mw.contentKey, mw.connectedSlug);
+    if (result.kind === "none") return;
+    setMultiSelectValuesMap((prev) => ({ ...prev, [mw.widgetId]: result.ids }));
+    if (result.kind === "objects") {
+      setMultiSelectExtraFieldValuesMap((prev) => ({ ...prev, [mw.widgetId]: result.extraFieldValues }));
     }
   });
 
@@ -776,7 +768,8 @@ export function useWidgetPageState(
               setMultiSelectExtraFieldValuesMap,
               setExistingFileMetaMap,
               setImgBlobUrls,
-              pageIsEntity
+              pageIsEntity,
+              t
             );
             applyUrlParams();
           })
@@ -809,7 +802,8 @@ export function useWidgetPageState(
               setMultiSelectExtraFieldValuesMap,
               setExistingFileMetaMap,
               setImgBlobUrls,
-              pageIsEntity
+              pageIsEntity,
+              t
             );
             // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
             const fetchRelData = extractFetchRelData(dataJson);
@@ -871,7 +865,8 @@ export function useWidgetPageState(
           setMultiSelectExtraFieldValuesMap,
           setExistingFileMetaMap,
           setImgBlobUrls,
-          pageIsEntity
+          pageIsEntity,
+          t
         );
         // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
         const fetchRelData = extractFetchRelData(rawDataJson);
@@ -1388,20 +1383,27 @@ export function useWidgetPageState(
             }
 
             if (slugStoredId) {
-              await api.put(`/page-data/${connectedSlug}/${slugStoredId}`, {
-                dataJson: finalDataJson,
-                ...(pageSlug && { templateSlug: pageSlug }),
-                ...(groupValidationRuleIds.length > 0 && { validationRuleIds: groupValidationRuleIds }),
-              });
+              await api.put(
+                `/page-data/${connectedSlug}/${slugStoredId}`,
+                buildDataSavePayload({
+                  dataJson: finalDataJson,
+                  pkKeys: [],
+                  templateSlug: pageSlug,
+                  validationRuleIds: groupValidationRuleIds,
+                })
+              );
               savedDataId = slugStoredId;
             } else {
-              const res = await api.post(`/page-data/${connectedSlug}`, {
-                dataJson: finalDataJson,
-                ...(pkKeys.length > 0 && { pkKeys }),
-                ...(groupId && { groupId }),
-                ...(pageSlug && { templateSlug: pageSlug }),
-                ...(groupValidationRuleIds.length > 0 && { validationRuleIds: groupValidationRuleIds }),
-              });
+              const res = await api.post(
+                `/page-data/${connectedSlug}`,
+                buildDataSavePayload({
+                  dataJson: finalDataJson,
+                  pkKeys,
+                  groupId,
+                  templateSlug: pageSlug,
+                  validationRuleIds: groupValidationRuleIds,
+                })
+              );
               savedDataId = res.data.id;
               /* group_id가 새로 생성된 경우 상태에 저장 */
               if (groupId && !storedGroupId) setCurrentGroupId(groupId);

@@ -93,6 +93,8 @@ import {
   buildSearchFieldsMap,
   buildSearchQueryParams,
   validateSearchDateRange,
+  extractSubListRows,
+  extractMultiSelectSelection,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -147,6 +149,11 @@ async function fetchAndMapFieldValues(
           ? String(section[key])
           : // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ((f as any).defaultValue ?? "");
+    } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
+      const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
+      const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
+      if (fromVal !== undefined) values[f.id + "_from"] = String(fromVal ?? "");
+      if (toVal !== undefined) values[f.id + "_to"] = String(toVal ?? "");
     } else if (section[key] !== undefined) {
       values[f.id] = String(section[key]);
     }
@@ -464,6 +471,9 @@ export function WidgetRenderer({
   >({});
   /* 팝업 내 MultiSelect 선택 ID — widgetId → number[] */
   const [popupMultiSelectValuesMap, setPopupMultiSelectValuesMap] = useState<Record<string, number[]>>({});
+  const [popupMultiSelectExtraFieldMap, setPopupMultiSelectExtraFieldMap] = useState<
+    Record<string, Record<number, Record<string, string>>>
+  >({});
   /* 팝업 내 Search 위젯 값 — widgetId → { fieldId: 값 } (page 모드 searchValues와 달리 위젯별로 분리 보관) */
   const [popupSearchValuesMap, setPopupSearchValuesMap] = useState<Record<string, Record<string, string>>>({});
   /* 팝업 기존 파일 메타 — widgetId → { fieldId: meta[] } (page 모드 existingFileMetaMap과 동일 구조) */
@@ -670,6 +680,7 @@ export function WidgetRenderer({
     setPopupEditId(null);
     setPopupSubListRowsMap({});
     setPopupMultiSelectValuesMap({});
+    setPopupMultiSelectExtraFieldMap({});
     setPopupTableSelectedRowsMap({});
     setPopupParamSaveExtras({});
     setPopupSearchValuesMap({});
@@ -706,6 +717,7 @@ export function WidgetRenderer({
       setPopupSubListRowsMap({});
       setPopupSubListFileMap({});
       setPopupMultiSelectValuesMap({});
+      setPopupMultiSelectExtraFieldMap({});
       setPopupTableSelectedRowsMap({});
       setPopupTableDataMap({});
       setPopupSortKeyMap({});
@@ -806,13 +818,26 @@ export function WidgetRenderer({
           sublistContents.forEach((c) => {
             const sw = c.widget as { widgetId?: string; contentKey?: string };
             const wid = sw.widgetId ?? "";
-            const section = sw.contentKey
-              ? (sourceData[sw.contentKey] as Record<string, unknown> | undefined)
-              : sourceData;
-            const rawRows = (section?.rows ?? []) as Record<string, unknown>[];
-            initSubListRows[wid] = rawRows.map((r, i) => ({ _rowId: `row-${i}`, ...r }));
+            initSubListRows[wid] = extractSubListRows(sourceData, sw.contentKey);
           });
           setPopupSubListRowsMap(initSubListRows);
+        }
+
+        const multiSelectContents = cfg.widgetItems
+          .flatMap((item) => item.contents)
+          .filter((c) => c.widget?.type === "multiselect");
+        if (multiSelectContents.length > 0) {
+          const initMultiSelectValues: Record<string, number[]> = {};
+          const initMultiSelectExtraFields: Record<string, Record<number, Record<string, string>>> = {};
+          multiSelectContents.forEach((c) => {
+            const mw = c.widget as { widgetId?: string; contentKey?: string; connectedSlug?: string };
+            const wid = mw.widgetId ?? "";
+            const result = extractMultiSelectSelection(sourceData, mw.contentKey, mw.connectedSlug);
+            if (result.kind !== "none") initMultiSelectValues[wid] = result.ids;
+            if (result.kind === "objects") initMultiSelectExtraFields[wid] = result.extraFieldValues;
+          });
+          setPopupMultiSelectValuesMap(initMultiSelectValues);
+          setPopupMultiSelectExtraFieldMap(initMultiSelectExtraFields);
         }
 
         /* 기존 파일 메타데이터 조회 — widgetId별 구조로 저장 */
@@ -1123,7 +1148,13 @@ export function WidgetRenderer({
   );
 
   const handlePopupContentAction = useCallback(
-    async (_widgetIds: string[], action: "save" | "delete", _goBackAfterAction?: boolean) => {
+    async (
+      _widgetIds: string[],
+      action: "save" | "delete",
+      _goBackAfterAction?: boolean,
+      _resolvedFormValuesMap?: Record<string, Record<string, string>>,
+      contentValidationRuleIds?: Record<string, number[]>
+    ) => {
       if (!popupListSlug) return;
 
       /* 삭제 */
@@ -1144,13 +1175,16 @@ export function WidgetRenderer({
         return;
       }
 
-      /* 저장 — form/sublist 위젯 추출 */
+      /* 저장 — form/sublist/multiselect 위젯 추출 */
       const saveFormContents = (popupCfg?.widgetItems ?? [])
         .flatMap((item) => item.contents)
         .filter((c) => c.widget?.type === "form");
       const saveSublistContents = (popupCfg?.widgetItems ?? [])
         .flatMap((item) => item.contents)
         .filter((c) => c.widget?.type === "sublist");
+      const saveMultiSelectContents = (popupCfg?.widgetItems ?? [])
+        .flatMap((item) => item.contents)
+        .filter((c) => c.widget?.type === "multiselect");
 
       /* 유효성 검사 — cross-form hideCondition 평가를 위해 팝업 내 통합 values/keyToId 구성 */
       const popupAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
@@ -1260,18 +1294,33 @@ export function WidgetRenderer({
         const allSaveWidgets = [
           ...saveFormContents.map((c) => c.widget),
           ...saveSublistContents.map((c) => c.widget),
+          ...saveMultiSelectContents.map((c) => c.widget),
         ] as Parameters<typeof buildDataJson>[0];
         const popupAllFormValues = Object.assign({}, ...Object.values(popupFormValuesMap)) as Record<string, string>;
-        const { dataJson } = buildDataJson(
+        const popupMultiSelectMap: Record<string, number[]> = {};
+        saveMultiSelectContents.forEach((c) => {
+          const mw = c.widget as { widgetId?: string };
+          const wid = mw.widgetId ?? "";
+          popupMultiSelectMap[wid] = popupMultiSelectValuesMap[wid] ?? [];
+        });
+        const { dataJson, pkKeys } = buildDataJson(
           allSaveWidgets,
           popupFormValuesMap,
           formFileIdsMap,
           processedSubListRowsMap,
-          {},
-          undefined,
-          undefined,
+          popupMultiSelectMap,
+          popupMultiSelectExtraFieldMap,
+          popupCfg?.mainConnectedSlug,
           popupAllFormValues
         );
+
+        const popupValidationRuleIds = contentValidationRuleIds
+          ? [
+              ...new Set(
+                allSaveWidgets.flatMap((w) => contentValidationRuleIds[(w as { widgetId: string }).widgetId] ?? [])
+              ),
+            ]
+          : [];
 
         /* paramSave extras 병합 — 저장 시 폼에 없던 파라미터를 dataJson에 추가 */
         if (Object.keys(popupParamSaveExtras).length > 0) {
@@ -1291,17 +1340,27 @@ export function WidgetRenderer({
         /* 4단계: page_data 저장 (신규 POST / 수정 PUT) */
         let savedId: number | null = null;
         if (popupEditId) {
-          await api.put(`/page-data/${popupListSlug}/${popupEditId}`, {
-            dataJson,
-            ...(pageSlug && { templateSlug: pageSlug }),
-          });
+          await api.put(
+            `/page-data/${popupListSlug}/${popupEditId}`,
+            buildDataSavePayload({
+              dataJson,
+              pkKeys: [],
+              templateSlug: pageSlug,
+              validationRuleIds: popupValidationRuleIds,
+            })
+          );
           savedId = popupEditId;
           toast.success(t("common.updated"));
         } else {
-          const saveRes = await api.post(`/page-data/${popupListSlug}`, {
-            dataJson,
-            ...(pageSlug && { templateSlug: pageSlug }),
-          });
+          const saveRes = await api.post(
+            `/page-data/${popupListSlug}`,
+            buildDataSavePayload({
+              dataJson,
+              pkKeys,
+              templateSlug: pageSlug,
+              validationRuleIds: popupValidationRuleIds,
+            })
+          );
           savedId = saveRes.data.id;
           toast.success(t("common.saved"));
         }
@@ -1330,6 +1389,8 @@ export function WidgetRenderer({
       popupExistingMetaMap,
       popupSubListRowsMap,
       popupSubListFileMap,
+      popupMultiSelectValuesMap,
+      popupMultiSelectExtraFieldMap,
       popupParamSaveExtras,
       handlePopupClose,
       onRefresh,
@@ -1438,8 +1499,8 @@ export function WidgetRenderer({
             formFileIdsMap,
             processedSubListRowsMap,
             multiSelectMap,
-            undefined,
-            undefined,
+            popupMultiSelectExtraFieldMap,
+            popupCfg?.mainConnectedSlug,
             datasaveAllFormValues
           );
 
@@ -1503,6 +1564,7 @@ export function WidgetRenderer({
       popupSubListRowsMap,
       popupSubListFileMap,
       popupMultiSelectValuesMap,
+      popupMultiSelectExtraFieldMap,
       popupTableSelectedRowsMap,
       popupTableDataMap,
       popupParamSaveExtras,
@@ -1563,6 +1625,16 @@ export function WidgetRenderer({
             /* 팝업 내 MultiSelect 선택 ID */
             multiSelectValuesMap={popupMultiSelectValuesMap}
             onMultiSelectChange={(wId, ids) => setPopupMultiSelectValuesMap((prev) => ({ ...prev, [wId]: ids }))}
+            multiSelectExtraFieldValuesMap={popupMultiSelectExtraFieldMap}
+            onMultiSelectExtraFieldChange={(wId, itemId, fieldKey, value) =>
+              setPopupMultiSelectExtraFieldMap((prev) => ({
+                ...prev,
+                [wId]: {
+                  ...(prev[wId] ?? {}),
+                  [itemId]: { ...(prev[wId]?.[itemId] ?? {}), [fieldKey]: value },
+                },
+              }))
+            }
             /* 파일 업로드 — widgetId별 구조 직접 전달 (page 모드와 동일) */
             fileValuesMap={popupFileValuesMap}
             existingFileMetaMap={popupExistingMetaMap}
