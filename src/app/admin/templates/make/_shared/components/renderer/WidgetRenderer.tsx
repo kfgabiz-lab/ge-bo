@@ -56,6 +56,7 @@ if (typeof document !== "undefined") {
   );
 }
 import api, { getApiErrorMessage } from "@/lib/api";
+import { waitForSitesLoaded } from "@/store/use-site-store";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
 import { CodeGroupDef } from "../../types";
 import type { SearchFieldConfig } from "../../types";
@@ -140,6 +141,10 @@ async function fetchAndMapFieldValues(
 
   const values: Record<string, string> = {};
   const existingFileIds: Record<string, number[]> = {};
+
+  if (editId == null) {
+    await waitForSitesLoaded();
+  }
 
   fields.forEach((f) => {
     const key = f.fieldKey || f.label;

@@ -39,6 +39,7 @@ interface SiteState {
   sites: Site[];
   activeSiteId: number | null;
   isLoading: boolean;
+  sitesLoaded: boolean;
 
   fetchSites: () => Promise<void>;
   createSite: (data: SiteCreateRequest) => Promise<Site>;
@@ -56,14 +57,15 @@ export const useSiteStore = create<SiteState>((set, get) => ({
   sites: [],
   activeSiteId: null,
   isLoading: false,
+  sitesLoaded: false,
 
   fetchSites: async () => {
     set({ isLoading: true });
     try {
       const res = await api.get<Site[]>("/sites");
-      set({ sites: res.data, isLoading: false });
+      set({ sites: res.data, isLoading: false, sitesLoaded: true });
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, sitesLoaded: true });
       toast.error("홈페이지 목록을 불러오지 못했습니다.");
     }
   },
@@ -122,3 +124,17 @@ export const useSiteStore = create<SiteState>((set, get) => ({
 
   setSites: (sites) => set({ sites }),
 }));
+
+export function waitForSitesLoaded(): Promise<void> {
+  if (useSiteStore.getState().sitesLoaded) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const unsubscribe = useSiteStore.subscribe((state) => {
+      if (state.sitesLoaded) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}

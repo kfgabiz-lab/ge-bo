@@ -21,6 +21,7 @@ import { useLeaveCheck } from "./useLeaveCheck";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
+import { useSiteStore } from "@/store/use-site-store";
 import {
   buildDataJson,
   buildDataSavePayload,
@@ -373,6 +374,9 @@ export function useWidgetPageState(
    * connectedType이 'data'면 Table 위젯이 entity REST API로 데이터를 조회한다. */
   const pageIsEntity = options?.connectedType === "data";
 
+  /* 사이트 시간대 로드 완료 여부 — 날짜 기본값 계산은 이 값이 true가 될 때까지 대기 */
+  const sitesLoaded = useSiteStore((s) => s.sitesLoaded);
+
   /* 검색 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>({});
   const searchValuesRef = useRef<Record<string, string>>({});
@@ -600,6 +604,7 @@ export function useWidgetPageState(
   /* Search 위젯 날짜·옵션 기본값 초기화 — widgetSub 페이지 패턴 지원 */
   useEffect(() => {
     if (!widgetItems.length) return;
+    if (!sitesLoaded) return;
     const initVals: Record<string, string> = {};
     flatWidgets(widgetItems).forEach((w) => {
       if (w.type !== "search") return;
@@ -656,7 +661,7 @@ export function useWidgetPageState(
       setSearchValues((prev) => ({ ...initVals, ...prev }));
       searchValuesRef.current = { ...initVals, ...searchValuesRef.current };
     }
-  }, [widgetItems]);
+  }, [widgetItems, sitesLoaded]);
 
   /* URL ?id / ?group_id 기반 수정 모드 — enableUrlEditMode: true 시 동작 */
   useEffect(() => {
@@ -802,14 +807,15 @@ export function useWidgetPageState(
           .catch(() => toast.error(t("common.error.load_existing_data")));
       }
     } else {
-      /* 신규 모드 — 기본값 초기화 */
+      /* 신규 모드 — 기본값 초기화 (사이트 시간대 로드 완료 후에만 계산) */
+      if (!sitesLoaded) return;
       setCurrentGroupId(null);
       setMultiSelectValuesMap({});
       setFormValuesMap(initFormDefaultValues(formWidgets, t));
       applyUrlParams();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgetItems, searchParams, options?.enableUrlEditMode]);
+  }, [widgetItems, searchParams, options?.enableUrlEditMode, sitesLoaded]);
 
   /* 수정 모드 초기 데이터 로드 — sharedDataId(탭 공유 row id) 있을 때
    * Form/SubList/MultiSelect 모두 restoreFormDataFromJson 공통 함수로 복원
