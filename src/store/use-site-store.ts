@@ -122,19 +122,29 @@ export const useSiteStore = create<SiteState>((set, get) => ({
     }
   },
 
-  setSites: (sites) => set({ sites }),
+  setSites: (sites) => set({ sites, sitesLoaded: true }),
 }));
+
+const WAIT_FOR_SITES_LOADED_TIMEOUT_MS = 5000;
 
 export function waitForSitesLoaded(): Promise<void> {
   if (useSiteStore.getState().sitesLoaded) {
     return Promise.resolve();
   }
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      clearTimeout(timer);
+      resolve();
+    };
     const unsubscribe = useSiteStore.subscribe((state) => {
       if (state.sitesLoaded) {
-        unsubscribe();
-        resolve();
+        finish();
       }
     });
+    const timer = setTimeout(finish, WAIT_FOR_SITES_LOADED_TIMEOUT_MS);
   });
 }

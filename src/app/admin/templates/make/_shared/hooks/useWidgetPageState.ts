@@ -807,11 +807,13 @@ export function useWidgetPageState(
           .catch(() => toast.error(t("common.error.load_existing_data")));
       }
     } else {
-      /* 신규 모드 — 기본값 초기화 (사이트 시간대 로드 완료 후에만 계산) */
-      if (!sitesLoaded) return;
+      /* 신규 모드 — 기본값 초기화 */
       setCurrentGroupId(null);
       setMultiSelectValuesMap({});
-      setFormValuesMap(initFormDefaultValues(formWidgets, t));
+      /* 날짜 기본값(defaultToday 등)은 사이트 시간대 로드 완료 후에만 계산 */
+      if (sitesLoaded) {
+        setFormValuesMap(initFormDefaultValues(formWidgets, t));
+      }
       applyUrlParams();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
