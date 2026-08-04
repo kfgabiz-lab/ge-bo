@@ -2432,6 +2432,26 @@ export async function saveTableRows(opts: {
   return savedCount;
 }
 
+export function isDateRangeWithinMaxLimit(
+  from: string,
+  to: string,
+  maxRangeValue: number,
+  maxRangeUnit: NonNullable<import("./types").SearchFieldConfig["maxRangeUnit"]> = "day"
+): boolean {
+  const fromDate = new Date(from.length === 7 ? from + "-01" : from);
+  const toDate = new Date(to.length === 7 ? to + "-01" : to);
+
+  if (maxRangeUnit === "month" || maxRangeUnit === "year") {
+    const limit = new Date(toDate);
+    if (maxRangeUnit === "month") limit.setMonth(limit.getMonth() - maxRangeValue);
+    else limit.setFullYear(limit.getFullYear() - maxRangeValue);
+    return fromDate >= limit;
+  }
+
+  const maxMs = maxRangeValue * (maxRangeUnit === "week" ? 7 : 1) * 86400000;
+  return toDate.getTime() - fromDate.getTime() <= maxMs;
+}
+
 /**
  * dateRange 최대 조회 기간 검증 — 검색 실행 전 호출
  * maxRangeValue 미설정 필드는 건너뜀 (기존 동작 유지)
@@ -2450,38 +2470,16 @@ export function validateSearchDateRange(
     const to = searchValues[f.id + "_to"];
     if (!from || !to) continue;
 
-    /* yearMonth(YYYY-MM)은 해당 월 1일로 보정 */
-    const fromDate = new Date(from.length === 7 ? from + "-01" : from);
-    const toDate = new Date(to.length === 7 ? to + "-01" : to);
     const unit = f.maxRangeUnit ?? "day";
-    const label = f.label || "날짜 범위";
-
-    /* month/year: toDate 기준 N개월/년 전 날짜와 fromDate 비교 */
-    if (unit === "month" || unit === "year") {
-      const limit = new Date(toDate);
-      if (unit === "month") limit.setMonth(limit.getMonth() - f.maxRangeValue);
-      else limit.setFullYear(limit.getFullYear() - f.maxRangeValue);
-      if (fromDate < limit) {
-        const unitText = unit === "month" ? "개월" : "년";
-        toast.warning(
-          t
-            ? t("common.validation.max_range", { label, value: String(f.maxRangeValue), unit: unitText })
-            : `'${label}' 최대 ${f.maxRangeValue}${unitText} 이내로 조회하세요.`
-        );
-        return false;
-      }
-    } else {
-      /* day/week: ms 차이 비교 */
-      const maxMs = f.maxRangeValue * (unit === "week" ? 7 : 1) * 86400000;
-      if (toDate.getTime() - fromDate.getTime() > maxMs) {
-        const unitText = unit === "week" ? "주" : "일";
-        toast.warning(
-          t
-            ? t("common.validation.max_range", { label, value: String(f.maxRangeValue), unit: unitText })
-            : `'${label}' 최대 ${f.maxRangeValue}${unitText} 이내로 조회하세요.`
-        );
-        return false;
-      }
+    if (!isDateRangeWithinMaxLimit(from, to, f.maxRangeValue, unit)) {
+      const label = f.label || "날짜 범위";
+      const unitText = unit === "month" ? "개월" : unit === "year" ? "년" : unit === "week" ? "주" : "일";
+      toast.warning(
+        t
+          ? t("common.validation.max_range", { label, value: String(f.maxRangeValue), unit: unitText })
+          : `'${label}' 최대 ${f.maxRangeValue}${unitText} 이내로 조회하세요.`
+      );
+      return false;
     }
   }
   return true;
