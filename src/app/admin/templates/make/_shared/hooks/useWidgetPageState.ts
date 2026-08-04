@@ -161,7 +161,8 @@ function findSection(dataJson: Record<string, unknown>, contentKey: string | und
   if (dataJson[contentKey] && typeof dataJson[contentKey] === "object") {
     return dataJson[contentKey] as Record<string, unknown>;
   }
-  for (const val of Object.values(dataJson)) {
+  for (const [key, val] of Object.entries(dataJson)) {
+    if (key.startsWith("_fetchedRel")) continue;
     if (val && typeof val === "object" && !Array.isArray(val)) {
       const nested = (val as Record<string, unknown>)[contentKey];
       if (nested && typeof nested === "object" && !Array.isArray(nested)) {
