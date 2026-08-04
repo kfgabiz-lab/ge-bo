@@ -1187,6 +1187,20 @@ export function useWidgetPageState(
         )
           return;
 
+        /* MultiSelect 유효성 검사 — required=true인데 선택값이 없으면 저장 중단 */
+        for (const w of targetWidgets) {
+          if (w.type !== "multiselect") continue;
+          const mw = w as MultiSelectWidget;
+          if (!mw.required) continue;
+          if ((multiSelectValuesMap[mw.widgetId] ?? []).length === 0) {
+            const title = mw.title || "다중선택";
+            toast.warning(
+              t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
+            );
+            return;
+          }
+        }
+
         /* mainConnectedSlug가 있으면 전체 위젯을 하나의 slug로 통합 저장 */
         const slugGroups = options?.mainConnectedSlug
           ? [[options.mainConnectedSlug, targetWidgets] as [string, (FormWidget | SubListWidget | MultiSelectWidget)[]]]
