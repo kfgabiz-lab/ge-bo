@@ -8,8 +8,11 @@ import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/re
 import type { SearchWidget, SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { TableWidget } from "@/app/admin/templates/make/_shared/components/builder/TableBuilder";
 import type { TableActionHandlers } from "@/app/admin/templates/make/_shared/components/renderer/types";
-import { formatIsoDateTime } from "@/app/admin/templates/make/_shared/utils";
+import { isDateRangeWithinMaxLimit } from "@/app/admin/templates/make/_shared/utils";
+import type { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
+import { useI18n } from "@/hooks/use-i18n";
 import { useCodeStore } from "@/store/use-code-store";
+import { toast } from "sonner";
 import api from "@/lib/api";
 
 interface TrainingApplicationItem {
@@ -34,7 +37,7 @@ interface PageResponse {
   number: number;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const LIST_API_PATH = "training-applications";
 const CSV_CONNECTED_SLUG = "training-applications";
 
@@ -56,8 +59,6 @@ const PERIOD_FIELD_BY_TYPE: Record<string, string> = {
   "02": "scheduleStartRange",
   "03": "scheduleEndRange",
 };
-
-const MAX_SEARCH_RANGE_DAYS = 31;
 
 function resolvePeriodRange(search: Record<string, string>) {
   const periodType = search.periodType || "01";
@@ -97,6 +98,7 @@ function getDefaultSearch(): Record<string, string> {
 
 export default function TrainingRequestListPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const { groups: codeGroups, fetchGroups } = useCodeStore();
 
   const [items, setItems] = useState<TrainingApplicationItem[]>([]);
@@ -186,42 +188,55 @@ export default function TrainingRequestListPage() {
             {
               id: "periodType",
               type: "select",
-              label: "검색 기간 구분",
+              label: "",
+              labelMsgKey: "common.label.searchPeriodType",
               fieldKey: "searchPeriodType",
               colSpan: 1,
-              options: ["신청 일시:01", "희망 시작일:02", "희망 종료일:03"],
+              options: ["신청 일시:01", "시작일:02", "종료일:03"],
               codeGroupCode: "SEARCHPERIODTYPE",
               defaultOptionValue: "01",
             },
             {
               id: "createdRange",
               type: "dateRange",
-              label: "시작일",
-              label2: "종료일",
+              label: "",
+              labelMsgKey: "common.label.startDate",
+              label2: "",
+              label2MsgKey: "common.label.endDate",
               fieldKey: "createdFrom",
               fieldKey2: "createdTo",
               colSpan: 2,
               hideCondition: "searchPeriodType!=01",
+              maxRangeUnit: "month",
+              maxRangeValue: 1,
             },
             {
               id: "scheduleStartRange",
               type: "dateRange",
-              label: "시작일",
-              label2: "종료일",
+              label: "",
+              labelMsgKey: "common.label.startDate",
+              label2: "",
+              label2MsgKey: "common.label.endDate",
               fieldKey: "scheduleStartFrom",
               fieldKey2: "scheduleStartTo",
               colSpan: 2,
               hideCondition: "searchPeriodType!=02",
+              maxRangeUnit: "month",
+              maxRangeValue: 1,
             },
             {
               id: "scheduleEndRange",
               type: "dateRange",
-              label: "시작일",
-              label2: "종료일",
+              label: "",
+              labelMsgKey: "common.label.startDate",
+              label2: "",
+              label2MsgKey: "common.label.endDate",
               fieldKey: "scheduleEndFrom",
               fieldKey2: "scheduleEndTo",
               colSpan: 2,
               hideCondition: "searchPeriodType!=03",
+              maxRangeUnit: "month",
+              maxRangeValue: 1,
             },
           ],
         },
@@ -232,7 +247,8 @@ export default function TrainingRequestListPage() {
             {
               id: "trainingScheduleType",
               type: "select",
-              label: "분류",
+              label: "",
+              labelMsgKey: "training.label.category",
               fieldKey: "trainingScheduleType",
               colSpan: 1,
               placeholder: "전체",
@@ -242,7 +258,8 @@ export default function TrainingRequestListPage() {
             {
               id: "trainingFormat",
               type: "select",
-              label: "Training Type",
+              label: "",
+              labelMsgKey: "common.label.trainingType",
               fieldKey: "trainingFormat",
               colSpan: 1,
               placeholder: "전체",
@@ -252,7 +269,8 @@ export default function TrainingRequestListPage() {
             {
               id: "trainingCourse",
               type: "select",
-              label: "Training",
+              label: "",
+              labelMsgKey: "common.label.training",
               fieldKey: "trainingCourse",
               colSpan: 1,
               placeholder: "전체",
@@ -268,7 +286,8 @@ export default function TrainingRequestListPage() {
             {
               id: "curriculumTitle",
               type: "input",
-              label: "Course명",
+              label: "",
+              labelMsgKey: "common.label.courseTitle",
               fieldKey: "curriculumTitle",
               colSpan: 2,
               placeholder: "Course명을 입력하세요.",
@@ -276,7 +295,8 @@ export default function TrainingRequestListPage() {
             {
               id: "sessionTitle",
               type: "input",
-              label: "제목",
+              label: "",
+              labelMsgKey: "common.label.title",
               fieldKey: "sessionTitle",
               colSpan: 2,
               placeholder: "제목을 입력하세요.",
@@ -300,100 +320,110 @@ export default function TrainingRequestListPage() {
       columns: [
         {
           id: "c1",
-          header: "분류",
+          header: "",
+          headerMsgKey: "training.label.category",
           accessor: "scheduleType",
-          cellType: "text",
-          align: "center",
-          sortable: false,
-          width: 120,
-          codeGroupCode: "TRAININGSCHEDULETYPE",
-        },
-        {
-          id: "c2",
-          header: "Training Type",
-          accessor: "trainingType",
-          cellType: "text",
-          align: "center",
-          sortable: true,
-          width: 100,
-          codeGroupCode: "TRAININGTYPE",
-        },
-        {
-          id: "c3",
-          header: "Training",
-          accessor: "trainingCourse",
-          cellType: "text",
-          align: "center",
-          sortable: true,
-          width: 110,
-          codeGroupCode: "TRAININGCOURSE",
-        },
-        {
-          id: "c4",
-          header: "Course",
-          accessor: "curriculumTitle",
-          cellType: "text",
-          align: "left",
-          sortable: true,
-          width: 200,
-        },
-        {
-          id: "c5",
-          header: "제목",
-          accessor: "sessionTitle",
-          cellType: "text",
-          align: "left",
-          sortable: true,
-          width: 170,
-        },
-        {
-          id: "c6",
-          header: "시작일",
-          accessor: "dateFrom",
-          cellType: "text",
-          align: "center",
-          sortable: true,
-          width: 110,
-        },
-        {
-          id: "c7",
-          header: "종료일",
-          accessor: "dateTo",
-          cellType: "text",
-          align: "center",
-          sortable: true,
-          width: 110,
-        },
-        {
-          id: "c8",
-          header: "신청 일시",
-          accessor: "createdAt",
           cellType: "text",
           align: "center",
           sortable: true,
           width: 150,
-          dateFormat: "YYYY-MM-DD HH:mm:ss",
+          codeGroupCode: "TRAININGSCHEDULETYPE",
+        },
+        {
+          id: "c2",
+          header: "",
+          headerMsgKey: "common.label.trainingType",
+          accessor: "trainingType",
+          cellType: "text",
+          align: "center",
+          sortable: true,
+          width: 150,
+          codeGroupCode: "TRAININGTYPE",
+        },
+        {
+          id: "c3",
+          header: "",
+          headerMsgKey: "common.label.training",
+          accessor: "trainingCourse",
+          cellType: "text",
+          align: "center",
+          sortable: true,
+          width: 150,
+          codeGroupCode: "TRAININGCOURSE",
+        },
+        {
+          id: "c4",
+          header: "",
+          headerMsgKey: "training.label.course",
+          accessor: "curriculumTitle",
+          cellType: "text",
+          align: "center",
+          sortable: true,
+          width: 150,
+        },
+        {
+          id: "c5",
+          header: "",
+          headerMsgKey: "common.label.title",
+          accessor: "sessionTitle",
+          cellType: "text",
+          align: "center",
+          sortable: true,
+          width: 150,
+        },
+        {
+          id: "c6",
+          header: "",
+          headerMsgKey: "common.label.startDate",
+          accessor: "dateFrom",
+          cellType: "text",
+          align: "center",
+          sortable: true,
+          width: 150,
+        },
+        {
+          id: "c7",
+          header: "",
+          headerMsgKey: "common.label.endDate",
+          accessor: "dateTo",
+          cellType: "text",
+          align: "left",
+          sortable: true,
+          width: 150,
+        },
+        {
+          id: "c8",
+          header: "",
+          headerMsgKey: "common.label.applicationDatetime",
+          accessor: "createdAt",
+          cellType: "date",
+          align: "left",
+          sortable: true,
+          width: 150,
+          dateFormat: "YYYY-MM-DD HH:mm",
         },
         {
           id: "c9",
-          header: "발송 대상",
+          header: "",
+          headerMsgKey: "common.label.sendTarget",
           accessor: "email",
           cellType: "text",
           align: "left",
           sortable: true,
-          width: 180,
+          width: 150,
           maskType: "custom",
           maskCustomRegex: "(?<=.{2}).(?=[^@]*@)",
           maskCustomReplacement: "*",
         },
         {
           id: "c10",
-          header: "신청자",
+          header: "",
+          headerMsgKey: "common.label.applicant",
           accessor: "applicant",
           cellType: "text",
-          align: "left",
-          sortable: false,
-          width: 110,
+          align: "center",
+          sortable: true,
+          width: 150,
           maskType: "name",
           maskPattern: "mid",
         },
@@ -405,7 +435,7 @@ export default function TrainingRequestListPage() {
           align: "center",
           sortable: false,
           actions: ["edit"],
-          width: 70,
+          width: 120,
         },
       ],
     }),
@@ -442,21 +472,30 @@ export default function TrainingRequestListPage() {
     setSearchValues((prev) => ({ ...prev, [fieldId]: value }));
   }, []);
 
+  const searchFields = useMemo<SearchFieldConfig[]>(
+    () => SEARCH_WIDGET.rows.flatMap((row) => row.fields),
+    [SEARCH_WIDGET]
+  );
+
   const handleSearch = useCallback(() => {
     const nextSearch = { ...searchValues };
 
     const { from, to } = resolvePeriodRange(nextSearch);
-    if (from && to) {
-      const diffDays = (new Date(to).getTime() - new Date(from).getTime()) / (1000 * 60 * 60 * 24);
-      if (diffDays > MAX_SEARCH_RANGE_DAYS) {
-        alert("한달 이내의 기간 검색 가능합니다.");
-        return;
-      }
+    const activeFieldId = PERIOD_FIELD_BY_TYPE[nextSearch.periodType || "01"] ?? "createdRange";
+    const activeField = searchFields.find((f) => f.id === activeFieldId);
+    if (
+      from &&
+      to &&
+      activeField?.maxRangeValue &&
+      !isDateRangeWithinMaxLimit(from, to, activeField.maxRangeValue, activeField.maxRangeUnit)
+    ) {
+      toast.warning(t("common.validation.date_range_one_month"));
+      return;
     }
 
     setAppliedSearch(nextSearch);
     fetchList(0, nextSearch, sortKey, sortDir);
-  }, [searchValues, sortKey, sortDir, fetchList]);
+  }, [searchValues, searchFields, t, sortKey, sortDir, fetchList]);
 
   const handleReset = useCallback(() => {
     const defaults = getDefaultSearch();
@@ -503,7 +542,7 @@ export default function TrainingRequestListPage() {
         _numericId: item.id,
         _scheduleType: item.scheduleType,
         scheduleType: item.scheduleType,
-        createdAt: formatIsoDateTime(item.createdAt),
+        createdAt: item.createdAt,
         applicant: item.applicant,
         email: item.email,
         trainingCourse: item.trainingCourse ?? "-",
