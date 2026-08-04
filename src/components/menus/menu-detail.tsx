@@ -395,7 +395,6 @@ function MenuForm({
             maxLength={50}
           />
         )}
-        {nameMsgKeyError && <p className="text-[11px] text-red-500 mt-1">{nameMsgKeyError}</p>}
       </div>
 
       {/* URL */}
@@ -426,7 +425,6 @@ function MenuForm({
             {t("menu.template.linked", { name: linkedTemplateName })}
           </p>
         )}
-        {urlError && <p className="text-[11px] text-red-500 mt-1">{urlError}</p>}
       </div>
 
       {/* 메뉴 설명 — i18nMode에 따라 다국어 키 선택 ↔ 직접 입력 전환 */}
@@ -467,7 +465,6 @@ function MenuForm({
             max={999}
             className={inputCls(sortOrderError)}
           />
-          {sortOrderError && <p className="text-[11px] text-red-500 mt-1">{sortOrderError}</p>}
         </div>
         <div>
           <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t("common.label.visible")}</label>
@@ -545,6 +542,7 @@ function CreateMenuForm({
     setNameMsgKeyError(ne);
     setUrlError(ue);
     if (ne || ue) {
+      toast.error(ne || ue);
       if (ue) urlRef.current?.focus();
       return;
     }
@@ -907,6 +905,7 @@ export function MenuDetail() {
     setUrlError(ue);
     setSortOrderError(se);
     if (ne || ue || se) {
+      toast.error(ne || ue || se);
       if (ue) urlRef.current?.focus();
       return;
     }

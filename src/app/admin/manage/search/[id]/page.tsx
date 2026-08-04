@@ -257,7 +257,7 @@ export default function SearchMgmtDetailPage() {
               disabled={saving}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              등록
+              {savedId ? "저장" : "등록"}
             </button>
           </div>
         </div>

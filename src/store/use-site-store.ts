@@ -1,6 +1,4 @@
 import { create } from "zustand";
-import { toast } from "sonner";
-import api, { getApiErrorMessage } from "@/lib/api";
 
 export interface Site {
   id: number;
@@ -38,13 +36,8 @@ export interface SiteUpdateRequest {
 interface SiteState {
   sites: Site[];
   activeSiteId: number | null;
-  isLoading: boolean;
   sitesLoaded: boolean;
 
-  fetchSites: () => Promise<void>;
-  createSite: (data: SiteCreateRequest) => Promise<Site>;
-  updateSite: (id: number, data: SiteUpdateRequest) => Promise<Site>;
-  deleteSite: (id: number) => Promise<void>;
   setActiveSiteId: (id: number | null) => void;
   loadActiveSiteFromStorage: () => void;
   /** 헤더의 사이트 선택 드롭다운처럼 이미 목록을 받아온 곳에서, 별도 재조회 없이 store에 바로 채워넣을 때 사용 */
@@ -53,58 +46,10 @@ interface SiteState {
 
 const STORAGE_KEY = "bo_active_site_id";
 
-export const useSiteStore = create<SiteState>((set, get) => ({
+export const useSiteStore = create<SiteState>((set) => ({
   sites: [],
   activeSiteId: null,
-  isLoading: false,
   sitesLoaded: false,
-
-  fetchSites: async () => {
-    set({ isLoading: true });
-    try {
-      const res = await api.get<Site[]>("/sites");
-      set({ sites: res.data, isLoading: false, sitesLoaded: true });
-    } catch {
-      set({ isLoading: false, sitesLoaded: true });
-      toast.error("홈페이지 목록을 불러오지 못했습니다.");
-    }
-  },
-
-  createSite: async (data) => {
-    try {
-      const res = await api.post<Site>("/sites", data);
-      set((state) => ({ sites: [...state.sites, res.data] }));
-      return res.data;
-    } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e, "홈페이지 등록 중 오류가 발생했습니다."));
-      throw e;
-    }
-  },
-
-  updateSite: async (id, data) => {
-    try {
-      const res = await api.patch<Site>(`/sites/${id}`, data);
-      set((state) => ({ sites: state.sites.map((s) => (s.id === id ? res.data : s)) }));
-      return res.data;
-    } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e, "홈페이지 수정 중 오류가 발생했습니다."));
-      throw e;
-    }
-  },
-
-  deleteSite: async (id) => {
-    try {
-      await api.delete(`/sites/${id}`);
-      set((state) => ({ sites: state.sites.filter((s) => s.id !== id) }));
-      // 삭제된 항목이 활성 홈페이지였으면 초기화
-      if (get().activeSiteId === id) {
-        get().setActiveSiteId(null);
-      }
-    } catch (e: unknown) {
-      toast.error(getApiErrorMessage(e, "홈페이지 삭제 중 오류가 발생했습니다."));
-      throw e;
-    }
-  },
 
   setActiveSiteId: (id) => {
     set({ activeSiteId: id });

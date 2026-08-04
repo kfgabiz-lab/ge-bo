@@ -8,7 +8,7 @@ import { GridCell } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
-import { useSiteStore } from "@/store/use-site-store";
+import { useSiteManagementStore } from "@/store/use-site-management-store";
 import { useI18n } from "@/hooks/use-i18n";
 
 /* ── 상수 ── */
@@ -65,7 +65,7 @@ export default function SiteDetailPage() {
   const id = params.id as string;
   const isNew = id === "new";
 
-  const { createSite, updateSite } = useSiteStore();
+  const { createSite, updateSite } = useSiteManagementStore();
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -90,7 +90,7 @@ export default function SiteDetailPage() {
         {
           id: "s1",
           type: "action-button",
-          label: t("common.btn.cancel"),
+          label: t("common.btn.list"),
           colSpan: 1,
           color: "gray",
           connType: "close",

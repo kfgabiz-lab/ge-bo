@@ -251,7 +251,7 @@ export default function I18nPage() {
         </GridCell>
 
         {/* 테이블 위젯 */}
-        <GridCell colSpan={12} rowSpan={8}>
+        <GridCell colSpan={12} rowSpan={9}>
           <WidgetRenderer
             mode="live"
             widget={TABLE_WIDGET}
