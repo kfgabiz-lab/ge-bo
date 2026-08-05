@@ -1193,7 +1193,7 @@ export function useWidgetPageState(
           const mw = w as MultiSelectWidget;
           if (!mw.required) continue;
           if ((multiSelectValuesMap[mw.widgetId] ?? []).length === 0) {
-            const title = mw.title || "다중선택";
+            const title = mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
             toast.warning(
               t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
             );

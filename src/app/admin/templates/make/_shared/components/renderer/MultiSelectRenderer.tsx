@@ -326,6 +326,7 @@ export function MultiSelectRenderer({
         {(widget.titleMsgKey || widget.title) && (
           <p className="text-sm font-medium text-slate-700">
             {widget.titleMsgKey ? t(widget.titleMsgKey) : widget.title}
+            {widget.required && <span className="text-red-500 ml-0.5">*</span>}
           </p>
         )}
 

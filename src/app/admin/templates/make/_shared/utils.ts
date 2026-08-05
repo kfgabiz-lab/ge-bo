@@ -2185,6 +2185,7 @@ export function validateDataSaveWidgets(opts: {
     contentKey?: string;
     required?: boolean;
     title?: string;
+    titleMsgKey?: string;
     enableRowSelection?: boolean;
     columns?: import("./components/renderer/types").SubListColumn[];
   }>;
@@ -2264,7 +2265,7 @@ export function validateDataSaveWidgets(opts: {
     if (w.type !== "multiselect") continue;
     if (!w.required) continue;
     if ((multiSelectValuesMap[w.widgetId ?? ""] ?? []).length === 0) {
-      const title = w.title || "다중선택";
+      const title = w.titleMsgKey ? (t ? t(w.titleMsgKey) : w.titleMsgKey) : w.title || "다중선택";
       toast.warning(t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`);
       return false;
     }
