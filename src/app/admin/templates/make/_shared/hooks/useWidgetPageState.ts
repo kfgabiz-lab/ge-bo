@@ -503,6 +503,14 @@ export function useWidgetPageState(
           Object.assign(params, buildSearchQueryParams(searchFields, sv));
         }
 
+        if (tableWidget.contentRelation?.inner) {
+          const innerRelationId = tableWidget.contentRelation.inner.relationId;
+          params[`innerRel_${innerRelationId}`] = String(innerRelationId);
+        }
+        if (tableWidget.contentRelation?.outer) {
+          params.fetchRelationIds = tableWidget.contentRelation.outer.relationIds.join(",");
+        }
+
         /* entity 모드: /api/v1/{slug} (Slug Entity 코드생성 REST API) — 그 외: 기존 page_data API */
         const url = isEntity ? entityApiPath(connectedSlug) : `/page-data/${connectedSlug}`;
         const res = await api.get(url, { params });

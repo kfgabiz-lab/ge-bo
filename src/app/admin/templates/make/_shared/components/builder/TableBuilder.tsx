@@ -70,6 +70,10 @@ export interface TableWidget {
   displayMode: DisplayMode; /* 표시 방식 (pagination | scroll) */
   /** 행 다중선택 체크박스 표시 여부 (기본 false) */
   enableRowSelection?: boolean;
+  contentRelation?: {
+    inner?: { relationId: number };
+    outer?: { relationIds: number[] };
+  };
 }
 
 /* ══════════════════════════════════════════ */
@@ -240,6 +244,23 @@ export function TableBuilder({
 
   /* 전체 slug-relation 목록 — 공통 훅으로 fetch */
   const allSlugRelations = useSlugRelations();
+
+  const contentRelationSlug = widget.connectedSlug ?? connDefaultSlug ?? "";
+  const contentRelationCandidates = allSlugRelations.filter((r) => r.masterSlug === contentRelationSlug);
+
+  const setInnerContentRelation = (relationId: number | null) => {
+    const cr = widget.contentRelation ?? {};
+    const nextCr = { ...cr, inner: relationId ? { relationId } : undefined };
+    onChange({ ...widget, contentRelation: nextCr.inner || nextCr.outer ? nextCr : undefined });
+  };
+
+  const toggleOuterContentRelation = (relationId: number) => {
+    const cr = widget.contentRelation ?? {};
+    const current = cr.outer?.relationIds ?? [];
+    const next = current.includes(relationId) ? current.filter((id) => id !== relationId) : [...current, relationId];
+    const nextCr = { ...cr, outer: next.length > 0 ? { relationIds: next } : undefined };
+    onChange({ ...widget, contentRelation: nextCr.inner || nextCr.outer ? nextCr : undefined });
+  };
 
   /* 드래그 센서 — 3px 이상 이동 시 드래그 시작 (클릭 오인 방지) */
   const sensors = useSensors(
@@ -517,6 +538,56 @@ export function TableBuilder({
           value={widget.enableRowSelection ?? false}
           onChange={(v) => onChange({ ...widget, enableRowSelection: v })}
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">컨텐츠 레벨 relation</p>
+
+        <div>
+          <label className="text-[10px] font-medium text-slate-500 mb-1 block">inner (매칭 필터링, 단일)</label>
+          <select
+            value={widget.contentRelation?.inner?.relationId ?? ""}
+            onChange={(e) => setInnerContentRelation(e.target.value ? Number(e.target.value) : null)}
+            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900"
+          >
+            <option value="">— 없음 —</option>
+            {contentRelationCandidates.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.description
+                  ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                  : `${r.masterSlug} → ${r.slaveSlug}`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-[10px] font-medium text-slate-500 mb-1 block">outer (FETCH 실행 범위, 다중)</label>
+          {contentRelationCandidates.length === 0 ? (
+            <p className="text-[10px] text-slate-400 italic px-1">연결 가능한 relation이 없습니다.</p>
+          ) : (
+            <div className="border border-slate-200 rounded overflow-hidden">
+              {contentRelationCandidates.map((r) => (
+                <label
+                  key={r.id}
+                  className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                >
+                  <input
+                    type="checkbox"
+                    checked={(widget.contentRelation?.outer?.relationIds ?? []).includes(r.id)}
+                    onChange={() => toggleOuterContentRelation(r.id)}
+                    className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                  />
+                  <span className="text-xs text-slate-700 truncate">
+                    {r.description
+                      ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                      : `${r.masterSlug} → ${r.slaveSlug}`}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 연결된 Search 위젯 */}
