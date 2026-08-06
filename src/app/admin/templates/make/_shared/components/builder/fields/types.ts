@@ -225,6 +225,8 @@ export interface FieldEditValues {
   optionOrderDir?: "ASC" | "DESC";
   /** SLUG 옵션 필터 조건식 — evalConditionExpr 문법 재사용, flattenPageDataItem 기준 flat key로 평가 */
   optionFilter?: string;
+  /** SLUG 옵션 파생 키 — 선택된 row에서 추가로 뽑아낼 flat key 목록 (쉼표 구분) */
+  optionDerivedKeys?: string;
   /* ── address 전용 ── */
   /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
   addressLanguage?: "ko" | "en";

@@ -5,6 +5,8 @@ const SYSTEM_ADMIN_PATHS = [
   "/admin/system",
   "/admin/database",
   "/admin/settings/slug-registry",
+  "/admin/settings/users",
+  "/admin/settings/roles",
   "/admin/templates/make",
   "/admin/templates/layer",
 ];
@@ -27,6 +29,8 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
 
   /*
    * Google Maps, YouTube, 구글 루커 스튜디오 연동을 차단하므로 적용하지 않습니다.
@@ -77,7 +81,9 @@ export function middleware(request: NextRequest): NextResponse {
 
   const isSystem = request.cookies.get("bo_is_system")?.value;
   if (isSystem !== "true") {
-    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/admin/dashboard";
+    return NextResponse.redirect(dashboardUrl);
   }
 
   return NextResponse.next();

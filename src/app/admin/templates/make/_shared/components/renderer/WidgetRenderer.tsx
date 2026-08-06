@@ -97,6 +97,7 @@ import {
   extractSubListRows,
   extractMultiSelectSelection,
   computeFieldDefaultValue,
+  evalWidgetHideCondition,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -205,6 +206,8 @@ interface WidgetRendererProps {
   formValues?: Record<string, string>;
   /** Form 필드값 변경 핸들러 */
   onFormValuesChange?: (fieldId: string, value: string) => void;
+  /** select(SLUG 옵션) optionDerivedKeys 파생값 변경 핸들러 — "{fieldKey}.{derivedKey}" 가상키로 formValuesMap에 반영 (markDirty 없음) */
+  onDerivedValueChange?: (fieldId: string, value: string) => void;
   /** cross-form 데이터생성 실시간 자동입력 콜백 — 어느 폼이든 fieldId로 값 업데이트 */
   onChangeAllFormValues?: (fieldId: string, value: string) => void;
   /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 */
@@ -375,6 +378,7 @@ export function WidgetRenderer({
   /* form */
   formValues = {},
   onFormValuesChange,
+  onDerivedValueChange,
   onChangeAllFormValues,
   allFormValues,
   allFieldKeyToId,
@@ -1257,8 +1261,16 @@ export function WidgetRenderer({
 
       /* 유효성 검사 — multiselect 위젯별 required */
       for (const c of saveMultiSelectContents) {
-        const mw = c.widget as { widgetId?: string; required?: boolean; title?: string; titleMsgKey?: string };
+        const mw = c.widget as {
+          widgetId?: string;
+          required?: boolean;
+          title?: string;
+          titleMsgKey?: string;
+          hideCondition?: string;
+        };
         if (!mw.required) continue;
+        if (mw.hideCondition && evalWidgetHideCondition(mw.hideCondition, popupAllKeyToId, popupAllFormValues))
+          continue;
         if ((popupMultiSelectValuesMap[mw.widgetId ?? ""] ?? []).length === 0) {
           const title = mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
           toast.warning(
@@ -1638,6 +1650,12 @@ export function WidgetRenderer({
             /* 폼 — widgetId별 구조 직접 전달 (page 모드와 동일) */
             formValuesMap={popupFormValuesMap}
             onFormValuesChange={(wid, fieldId, value) =>
+              setPopupFormValuesMap((prev) => ({
+                ...prev,
+                [wid]: { ...(prev[wid] ?? {}), [fieldId]: value },
+              }))
+            }
+            onDerivedValueChange={(wid, fieldId, value) =>
               setPopupFormValuesMap((prev) => ({
                 ...prev,
                 [wid]: { ...(prev[wid] ?? {}), [fieldId]: value },
@@ -2117,6 +2135,7 @@ export function WidgetRenderer({
         codeGroups={codeGroups}
         values={formValues}
         onChangeValues={onFormValuesChange}
+        onDerivedValueChange={onDerivedValueChange}
         onChangeAllFormValues={onChangeAllFormValues}
         allFormValues={allFormValues}
         allFieldKeyToId={allFieldKeyToId}

@@ -102,6 +102,7 @@ export function SelectField({
         optionOrderKey={values.optionOrderKey}
         optionOrderDir={values.optionOrderDir}
         optionFilter={values.optionFilter}
+        optionDerivedKeys={values.optionDerivedKeys}
         codeGroups={codeGroups}
         codeGroupsLoading={codeGroupsLoading}
         onChange={(updates) => onChange(updates)}

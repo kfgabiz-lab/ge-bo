@@ -359,6 +359,23 @@ export const evalFieldCondition = (
   });
 
 /**
+ * MultiSelectWidget.hideCondition 등 위젯 단위 조건 평가 — evalFieldCondition과 리졸버 순서만 다르다.
+ * fieldId를 못 찾거나 값이 없으면 key 자체를 formValues의 가상키(예: "curriculum_id.product_category")로 직접 조회한다.
+ * @param allFieldKeyToId fieldKey → fieldId 역매핑
+ * @param allFormValues   fieldId(또는 가상키) → 현재값 맵
+ */
+export const evalWidgetHideCondition = (
+  condition: string,
+  allFieldKeyToId: Record<string, string>,
+  allFormValues: Record<string, string>
+): boolean =>
+  evalConditionExpr(condition, (key) => {
+    const fieldId = allFieldKeyToId[key];
+    if (fieldId) return allFormValues[fieldId] ?? "";
+    return allFormValues[key];
+  });
+
+/**
  * fieldKey → fieldId(id) 역매핑 테이블 생성 — hideCondition/disableCondition 평가 등에서 공용으로 사용
  * FormRenderer·SearchRenderer가 각자 인라인으로 만들던 동일한 로직을 공통함수로 분리
  * @param fields fieldKey를 가진 필드 배열 (Search/Form 필드 등)

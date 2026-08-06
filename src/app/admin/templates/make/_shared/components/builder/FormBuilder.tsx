@@ -410,6 +410,7 @@ export function FormBuilder({
         optionOrderKey: f.optionOrderKey,
         optionOrderDir: f.optionOrderDir,
         optionFilter: f.optionFilter,
+        optionDerivedKeys: f.optionDerivedKeys,
         /* ── 연결 Slug (input/text 전용) ── */
         relationSlugId: f.relationSlugId,
         /* ── Data 표현식 (input/text 전용) ── */

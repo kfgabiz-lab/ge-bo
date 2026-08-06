@@ -163,6 +163,7 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
     optionTextKey: col.optionTextKey,
     optionOrderKey: col.optionOrderKey,
     optionOrderDir: col.optionOrderDir,
+    optionDerivedKeys: col.optionDerivedKeys,
     /* date/dateRange 필드간 대소비교 검증 (콤마구분 단일 표현식) */
     compareExpr: col.compareExpr,
   };
@@ -236,6 +237,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
   if (updates.optionTextKey !== undefined) patch.optionTextKey = updates.optionTextKey;
   if (updates.optionOrderKey !== undefined) patch.optionOrderKey = updates.optionOrderKey;
   if (updates.optionOrderDir !== undefined) patch.optionOrderDir = updates.optionOrderDir;
+  if (updates.optionDerivedKeys !== undefined) patch.optionDerivedKeys = updates.optionDerivedKeys;
   /* date/dateRange 필드간 대소비교 검증 — 입력값을 비우면(빈 문자열) 명시적으로 undefined를 보내 초기화해야 하므로
        다른 항목과 달리 `!== undefined` 대신 `in` 체크로 "값이 아예 안 왔는지"만 구분한다 */
   if ("compareExpr" in updates) patch.compareExpr = updates.compareExpr;

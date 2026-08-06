@@ -159,6 +159,8 @@ interface FieldRendererProps {
   field: SearchFieldConfig;
   value?: string;
   onChange?: (v: string) => void;
+  /** select(SLUG 옵션) 전용: optionDerivedKeys로 지정된 파생키들의 현재 선택 row 값을 emit (key는 파생키명만, 접두어 없이) */
+  onDerivedChange?: (derived: Record<string, string>) => void;
   /** dateRange 전용: 시작일 (valueFrom/valueTo 사용 시 value 무시) */
   valueFrom?: string;
   /** dateRange 전용: 종료일 */
@@ -712,6 +714,60 @@ function buildSlugOptRows(
 }
 
 /**
+ * useOptionDerivedValues — SLUG 옵션에서 선택된 row의 파생값을 emit하는 공용 훅
+ * SlugOptionSelect / SlugAutocompleteInput이 공용으로 사용한다.
+ *
+ * field.optionDerivedKeys에 명시된 컬럼들을 선택된 row에서 추출해 onDerivedChange로 전달한다.
+ * - value === "": 각 파생키에 빈 문자열 emit
+ * - rawRows 미로드 상태: emit 하지 않음
+ * - lastEmittedRef로 동일한 값 재emit 방지
+ */
+function useOptionDerivedValues(
+  rawRows: Record<string, unknown>[],
+  value: string,
+  field: SearchFieldConfig,
+  onDerivedChange?: (derived: Record<string, string>) => void
+) {
+  const lastEmittedRef = useRef<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    if (!field.optionDerivedKeys) return;
+    const derivedKeys = field.optionDerivedKeys
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+    if (derivedKeys.length === 0) return;
+
+    let derived: Record<string, string>;
+
+    if (value === "") {
+      derived = {};
+      derivedKeys.forEach((k) => {
+        derived[k] = "";
+      });
+    } else {
+      if (rawRows.length === 0) return;
+      const row = rawRows.find((r) => String(r[field.optionValueKey ?? ""] ?? "") === value);
+      if (!row) return;
+      derived = {};
+      derivedKeys.forEach((k) => {
+        derived[k] = String(row[k] ?? "");
+      });
+    }
+
+    const prev = lastEmittedRef.current;
+    const isSame =
+      !!prev &&
+      Object.keys(derived).length === Object.keys(prev).length &&
+      Object.entries(derived).every(([k, v]) => prev[k] === v);
+    if (isSame) return;
+
+    lastEmittedRef.current = derived;
+    onDerivedChange?.(derived);
+  }, [rawRows, value, field.optionDerivedKeys, field.optionValueKey, onDerivedChange]);
+}
+
+/**
  * SlugOptionSelect — SLUG 옵션 소스 select 컴포넌트 (live 모드 전용)
  *
  * field.optionSlug로 지정된 SLUG에서 데이터를 API fetch하여 select 옵션을 채운다.
@@ -722,6 +778,7 @@ function SlugOptionSelect({
   field,
   value,
   onChange,
+  onDerivedChange,
   isDisabled,
   isReadOnly,
   placeholder,
@@ -731,6 +788,7 @@ function SlugOptionSelect({
   field: SearchFieldConfig;
   value: string;
   onChange?: (v: string) => void;
+  onDerivedChange?: (derived: Record<string, string>) => void;
   isDisabled: boolean;
   isReadOnly: boolean;
   placeholder: string;
@@ -776,6 +834,8 @@ function SlugOptionSelect({
     ]
   );
 
+  useOptionDerivedValues(rawRows, value, field, onDerivedChange);
+
   return (
     <div className="relative">
       <select
@@ -810,6 +870,7 @@ function SlugAutocompleteInput({
   field,
   value,
   onChange,
+  onDerivedChange,
   isDisabled,
   isReadOnly,
   placeholder,
@@ -818,6 +879,7 @@ function SlugAutocompleteInput({
   field: SearchFieldConfig;
   value: string;
   onChange?: (v: string) => void;
+  onDerivedChange?: (derived: Record<string, string>) => void;
   isDisabled: boolean;
   isReadOnly: boolean;
   placeholder: string;
@@ -862,6 +924,8 @@ function SlugAutocompleteInput({
     ]
   );
 
+  useOptionDerivedValues(rawRows, value, field, onDerivedChange);
+
   return (
     <AutocompleteInput
       value={value}
@@ -879,6 +943,7 @@ export function FieldRenderer({
   field,
   value = "",
   onChange,
+  onDerivedChange,
   valueFrom,
   valueTo,
   onFromChange,
@@ -1051,6 +1116,7 @@ export function FieldRenderer({
               field={field}
               value={value}
               onChange={onChange}
+              onDerivedChange={onDerivedChange}
               isDisabled={isDisabled}
               isReadOnly={isReadOnly}
               placeholder={selectPlaceholder}
@@ -1107,6 +1173,7 @@ export function FieldRenderer({
             field={field}
             value={value}
             onChange={onChange}
+            onDerivedChange={onDerivedChange}
             isDisabled={isDisabled}
             isReadOnly={isReadOnly}
             placeholder={selectPlaceholder}

@@ -432,6 +432,19 @@ export function MultiSelectBuilder({
           />
         </div>
 
+        <div>
+          <label className={LABEL_CLS}>
+            동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span>
+          </label>
+          <input
+            type="text"
+            value={widget.hideCondition ?? ""}
+            onChange={(e) => onChange({ ...widget, hideCondition: e.target.value || undefined })}
+            placeholder="예: status=1,type=Y / status= (빈값)"
+            className={INPUT_CLS}
+          />
+        </div>
+
         {/* 표시 필드 — 연동 모드에서는 라벨이 _fetchedRel{id} 값으로 자동 결정되므로 숨김 */}
         {(widget.sourceMode ?? "call") === "call" && (
           <div>

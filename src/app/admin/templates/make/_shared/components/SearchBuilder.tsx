@@ -119,7 +119,11 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
   const toggleRowCollapse = (id: string) =>
     setCollapsedRows((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
@@ -355,6 +359,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       optionOrderKey,
       optionOrderDir,
       optionFilter,
+      optionDerivedKeys,
       /* 조건식 검색 연동 (select 전용, data 재사용) */
       data,
       /* 조인 검색 연동 (select/input 전용) */
@@ -453,6 +458,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       optionOrderKey: pendingType === "select" ? optionOrderKey || undefined : undefined,
       optionOrderDir: pendingType === "select" ? optionOrderDir || undefined : undefined,
       optionFilter: pendingType === "select" ? optionFilter || undefined : undefined,
+      optionDerivedKeys: pendingType === "select" ? optionDerivedKeys || undefined : undefined,
       data: pendingType === "select" ? data?.trim() || undefined : undefined,
       /* 조인 검색 연동 (select/input 전용) */
       joinRelationSlugId:
@@ -763,6 +769,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                           optionOrderKey: field.optionOrderKey,
                                           optionOrderDir: field.optionOrderDir,
                                           optionFilter: field.optionFilter,
+                                          optionDerivedKeys: field.optionDerivedKeys,
                                           /* 조건식 검색 연동 (select 전용, data 재사용) */
                                           data: field.data,
                                           /* 조인 검색 연동 (select/input 전용) */

@@ -212,6 +212,8 @@ export interface SubListColumn {
   optionOrderKey?: string;
   /** SLUG 데이터 정렬 방향 (ASC / DESC) */
   optionOrderDir?: "ASC" | "DESC";
+  /** select(SLUG 옵션) 선택 시 함께 추출할 파생 키 목록 — 콤마구분 (예: "product_category,product_line") */
+  optionDerivedKeys?: string;
   /* ── date/dateRange 필드간 대소비교 검증 — 콤마구분 단일 표현식 (types.ts SearchFieldConfig.compareExpr와 동일 문법) ──
    *   [part]연산자$대상fieldKey[_from|_to] 를 콤마(,)로 나열(AND)
    * @example "<$endDate,<$dueDate" / "to<$endDate_from" */
@@ -315,6 +317,9 @@ export interface MultiSelectWidget {
   bgColor?: string;
   /** 선택된 항목마다 인라인으로 표시할 추가 입력 필드 목록 */
   extraFields?: MultiSelectExtraField[];
+  /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 위젯을 숨김
+   *  형식: "fieldKey=값" (단일) / "key1=v1,key2=v2" (AND 복수 조건) / "key!=값" (불일치) */
+  hideCondition?: string;
 }
 
 /* ── Tab 위젯 타입 ── */

@@ -32,6 +32,8 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
           // require-corp, credentialless 둘 다 구글 루커 스튜디오 임베드가 거부되어 COEP 적용 보류. 보안점검 예외 등록 필요.
           // { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
         ],

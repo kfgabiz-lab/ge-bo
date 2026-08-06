@@ -43,6 +43,7 @@ import {
   buildSearchQueryParams,
   extractSubListRows,
   extractMultiSelectSelection,
+  evalWidgetHideCondition,
 } from "../utils";
 import {
   entityApiPath,
@@ -244,7 +245,16 @@ async function restoreFormDataFromJson(
         Object.assign(vals, computeFieldDefaultValue(f, t));
       }
     });
-    setFormValuesMap((prev) => ({ ...prev, [fw.widgetId]: vals }));
+    setFormValuesMap((prev) => {
+      const existingVals = prev[fw.widgetId] ?? {};
+      const preservedVirtualVals: Record<string, string> = {};
+      Object.keys(existingVals).forEach((k) => {
+        if (k.includes(".") && !fw.fields.some((f) => f.id === k)) {
+          preservedVirtualVals[k] = existingVals[k];
+        }
+      });
+      return { ...prev, [fw.widgetId]: { ...preservedVirtualVals, ...vals } };
+    });
   });
 
   /* SubList 행 복원 */
@@ -1008,6 +1018,10 @@ export function useWidgetPageState(
     [markDirty]
   );
 
+  const updateDerivedValue = useCallback((widgetId: string, fieldId: string, value: string) => {
+    setFormValuesMap((prev) => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: value } }));
+  }, []);
+
   /**
    * 파일 선택 핸들러
    * - rowId 없음: Form 위젯 파일 → fileValuesMap
@@ -1200,6 +1214,7 @@ export function useWidgetPageState(
           if (w.type !== "multiselect") continue;
           const mw = w as MultiSelectWidget;
           if (!mw.required) continue;
+          if (mw.hideCondition && evalWidgetHideCondition(mw.hideCondition, allFieldKeyToId, allFormValues)) continue;
           if ((multiSelectValuesMap[mw.widgetId] ?? []).length === 0) {
             const title = mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
             toast.warning(
@@ -2130,6 +2145,27 @@ export function useWidgetPageState(
     setCategorySelections((prev) => ({ ...prev, [widgetId]: selectedId }));
   }, []);
 
+  const handleMultiSelectChange = useCallback(
+    (wId: string, ids: number[]) => {
+      setMultiSelectValuesMap((prev) => ({ ...prev, [wId]: ids }));
+      markDirty();
+    },
+    [markDirty]
+  );
+
+  const handleMultiSelectExtraFieldChange = useCallback(
+    (wId: string, itemId: number, fieldKey: string, value: string) => {
+      setMultiSelectExtraFieldValuesMap((prev) => ({
+        ...prev,
+        [wId]: {
+          ...(prev[wId] ?? {}),
+          [itemId]: { ...(prev[wId]?.[itemId] ?? {}), [fieldKey]: value },
+        },
+      }));
+    },
+    []
+  );
+
   /* PageGridRenderer에 바로 spread할 수 있도록 묶어서 반환 */
   const gridProps = {
     searchValues,
@@ -2138,6 +2174,7 @@ export function useWidgetPageState(
     onReset: handleReset,
     formValuesMap,
     onFormValuesChange: updateFormValue,
+    onDerivedValueChange: updateDerivedValue,
     onContentAction: handleContentAction,
     onDataSave: handleDataSave,
     onApiCall: handleApiCall,
@@ -2168,19 +2205,9 @@ export function useWidgetPageState(
     onRemoveExisting: handleRemoveExisting,
     /* 멀티셀렉트 */
     multiSelectValuesMap,
-    onMultiSelectChange: (wId: string, ids: number[]) => {
-      setMultiSelectValuesMap((prev) => ({ ...prev, [wId]: ids }));
-      markDirty();
-    },
+    onMultiSelectChange: handleMultiSelectChange,
     multiSelectExtraFieldValuesMap,
-    onMultiSelectExtraFieldChange: (wId: string, itemId: number, fieldKey: string, value: string) =>
-      setMultiSelectExtraFieldValuesMap((prev) => ({
-        ...prev,
-        [wId]: {
-          ...(prev[wId] ?? {}),
-          [itemId]: { ...(prev[wId]?.[itemId] ?? {}), [fieldKey]: value },
-        },
-      })),
+    onMultiSelectExtraFieldChange: handleMultiSelectExtraFieldChange,
     /* _fetchedRel{id} 데이터 맵 — FormRenderer rowData 확장용 */
     formFetchRelMap,
     /* entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */

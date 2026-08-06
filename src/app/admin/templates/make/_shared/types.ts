@@ -249,6 +249,8 @@ export interface SearchFieldConfig {
   /** SLUG 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
    *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
   optionFilter?: string;
+  /** SLUG 옵션 파생 키 — 선택된 row에서 추가로 뽑아낼 flat key 목록 (쉼표 구분) */
+  optionDerivedKeys?: string;
   /* ── address 전용 ── */
   /** 주소검색 결과 언어 — 미설정 시 'en'으로 취급 */
   addressLanguage?: "ko" | "en";
