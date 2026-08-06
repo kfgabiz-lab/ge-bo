@@ -1255,6 +1255,19 @@ export function WidgetRenderer({
       )
         return;
 
+      /* 유효성 검사 — multiselect 위젯별 required */
+      for (const c of saveMultiSelectContents) {
+        const mw = c.widget as { widgetId?: string; required?: boolean; title?: string; titleMsgKey?: string };
+        if (!mw.required) continue;
+        if ((popupMultiSelectValuesMap[mw.widgetId ?? ""] ?? []).length === 0) {
+          const title = mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
+          toast.warning(
+            t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
+          );
+          return;
+        }
+      }
+
       setPopupSaving(true);
       try {
         const newIds: number[] = [];

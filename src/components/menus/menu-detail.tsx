@@ -246,6 +246,10 @@ interface MenuFormProps {
   sortOrder: number | string;
   visible: boolean;
   linkedTemplateName: string;
+  /* Meta Title/Description — FO 탭 + 2Depth 이상 메뉴에서만 노출 */
+  showMeta: boolean;
+  metaTitle: string;
+  metaDescription: string;
   /* 에러 */
   nameMsgKeyError: string;
   urlError: string;
@@ -256,6 +260,8 @@ interface MenuFormProps {
   onDescriptionChange: (v: string) => void;
   onDescriptionMsgKeyChange: (v: string) => void;
   onUrlChange: (v: string) => void;
+  onMetaTitleChange: (v: string) => void;
+  onMetaDescriptionChange: (v: string) => void;
   onIconChange: (v: string) => void;
   onSortOrderChange: (v: string) => void;
   onVisibleChange: (v: boolean) => void;
@@ -292,6 +298,9 @@ function MenuForm({
   sortOrder,
   visible,
   linkedTemplateName,
+  showMeta,
+  metaTitle,
+  metaDescription,
   nameMsgKeyError,
   urlError,
   sortOrderError = "",
@@ -300,6 +309,8 @@ function MenuForm({
   onDescriptionChange,
   onDescriptionMsgKeyChange,
   onUrlChange,
+  onMetaTitleChange,
+  onMetaDescriptionChange,
   onIconChange,
   onSortOrderChange,
   onVisibleChange,
@@ -447,6 +458,47 @@ function MenuForm({
         )}
       </div>
 
+      {/* Meta Title / Meta Description — FO 탭 + 2Depth 이상 메뉴에서만 노출 */}
+      {showMeta && (
+        <>
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+              Meta Title
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">50~60자 사이로 입력해 주세요.</span>
+            </label>
+            <input
+              type="text"
+              value={metaTitle}
+              onChange={(e) => onMetaTitleChange(e.target.value)}
+              className={inputCls("")}
+              placeholder="Meta Title"
+              maxLength={60}
+            />
+            <div className="flex items-center justify-end mt-1">
+              <span className="text-xs text-slate-400">{metaTitle.length}/60</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+              Meta Description
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">150~160자 사이로 입력해 주세요.</span>
+            </label>
+            <textarea
+              value={metaDescription}
+              onChange={(e) => onMetaDescriptionChange(e.target.value)}
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none"
+              rows={3}
+              placeholder="Meta Description"
+              maxLength={160}
+            />
+            <div className="flex items-center justify-end mt-1">
+              <span className="text-xs text-slate-400">{metaDescription.length}/160</span>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* 아이콘 + 정렬 순서 + 노출 여부 — 3컬럼 */}
       <div className="grid grid-cols-3 gap-4">
         <div>
@@ -516,6 +568,8 @@ function CreateMenuForm({
   const [icon, setIcon] = useState("");
   const [sortOrder, setSortOrder] = useState<number | string>(1);
   const [visible, setVisible] = useState(true);
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
   const [nameMsgKeyError, setNameMsgKeyError] = useState("");
   const [urlError, setUrlError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -524,6 +578,8 @@ function CreateMenuForm({
 
   const canSelectFolder = parentDepth < 2;
   const depthLabel = parentId === null ? "1depth" : parentDepth === 1 ? "2depth" : "3depth";
+  /* Meta Title/Description — FO 탭 + 2Depth 이상(부모 존재)에서만 노출 */
+  const showMeta = menuType === "FO" && parentId !== null;
 
   /* 자동 포커싱 */
   useEffect(() => {
@@ -555,6 +611,8 @@ function CreateMenuForm({
         description: i18nMode ? "" : description.trim(),
         descriptionMsgKey: i18nMode ? descriptionMsgKey || undefined : undefined,
         url: url.trim(),
+        metaTitle: showMeta ? metaTitle.trim() || undefined : undefined,
+        metaDescription: showMeta ? metaDescription.trim() || undefined : undefined,
         icon,
         parentId,
         menuType,
@@ -631,6 +689,9 @@ function CreateMenuForm({
         sortOrder={sortOrder}
         visible={visible}
         linkedTemplateName={linkedTemplateName}
+        showMeta={showMeta}
+        metaTitle={metaTitle}
+        metaDescription={metaDescription}
         nameMsgKeyError={nameMsgKeyError}
         urlError={urlError}
         onNameChange={(v) => {
@@ -647,6 +708,8 @@ function CreateMenuForm({
           setUrl(v);
           if (urlError) setUrlError("");
         }}
+        onMetaTitleChange={setMetaTitle}
+        onMetaDescriptionChange={setMetaDescription}
         onIconChange={setIcon}
         onSortOrderChange={(v) => {
           const n = parseInt(v, 10);
@@ -702,6 +765,8 @@ export function MenuDetail() {
   const [icon, setIcon] = useState("");
   const [sortOrder, setSortOrder] = useState<number | string>(1);
   const [visible, setVisible] = useState(true);
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
   const [linkedTemplateName, setLinkedTemplateName] = useState("");
   const templatesCache = useRef<{ pageUrl: string; name: string }[]>([]);
 
@@ -730,6 +795,8 @@ export function MenuDetail() {
       setIcon(selectedMenu.icon);
       setSortOrder(selectedMenu.sortOrder);
       setVisible(selectedMenu.visible);
+      setMetaTitle(selectedMenu.metaTitle ?? "");
+      setMetaDescription(selectedMenu.metaDescription ?? "");
       setNameMsgKeyError("");
       setUrlError("");
       setSortOrderError("");
@@ -808,11 +875,24 @@ export function MenuDetail() {
         url !== (selectedMenu.url || "") ||
         icon !== selectedMenu.icon ||
         Number(sortOrder) !== selectedMenu.sortOrder ||
-        visible !== selectedMenu.visible;
+        visible !== selectedMenu.visible ||
+        metaTitle !== (selectedMenu.metaTitle ?? "") ||
+        metaDescription !== (selectedMenu.metaDescription ?? "");
       setIsDirty(dirty);
       setStoreDirty(dirty);
     }
-  }, [nameMsgKey, descriptionMsgKey, url, icon, sortOrder, visible, selectedMenu, setStoreDirty]);
+  }, [
+    nameMsgKey,
+    descriptionMsgKey,
+    url,
+    icon,
+    sortOrder,
+    visible,
+    metaTitle,
+    metaDescription,
+    selectedMenu,
+    setStoreDirty,
+  ]);
 
   /* ── 생성 모드 ── */
   if (!selectedMenu && isCreating) {
@@ -843,6 +923,8 @@ export function MenuDetail() {
 
   const isParent = !selectedMenu.parentId;
   const hasChildren = !!(selectedMenu.children && selectedMenu.children.length > 0);
+  /* Meta Title/Description — FO 탭 + 2Depth 이상(부모 존재)에서만 노출 */
+  const showMeta = activeTab === "FO" && !isParent;
   /* URL 유무로 폴더/프로그램 판단 */
   const isFolderActive = !url || !url.trim();
   const isProgramActive = !isFolderActive;
@@ -917,6 +999,8 @@ export function MenuDetail() {
         description: i18nMode ? "" : description.trim(),
         descriptionMsgKey: i18nMode ? descriptionMsgKey || undefined : undefined,
         url: (url || "").endsWith("/") && (url || "").length > 1 ? (url || "").replace(/\/+$/, "") : url || "",
+        metaTitle: showMeta ? metaTitle.trim() || undefined : undefined,
+        metaDescription: showMeta ? metaDescription.trim() || undefined : undefined,
         icon,
         sortOrder: Number(sortOrder),
         visible,
@@ -1007,6 +1091,9 @@ export function MenuDetail() {
           sortOrder={sortOrder}
           visible={visible}
           linkedTemplateName={linkedTemplateName}
+          showMeta={showMeta}
+          metaTitle={metaTitle}
+          metaDescription={metaDescription}
           nameMsgKeyError={nameMsgKeyError}
           urlError={urlError}
           sortOrderError={sortOrderError}
@@ -1021,6 +1108,8 @@ export function MenuDetail() {
           onDescriptionChange={setDescription}
           onDescriptionMsgKeyChange={setDescriptionMsgKey}
           onUrlChange={handleUrlChange}
+          onMetaTitleChange={setMetaTitle}
+          onMetaDescriptionChange={setMetaDescription}
           onIconChange={setIcon}
           onSortOrderChange={handleSortChange}
           onVisibleChange={setVisible}
