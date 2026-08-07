@@ -196,7 +196,8 @@ export default function EmailSendHisPage() {
           cellType: "text",
           align: "center",
           sortable: false,
-          width: 110,
+          width: 14,
+          widthUnit: "%",
           codeGroupCode: "EMAILSENDTYPE",
         },
         {
@@ -206,7 +207,8 @@ export default function EmailSendHisPage() {
           cellType: "text",
           align: "center",
           sortable: false,
-          width: 150,
+          width: 14,
+          widthUnit: "%",
           codeGroupCode: "TRAININGCOURSE",
         },
         {
@@ -216,6 +218,8 @@ export default function EmailSendHisPage() {
           cellType: "text",
           align: "left",
           sortable: false,
+          width: 15,
+          widthUnit: "%",
         },
         {
           id: "c4",
@@ -224,7 +228,8 @@ export default function EmailSendHisPage() {
           cellType: "text",
           align: "center",
           sortable: false,
-          width: 90,
+          width: 14,
+          widthUnit: "%",
           codeGroupCode: "SENDSTATUS",
         },
         {
@@ -234,7 +239,8 @@ export default function EmailSendHisPage() {
           cellType: "text",
           align: "center",
           sortable: false,
-          width: 160,
+          width: 14,
+          widthUnit: "%",
         },
         {
           id: "c6",
@@ -243,7 +249,8 @@ export default function EmailSendHisPage() {
           cellType: "text",
           align: "center",
           sortable: false,
-          width: 160,
+          width: 15,
+          widthUnit: "%",
         },
         {
           id: "c7",
@@ -253,7 +260,8 @@ export default function EmailSendHisPage() {
           align: "center",
           sortable: false,
           actions: ["edit"],
-          width: 70,
+          width: 14,
+          widthUnit: "%",
         },
       ],
     }),

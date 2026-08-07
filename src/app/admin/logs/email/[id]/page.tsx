@@ -190,7 +190,7 @@ export default function EmailSendHisDetailPage() {
 
   return (
     <PageLayout mode="live">
-      <GridCell colSpan={12} rowSpan={7}>
+      <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer
           mode="live"
           widget={INFO_FORM_WIDGET}
@@ -201,7 +201,7 @@ export default function EmailSendHisDetailPage() {
         />
       </GridCell>
 
-      <GridCell colSpan={12} rowSpan={7}>
+      <GridCell colSpan={12} rowSpan={6}>
         <WidgetRenderer
           mode="live"
           widget={CONTENT_FORM_WIDGET}
@@ -217,7 +217,7 @@ export default function EmailSendHisDetailPage() {
           <button
             type="button"
             onClick={resend}
-            className="px-3 py-1.5 rounded text-[13px] font-medium bg-orange-500 hover:bg-orange-600 text-white transition-all"
+            className="px-10 py-2.5 min-h-[40px] rounded-md text-xs font-bold whitespace-nowrap flex items-center justify-center shadow-sm bg-black hover:opacity-90 text-white transition-all"
           >
             재발송
           </button>

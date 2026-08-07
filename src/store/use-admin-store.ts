@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import api from '@/lib/api';
+import { create } from "zustand";
+import api from "@/lib/api";
 
 export interface Admin {
   id: number;
@@ -28,20 +28,19 @@ interface AdminState {
   setFilterRole: (role: string) => void;
   openDrawer: (admin?: Admin) => void;
   closeDrawer: () => void;
-  addAdmin: (admin: Omit<Admin, 'id' | 'createdAt' | 'isActive'>) => Promise<{ admin: Admin; tempPassword: string }>;
+  addAdmin: (admin: Omit<Admin, "id" | "createdAt" | "isActive">) => Promise<{ admin: Admin; tempPassword: string }>;
   updateAdmin: (id: number, admin: Partial<Admin>) => Promise<Admin>;
   deleteAdmin: (id: number) => Promise<void>;
   toggleAdminStatus: (id: number) => Promise<void>;
-  resetPassword: (id: number) => Promise<string>;
 }
 
-const API_PATH = '/admins';
+const API_PATH = "/admins";
 
 export const useAdminStore = create<AdminState>((set, get) => ({
   admins: [],
   isLoading: false,
-  searchTerm: '',
-  filterRole: 'ALL',
+  searchTerm: "",
+  filterRole: "ALL",
   isDrawerOpen: false,
   selectedAdmin: null,
 
@@ -51,7 +50,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       const response = await api.get(API_PATH);
       set({ admins: response.data, isLoading: false });
     } catch (error) {
-      console.error('Failed to fetch admins:', error);
+      console.error("Failed to fetch admins:", error);
       set({ isLoading: false });
     }
   },
@@ -124,19 +123,7 @@ export const useAdminStore = create<AdminState>((set, get) => ({
         admins: state.admins.map((a) => (a.id === id ? updatedAdmin : a)),
       }));
     } catch (error) {
-      console.error('Failed to toggle status:', error);
-      throw error;
-    }
-  },
-
-  resetPassword: async (id) => {
-    set({ isLoading: true });
-    try {
-      const response = await api.post(`${API_PATH}/${id}/reset-password`);
-      set({ isLoading: false });
-      return response.data.tempPassword;
-    } catch (error) {
-      set({ isLoading: false });
+      console.error("Failed to toggle status:", error);
       throw error;
     }
   },
