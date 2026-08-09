@@ -1,12 +1,12 @@
-﻿import axios, { InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '@/store/auth-store';
-import { useSiteStore } from '@/store/use-site-store';
+﻿import axios, { InternalAxiosRequestConfig } from "axios";
+import { useAuthStore } from "@/store/auth-store";
+import { useSiteStore } from "@/store/use-site-store";
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
-    _retry?: boolean;
+  _retry?: boolean;
 }
 
-const BASE_URL = '/api/v1';
+const BASE_URL = "/api/v1";
 
 /* 동시 401 race condition 방지 — refresh는 한 번만 실행, 나머지는 대기 */
 let refreshPromise: Promise<string> | null = null;
@@ -18,63 +18,74 @@ let refreshPromise: Promise<string> | null = null;
  * - 401 응답 시 /auth/refresh로 토큰 갱신 후 원래 요청 재시도
  */
 const api = axios.create({
-    baseURL: BASE_URL,
-    timeout: 10000,
-    headers: { 'Content-Type': 'application/json' },
-    withCredentials: true,
+  baseURL: BASE_URL,
+  timeout: 60000,
+  headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 // 요청 인터셉터: Access Token + 활성 사이트 ID 자동 첨부
 api.interceptors.request.use(
-    (config) => {
-        const token = useAuthStore.getState().accessToken;
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        const siteId = useSiteStore.getState().activeSiteId;
-        if (siteId) {
-            config.headers['X-Site-Id'] = String(siteId);
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
+  (config) => {
+    const token = useAuthStore.getState().accessToken;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    const siteId = useSiteStore.getState().activeSiteId;
+    if (siteId) {
+      config.headers["X-Site-Id"] = String(siteId);
+    }
+    if (typeof window !== "undefined") {
+      config.headers["X-Menu-Path"] = window.location.pathname.replace(/^\/bo/, "");
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
 );
 
 // 응답 인터셉터: 401 발생 시 Refresh Token 쿠키로 갱신 후 재시도
 api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const original = error.config as RetryableConfig;
+  (response) => response,
+  async (error) => {
+    const original = error.config as RetryableConfig;
 
-        if (error.response?.status === 401 && !original._retry && original.url !== '/auth/refresh' && original.url !== '/auth/logout') {
-            original._retry = true;
-            try {
-                /* 이미 refresh 진행 중이면 동일한 Promise 대기, 아니면 새로 시작 */
-                if (!refreshPromise) {
-                    refreshPromise = api.post('/auth/refresh', {}, { withCredentials: true })
-                        .then(resp => {
-                            const { accessToken, adminInfo } = resp.data;
-                            useAuthStore.getState().setAccessToken(accessToken, adminInfo);
-                            return accessToken as string;
-                        })
-                        .finally(() => { refreshPromise = null; });
-                }
-                const accessToken = await refreshPromise;
-                original.headers.Authorization = `Bearer ${accessToken}`;
-                return api(original);
-            } catch {
-                // Refresh 실패 시 로그아웃 처리
-                refreshPromise = null;
-                await api.post('/auth/logout', {}, { withCredentials: true }).catch(() => {});
-                useAuthStore.getState().logout();
-                if (typeof window !== 'undefined' && window.location.pathname !== '/bo/admin/login') {
-                    window.location.href = '/bo/admin/login';
-                }
-            }
+    if (
+      error.response?.status === 401 &&
+      !original._retry &&
+      original.url !== "/auth/refresh" &&
+      original.url !== "/auth/logout"
+    ) {
+      original._retry = true;
+      try {
+        /* 이미 refresh 진행 중이면 동일한 Promise 대기, 아니면 새로 시작 */
+        if (!refreshPromise) {
+          refreshPromise = api
+            .post("/auth/refresh", {}, { withCredentials: true })
+            .then((resp) => {
+              const { accessToken, adminInfo } = resp.data;
+              useAuthStore.getState().setAccessToken(accessToken, adminInfo);
+              return accessToken as string;
+            })
+            .finally(() => {
+              refreshPromise = null;
+            });
         }
-
-        return Promise.reject(error);
+        const accessToken = await refreshPromise;
+        original.headers.Authorization = `Bearer ${accessToken}`;
+        return api(original);
+      } catch {
+        // Refresh 실패 시 로그아웃 처리
+        refreshPromise = null;
+        await api.post("/auth/logout", {}, { withCredentials: true }).catch(() => {});
+        useAuthStore.getState().logout();
+        if (typeof window !== "undefined" && window.location.pathname !== "/bo/admin/login") {
+          window.location.href = "/bo/admin/login";
+        }
+      }
     }
+
+    return Promise.reject(error);
+  }
 );
 
 /**
@@ -84,8 +95,8 @@ api.interceptors.response.use(
  * toast.error(getApiErrorMessage(err, '기본 문구')) 형태로 사용.
  */
 export function getApiErrorMessage(err: unknown, fallback: string): string {
-    const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-    return message || fallback;
+  const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  return message || fallback;
 }
 
 export default api;
