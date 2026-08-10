@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/** SYSTEM_ADMIN 전용 경로 목록 */
-const SYSTEM_ADMIN_PATHS = [
-  "/admin/system",
-  "/admin/database",
-  "/admin/settings/slug-registry",
-  "/admin/settings/users",
-  "/admin/settings/roles",
-  "/admin/templates/make",
-  "/admin/templates/layer",
-];
-
 /*
  * AppScan에서 주로 사용하는 단순 XSS 테스트 패턴을 차단합니다.
  *
@@ -57,9 +46,7 @@ function badRequest(): NextResponse {
 
 /**
  * Next.js 미들웨어 — 요청 레벨 1차 방어
- * 1) AppScan XSS 테스트 대응: 루트 경로의 위험 문자 패턴/비정상 메소드 차단
- * 2) bo_is_system 쿠키를 읽어 시스템관리자 전용 경로 보호 (role.is_system 기반)
- * 클라이언트 가드(SystemAdminGuard)가 2차 보호 담당
+ * AppScan XSS 테스트 대응: 루트 경로의 위험 문자 패턴/비정상 메소드 차단
  */
 export function middleware(request: NextRequest): NextResponse {
   const { pathname, searchParams } = request.nextUrl;
@@ -74,16 +61,6 @@ export function middleware(request: NextRequest): NextResponse {
         return badRequest();
       }
     }
-  }
-
-  const isProtected = SYSTEM_ADMIN_PATHS.some((path) => pathname.startsWith(path));
-  if (!isProtected) return NextResponse.next();
-
-  const isSystem = request.cookies.get("bo_is_system")?.value;
-  if (isSystem !== "true") {
-    const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/admin/dashboard";
-    return NextResponse.redirect(dashboardUrl);
   }
 
   return NextResponse.next();

@@ -35,9 +35,6 @@ api.interceptors.request.use(
     if (siteId) {
       config.headers["X-Site-Id"] = String(siteId);
     }
-    if (typeof window !== "undefined") {
-      config.headers["X-Menu-Path"] = window.location.pathname.replace(/^\/bo/, "");
-    }
     return config;
   },
   (error) => Promise.reject(error)
