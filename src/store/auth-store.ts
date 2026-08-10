@@ -74,10 +74,7 @@ export const useAuthStore = create<AuthState>((set) => ({
                 document.cookie = `bo_is_system=${adminInfo.isSystem}; path=/; SameSite=Strict`;
             }
         } catch {
-            set({ isLoggedIn: false, adminInfo: null, accessToken: null });
-            if (typeof window !== 'undefined') {
-                document.cookie = 'bo_is_system=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            }
+            // 실패해도 로그아웃 처리하지 않음
         }
     },
 }));
