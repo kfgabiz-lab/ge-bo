@@ -97,7 +97,7 @@ const MenuItemComponent = ({
         {!isCollapsed && <span className="truncate">{displayName}</span>}
       </div>
       {hasChildren && !isCollapsed && (
-        <span className="text-slate-600 flex-shrink-0">
+        <span className="text-slate-500 flex-shrink-0">
           {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </span>
       )}
@@ -205,9 +205,9 @@ export function Sidebar() {
                     {category.nameMsgKey ? t(category.nameMsgKey) : category.name}
                   </span>
                   {collapsedCategories.has(category.id) ? (
-                    <ChevronRight className="w-3 h-3 text-slate-600 group-hover:text-slate-500 transition-colors" />
+                    <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-slate-400 transition-colors" />
                   ) : (
-                    <ChevronDown className="w-3 h-3 text-slate-600 group-hover:text-slate-500 transition-colors" />
+                    <ChevronDown className="w-3 h-3 text-slate-500 group-hover:text-slate-400 transition-colors" />
                   )}
                 </button>
               )}
