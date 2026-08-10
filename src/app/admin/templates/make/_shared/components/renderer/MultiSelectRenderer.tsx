@@ -29,7 +29,7 @@ import { FieldRenderer } from "./FieldRenderer";
 import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from "./types";
 import type { SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { flattenPageDataItem, evalConditionExpr, formatFetchedRelValue, formatFetchedRelMulti } from "../../utils";
+import { flattenPageDataItem, evalConditionExpr, formatFetchedRelValue, extractFetchedRelItems } from "../../utils";
 import { PortalDropdown } from "@/components/ui/portal-dropdown";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
 
@@ -153,12 +153,9 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
 function buildLabel(item: OptionItem, widget: MultiSelectWidget): string {
   const outerRelationIds = widget.contentRelation?.outer?.relationIds;
   if (outerRelationIds && outerRelationIds.length > 0) {
-    const relMultiLabel = formatFetchedRelMulti(
-      item as Record<string, unknown>,
-      outerRelationIds,
-      undefined,
-      "ONE_LINE"
-    );
+    const relMultiLabel = outerRelationIds
+      .flatMap((id) => extractFetchedRelItems(item as Record<string, unknown>, id, undefined))
+      .join(" > ");
     if (relMultiLabel) return relMultiLabel;
   }
   if ((widget.sourceMode ?? "call") === "relation" && widget.sourceRelationSlugId) {
