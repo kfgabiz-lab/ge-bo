@@ -287,6 +287,20 @@ export function MultiSelectBuilder({
   const slugRelations = useSlugRelations();
   const sourceRelations = slugRelations.filter((r) => r.relationDir === "FETCH");
 
+  const contentRelationSlug =
+    (widget.sourceMode ?? "call") === "relation"
+      ? (sourceRelations.find((r) => r.id === widget.sourceRelationSlugId)?.masterSlug ?? "")
+      : (widget.sourceSlug ?? "");
+  const contentRelationCandidates = slugRelations.filter((r) => r.masterSlug === contentRelationSlug);
+
+  const toggleOuterContentRelation = (relationId: number) => {
+    const cr = widget.contentRelation ?? {};
+    const current = cr.outer?.relationIds ?? [];
+    const next = current.includes(relationId) ? current.filter((id) => id !== relationId) : [...current, relationId];
+    const nextCr = { ...cr, outer: next.length > 0 ? { relationIds: next } : undefined };
+    onChange({ ...widget, contentRelation: nextCr.inner || nextCr.outer ? nextCr : undefined });
+  };
+
   /* ── 이 컨텐츠(MultiSelect)가 실제로 연결된 Entity 기준 필드 목록 ──
        widget.connectedSlug(이 MultiSelect 자체의 연결 Entity)가 없으면 위젯 최상위 연결 Entity(connDefaultSlug)로 자연 폴백한다.
        추가 입력 필드 Key selectbox 옵션은 위젯 최상위가 아니라 이 값을 기준으로 구성해야 한다. */
@@ -430,6 +444,37 @@ export function MultiSelectBuilder({
             placeholder="예: status=1,type=Y"
             className={INPUT_CLS}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">컨텐츠 레벨 relation</p>
+          <div>
+            <label className={LABEL_CLS}>outer (FETCH 실행 범위, 다중)</label>
+            {contentRelationCandidates.length === 0 ? (
+              <p className="text-[10px] text-slate-400 italic px-1">연결 가능한 relation이 없습니다.</p>
+            ) : (
+              <div className="border border-slate-200 rounded overflow-hidden">
+                {contentRelationCandidates.map((r) => (
+                  <label
+                    key={r.id}
+                    className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={(widget.contentRelation?.outer?.relationIds ?? []).includes(r.id)}
+                      onChange={() => toggleOuterContentRelation(r.id)}
+                      className="accent-slate-900 w-3.5 h-3.5 flex-shrink-0"
+                    />
+                    <span className="text-xs text-slate-700 truncate">
+                      {r.description
+                        ? `${r.description} (${r.masterSlug} → ${r.slaveSlug})`
+                        : `${r.masterSlug} → ${r.slaveSlug}`}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

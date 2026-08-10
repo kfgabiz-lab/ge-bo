@@ -301,6 +301,10 @@ export interface MultiSelectWidget {
    *  `_fetchedRel{sourceRelationSlugId}` 값(카테고리 계층 relation이면 BE가 categoryDepth/categoryDepthFrom 기준으로
    *  " > "로 합쳐서 내려준 문자열)을 그대로 사용한다 */
   sourceRelationSlugId?: number;
+  contentRelation?: {
+    inner?: { relationId: number };
+    outer?: { relationIds: number[] };
+  };
   /** 저장 시 연결되는 slug (연결 slug) */
   connectedSlug?: string;
   /** 표시 텍스트 필드 키 — 쉼표 구분, 순서대로 ' > '로 연결 (예: "name,dept")

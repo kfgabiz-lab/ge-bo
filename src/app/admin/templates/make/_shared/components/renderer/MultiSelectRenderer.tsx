@@ -29,7 +29,7 @@ import { FieldRenderer } from "./FieldRenderer";
 import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from "./types";
 import type { SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { flattenPageDataItem, evalConditionExpr, formatFetchedRelValue } from "../../utils";
+import { flattenPageDataItem, evalConditionExpr, formatFetchedRelValue, formatFetchedRelMulti } from "../../utils";
 import { PortalDropdown } from "@/components/ui/portal-dropdown";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
 
@@ -106,14 +106,22 @@ const inFlightSourceRequests = new Map<string, Promise<SourceRow[]>>();
  * - 캐시 키에 depth 범위를 포함시켜, 같은 slug라도 depth 조건이 다른 위젯끼리
  *   요청/응답이 섞이지 않도록 한다.
  */
-function fetchSourceRows(slug: string, depthGte?: number, depthLte?: number): Promise<SourceRow[]> {
-  const cacheKey = `${slug}|${depthGte ?? ""}|${depthLte ?? ""}`;
+function fetchSourceRows(
+  slug: string,
+  depthGte?: number,
+  depthLte?: number,
+  fetchRelationIds?: number[],
+  innerRelationId?: number
+): Promise<SourceRow[]> {
+  const cacheKey = `${slug}|${depthGte ?? ""}|${depthLte ?? ""}|${fetchRelationIds?.join(",") ?? ""}|${innerRelationId ?? ""}`;
   const cached = inFlightSourceRequests.get(cacheKey);
   if (cached) return cached;
 
-  const params: Record<string, number> = { size: 9999 };
+  const params: Record<string, number | string> = { size: 9999 };
   if (depthGte !== undefined) params.depth_gte = depthGte;
   if (depthLte !== undefined) params.depth_lte = depthLte;
+  if (fetchRelationIds && fetchRelationIds.length > 0) params.fetchRelationIds = fetchRelationIds.join(",");
+  if (innerRelationId !== undefined) params[`innerRel_${innerRelationId}`] = String(innerRelationId);
 
   const request = api
     .get(`/page-data/${slug}`, { params })
@@ -143,6 +151,16 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
  *   다건 매칭(배열)이면 formatFetchedRelValue 공통함수로 구분자 합침 (TableCellRenderer와 동일 패턴)
  * - sourceMode='call'(기본): labelFields로 지정한 필드들을 dot notation으로 읽어 ' > '로 연결 (기존 동작 그대로) */
 function buildLabel(item: OptionItem, widget: MultiSelectWidget): string {
+  const outerRelationIds = widget.contentRelation?.outer?.relationIds;
+  if (outerRelationIds && outerRelationIds.length > 0) {
+    const relMultiLabel = formatFetchedRelMulti(
+      item as Record<string, unknown>,
+      outerRelationIds,
+      undefined,
+      "ONE_LINE"
+    );
+    if (relMultiLabel) return relMultiLabel;
+  }
   if ((widget.sourceMode ?? "call") === "relation" && widget.sourceRelationSlugId) {
     const raw = item[`_fetchedRel${widget.sourceRelationSlugId}`];
     if (Array.isArray(raw)) {
@@ -231,6 +249,9 @@ export function MultiSelectRenderer({
      호출 모드는 depth 자동 적용 대상이 아니므로 항상 undefined(기존 동작 그대로 유지) */
   const depthGte = sourceMode === "relation" ? selectedRelation?.categoryDepth : undefined;
   const depthLte = sourceMode === "relation" ? selectedRelation?.categoryDepth : undefined;
+  const outerRelationIds = widget.contentRelation?.outer?.relationIds;
+  const outerRelationIdsKey = outerRelationIds?.join(",") ?? "";
+  const innerRelationId = widget.contentRelation?.inner?.relationId;
 
   /* ── 상태 ── */
   const [liveOptions, setOptions] = useState<OptionItem[]>([]);
@@ -254,7 +275,7 @@ export function MultiSelectRenderer({
            FETCH relation을 자동 병합(_fetchedRel{id})해 내려주므로 조회 로직 자체는 동일하다
            동일 slug를 쓰는 다른 위젯 인스턴스와 요청 자체는 fetchSourceRows에서 공유하되,
            필터링(sourceFilter)은 아래에서 이 인스턴스가 개별적으로 수행한다 */
-    fetchSourceRows(effectiveSourceSlug, depthGte, depthLte)
+    fetchSourceRows(effectiveSourceSlug, depthGte, depthLte, outerRelationIds, innerRelationId)
       .then((rows) => {
         if (cancelled) return;
         /* flattenPageDataItem으로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */
@@ -282,7 +303,7 @@ export function MultiSelectRenderer({
     return () => {
       cancelled = true;
     };
-  }, [isPreview, effectiveSourceSlug, widget.sourceFilter, depthGte, depthLte]);
+  }, [isPreview, effectiveSourceSlug, widget.sourceFilter, depthGte, depthLte, outerRelationIdsKey, innerRelationId]);
 
   /* ── live: 외부 selectedIds 동기화 ── */
   useEffect(() => {
