@@ -5,14 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
-// import { Layers } from 'lucide-react'; /* 기존 로고 — 원복 시 주석 해제 */
 import * as LucideIcons from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { useMenuStore, MenuItem as DbMenu } from "@/store/use-menu-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 
-/* ── 아이콘 동적 렌더러 ── */
 const renderIcon = (name: string, className = "w-4 h-4") => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Icon = (LucideIcons as any)[name] as React.ComponentType<{ className?: string }> | undefined;
@@ -20,7 +18,6 @@ const renderIcon = (name: string, className = "w-4 h-4") => {
   return <Icon className={className} />;
 };
 
-/* ── 메뉴 아이템 ── */
 const MenuItemComponent = ({
   item,
   depth = 0,
@@ -34,12 +31,10 @@ const MenuItemComponent = ({
   const router = useRouter();
   const { t } = useI18n();
   const confirmLeave = useLeaveCheckStore((s) => s.confirmLeave);
-  /* nameMsgKey 있으면 locale-aware 텍스트, 없으면 name 컬럼 fallback */
   const displayName = item.nameMsgKey ? t(item.nameMsgKey) : item.name;
   const hasChildren = item.children && item.children.length > 0;
   const hasUrl = item.url && item.url.length > 0;
 
-  /* 활성 상태 판단 */
   const isDirectActive = hasUrl && item.url === pathname;
   const isChildActive =
     hasChildren &&
@@ -51,14 +46,12 @@ const MenuItemComponent = ({
   const isActive = isDirectActive || isChildActive;
   const [isOpen, setIsOpen] = useState(isActive ?? false);
 
-  /* 경로 변경 시 활성 메뉴 자동 열기 (렌더링 중 상태 조정: set-state-in-effect 회피) */
   const [prevIsActive, setPrevIsActive] = useState(isActive);
   if (isActive !== prevIsActive) {
     setPrevIsActive(isActive);
     if (isActive) setIsOpen(true);
   }
 
-  /* 비노출 메뉴는 렌더링하지 않음 — 상위가 숨김이면 children도 자동으로 숨겨짐 (hook 호출 이후로 이동: rules-of-hooks) */
   if (!item.visible) return null;
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -68,7 +61,6 @@ const MenuItemComponent = ({
     }
   };
 
-  /* 이탈체크 가드 — isDirty 상태에서 다른 메뉴 클릭 시 confirm */
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
     if (!confirmLeave) return;
     e.preventDefault();
@@ -133,18 +125,15 @@ const MenuItemComponent = ({
   );
 };
 
-/* ── 사이드바 ── */
 export function Sidebar() {
   const adminInfo = useAuthStore((state) => state.adminInfo);
   const accessToken = useAuthStore((state) => state.accessToken);
   const { navMenus: rawMenus, fetchNavMenus, isSidebarCollapsed, toggleSidebar } = useMenuStore();
   const { t } = useI18n();
 
-  /* SYSTEM_ADMIN이 아니면 isSystem=true 메뉴 제외 */
   const isSystemAdmin = adminInfo?.role === "SYSTEM_ADMIN";
   const menus = isSystemAdmin ? rawMenus : rawMenus.filter((cat) => !cat.isSystem);
 
-  /* 카테고리별 접기 상태 (id Set) */
   const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set());
 
   const toggleCategory = (id: number) => {
@@ -156,7 +145,6 @@ export function Sidebar() {
     });
   };
 
-  /* 메뉴가 처음 로드될 때(0 → N개) 모든 카테고리를 접힌 상태로 초기화 (렌더링 중 상태 조정: set-state-in-effect 회피) */
   const [prevMenusLength, setPrevMenusLength] = useState(0);
   if (menus.length !== prevMenusLength) {
     if (prevMenusLength === 0 && menus.length > 0) {
@@ -165,7 +153,6 @@ export function Sidebar() {
     setPrevMenusLength(menus.length);
   }
 
-  /* 메뉴 조회 (로그인 후) */
   useEffect(() => {
     if (!accessToken) return;
     fetchNavMenus();
@@ -175,26 +162,17 @@ export function Sidebar() {
     <aside
       className={`h-screen bg-[#161929] text-slate-400 flex flex-col fixed left-0 top-0 border-r border-white/[0.04] z-50 transition-all duration-300 ${isSidebarCollapsed ? "w-[70px]" : "w-[220px]"}`}
     >
-      {/* 로고 */}
       <div
         className="h-14 flex items-center gap-2.5 px-4 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.02]"
         onClick={toggleSidebar}
       >
-        {/* 기존 로고 — 원복 시 주석 해제
-                <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-br from-emerald-400 to-blue-500 rounded-sm flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                    <Layers className="w-4 h-4 text-white" />
-                </div>
-                {!isSidebarCollapsed && <span className="text-white font-extrabold text-[14px] tracking-tight truncate">WORKSPACE</span>}
-                */}
         {!isSidebarCollapsed && <img src="/bo/ls-electric-logo.png" alt="LS ELECTRIC" className="h-5 w-auto" />}
       </div>
 
-      {/* 네비게이션 — DB 메뉴 기반 */}
       <nav className="flex-1 py-4 px-2.5 overflow-y-auto space-y-4">
         {menus
           .filter((cat) => cat.visible !== false)
           .map((category) => (
-            /* 1depth 메뉴는 모두 카테고리 헤더 + 하위 메뉴 형태로 렌더링 */
             <div key={category.id}>
               {!isSidebarCollapsed && (
                 <button
@@ -222,7 +200,6 @@ export function Sidebar() {
           ))}
       </nav>
 
-      {/* 유저 프로필 */}
       <div className={`p-3 border-t border-white/[0.04] ${isSidebarCollapsed ? "flex justify-center" : ""}`}>
         <div
           className={`flex items-center gap-2.5 ${isSidebarCollapsed ? "px-0 justify-center" : "px-2"} py-2 rounded-lg hover:bg-white/[0.04] transition-all cursor-pointer`}
