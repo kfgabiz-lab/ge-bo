@@ -1,7 +1,7 @@
-﻿'use client';
+﻿"use client";
 
-import { Edit2, Trash2, Lock } from 'lucide-react';
-import { Role } from '@/store/use-role-store';
+import { Edit2, Trash2, Lock } from "lucide-react";
+import { Role } from "@/store/use-role-store";
 
 interface RoleCardProps {
   role: Role;
@@ -26,12 +26,10 @@ export const RoleCard = ({ role, onEdit, onDelete }: RoleCardProps) => {
         )}
       </div>
 
-      {/* 표시명 + 설명 */}
+      {/* 권한명 + 설명 */}
       <div className="flex-1">
         <p className="text-sm font-semibold text-[#111827]">{role.displayName}</p>
-        {role.description && (
-          <p className="text-xs text-[#9ca3af] mt-1 line-clamp-2">{role.description}</p>
-        )}
+        {role.description && <p className="text-xs text-[#9ca3af] mt-1 line-clamp-2">{role.description}</p>}
       </div>
 
       {/* 하단: 인원 수 + 액션 */}
@@ -54,8 +52,8 @@ export const RoleCard = ({ role, onEdit, onDelete }: RoleCardProps) => {
             disabled={role.isSystem}
             className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
               role.isSystem
-                ? 'text-[#d1d5db] cursor-not-allowed'
-                : 'text-[#6b7280] hover:text-[#ef4444] hover:bg-[#fef2f2]'
+                ? "text-[#d1d5db] cursor-not-allowed"
+                : "text-[#6b7280] hover:text-[#ef4444] hover:bg-[#fef2f2]"
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
