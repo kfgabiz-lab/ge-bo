@@ -68,7 +68,7 @@ const MenuItemComponent = ({
     router.push(url);
   };
 
-  const base = `relative flex items-center justify-between gap-2.5 py-2 pr-3 rounded-lg transition-all duration-150 text-[13px] group ${depth > 0 && !isCollapsed ? "pl-9" : "pl-3"} ${isCollapsed ? "justify-center pr-0" : ""}`;
+  const base = `relative flex items-center justify-between gap-2.5 py-2 pr-3 rounded-lg transition-all duration-150 text-sm group ${depth > 0 && !isCollapsed ? "pl-9" : "pl-3"} ${isCollapsed ? "justify-center pr-0" : ""}`;
   const style = isActive
     ? "bg-white/[0.08] text-white font-medium"
     : depth === 0
@@ -163,10 +163,14 @@ export function Sidebar() {
       className={`h-screen bg-[#161929] text-slate-400 flex flex-col fixed left-0 top-0 border-r border-white/[0.04] z-50 transition-all duration-300 ${isSidebarCollapsed ? "w-[70px]" : "w-[220px]"}`}
     >
       <div
-        className="h-14 flex items-center gap-2.5 px-4 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.02]"
+        className={`h-14 flex items-center gap-2.5 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.02] ${isSidebarCollapsed ? "justify-center px-0" : "px-4"}`}
         onClick={toggleSidebar}
       >
-        {!isSidebarCollapsed && <img src="/bo/ls-electric-logo.png" alt="LS ELECTRIC" className="h-5 w-auto" />}
+        {isSidebarCollapsed ? (
+          <ChevronRight className="w-4 h-4 text-slate-400" />
+        ) : (
+          <img src="/bo/ls-electric-logo.png" alt="LS ELECTRIC" className="h-5 w-auto" />
+        )}
       </div>
 
       <nav className="flex-1 py-4 px-2.5 overflow-y-auto space-y-4">
@@ -179,7 +183,7 @@ export function Sidebar() {
                   onClick={() => toggleCategory(category.id)}
                   className="w-full flex items-center justify-between mb-2 px-3 group"
                 >
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-400 transition-colors">
+                  <span className="text-sm font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-400 transition-colors">
                     {category.nameMsgKey ? t(category.nameMsgKey) : category.name}
                   </span>
                   {collapsedCategories.has(category.id) ? (

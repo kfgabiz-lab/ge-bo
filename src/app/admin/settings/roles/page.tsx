@@ -77,7 +77,7 @@ export default function RolesSystemPage() {
             {
               id: "f1",
               type: "input",
-              label: t("common.label.displayName"),
+              label: t("role.label.name"),
               colSpan: 1,
               placeholder: t("role.placeholder.search"),
             },
@@ -131,7 +131,7 @@ export default function RolesSystemPage() {
         },
         {
           id: "c2",
-          header: t("common.label.displayName"),
+          header: t("role.label.name"),
           accessor: "displayName",
           cellType: "text",
           align: "left",

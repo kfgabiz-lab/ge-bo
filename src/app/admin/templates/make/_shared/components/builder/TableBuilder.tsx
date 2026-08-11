@@ -475,7 +475,7 @@ export function TableBuilder({
     <div className="space-y-2 pt-1">
       {/* 표시 방식 */}
       <div>
-        <label className="text-[10px] font-medium text-slate-500 mb-1 block">표시 방식</label>
+        <label className="text-sm font-medium text-slate-500 mb-1 block">표시 방식</label>
         <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md">
           {(["pagination", "scroll"] as const).map((m) => (
             <button
@@ -493,7 +493,7 @@ export function TableBuilder({
       {/* Key | 연결 Slug — 2열 그리드 */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+          <label className="text-sm font-medium text-slate-500 mb-1 block">
             Key <span className="text-red-400">*</span>
           </label>
           <input
@@ -515,7 +515,7 @@ export function TableBuilder({
 
       {/* 페이지당 건수 */}
       <div>
-        <label className="text-[10px] font-medium text-slate-500 mb-1 block">페이지당 건수</label>
+        <label className="text-sm font-medium text-slate-500 mb-1 block">페이지당 건수</label>
         {(widget.displayMode ?? "pagination") === "pagination" ? (
           <input
             type="number"
@@ -532,7 +532,7 @@ export function TableBuilder({
 
       {/* 체크박스 */}
       <div>
-        <label className="text-[10px] font-medium text-slate-500 mb-1 block">체크박스</label>
+        <label className="text-sm font-medium text-slate-500 mb-1 block">체크박스</label>
         <ToggleRow
           label={widget.enableRowSelection ? "사용" : "미사용"}
           value={widget.enableRowSelection ?? false}
@@ -544,7 +544,7 @@ export function TableBuilder({
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">컨텐츠 레벨 relation</p>
 
         <div>
-          <label className="text-[10px] font-medium text-slate-500 mb-1 block">inner (매칭 필터링, 단일)</label>
+          <label className="text-sm font-medium text-slate-500 mb-1 block">inner (매칭 필터링, 단일)</label>
           <select
             value={widget.contentRelation?.inner?.relationId ?? ""}
             onChange={(e) => setInnerContentRelation(e.target.value ? Number(e.target.value) : null)}
@@ -562,7 +562,7 @@ export function TableBuilder({
         </div>
 
         <div>
-          <label className="text-[10px] font-medium text-slate-500 mb-1 block">outer (FETCH 실행 범위, 다중)</label>
+          <label className="text-sm font-medium text-slate-500 mb-1 block">outer (FETCH 실행 범위, 다중)</label>
           {contentRelationCandidates.length === 0 ? (
             <p className="text-[10px] text-slate-400 italic px-1">연결 가능한 relation이 없습니다.</p>
           ) : (
@@ -647,7 +647,7 @@ export function TableBuilder({
               /* Phase 1: 셀 타입 선택 */
               <>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-semibold text-slate-500">셀 타입 선택</span>
+                  <span className="text-sm font-semibold text-slate-500">셀 타입 선택</span>
                   <button onClick={() => setPendingCol(null)} className="text-slate-400 hover:text-slate-600">
                     <X className="w-3 h-3" />
                   </button>
@@ -671,7 +671,7 @@ export function TableBuilder({
                     <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">
                       {pendingCol.cellType}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-500">컬럼 설정</span>
+                    <span className="text-sm font-semibold text-slate-500">컬럼 설정</span>
                   </div>
                   <button
                     onClick={() => setPendingCol((prev) => ({ ...prev!, cellType: undefined }))}

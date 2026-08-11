@@ -14,8 +14,8 @@
 
 import { LABEL_CLS, INPUT_CLS } from "./fields/_FieldBase";
 import { SlugSelectField } from "./fields";
-import { MessageKeySelector } from '@/components/i18n/message-key-selector';
-import { useBuilderI18nMode } from '../../contexts/BuilderI18nModeContext';
+import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { useBuilderI18nMode } from "../../contexts/BuilderI18nModeContext";
 import type { TabWidget, TabItem } from "../renderer/types";
 import type { TemplateItem } from "../../types";
 
@@ -90,7 +90,7 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
         {tabs.map((tab, idx) => (
           <div key={tab.id} className="border border-slate-200 rounded p-2 space-y-2 bg-slate-50">
             {/* 탭 번호 헤더 */}
-            <p className="text-[10px] font-semibold text-slate-500">탭 {idx + 1}</p>
+            <p className="text-sm font-semibold text-slate-500">탭 {idx + 1}</p>
 
             {/* 라벨 | key — 한 줄 배치 */}
             <div className="flex gap-2">
@@ -100,8 +100,8 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
                 </label>
                 {i18nMode ? (
                   <MessageKeySelector
-                    value={tab.labelMsgKey ?? ''}
-                    onChange={key => handleTabChange(idx, { labelMsgKey: key || undefined })}
+                    value={tab.labelMsgKey ?? ""}
+                    onChange={(key) => handleTabChange(idx, { labelMsgKey: key || undefined })}
                     resourceType="WORD"
                     size="sm"
                   />
@@ -116,13 +116,15 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
                 )}
               </div>
               <div className="w-24">
-                <label className={LABEL_CLS}>key <span className="text-red-400">*</span></label>
+                <label className={LABEL_CLS}>
+                  key <span className="text-red-400">*</span>
+                </label>
                 <input
                   type="text"
                   value={tab.contentKey ?? ""}
                   onChange={(e) => handleTabChange(idx, { contentKey: e.target.value || undefined })}
                   placeholder={`tab_${idx + 1}`}
-                  className={`${INPUT_CLS} ${!tab.contentKey ? 'border-red-300' : ''}`}
+                  className={`${INPUT_CLS} ${!tab.contentKey ? "border-red-300" : ""}`}
                 />
               </div>
             </div>
@@ -133,7 +135,7 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
                 <SlugSelectField
                   label="연결 페이지"
                   value={tab.pageSlug ?? ""}
-                  onChange={slug => handleTabChange(idx, { pageSlug: slug })}
+                  onChange={(slug) => handleTabChange(idx, { pageSlug: slug })}
                   slugOptions={pageTemplates}
                   emptyLabel="-- 연결 없음 --"
                 />
@@ -161,7 +163,6 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
                 </div>
               )}
             </div>
-
           </div>
         ))}
       </div>

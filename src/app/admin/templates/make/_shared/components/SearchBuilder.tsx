@@ -800,7 +800,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                   <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded font-mono">
                                     {pendingType}
                                   </span>
-                                  <span className="text-[10px] font-semibold text-slate-500">필드 설정</span>
+                                  <span className="text-sm font-semibold text-slate-500">필드 설정</span>
                                 </div>
                                 <button onClick={cancelAddField} className="text-slate-400 hover:text-slate-600">
                                   <X className="w-3.5 h-3.5" />

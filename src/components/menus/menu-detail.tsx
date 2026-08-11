@@ -335,7 +335,7 @@ function MenuForm({
     <div className={wrapperClassName}>
       {/* 메뉴 타입 (폴더 ↔ 프로그램) */}
       <div>
-        <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t("common.label.type")}</label>
+        <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t("common.label.type")}</label>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -372,7 +372,7 @@ function MenuForm({
       {/* 메뉴명 — i18nMode에 따라 다국어 키 선택 ↔ 직접 입력 전환 */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-xs font-medium text-slate-600 flex items-center gap-1">
+          <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
             {t("menu.label.name")}
             <span className="text-red-500">*</span>
           </label>
@@ -411,7 +411,7 @@ function MenuForm({
       {/* URL */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-xs font-medium text-slate-600">URL</label>
+          <label className="text-sm font-medium text-slate-600">URL</label>
           <TemplateUrlPicker onSelect={onTemplateSelect} />
         </div>
         <input
@@ -440,9 +440,9 @@ function MenuForm({
 
       {/* 메뉴 설명 — i18nMode에 따라 다국어 키 선택 ↔ 직접 입력 전환 */}
       <div>
-        <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+        <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-1">
           {t("common.label.description")}
-          <span className="ml-1.5 text-[10px] text-slate-400 font-normal">{t("common.field.optional")}</span>
+          <span className="ml-1.5 text-sm text-slate-400 font-normal">{t("common.field.optional")}</span>
         </label>
         {i18nMode ? (
           <MessageKeySelector value={descriptionMsgKey} onChange={onDescriptionMsgKeyChange} />
@@ -462,9 +462,9 @@ function MenuForm({
       {showMeta && (
         <>
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+            <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-1">
               Meta Title
-              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">50~60자 사이로 입력해 주세요.</span>
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">최대 150자로 입력해 주세요.</span>
             </label>
             <input
               type="text"
@@ -472,17 +472,17 @@ function MenuForm({
               onChange={(e) => onMetaTitleChange(e.target.value)}
               className={inputCls("")}
               placeholder="Meta Title"
-              maxLength={60}
+              maxLength={150}
             />
             <div className="flex items-center justify-end mt-1">
-              <span className="text-xs text-slate-400">{metaTitle.length}/60</span>
+              <span className="text-xs text-slate-400">{metaTitle.length}/150</span>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+            <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-1">
               Meta Description
-              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">150~160자 사이로 입력해 주세요.</span>
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">최대 180자 이하로 입력해 주세요.</span>
             </label>
             <textarea
               value={metaDescription}
@@ -490,10 +490,10 @@ function MenuForm({
               className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none"
               rows={3}
               placeholder="Meta Description"
-              maxLength={160}
+              maxLength={180}
             />
             <div className="flex items-center justify-end mt-1">
-              <span className="text-xs text-slate-400">{metaDescription.length}/160</span>
+              <span className="text-xs text-slate-400">{metaDescription.length}/180</span>
             </div>
           </div>
         </>
@@ -502,11 +502,11 @@ function MenuForm({
       {/* 아이콘 + 정렬 순서 + 노출 여부 — 3컬럼 */}
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t("common.label.icon")}</label>
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t("common.label.icon")}</label>
           <IconPicker value={icon} onChange={onIconChange} />
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t("common.label.sortOrder")}</label>
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t("common.label.sortOrder")}</label>
           <input
             ref={sortRef}
             type="number"
@@ -519,7 +519,7 @@ function MenuForm({
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t("common.label.visible")}</label>
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t("common.label.visible")}</label>
           <button
             type="button"
             onClick={() => onVisibleChange(!visible)}
