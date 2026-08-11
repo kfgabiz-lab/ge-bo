@@ -464,7 +464,7 @@ function MenuForm({
           <div>
             <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
               Meta Title
-              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">50~60자 사이로 입력해 주세요.</span>
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">최대 150자로 입력해 주세요.</span>
             </label>
             <input
               type="text"
@@ -472,17 +472,17 @@ function MenuForm({
               onChange={(e) => onMetaTitleChange(e.target.value)}
               className={inputCls("")}
               placeholder="Meta Title"
-              maxLength={60}
+              maxLength={150}
             />
             <div className="flex items-center justify-end mt-1">
-              <span className="text-xs text-slate-400">{metaTitle.length}/60</span>
+              <span className="text-xs text-slate-400">{metaTitle.length}/150</span>
             </div>
           </div>
 
           <div>
             <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
               Meta Description
-              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">150~160자 사이로 입력해 주세요.</span>
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">최대 180자 이하로 입력해 주세요.</span>
             </label>
             <textarea
               value={metaDescription}
@@ -490,10 +490,10 @@ function MenuForm({
               className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 resize-none"
               rows={3}
               placeholder="Meta Description"
-              maxLength={160}
+              maxLength={180}
             />
             <div className="flex items-center justify-end mt-1">
-              <span className="text-xs text-slate-400">{metaDescription.length}/160</span>
+              <span className="text-xs text-slate-400">{metaDescription.length}/180</span>
             </div>
           </div>
         </>
