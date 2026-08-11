@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useCallback, useEffect, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Youtube from "@tiptap/extension-youtube";
@@ -39,7 +39,46 @@ import {
   FileText,
   Eye,
   X,
+  ArrowUpToLine,
+  ArrowDownToLine,
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  Trash2,
+  PaintBucket,
+  Eraser,
 } from "lucide-react";
+
+const TableCellWithBackground = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.backgroundColor || null,
+        renderHTML: (attributes: { backgroundColor?: string | null }) => {
+          if (!attributes.backgroundColor) return {};
+          return { style: `background-color: ${attributes.backgroundColor}` };
+        },
+      },
+    };
+  },
+});
+
+const TableHeaderWithBackground = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      backgroundColor: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.style.backgroundColor || null,
+        renderHTML: (attributes: { backgroundColor?: string | null }) => {
+          if (!attributes.backgroundColor) return {};
+          return { style: `background-color: ${attributes.backgroundColor}` };
+        },
+      },
+    };
+  },
+});
 
 /* ─────────────────────────────────────────────
    Props 인터페이스 — wysiwyg-editor.tsx와 동일하게 유지
@@ -130,7 +169,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
           {tab === "url" ? (
             <>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">이미지 URL</label>
+                <label className="block text-sm text-slate-500 mb-1">이미지 URL</label>
                 <input
                   type="text"
                   value={urlInput}
@@ -142,7 +181,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">대체 텍스트 (선택)</label>
+                <label className="block text-sm text-slate-500 mb-1">대체 텍스트 (선택)</label>
                 <input
                   type="text"
                   value={altInput}
@@ -172,7 +211,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
           ) : (
             <>
               <div>
-                <label className="block text-xs text-slate-500 mb-2">이미지 파일 선택</label>
+                <label className="block text-sm text-slate-500 mb-2">이미지 파일 선택</label>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                 <button
                   type="button"
@@ -230,7 +269,7 @@ function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProp
         </div>
         <div className="p-4 space-y-3">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">URL</label>
+            <label className="block text-sm text-slate-500 mb-1">URL</label>
             <input
               type="text"
               value={hrefInput}
@@ -323,7 +362,7 @@ interface PreviewPanelProps {
 function PreviewPanel({ html }: PreviewPanelProps) {
   return (
     <div className="border-t border-slate-200 p-3 bg-slate-50 max-h-64 overflow-y-auto">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">미리보기</p>
+      <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-2">미리보기</p>
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
@@ -355,6 +394,23 @@ function EditorToolbar({
   showPreview,
   onTogglePreview,
 }: EditorToolbarProps) {
+  const tableCommandState = useEditorState({
+    editor,
+    selector: ({ editor: snapshotEditor }) =>
+      snapshotEditor
+        ? {
+            canAddRowBefore: snapshotEditor.can().addRowBefore(),
+            canAddRowAfter: snapshotEditor.can().addRowAfter(),
+            canDeleteRow: snapshotEditor.can().deleteRow(),
+            canAddColumnBefore: snapshotEditor.can().addColumnBefore(),
+            canAddColumnAfter: snapshotEditor.can().addColumnAfter(),
+            canDeleteColumn: snapshotEditor.can().deleteColumn(),
+            canDeleteTable: snapshotEditor.can().deleteTable(),
+            isInTable: snapshotEditor.isActive("tableCell") || snapshotEditor.isActive("tableHeader"),
+          }
+        : null,
+  });
+
   if (!editor) return null;
 
   /* 현재 Heading 레벨 계산 */
@@ -379,6 +435,34 @@ function EditorToolbar({
   /* 3x3 헤더 포함 테이블 삽입 */
   const handleInsertTable = () => {
     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+  };
+
+  const handleAddRowBefore = () => {
+    editor.chain().focus().addRowBefore().run();
+  };
+
+  const handleAddRowAfter = () => {
+    editor.chain().focus().addRowAfter().run();
+  };
+
+  const handleDeleteRow = () => {
+    editor.chain().focus().deleteRow().run();
+  };
+
+  const handleAddColumnBefore = () => {
+    editor.chain().focus().addColumnBefore().run();
+  };
+
+  const handleAddColumnAfter = () => {
+    editor.chain().focus().addColumnAfter().run();
+  };
+
+  const handleDeleteColumn = () => {
+    editor.chain().focus().deleteColumn().run();
+  };
+
+  const handleDeleteTable = () => {
+    editor.chain().focus().deleteTable().run();
   };
 
   /* 유튜브 URL 입력 후 임베드 삽입 */
@@ -486,6 +570,68 @@ function EditorToolbar({
       <ToolbarButton onClick={handleInsertTable} title="테이블 삽입 (3×3)">
         <TableIcon size={14} />
       </ToolbarButton>
+
+      <ToolbarButton onClick={handleAddRowBefore} disabled={!tableCommandState?.canAddRowBefore} title="행 위에 추가">
+        <ArrowUpToLine size={14} />
+      </ToolbarButton>
+
+      <ToolbarButton onClick={handleAddRowAfter} disabled={!tableCommandState?.canAddRowAfter} title="행 아래에 추가">
+        <ArrowDownToLine size={14} />
+      </ToolbarButton>
+
+      <ToolbarButton onClick={handleDeleteRow} disabled={!tableCommandState?.canDeleteRow} title="행 삭제">
+        <Trash2 size={14} />
+      </ToolbarButton>
+
+      <ToolbarButton
+        onClick={handleAddColumnBefore}
+        disabled={!tableCommandState?.canAddColumnBefore}
+        title="열 왼쪽에 추가"
+      >
+        <ArrowLeftToLine size={14} />
+      </ToolbarButton>
+
+      <ToolbarButton
+        onClick={handleAddColumnAfter}
+        disabled={!tableCommandState?.canAddColumnAfter}
+        title="열 오른쪽에 추가"
+      >
+        <ArrowRightToLine size={14} />
+      </ToolbarButton>
+
+      <ToolbarButton onClick={handleDeleteColumn} disabled={!tableCommandState?.canDeleteColumn} title="열 삭제">
+        <Trash2 size={14} className="rotate-90" />
+      </ToolbarButton>
+
+      <ToolbarButton onClick={handleDeleteTable} disabled={!tableCommandState?.canDeleteTable} title="표 삭제">
+        <X size={14} />
+      </ToolbarButton>
+
+      <label
+        title="셀 배경색"
+        className="relative inline-flex items-center justify-center w-7 h-7 rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer transition-colors aria-disabled:opacity-40 aria-disabled:pointer-events-none aria-disabled:cursor-default"
+        aria-disabled={!tableCommandState?.isInTable}
+      >
+        <PaintBucket size={14} />
+        <input
+          type="color"
+          className="absolute opacity-0 w-px h-px pointer-events-none"
+          disabled={!tableCommandState?.isInTable}
+          onChange={(e) => {
+            editor.chain().focus().setCellAttribute("backgroundColor", e.target.value).run();
+          }}
+        />
+      </label>
+
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setCellAttribute("backgroundColor", null).run()}
+        disabled={!tableCommandState?.isInTable}
+        title="배경색 지우기"
+      >
+        <Eraser size={14} />
+      </ToolbarButton>
+
+      <ToolbarDivider />
 
       <ToolbarButton onClick={onImageOpen} title="이미지 삽입">
         <ImageIcon size={14} />
@@ -639,8 +785,8 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
       Subscript,
       Table.configure({ resizable: true }),
       TableRow,
-      TableHeader,
-      TableCell,
+      TableHeaderWithBackground,
+      TableCellWithBackground,
     ],
     content: initialValue,
     onUpdate: ({ editor: updatedEditor }) => {
