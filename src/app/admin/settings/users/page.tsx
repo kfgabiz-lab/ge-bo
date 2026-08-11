@@ -97,12 +97,11 @@ export default function AdminAccountsPage() {
               label: t("common.label.isActive"),
               colSpan: 1,
               /* 내부값: 'all'/'true'/'false' */
-              options: ["all", "true", "false"],
-              optionLabels: {
-                all: t("common.label.all"),
-                true: t("common.status.active"),
-                false: t("common.status.inactive"),
-              },
+              options: [
+                `${t("common.label.all")}:all`,
+                `${t("common.status.active")}:true`,
+                `${t("common.status.inactive")}:false`,
+              ],
             },
           ],
         },

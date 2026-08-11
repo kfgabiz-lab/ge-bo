@@ -248,11 +248,7 @@ export default function AdminDetailPage() {
           rowSpan: 1,
           required: true,
           fieldKey: "isActive",
-          options: ["true", "false"],
-          optionLabels: {
-            true: t("common.status.active"),
-            false: t("common.status.inactive"),
-          },
+          options: [`${t("common.status.active")}:true`, `${t("common.status.inactive")}:false`],
         },
         /* 4행: 비고 */
         {
