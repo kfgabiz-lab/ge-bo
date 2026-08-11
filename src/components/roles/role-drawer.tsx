@@ -17,7 +17,7 @@ const roleSchema = z.object({
     .min(2, "역할 코드는 2자 이상이어야 합니다.")
     .max(30, "역할 코드는 30자 이하여야 합니다.")
     .regex(/^[A-Z0-9_]+$/, "영문 대문자, 숫자, _만 입력 가능합니다."),
-  displayName: z.string().min(1, "표시명을 입력해주세요.").max(20, "표시명은 20자 이하여야 합니다."),
+  displayName: z.string().min(1, "권한명을 입력해주세요.").max(20, "권한명은 20자 이하여야 합니다."),
   description: z.string().max(100, "설명은 100자 이하여야 합니다.").optional(),
   color: z.string().min(1, "색상을 선택해주세요."),
   isSystem: z.boolean().optional(),
@@ -95,7 +95,7 @@ export const RoleDrawer = () => {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8eaed]">
           <div>
             <h2 className="text-sm font-bold text-[#111827]">{selectedRole ? "역할 수정" : "역할 추가"}</h2>
-            <p className="text-sm text-[#9ca3af] mt-0.5">
+            <p className="text-xs text-[#9ca3af] mt-0.5">
               {selectedRole ? "역할 정보를 수정합니다" : "새로운 역할을 등록합니다"}
             </p>
           </div>
@@ -145,10 +145,10 @@ export const RoleDrawer = () => {
               )}
             </div>
 
-            {/* 표시명 */}
+            {/* 권한명 */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[#374151]">
-                표시명 <span className="text-red-500">*</span>
+              <label className="text-xs font-medium text-[#374151]">
+                권한명 <span className="text-red-500">*</span>
               </label>
               <input
                 {...register("displayName")}
@@ -219,10 +219,10 @@ export const RoleDrawer = () => {
               <div className="flex items-center gap-2.5">
                 <Shield className={`w-4 h-4 ${isSystem ? "text-[#4361ee]" : "text-[#9ca3af]"}`} />
                 <div className="text-left">
-                  <p className={`text-sm font-semibold ${isSystem ? "text-[#4361ee]" : "text-[#374151]"}`}>
+                  <p className={`text-xs font-semibold ${isSystem ? "text-[#4361ee]" : "text-[#374151]"}`}>
                     관리자 역할
                   </p>
-                  <p className="text-sm text-[#9ca3af] mt-0.5">
+                  <p className="text-[11px] text-[#9ca3af] mt-0.5">
                     {selectedRole ? "등록 후 변경할 수 없습니다." : "활성화 시 삭제 불가능한 관리자 역할로 등록됩니다"}
                   </p>
                 </div>
