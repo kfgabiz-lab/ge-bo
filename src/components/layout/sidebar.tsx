@@ -213,7 +213,7 @@ export function Sidebar() {
                 <p className="text-[12px] font-semibold text-slate-200 truncate">
                   {adminInfo?.name || "Administrator"}
                 </p>
-                <p className="text-[10px] text-slate-500 truncate">{adminInfo?.email || "-"}</p>
+                <p className="text-[10px] text-slate-500 truncate">{adminInfo?.roleDisplayName || "-"}</p>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
             </>
