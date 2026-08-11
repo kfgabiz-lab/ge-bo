@@ -1,378 +1,445 @@
-'use client';
+"use client";
 
 /**
  * FieldBase — 라벨|Key + ColSpan + (RowSpan) 공통 베이스
  * 모든 필드 컴포넌트(InputField, SelectField 등) 내부에서만 사용하는 내부 컴포넌트.
  */
 
-import React from 'react';
-import { ColSpanMode } from './types';
-import { ToggleRow } from './_ToggleRow';
-import { MessageKeySelector } from '@/components/i18n/message-key-selector';
-import { useBuilderI18nMode } from '../../../contexts/BuilderI18nModeContext';
+import React from "react";
+import { ColSpanMode } from "./types";
+import { ToggleRow } from "./_ToggleRow";
+import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { useBuilderI18nMode } from "../../../contexts/BuilderI18nModeContext";
 
 /** 필드 input 공통 클래스 */
-export const INPUT_CLS = 'w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900';
+export const INPUT_CLS =
+  "w-full border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-slate-900";
 /** 필드 라벨 공통 클래스 */
-export const LABEL_CLS = 'text-[10px] font-medium text-slate-500 mb-1 block';
+export const LABEL_CLS = "text-sm font-medium text-slate-500 mb-1 block";
 
 interface FieldBaseProps {
-    label: string;
-    fieldKey?: string;
-    colSpan: number;
-    colSpanMode: ColSpanMode;
-    /** dateRange 전용 두 번째 라벨 값 */
-    label2?: string;
-    /** dateRange 두 번째 라벨 다국어 키 */
-    label2MsgKey?: string;
-    /** dateRange 종료일 저장 Key — 미설정 시 시작일 Key + '_from'/'_to'로 자동유도 */
-    key2?: string;
-    /** true 시 라벨 텍스트가 "라벨 1"로 표시되고 라벨2 입력 영역 노출 */
-    showLabel2?: boolean;
-    rowSpan?: number;
-    rowSpanConfig?: { min: number; max: number };
-    autoFocus?: boolean;
-    /** 라벨 다국어 키 — 설정 시 MessageKeySelector 모드로 표시 */
-    labelMsgKey?: string;
-    /** 설명 다국어 키 */
-    descriptionMsgKey?: string;
-    /** 라벨 선택 입력 여부 — true 시 라벨 입력란의 * 숨김 */
-    labelOptional?: boolean;
-    /** 한 줄 배치 모드 (공간영역 등에서 사용) */
-    compact?: boolean;
-    /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
-    hideColSpan?: boolean;
-    /** hideCondition/disableCondition 입력란 숨김 — SubList 등 동적 조건 미지원 컨텍스트 */
-    hideConditionFields?: boolean;
-    /** 필수 항목 여부 — 모든 필드 공통 */
-    required?: boolean;
-    /** 라벨 하단 설명 텍스트 */
-    description?: string;
-    /** PK 여부 — colSpanMode.type === 'input'(Form) 일 때만 표시, 미전달 시 체크박스 숨김 */
-    isPk?: boolean;
-    /** 읽기 전용 여부 — Form 빌더(input 모드)일 때만 표시 */
-    readonly?: boolean;
-    /** 저장 컨펌 여부 — ActionButtonField에서만 전달, true 시 live 모드 클릭 시 confirm 창 */
-    saveConfirm?: boolean;
-    /** 동적 HIDE 조건 — Form 빌더(input 모드)일 때만 표시 */
-    hideCondition?: string;
-    /** 동적 Disable 조건 — Form 빌더(input 모드)일 때만 표시 */
-    disableCondition?: string;
-    /** 검색제외 — true 시 검색 API 파라미터에 포함하지 않음 (검색 모드에서만 표시) */
-    excludeFromSearch?: boolean;
-    /** Slug Entity 필드 목록 — 있을 때 Key 입력을 selectbox로 전환 (form 빌더 전용) */
-    slugEntityFields?: { key: string | null; label: string }[];
-    /** 라벨 오른쪽 슬롯 — 전달 시 Key가 아래 행으로 이동 (InputField의 연결 Slug용) */
-    labelSideSlot?: React.ReactNode;
-    /** Key 오른쪽 슬롯 — labelSideSlot 전달 시에만 나타나는 Data 입력 자리 (Key와 50:50 폭 공유) */
-    keySideSlot?: React.ReactNode;
-    /** Key 아래 전체 폭 슬롯 — keySideSlot 대신 사용, Key를 단독 row로 분리하고 그 아래 전체 폭으로 표시 (TextField의 출력방식+Data용) */
-    keySideSlotFullWidth?: React.ReactNode;
-    onChange: (updates: Partial<{ label: string; labelMsgKey: string | undefined; label2: string; label2MsgKey: string | undefined; fieldKey: string; fieldKey2: string | undefined; colSpan: number; rowSpan: number; required: boolean; isPk: boolean; readonly: boolean; saveConfirm: boolean; hideCondition: string | undefined; disableCondition: string | undefined; excludeFromSearch: boolean; description: string; descriptionMsgKey: string | undefined }>) => void;
-    onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-    children?: React.ReactNode;
+  label: string;
+  fieldKey?: string;
+  colSpan: number;
+  colSpanMode: ColSpanMode;
+  /** dateRange 전용 두 번째 라벨 값 */
+  label2?: string;
+  /** dateRange 두 번째 라벨 다국어 키 */
+  label2MsgKey?: string;
+  /** dateRange 종료일 저장 Key — 미설정 시 시작일 Key + '_from'/'_to'로 자동유도 */
+  key2?: string;
+  /** true 시 라벨 텍스트가 "라벨 1"로 표시되고 라벨2 입력 영역 노출 */
+  showLabel2?: boolean;
+  rowSpan?: number;
+  rowSpanConfig?: { min: number; max: number };
+  autoFocus?: boolean;
+  /** 라벨 다국어 키 — 설정 시 MessageKeySelector 모드로 표시 */
+  labelMsgKey?: string;
+  /** 설명 다국어 키 */
+  descriptionMsgKey?: string;
+  /** 라벨 선택 입력 여부 — true 시 라벨 입력란의 * 숨김 */
+  labelOptional?: boolean;
+  /** 한 줄 배치 모드 (공간영역 등에서 사용) */
+  compact?: boolean;
+  /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
+  hideColSpan?: boolean;
+  /** hideCondition/disableCondition 입력란 숨김 — SubList 등 동적 조건 미지원 컨텍스트 */
+  hideConditionFields?: boolean;
+  /** 필수 항목 여부 — 모든 필드 공통 */
+  required?: boolean;
+  /** 라벨 하단 설명 텍스트 */
+  description?: string;
+  /** PK 여부 — colSpanMode.type === 'input'(Form) 일 때만 표시, 미전달 시 체크박스 숨김 */
+  isPk?: boolean;
+  /** 읽기 전용 여부 — Form 빌더(input 모드)일 때만 표시 */
+  readonly?: boolean;
+  /** 저장 컨펌 여부 — ActionButtonField에서만 전달, true 시 live 모드 클릭 시 confirm 창 */
+  saveConfirm?: boolean;
+  /** 동적 HIDE 조건 — Form 빌더(input 모드)일 때만 표시 */
+  hideCondition?: string;
+  /** 동적 Disable 조건 — Form 빌더(input 모드)일 때만 표시 */
+  disableCondition?: string;
+  /** 검색제외 — true 시 검색 API 파라미터에 포함하지 않음 (검색 모드에서만 표시) */
+  excludeFromSearch?: boolean;
+  /** Slug Entity 필드 목록 — 있을 때 Key 입력을 selectbox로 전환 (form 빌더 전용) */
+  slugEntityFields?: { key: string | null; label: string }[];
+  /** 라벨 오른쪽 슬롯 — 전달 시 Key가 아래 행으로 이동 (InputField의 연결 Slug용) */
+  labelSideSlot?: React.ReactNode;
+  /** Key 오른쪽 슬롯 — labelSideSlot 전달 시에만 나타나는 Data 입력 자리 (Key와 50:50 폭 공유) */
+  keySideSlot?: React.ReactNode;
+  /** Key 아래 전체 폭 슬롯 — keySideSlot 대신 사용, Key를 단독 row로 분리하고 그 아래 전체 폭으로 표시 (TextField의 출력방식+Data용) */
+  keySideSlotFullWidth?: React.ReactNode;
+  onChange: (
+    updates: Partial<{
+      label: string;
+      labelMsgKey: string | undefined;
+      label2: string;
+      label2MsgKey: string | undefined;
+      fieldKey: string;
+      fieldKey2: string | undefined;
+      colSpan: number;
+      rowSpan: number;
+      required: boolean;
+      isPk: boolean;
+      readonly: boolean;
+      saveConfirm: boolean;
+      hideCondition: string | undefined;
+      disableCondition: string | undefined;
+      excludeFromSearch: boolean;
+      description: string;
+      descriptionMsgKey: string | undefined;
+    }>
+  ) => void;
+  onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  children?: React.ReactNode;
 }
 
 /** 라벨|Key 한 줄 + ColSpan + (RowSpan) — 모든 필드 컴포넌트 공통 베이스 */
 export function FieldBase(props: FieldBaseProps) {
-    const {
-        label, labelMsgKey, label2, key2, showLabel2, fieldKey,
-        colSpan, colSpanMode,
-        rowSpan, rowSpanConfig,
-        autoFocus, labelOptional, compact, hideColSpan, hideConditionFields, required, description, descriptionMsgKey, isPk, readonly, saveConfirm, hideCondition, disableCondition, excludeFromSearch, slugEntityFields, labelSideSlot, keySideSlot, keySideSlotFullWidth, onChange, onLabelKeyDown,
-        children
-    } = props;
+  const {
+    label,
+    labelMsgKey,
+    label2,
+    key2,
+    showLabel2,
+    fieldKey,
+    colSpan,
+    colSpanMode,
+    rowSpan,
+    rowSpanConfig,
+    autoFocus,
+    labelOptional,
+    compact,
+    hideColSpan,
+    hideConditionFields,
+    required,
+    description,
+    descriptionMsgKey,
+    isPk,
+    readonly,
+    saveConfirm,
+    hideCondition,
+    disableCondition,
+    excludeFromSearch,
+    slugEntityFields,
+    labelSideSlot,
+    keySideSlot,
+    keySideSlotFullWidth,
+    onChange,
+    onLabelKeyDown,
+    children,
+  } = props;
 
-    /* Form 빌더 여부 — input 타입 colSpan 사용 시 한 줄 레이아웃 + PK 표시 */
-    const isFormMode = colSpanMode.type === 'input';
+  /* Form 빌더 여부 — input 타입 colSpan 사용 시 한 줄 레이아웃 + PK 표시 */
+  const isFormMode = colSpanMode.type === "input";
 
-    /* 전역 다국어 모드 — SizeSettingPanel의 🌐 토글로 제어 */
-    const { i18nMode } = useBuilderI18nMode();
+  /* 전역 다국어 모드 — SizeSettingPanel의 🌐 토글로 제어 */
+  const { i18nMode } = useBuilderI18nMode();
 
-    /* Key 입력 요소 — labelSideSlot 있을 때 두 번째 행으로 이동되므로 변수로 추출 */
-    const keyInputEl = slugEntityFields && slugEntityFields.length > 0 ? (
-        <select
-            value={fieldKey ?? ''}
-            onChange={e => onChange({ fieldKey: e.target.value || '' })}
-            className={`${INPUT_CLS} font-mono`}
-        >
-            <option value="">— 선택없음 —</option>
-            {slugEntityFields.filter(f => f.key).map(f => (
-                <option key={f.key} value={f.key!}>{f.key} ({f.label})</option>
-            ))}
-        </select>
+  /* Key 입력 요소 — labelSideSlot 있을 때 두 번째 행으로 이동되므로 변수로 추출 */
+  const keyInputEl =
+    slugEntityFields && slugEntityFields.length > 0 ? (
+      <select
+        value={fieldKey ?? ""}
+        onChange={(e) => onChange({ fieldKey: e.target.value || "" })}
+        className={`${INPUT_CLS} font-mono`}
+      >
+        <option value="">— 선택없음 —</option>
+        {slugEntityFields
+          .filter((f) => f.key)
+          .map((f) => (
+            <option key={f.key} value={f.key!}>
+              {f.key} ({f.label})
+            </option>
+          ))}
+      </select>
     ) : (
-        <input
-            type="text"
-            value={fieldKey}
-            onChange={e => onChange({ fieldKey: e.target.value })}
-            placeholder="예: userName, status..."
-            className={`${INPUT_CLS} font-mono`}
-        />
+      <input
+        type="text"
+        value={fieldKey}
+        onChange={(e) => onChange({ fieldKey: e.target.value })}
+        placeholder="예: userName, status..."
+        className={`${INPUT_CLS} font-mono`}
+      />
     );
 
-    return (
-        <>
-            {/* 라벨 행 — labelSideSlot 있으면 오른쪽에 슬롯(연결 Slug 등), 없으면 기존 Key */}
-            <div className="grid grid-cols-2 gap-2">
-                <div>
-                    <label className={LABEL_CLS}>
-                        {showLabel2 ? '라벨 1' : '라벨'} {!labelOptional && <span className="text-red-400">*</span>}
-                    </label>
-                    {i18nMode ? (
-                        /* 다국어 키 모드 — MessageKeySelector */
-                        <MessageKeySelector
-                            value={labelMsgKey ?? ''}
-                            onChange={key => onChange({ labelMsgKey: key })}
-                            resourceType="WORD"
-                            size="sm"
-                        />
-                    ) : (
-                        /* 직접 입력 모드 */
-                        <input
-                            type="text"
-                            value={label}
-                            onChange={e => onChange({ label: e.target.value })}
-                            onKeyDown={onLabelKeyDown}
-                            placeholder="라벨을 입력하세요"
-                            className={INPUT_CLS}
-                            autoFocus={autoFocus}
-                        />
-                    )}
-                </div>
-                <div>
-                    {labelSideSlot !== undefined ? (
-                        /* labelSideSlot 있으면 슬롯 표시 (Key는 아래 행으로 이동) */
-                        labelSideSlot
-                    ) : (
-                        /* 기존 동작 — Key 입력 */
-                        <>
-                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                            {keyInputEl}
-                        </>
-                    )}
-                </div>
-            </div>
+  return (
+    <>
+      {/* 라벨 행 — labelSideSlot 있으면 오른쪽에 슬롯(연결 Slug 등), 없으면 기존 Key */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={LABEL_CLS}>
+            {showLabel2 ? "라벨 1" : "라벨"} {!labelOptional && <span className="text-red-400">*</span>}
+          </label>
+          {i18nMode ? (
+            /* 다국어 키 모드 — MessageKeySelector */
+            <MessageKeySelector
+              value={labelMsgKey ?? ""}
+              onChange={(key) => onChange({ labelMsgKey: key })}
+              resourceType="WORD"
+              size="sm"
+            />
+          ) : (
+            /* 직접 입력 모드 */
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => onChange({ label: e.target.value })}
+              onKeyDown={onLabelKeyDown}
+              placeholder="라벨을 입력하세요"
+              className={INPUT_CLS}
+              autoFocus={autoFocus}
+            />
+          )}
+        </div>
+        <div>
+          {labelSideSlot !== undefined ? (
+            /* labelSideSlot 있으면 슬롯 표시 (Key는 아래 행으로 이동) */
+            labelSideSlot
+          ) : (
+            /* 기존 동작 — Key 입력 */
+            <>
+              <label className={LABEL_CLS}>
+                Key <span className="text-red-400">*</span>
+              </label>
+              {keyInputEl}
+            </>
+          )}
+        </div>
+      </div>
 
-            {/* Key + Data 행 — labelSideSlot 있을 때만 추가 표시 */}
-            {labelSideSlot !== undefined && (
-                keySideSlotFullWidth !== undefined ? (
-                    /* keySideSlotFullWidth 전달 시 — Key 단독 row + 슬롯 내용 전체 폭 row로 분리 (TextField 등) */
-                    <>
-                        <div>
-                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                            {keyInputEl}
-                        </div>
-                        {keySideSlotFullWidth}
-                    </>
-                ) : (
-                    /* 기존 동작 — Key : keySideSlot 50:50 (InputField의 Data 입력 등) */
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className={LABEL_CLS}>Key <span className="text-red-400">*</span></label>
-                            {keyInputEl}
-                        </div>
-                        <div>
-                            {keySideSlot}
-                        </div>
-                    </div>
-                )
-            )}
-
-            {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}
+      {/* Key + Data 행 — labelSideSlot 있을 때만 추가 표시 */}
+      {labelSideSlot !== undefined &&
+        (keySideSlotFullWidth !== undefined ? (
+          /* keySideSlotFullWidth 전달 시 — Key 단독 row + 슬롯 내용 전체 폭 row로 분리 (TextField 등) */
+          <>
             <div>
-                <label className={LABEL_CLS}>설명 <span className="text-slate-300 font-normal">(선택)</span></label>
-                {i18nMode ? (
-                    <MessageKeySelector
-                        value={descriptionMsgKey ?? ''}
-                        onChange={key => onChange({ descriptionMsgKey: key })}
-                        resourceType="SENTENCE"
-                        size="sm"
-                    />
-                ) : (
-                    <input
-                        type="text"
-                        value={description ?? ''}
-                        onChange={e => onChange({ description: e.target.value || undefined })}
-                        placeholder="예: 설명을 입력 해주세요."
-                        className={INPUT_CLS}
-                    />
-                )}
+              <label className={LABEL_CLS}>
+                Key <span className="text-red-400">*</span>
+              </label>
+              {keyInputEl}
             </div>
+            {keySideSlotFullWidth}
+          </>
+        ) : (
+          /* 기존 동작 — Key : keySideSlot 50:50 (InputField의 Data 입력 등) */
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={LABEL_CLS}>
+                Key <span className="text-red-400">*</span>
+              </label>
+              {keyInputEl}
+            </div>
+            <div>{keySideSlot}</div>
+          </div>
+        ))}
 
-            {/* 라벨 2 (dateRange 전용) */}
-            {showLabel2 && (
-                <div>
-                    <label className={LABEL_CLS}>라벨 2 <span className="text-red-400">*</span></label>
-                    {i18nMode ? (
-                        <MessageKeySelector
-                            value={props.label2MsgKey ?? ''}
-                            onChange={key => onChange({ label2MsgKey: key })}
-                            resourceType="WORD"
-                            size="sm"
-                        />
-                    ) : (
-                        <input
-                            type="text"
-                            value={label2 || ''}
-                            onChange={e => onChange({ label2: e.target.value })}
-                            placeholder="예: 종료일"
-                            className={INPUT_CLS}
-                        />
-                    )}
-                </div>
-            )}
+      {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}
+      <div>
+        <label className={LABEL_CLS}>
+          설명 <span className="text-slate-300 font-normal">(선택)</span>
+        </label>
+        {i18nMode ? (
+          <MessageKeySelector
+            value={descriptionMsgKey ?? ""}
+            onChange={(key) => onChange({ descriptionMsgKey: key })}
+            resourceType="SENTENCE"
+            size="sm"
+          />
+        ) : (
+          <input
+            type="text"
+            value={description ?? ""}
+            onChange={(e) => onChange({ description: e.target.value || undefined })}
+            placeholder="예: 설명을 입력 해주세요."
+            className={INPUT_CLS}
+          />
+        )}
+      </div>
 
-            {/* 종료일 Key (dateRange 전용) — 미설정 시 시작일 Key + '_from'/'_to'로 자동유도.
+      {/* 라벨 2 (dateRange 전용) */}
+      {showLabel2 && (
+        <div>
+          <label className={LABEL_CLS}>
+            라벨 2 <span className="text-red-400">*</span>
+          </label>
+          {i18nMode ? (
+            <MessageKeySelector
+              value={props.label2MsgKey ?? ""}
+              onChange={(key) => onChange({ label2MsgKey: key })}
+              resourceType="WORD"
+              size="sm"
+            />
+          ) : (
+            <input
+              type="text"
+              value={label2 || ""}
+              onChange={(e) => onChange({ label2: e.target.value })}
+              placeholder="예: 종료일"
+              className={INPUT_CLS}
+            />
+          )}
+        </div>
+      )}
+
+      {/* 종료일 Key (dateRange 전용) — 미설정 시 시작일 Key + '_from'/'_to'로 자동유도.
                 entity 연결 시 시작·종료가 완전히 독립된 두 필드(예: dispFrom/dispTo)일 수 있어 개별 지정 가능하게 함 */}
-            {showLabel2 && (
-                <div>
-                    <label className={LABEL_CLS}>종료일 Key <span className="text-slate-300 font-normal">(선택)</span></label>
-                    <input
-                        type="text"
-                        value={key2 ?? ''}
-                        onChange={e => onChange({ fieldKey2: e.target.value || undefined })}
-                        placeholder="미입력 시 시작일 Key 기준 자동유도"
-                        className={`${INPUT_CLS} font-mono`}
-                    />
-                </div>
-            )}
+      {showLabel2 && (
+        <div>
+          <label className={LABEL_CLS}>
+            종료일 Key <span className="text-slate-300 font-normal">(선택)</span>
+          </label>
+          <input
+            type="text"
+            value={key2 ?? ""}
+            onChange={(e) => onChange({ fieldKey2: e.target.value || undefined })}
+            placeholder="미입력 시 시작일 Key 기준 자동유도"
+            className={`${INPUT_CLS} font-mono`}
+          />
+        </div>
+      )}
 
-            {/* ColSpan / RowSpan 배치 — hideColSpan=true 시 숨김
+      {/* ColSpan / RowSpan 배치 — hideColSpan=true 시 숨김
                 - button 모드(Search): 수직 레이아웃
                 - input 모드(Form): 2열 그리드로 한 줄 배치 */}
-            {!hideColSpan && <div className={compact || isFormMode ? 'grid grid-cols-2 gap-2 mt-1' : 'space-y-1'}>
-                {/* ColSpan */}
-                <div className={compact || isFormMode ? '' : 'flex items-center justify-between'}>
-                    <span className={LABEL_CLS}>ColSpan (가로)</span>
-                    {colSpanMode.type === 'button' ? (
-                        <div className="flex items-center gap-0.5">
-                            {colSpanMode.options.map(n => {
-                                const min = colSpanMode.minSpan ?? 1;
-                                return (
-                                    <button
-                                        key={n} type="button"
-                                        onClick={() => n >= min && onChange({ colSpan: n })}
-                                        disabled={n < min}
-                                        className={`w-5 h-5 text-[10px] font-semibold rounded transition-all
-                                            ${colSpan === n
-                                                ? 'bg-slate-900 text-white border-slate-900'
+      {!hideColSpan && (
+        <div className={compact || isFormMode ? "grid grid-cols-2 gap-2 mt-1" : "space-y-1"}>
+          {/* ColSpan */}
+          <div className={compact || isFormMode ? "" : "flex items-center justify-between"}>
+            <span className={LABEL_CLS}>ColSpan (가로)</span>
+            {colSpanMode.type === "button" ? (
+              <div className="flex items-center gap-0.5">
+                {colSpanMode.options.map((n) => {
+                  const min = colSpanMode.minSpan ?? 1;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => n >= min && onChange({ colSpan: n })}
+                      disabled={n < min}
+                      className={`w-5 h-5 text-[10px] font-semibold rounded transition-all
+                                            ${
+                                              colSpan === n
+                                                ? "bg-slate-900 text-white border-slate-900"
                                                 : n < min
-                                                    ? 'bg-slate-100 text-slate-300 border border-slate-100 cursor-not-allowed'
-                                                    : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-100'}`}
-                                    >{n}</button>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <input
-                            type="number"
-                            min={colSpanMode.min}
-                            max={colSpanMode.max}
-                            value={colSpan}
-                            onChange={e => onChange({
-                                colSpan: Math.max(colSpanMode.min, Math.min(colSpanMode.max, Number(e.target.value) || colSpanMode.min)),
-                            })}
-                            className={INPUT_CLS}
-                        />
-                    )}
-                </div>
-
-                {/* RowSpan (지정 시만 표시) */}
-                {rowSpanConfig && (
-                    <div className={compact || isFormMode ? '' : 'flex items-center justify-between'}>
-                        <span className={LABEL_CLS}>RowSpan (세로)</span>
-                        <input
-                            type="number"
-                            min={rowSpanConfig.min}
-                            max={rowSpanConfig.max}
-                            value={rowSpan ?? rowSpanConfig.min}
-                            onChange={e => onChange({
-                                rowSpan: Math.max(rowSpanConfig.min, Math.min(rowSpanConfig.max, Number(e.target.value) || rowSpanConfig.min)),
-                            })}
-                            className={INPUT_CLS}
-                        />
-                    </div>
-                )}
-            </div>}
-
-            {/* 필수항목 | 읽기전용(Form) or 검색제외(Search) | 저장컨펌(ActionButton) — ColSpan/RowSpan 바로 아래 한 줄 */}
-            <div className={`grid gap-1 mt-1 ${saveConfirm !== undefined ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                <ToggleRow
-                    label="필수 항목"
-                    value={!!required}
-                    onChange={v => onChange({ required: v })}
-                />
-                {isFormMode ? (
-                    <ToggleRow
-                        label="읽기 전용"
-                        value={!!readonly}
-                        onChange={v => onChange({ readonly: v })}
-                    />
-                ) : (
-                    <ToggleRow
-                        label="검색 제외"
-                        value={!!excludeFromSearch}
-                        onChange={v => onChange({ excludeFromSearch: v })}
-                    />
-                )}
-                {/* 저장 컨펌 — ActionButtonField에서만 prop 전달 시 표시 */}
-                {saveConfirm !== undefined && (
-                    <ToggleRow
-                        label="저장 컨펌"
-                        value={!!saveConfirm}
-                        onChange={v => onChange({ saveConfirm: v })}
-                    />
-                )}
-            </div>
-
-            {/* 동적 HIDE 조건 | 동적 Disable 조건 — SubList 등 미지원 컨텍스트 제외 */}
-            {!hideConditionFields && (
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className={LABEL_CLS}>동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span></label>
-                        <input
-                            type="text"
-                            value={hideCondition ?? ''}
-                            onChange={e => onChange({ hideCondition: e.target.value || undefined })}
-                            placeholder="예: status=1,type=Y / status= (빈값)"
-                            className={INPUT_CLS}
-                        />
-                    </div>
-                    <div>
-                        <label className={LABEL_CLS}>동적 Disable 조건 <span className="text-slate-300 font-normal">(선택)</span></label>
-                        <input
-                            type="text"
-                            value={disableCondition ?? ''}
-                            onChange={e => onChange({ disableCondition: e.target.value || undefined })}
-                            placeholder="예: status=1,type=Y / status= (빈값)"
-                            className={INPUT_CLS}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* 자식 컴포넌트 추가 영역 */}
-            {children}
-
-            {/* PK 여부 — Form 빌더 + isPk prop 전달된 경우에만 표시 */}
-            {isFormMode && isPk !== undefined && (
-                <div className="flex items-center gap-2 px-1 py-1 border-t border-slate-100 mt-0.5">
-                    <input
-                        type="checkbox"
-                        id={`pk-${fieldKey || 'field'}`}
-                        checked={!!isPk}
-                        onChange={e => onChange({ isPk: e.target.checked })}
-                        className="w-3.5 h-3.5 rounded accent-slate-900 cursor-pointer"
-                    />
-                    <label
-                        htmlFor={`pk-${fieldKey || 'field'}`}
-                        className="text-xs text-slate-600 cursor-pointer select-none"
+                                                  ? "bg-slate-100 text-slate-300 border border-slate-100 cursor-not-allowed"
+                                                  : "bg-white text-slate-400 border border-slate-200 hover:bg-slate-100"
+                                            }`}
                     >
-                        PK 여부
-                    </label>
-                </div>
+                      {n}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <input
+                type="number"
+                min={colSpanMode.min}
+                max={colSpanMode.max}
+                value={colSpan}
+                onChange={(e) =>
+                  onChange({
+                    colSpan: Math.max(
+                      colSpanMode.min,
+                      Math.min(colSpanMode.max, Number(e.target.value) || colSpanMode.min)
+                    ),
+                  })
+                }
+                className={INPUT_CLS}
+              />
             )}
-        </>
-    );
+          </div>
+
+          {/* RowSpan (지정 시만 표시) */}
+          {rowSpanConfig && (
+            <div className={compact || isFormMode ? "" : "flex items-center justify-between"}>
+              <span className={LABEL_CLS}>RowSpan (세로)</span>
+              <input
+                type="number"
+                min={rowSpanConfig.min}
+                max={rowSpanConfig.max}
+                value={rowSpan ?? rowSpanConfig.min}
+                onChange={(e) =>
+                  onChange({
+                    rowSpan: Math.max(
+                      rowSpanConfig.min,
+                      Math.min(rowSpanConfig.max, Number(e.target.value) || rowSpanConfig.min)
+                    ),
+                  })
+                }
+                className={INPUT_CLS}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 필수항목 | 읽기전용(Form) or 검색제외(Search) | 저장컨펌(ActionButton) — ColSpan/RowSpan 바로 아래 한 줄 */}
+      <div className={`grid gap-1 mt-1 ${saveConfirm !== undefined ? "grid-cols-3" : "grid-cols-2"}`}>
+        <ToggleRow label="필수 항목" value={!!required} onChange={(v) => onChange({ required: v })} />
+        {isFormMode ? (
+          <ToggleRow label="읽기 전용" value={!!readonly} onChange={(v) => onChange({ readonly: v })} />
+        ) : (
+          <ToggleRow
+            label="검색 제외"
+            value={!!excludeFromSearch}
+            onChange={(v) => onChange({ excludeFromSearch: v })}
+          />
+        )}
+        {/* 저장 컨펌 — ActionButtonField에서만 prop 전달 시 표시 */}
+        {saveConfirm !== undefined && (
+          <ToggleRow label="저장 컨펌" value={!!saveConfirm} onChange={(v) => onChange({ saveConfirm: v })} />
+        )}
+      </div>
+
+      {/* 동적 HIDE 조건 | 동적 Disable 조건 — SubList 등 미지원 컨텍스트 제외 */}
+      {!hideConditionFields && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>
+              동적 HIDE 조건 <span className="text-slate-300 font-normal">(선택)</span>
+            </label>
+            <input
+              type="text"
+              value={hideCondition ?? ""}
+              onChange={(e) => onChange({ hideCondition: e.target.value || undefined })}
+              placeholder="예: status=1,type=Y / status= (빈값)"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>
+              동적 Disable 조건 <span className="text-slate-300 font-normal">(선택)</span>
+            </label>
+            <input
+              type="text"
+              value={disableCondition ?? ""}
+              onChange={(e) => onChange({ disableCondition: e.target.value || undefined })}
+              placeholder="예: status=1,type=Y / status= (빈값)"
+              className={INPUT_CLS}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 자식 컴포넌트 추가 영역 */}
+      {children}
+
+      {/* PK 여부 — Form 빌더 + isPk prop 전달된 경우에만 표시 */}
+      {isFormMode && isPk !== undefined && (
+        <div className="flex items-center gap-2 px-1 py-1 border-t border-slate-100 mt-0.5">
+          <input
+            type="checkbox"
+            id={`pk-${fieldKey || "field"}`}
+            checked={!!isPk}
+            onChange={(e) => onChange({ isPk: e.target.checked })}
+            className="w-3.5 h-3.5 rounded accent-slate-900 cursor-pointer"
+          />
+          <label htmlFor={`pk-${fieldKey || "field"}`} className="text-sm text-slate-600 cursor-pointer select-none">
+            PK 여부
+          </label>
+        </div>
+      )}
+    </>
+  );
 }

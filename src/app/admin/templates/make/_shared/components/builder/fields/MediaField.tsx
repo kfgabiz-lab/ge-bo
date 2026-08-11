@@ -108,7 +108,7 @@ export const MediaField = (props: FieldEditProps) => {
 
           {/* 허용 형식 고정 표시 */}
           <div className="bg-slate-50 border border-slate-200 p-2 rounded-lg">
-            <p className="text-[10px] font-semibold text-slate-500 mb-1">허용 형식 (고정)</p>
+            <p className="text-sm font-semibold text-slate-500 mb-1">허용 형식 (고정)</p>
             <p className="text-[9.5px] text-slate-400 leading-relaxed font-mono">{FILE_TYPE_LABELS.image}</p>
           </div>
         </div>
@@ -131,7 +131,7 @@ export const MediaField = (props: FieldEditProps) => {
           </div>
           {/* 허용 형식 고정 표시 */}
           <div className="bg-slate-50 border border-slate-200 p-2 rounded-lg">
-            <p className="text-[10px] font-semibold text-slate-500 mb-1">허용 형식 (고정)</p>
+            <p className="text-sm font-semibold text-slate-500 mb-1">허용 형식 (고정)</p>
             <p className="text-[9.5px] text-slate-400 leading-relaxed font-mono">{FILE_TYPE_LABELS.video}</p>
           </div>
         </div>

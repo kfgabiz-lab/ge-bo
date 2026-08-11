@@ -88,7 +88,7 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
       </div>
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">
             {t("common.label.groupCode")} <span className="text-red-500">*</span>
           </label>
           <input
@@ -108,7 +108,7 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">
             {t("common.label.groupName")} <span className="text-red-500">*</span>
           </label>
           <MessageKeySelector
@@ -121,7 +121,7 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1.5 block">{t("common.label.description")}</label>
+          <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t("common.label.description")}</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -325,7 +325,7 @@ export function CodeDetail() {
         {/* 그룹 정보 — 한 줄 compact */}
         <div className="grid grid-cols-[1fr_1.2fr_1fr_90px] gap-2 items-end">
           <div>
-            <label className="text-[10px] font-medium text-slate-500 mb-1 block">{t("common.label.groupCode")}</label>
+            <label className="text-sm font-medium text-slate-500 mb-1 block">{t("common.label.groupCode")}</label>
             <input
               type="text"
               value={selectedGroup.groupCode}
@@ -334,7 +334,7 @@ export function CodeDetail() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+            <label className="text-sm font-medium text-slate-500 mb-1 block">
               {t("common.label.groupName")} <span className="text-red-500">*</span>
             </label>
             <MessageKeySelector
@@ -347,7 +347,7 @@ export function CodeDetail() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-medium text-slate-500 mb-1 block">{t("common.label.description")}</label>
+            <label className="text-sm font-medium text-slate-500 mb-1 block">{t("common.label.description")}</label>
             <input
               type="text"
               value={description}
@@ -358,7 +358,7 @@ export function CodeDetail() {
             />
           </div>
           <div>
-            <label className="text-[10px] font-medium text-slate-500 mb-1 block">{t("common.label.isActive")}</label>
+            <label className="text-sm font-medium text-slate-500 mb-1 block">{t("common.label.isActive")}</label>
             <select
               value={active ? "Y" : "N"}
               onChange={(e) => setActive(e.target.value === "Y")}

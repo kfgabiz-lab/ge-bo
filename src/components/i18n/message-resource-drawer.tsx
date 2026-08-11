@@ -123,7 +123,7 @@ export const MessageResourceDrawer = () => {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8eaed]">
           <div>
             <h2 className="text-sm font-bold text-[#111827]">{isEdit ? "항목 수정" : "항목 추가"}</h2>
-            <p className="text-xs text-[#9ca3af] mt-0.5">
+            <p className="text-sm text-[#9ca3af] mt-0.5">
               {isEdit ? "다국어 항목 정보를 수정합니다." : "새로운 다국어 항목을 등록합니다."}
             </p>
           </div>
@@ -143,11 +143,11 @@ export const MessageResourceDrawer = () => {
             className="flex-1 overflow-y-auto px-5 py-5 space-y-5"
           >
             <section className="space-y-4">
-              <p className="text-[11px] font-semibold text-[#9ca3af] uppercase tracking-widest">항목 정보</p>
+              <p className="text-sm font-semibold text-[#9ca3af] uppercase tracking-widest">항목 정보</p>
 
               {/* 유형 선택 — 단어 / 문장 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">
+                <label className="text-sm font-medium text-[#374151]">
                   유형 <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
@@ -170,7 +170,7 @@ export const MessageResourceDrawer = () => {
 
               {/* Key — 수정 불가 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">Key</label>
+                <label className="text-sm font-medium text-[#374151]">Key</label>
                 <div className="relative">
                   <input
                     value={selectedItem?.key ?? ""}
@@ -184,7 +184,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 한국어 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">
+                <label className="text-sm font-medium text-[#374151]">
                   한국어 <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -196,7 +196,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 영어 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">영어</label>
+                <label className="text-sm font-medium text-[#374151]">영어</label>
                 <textarea
                   {...updateForm.register("en")}
                   rows={3}
@@ -206,7 +206,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 사용여부 토글 — 수정 모드에서만 노출 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">사용여부</label>
+                <label className="text-sm font-medium text-[#374151]">사용여부</label>
                 <button
                   type="button"
                   onClick={() => updateForm.setValue("active", !updateForm.watch("active"))}
@@ -235,11 +235,11 @@ export const MessageResourceDrawer = () => {
             className="flex-1 overflow-y-auto px-5 py-5 space-y-5"
           >
             <section className="space-y-4">
-              <p className="text-[11px] font-semibold text-[#9ca3af] uppercase tracking-widest">항목 정보</p>
+              <p className="text-sm font-semibold text-[#9ca3af] uppercase tracking-widest">항목 정보</p>
 
               {/* 유형 선택 — 단어 / 문장 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">
+                <label className="text-sm font-medium text-[#374151]">
                   유형 <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
@@ -262,7 +262,7 @@ export const MessageResourceDrawer = () => {
 
               {/* Key */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">
+                <label className="text-sm font-medium text-[#374151]">
                   Key <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -274,7 +274,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 한국어 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">
+                <label className="text-sm font-medium text-[#374151]">
                   한국어 <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -287,7 +287,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 영어 */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[#374151]">영어</label>
+                <label className="text-sm font-medium text-[#374151]">영어</label>
                 <textarea
                   {...createForm.register("en")}
                   rows={3}

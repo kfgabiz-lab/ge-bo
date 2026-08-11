@@ -40,7 +40,7 @@ export function TableButtonField({ values, onChange, layerTemplates, onRequestLa
 
   return (
     <div className="space-y-1.5 pt-1 border-t border-slate-100" onClick={onRequestLayerTemplates}>
-      <span className="text-[10px] font-semibold text-slate-400 uppercase">버튼 설정</span>
+      <span className="text-sm font-semibold text-slate-400 uppercase">버튼 설정</span>
 
       {/* 버튼 라벨 | 색상 — 한 줄(1:1) */}
       <div className="grid grid-cols-2 gap-2">

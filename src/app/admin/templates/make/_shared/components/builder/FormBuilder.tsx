@@ -513,7 +513,7 @@ export function FormBuilder({
       {/* Key * | 연결 slug */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[10px] font-medium text-slate-500 mb-1 block">
+          <label className="text-sm font-medium text-slate-500 mb-1 block">
             Key <span className="text-red-400">*</span>
           </label>
           <input
@@ -536,7 +536,7 @@ export function FormBuilder({
       {/* 타이틀 + 설명 — 1행 안에 함께 표시됨 */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-[10px] font-medium text-slate-500 mb-1 block">타이틀</label>
+          <label className="text-sm font-medium text-slate-500 mb-1 block">타이틀</label>
           {i18nMode ? (
             <MessageKeySelector
               value={widget.titleMsgKey ?? ""}
@@ -555,7 +555,7 @@ export function FormBuilder({
           )}
         </div>
         <div>
-          <label className="text-[10px] font-medium text-slate-500 mb-1 block">설명</label>
+          <label className="text-sm font-medium text-slate-500 mb-1 block">설명</label>
           {i18nMode ? (
             <MessageKeySelector
               value={widget.descriptionMsgKey ?? ""}
