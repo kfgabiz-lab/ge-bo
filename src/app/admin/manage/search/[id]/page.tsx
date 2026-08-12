@@ -7,7 +7,21 @@ import PageLayout from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { useCodeStore } from "@/store/use-code-store";
+import { useMenusQuery } from "@/hooks/use-menu-queries";
+import type { MenuItem } from "@/store/use-menu-store";
 import api from "@/lib/api";
+
+/* 트리 구조인 FO 메뉴를 셀렉트 옵션용으로 평탄화 — url 없는 상위 분류 메뉴는 연결 대상에서 제외 */
+type FlatMenuOption = { id: number; label: string; url: string };
+
+function flattenMenuOptions(items: MenuItem[], depth = 0): FlatMenuOption[] {
+  return items.flatMap((item) => {
+    const label = `${"　".repeat(depth)}${item.metaTitle || item.name}`;
+    const self = item.url ? [{ id: item.id, label, url: item.url }] : [];
+    const children = item.children ? flattenMenuOptions(item.children, depth + 1) : [];
+    return [...self, ...children];
+  });
+}
 
 /* 분류(page_section) 옵션을 가져올 공통코드 그룹 코드 — 코드값/라벨은 DB(code_detail)에서만 가져온다 */
 const PAGE_SECTION_GROUP_CODE = "PAGE_SECTION";
@@ -28,6 +42,8 @@ interface SearchMgmtDetail {
   active: boolean;
   /* 분류 — code_detail(group_code='PAGE_SECTION')의 코드값. 선택 입력이라 미지정이면 null */
   pageSection: string | null;
+  /* 연동된 FO 메뉴 id — 수동 URL 입력이면 null */
+  menuId: number | null;
   texts: SearchTextEntry[];
 }
 
@@ -53,6 +69,12 @@ export default function SearchMgmtDetailPage() {
   const [isActive, setIsActive] = useState(true);
   /* 분류(page_section) — 선택 입력. 빈 문자열이면 "선택 안 함" */
   const [pageSection, setPageSection] = useState("");
+  /* URL 입력방식 — 직접입력 또는 FO 메뉴 선택. 메뉴 선택 시 url은 선택된 메뉴 값으로 자동 고정 */
+  const [inputMode, setInputMode] = useState<"manual" | "menu">("manual");
+  const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null);
+
+  const { data: menuList } = useMenusQuery("FO");
+  const menuOptions = useMemo(() => flattenMenuOptions(menuList ?? []), [menuList]);
   /* 검색텍스트 제목 — 선택 입력(미입력 시 전송하지 않음) */
   const [titleInput, setTitleInput] = useState("");
   const [textInput, setTextInput] = useState("");
@@ -87,6 +109,9 @@ export default function SearchMgmtDetailPage() {
         setIsActive(res.data.active);
         /* 저장된 분류 복원 — 미지정(null)이면 "선택 안 함"으로 */
         setPageSection(res.data.pageSection ?? "");
+        /* 연동된 메뉴가 있으면 메뉴선택 모드로, 없으면 직접입력 모드로 복원 */
+        setInputMode(res.data.menuId ? "menu" : "manual");
+        setSelectedMenuId(res.data.menuId ?? null);
         setTextList(res.data.texts.map(toTextEntry));
       } catch {
         toast.error("데이터를 찾을 수 없습니다.");
@@ -116,12 +141,15 @@ export default function SearchMgmtDetailPage() {
                서버는 pageSection 이 null 이면 "필드 미전달 = 기존 값 유지"로 해석하므로,
                null 을 보내면 선택 해제가 저장되지 않는다. 빈 문자열은 서버에서 NULL 로 정규화된다. */
       const sectionPayload = pageSection.trim();
+      /* 메뉴선택 모드가 아니면 항상 null 전송 — 연결 해제도 이 필드로 명시적으로 반영된다 */
+      const menuIdPayload = inputMode === "menu" ? selectedMenuId : null;
 
       if (savedId) {
         await api.put(`/search-manage/${savedId}`, {
           url: url.trim(),
           active: isActive,
           pageSection: sectionPayload,
+          menuId: menuIdPayload,
         });
         if (trimmedText) {
           const res = await api.post<SearchMgmtDetail>(`/search-manage/${savedId}/texts`, textPayload);
@@ -137,6 +165,7 @@ export default function SearchMgmtDetailPage() {
         url: url.trim(),
         active: isActive,
         pageSection: sectionPayload,
+        menuId: menuIdPayload,
       });
       const newId = created.data.id;
       let latestTexts = created.data.texts;
@@ -157,7 +186,7 @@ export default function SearchMgmtDetailPage() {
     } finally {
       setSaving(false);
     }
-  }, [url, isActive, pageSection, titleInput, textInput, savedId, router]);
+  }, [url, isActive, pageSection, inputMode, selectedMenuId, titleInput, textInput, savedId, router]);
 
   /* 검색텍스트 삭제 — 브라우저 기본 confirm으로 확인 후 실행 */
   const handleDeleteText = useCallback(
@@ -188,14 +217,54 @@ export default function SearchMgmtDetailPage() {
       <GridCell colSpan={12} rowSpan={3}>
         <div className="h-full space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">URL</label>
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="URL 입력"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-            />
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">URL</label>
+              <div className="flex gap-1 rounded-md border border-slate-200 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setInputMode("manual")}
+                  className={`rounded px-2 py-1 ${
+                    inputMode === "manual" ? "bg-slate-900 text-white" : "text-slate-600"
+                  }`}
+                >
+                  직접입력
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode("menu")}
+                  className={`rounded px-2 py-1 ${inputMode === "menu" ? "bg-slate-900 text-white" : "text-slate-600"}`}
+                >
+                  메뉴선택
+                </button>
+              </div>
+            </div>
+            {inputMode === "menu" ? (
+              <select
+                value={selectedMenuId ?? ""}
+                onChange={(e) => {
+                  const menuId = e.target.value ? Number(e.target.value) : null;
+                  setSelectedMenuId(menuId);
+                  const matched = menuOptions.find((m) => m.id === menuId);
+                  setUrl(matched?.url ?? "");
+                }}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              >
+                <option value="">FO 메뉴 선택</option>
+                {menuOptions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="URL 입력"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
+              />
+            )}
           </div>
           {/* 분류 — URL(=search_manage) 단위 속성. 선택 입력이라 "선택 안 함" 허용 */}
           <div>

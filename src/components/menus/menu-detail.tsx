@@ -464,7 +464,7 @@ function MenuForm({
           <div>
             <label className="text-sm font-medium text-slate-600 mb-1.5 flex items-center gap-1">
               Meta Title
-              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">최대 150자로 입력해 주세요.</span>
+              <span className="ml-1.5 text-[10px] text-slate-400 font-normal">최대 150자 이하로 입력해 주세요.</span>
             </label>
             <input
               type="text"
