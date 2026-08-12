@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageLayout from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/renderer";
@@ -98,6 +98,7 @@ function getDefaultSearch(): Record<string, string> {
 
 export default function TrainingRequestListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
   const { groups: codeGroups, fetchGroups } = useCodeStore();
 
@@ -107,8 +108,23 @@ export default function TrainingRequestListPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [searchValues, setSearchValues] = useState<Record<string, string>>(() => getDefaultSearch());
-  const [appliedSearch, setAppliedSearch] = useState<Record<string, string>>(() => getDefaultSearch());
+  const buildInitialSearch = (): Record<string, string> => {
+    const defaults = getDefaultSearch();
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const scheduleType = searchParams.get("scheduleType");
+    const trainingType = searchParams.get("trainingType");
+    return {
+      ...defaults,
+      createdRange_from: dateFrom || defaults.createdRange_from,
+      createdRange_to: dateTo || defaults.createdRange_to,
+      trainingScheduleType: scheduleType || defaults.trainingScheduleType,
+      trainingFormat: trainingType || defaults.trainingFormat,
+    };
+  };
+
+  const [searchValues, setSearchValues] = useState<Record<string, string>>(buildInitialSearch);
+  const [appliedSearch, setAppliedSearch] = useState<Record<string, string>>(buildInitialSearch);
 
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc" | undefined>(undefined);
