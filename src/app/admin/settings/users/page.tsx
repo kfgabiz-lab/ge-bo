@@ -6,7 +6,7 @@ import { useAdminStore, Admin } from "@/store/use-admin-store";
 import PageLayout from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/renderer";
-import type { SearchWidget, SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
+import type { SearchWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { TableWidget } from "@/app/admin/templates/make/_shared/components/builder/TableBuilder";
 import type { TableActionHandlers } from "@/app/admin/templates/make/_shared/components/renderer/types";
 import { useI18n } from "@/hooks/use-i18n";
@@ -104,27 +104,6 @@ export default function AdminAccountsPage() {
               ],
             },
           ],
-        },
-      ],
-    }),
-    [t]
-  );
-
-  /** 공간영역 위젯 — 관리자 등록 버튼 */
-  const SPACE_WIDGET: SpaceWidget = useMemo(
-    () => ({
-      type: "space",
-      widgetId: "admins-space",
-      align: "right",
-      showBorder: false,
-      items: [
-        {
-          id: "s1",
-          type: "action-button",
-          label: t("admin.btn.add"),
-          colSpan: 1,
-          color: "black",
-          connType: "close",
         },
       ],
     }),
@@ -309,16 +288,6 @@ export default function AdminAccountsPage() {
             onReset={handleReset}
           />
         </GridCell>
-
-        {/* 관리자 등록 버튼 — 당분간 사용 안함 */}
-        {/* <GridCell colSpan={1} colStart={12} rowSpan={1}>
-                    <WidgetRenderer
-                        mode="live"
-                        widget={SPACE_WIDGET}
-                        contentColSpan={1}
-                        onClose={() => router.push('/admin/settings/users/new')}
-                    />
-                </GridCell> */}
 
         {/* 테이블 위젯 */}
         <GridCell colSpan={12} rowSpan={9}>

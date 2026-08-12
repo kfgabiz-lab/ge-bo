@@ -28,7 +28,6 @@ interface AdminState {
   setFilterRole: (role: string) => void;
   openDrawer: (admin?: Admin) => void;
   closeDrawer: () => void;
-  addAdmin: (admin: Omit<Admin, "id" | "createdAt" | "isActive">) => Promise<{ admin: Admin; tempPassword: string }>;
   updateAdmin: (id: number, admin: Partial<Admin>) => Promise<Admin>;
   deleteAdmin: (id: number) => Promise<void>;
   toggleAdminStatus: (id: number) => Promise<void>;
@@ -60,23 +59,6 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   openDrawer: (admin) => set({ isDrawerOpen: true, selectedAdmin: admin || null }),
   closeDrawer: () => set({ isDrawerOpen: false, selectedAdmin: null }),
-
-  addAdmin: async (adminData) => {
-    set({ isLoading: true });
-    try {
-      const response = await api.post(API_PATH, adminData);
-      const newAdmin = response.data;
-      set((state) => ({
-        admins: [newAdmin, ...state.admins],
-        isLoading: false,
-        isDrawerOpen: false,
-      }));
-      return { admin: newAdmin, tempPassword: newAdmin.tempPassword };
-    } catch (error) {
-      set({ isLoading: false });
-      throw error;
-    }
-  },
 
   updateAdmin: async (id, adminData) => {
     set({ isLoading: true });

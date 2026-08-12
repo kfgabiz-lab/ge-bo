@@ -38,9 +38,8 @@ export default function AdminDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const id = params.id as string;
-  const isNew = id === "new";
 
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [adminData, setAdminData] = useState<AdminDetail | null>(null);
 
@@ -56,7 +55,7 @@ export default function AdminDetailPage() {
     sitePermissions: "",
   });
 
-  /* 수정 모드: 로드된 site ID 목록 */
+  /* 로드된 site ID 목록 */
   const [loadedSiteIds, setLoadedSiteIds] = useState<number[]>([]);
 
   /* 배정 가능한 역할 목록 */
@@ -78,21 +77,20 @@ export default function AdminDetailPage() {
 
   /* sites와 loadedSiteIds가 모두 준비됐을 때 체크박스 값(id 문자열)으로 변환 */
   useEffect(() => {
-    if (isNew || loadedSiteIds.length === 0 || sites.length === 0) return;
+    if (loadedSiteIds.length === 0 || sites.length === 0) return;
     const ids = loadedSiteIds.filter((siteId) => sites.some((s) => s.id === siteId)).map((siteId) => String(siteId));
     setFormValues((prev) => ({ ...prev, sitePermissions: ids.join(",") }));
-  }, [isNew, loadedSiteIds, sites]);
+  }, [loadedSiteIds, sites]);
 
   /* roles와 adminData가 모두 준비됐을 때 code → displayName 변환 */
   useEffect(() => {
-    if (isNew || !adminData || roles.length === 0) return;
+    if (!adminData || roles.length === 0) return;
     const displayName = roles.find((r) => r.code === adminData.role)?.displayName ?? adminData.role;
     setFormValues((prev) => ({ ...prev, role: displayName }));
-  }, [isNew, adminData, roles]);
+  }, [adminData, roles]);
 
-  /* 수정 모드: 기존 데이터 로드 */
+  /* 기존 데이터 로드 */
   useEffect(() => {
-    if (isNew) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -121,7 +119,7 @@ export default function AdminDetailPage() {
       }
     };
     load();
-  }, [id, isNew, router, t]);
+  }, [id, router, t]);
 
   /* 취소 / 저장 버튼 */
   const SPACE_WIDGET: SpaceWidget = useMemo(
@@ -154,7 +152,7 @@ export default function AdminDetailPage() {
     [t]
   );
 
-  /* 접속이력 버튼 — 수정 모드 전용 */
+  /* 접속이력 버튼 */
   const RESET_SPACE_WIDGET: SpaceWidget = useMemo(
     () => ({
       type: "space",
@@ -181,7 +179,7 @@ export default function AdminDetailPage() {
       type: "form",
       widgetId: "admins-detail-form",
       contentKey: "adminsDetailForm",
-      title: isNew ? t("admin.title.new") : t("admin.title.edit"),
+      title: t("admin.title.edit"),
       description: t("admin.description"),
       showBorder: true,
       fields: [
@@ -195,7 +193,7 @@ export default function AdminDetailPage() {
           required: true,
           fieldKey: "email",
           placeholder: "admin@example.com",
-          readonly: !isNew,
+          readonly: true,
         },
         {
           id: "name",
@@ -206,7 +204,7 @@ export default function AdminDetailPage() {
           required: true,
           fieldKey: "name",
           placeholder: t("admin.placeholder.username"),
-          readonly: !isNew,
+          readonly: true,
         },
         /* 2행: 부서코드 / 부서명 */
         {
@@ -217,7 +215,7 @@ export default function AdminDetailPage() {
           rowSpan: 1,
           fieldKey: "deptCode",
           placeholder: t("admin.placeholder.deptCode"),
-          readonly: !isNew,
+          readonly: true,
         },
         {
           id: "deptName",
@@ -227,7 +225,7 @@ export default function AdminDetailPage() {
           rowSpan: 1,
           fieldKey: "deptName",
           placeholder: t("admin.placeholder.deptNameInput"),
-          readonly: !isNew,
+          readonly: true,
         },
         /* 3행: 권한 / 계정상태 */
         {
@@ -262,7 +260,7 @@ export default function AdminDetailPage() {
         },
       ],
     }),
-    [isNew, roles, t]
+    [roles, t]
   );
 
   /* 홈페이지 접근 권한 폼 위젯 */
@@ -304,14 +302,6 @@ export default function AdminDetailPage() {
     async (_widgetIds: string[], action: "save" | "delete") => {
       if (action !== "save" || saving) return;
 
-      if (!formValues.email?.trim()) {
-        toast.error(t("validation.admin.email.required"));
-        return;
-      }
-      if (!formValues.name?.trim()) {
-        toast.error(t("validation.admin.name.required"));
-        return;
-      }
       if (!formValues.role) {
         toast.error(t("validation.admin.role.required"));
         return;
@@ -322,29 +312,17 @@ export default function AdminDetailPage() {
         /* 화면에서는 displayName 표시, API 전송 시 code로 역변환 */
         const roleCode = roles.find((r) => r.displayName === formValues.role)?.code ?? formValues.role;
         const payload = {
-          email: formValues.email,
-          name: formValues.name,
-          deptCode: formValues.deptCode || null,
-          deptName: formValues.deptName || null,
           remark: formValues.remark || null,
           role: roleCode,
           isActive: formValues.isActive === "true",
         };
 
-        let adminId: number;
-        if (isNew) {
-          const res = await api.post("/admins", payload);
-          adminId = res.data.id;
-          toast.success(`${t("admin.title.new")} 완료. 임시 비밀번호: ${res.data.tempPassword}`, { duration: 5000 });
-        } else {
-          await api.patch(`/admins/${id}`, payload);
-          adminId = Number(id);
-          toast.success(t("admin.updated"));
-        }
+        await api.patch(`/admins/${id}`, payload);
+        toast.success(t("admin.updated"));
 
         /* 선택한 홈페이지 id(체크박스 값) 저장 */
         const selectedSiteIds = (formValues.sitePermissions || "").split(",").filter(Boolean).map(Number);
-        await api.put(`/admins/${adminId}/sites`, { siteIds: selectedSiteIds });
+        await api.put(`/admins/${id}/sites`, { siteIds: selectedSiteIds });
 
         router.push("/admin/settings/users");
       } catch (e: unknown) {
@@ -353,7 +331,7 @@ export default function AdminDetailPage() {
         setSaving(false);
       }
     },
-    [formValues, id, isNew, saving, roles, router, t]
+    [formValues, id, saving, roles, router, t]
   );
 
   if (loading) {
@@ -388,12 +366,10 @@ export default function AdminDetailPage() {
         />
       </GridCell>
 
-      {/* 접속이력 버튼 — 수정 모드만 표시 */}
-      {!isNew && (
-        <GridCell colSpan={2} colStart={1} rowSpan={1}>
-          <WidgetRenderer mode="live" widget={RESET_SPACE_WIDGET} contentColSpan={2} onClose={handleAccessHistory} />
-        </GridCell>
-      )}
+      {/* 접속이력 버튼 */}
+      <GridCell colSpan={2} colStart={1} rowSpan={1}>
+        <WidgetRenderer mode="live" widget={RESET_SPACE_WIDGET} contentColSpan={2} onClose={handleAccessHistory} />
+      </GridCell>
 
       {/* 취소 / 저장 버튼 */}
       <GridCell colSpan={2} colStart={11} rowSpan={1}>
