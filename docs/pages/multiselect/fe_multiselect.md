@@ -21,6 +21,7 @@ interface MultiSelectWidget {
     contentKey: string;       // dataJson 저장 키 (예: "assignedUsers")
     connectedSlug?: string;   // 저장 대상 slug (action-button 연결용)
     sourceSlug: string;       // 옵션 목록을 가져올 slug
+    sourceFilter?: string;    // 옵션 필터 조건식 (예: "product_type=P,has_training=001") — 서버(filterExpr)+클라이언트 이중 적용
     labelFields: string;      // 표시 필드 — 쉼표 구분, ' > '로 연결 (예: "name,dept")
     valueField?: string;      // 저장 ID 필드 키 (기본: 'id')
     placeholder?: string;
@@ -102,6 +103,11 @@ interface MultiSelectRendererProps {
 | `selected` | `number[]` | 현재 선택된 ID 배열 |
 | `search` | `string` | 드롭다운 내 검색어 |
 | `isOpen` | `boolean` | 드롭다운 열림 여부 |
+
+**옵션 필터링(sourceFilter) 동작:**
+- `sourceFilter`가 설정되면 서버 요청에 `filterExpr` 쿼리파라미터로 함께 전달되어, 서버가 1차로 걸러서 필요한 만큼만 응답한다(`docs/pages/page-data/be_page-data.md` §5.1 `filterExpr` 참조).
+- 응답을 받은 뒤 클라이언트에서 `evalConditionExpr`로 동일 조건을 한 번 더 평가한다(안전망 — 서버 필터링과 무관하게 항상 실행, 제거하지 말 것).
+- in-flight 요청 캐시(`fetchSourceRows`)의 캐시키에는 `sourceFilter` 값도 포함된다 — 같은 `sourceSlug`를 쓰더라도 `sourceFilter`가 다른 위젯끼리는 요청/응답을 공유하지 않는다.
 
 ---
 

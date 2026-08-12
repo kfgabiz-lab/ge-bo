@@ -13,6 +13,7 @@ import Superscript from "@tiptap/extension-superscript";
 import Subscript from "@tiptap/extension-subscript";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { uploadFiles } from "@/app/admin/templates/make/_shared/utils";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import {
   Bold,
   Italic,
@@ -363,7 +364,7 @@ function PreviewPanel({ html }: PreviewPanelProps) {
   return (
     <div className="border-t border-slate-200 p-3 bg-slate-50 max-h-64 overflow-y-auto">
       <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-2">미리보기</p>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
     </div>
   );
 }

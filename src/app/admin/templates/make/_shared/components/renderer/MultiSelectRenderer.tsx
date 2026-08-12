@@ -111,9 +111,10 @@ function fetchSourceRows(
   depthGte?: number,
   depthLte?: number,
   fetchRelationIds?: number[],
-  innerRelationId?: number
+  innerRelationId?: number,
+  sourceFilter?: string
 ): Promise<SourceRow[]> {
-  const cacheKey = `${slug}|${depthGte ?? ""}|${depthLte ?? ""}|${fetchRelationIds?.join(",") ?? ""}|${innerRelationId ?? ""}`;
+  const cacheKey = `${slug}|${depthGte ?? ""}|${depthLte ?? ""}|${fetchRelationIds?.join(",") ?? ""}|${innerRelationId ?? ""}|${sourceFilter ?? ""}`;
   const cached = inFlightSourceRequests.get(cacheKey);
   if (cached) return cached;
 
@@ -122,6 +123,7 @@ function fetchSourceRows(
   if (depthLte !== undefined) params.depth_lte = depthLte;
   if (fetchRelationIds && fetchRelationIds.length > 0) params.fetchRelationIds = fetchRelationIds.join(",");
   if (innerRelationId !== undefined) params[`innerRel_${innerRelationId}`] = String(innerRelationId);
+  if (sourceFilter) params.filterExpr = sourceFilter;
 
   const request = api
     .get(`/page-data/${slug}`, { params })
@@ -272,7 +274,7 @@ export function MultiSelectRenderer({
            FETCH relation을 자동 병합(_fetchedRel{id})해 내려주므로 조회 로직 자체는 동일하다
            동일 slug를 쓰는 다른 위젯 인스턴스와 요청 자체는 fetchSourceRows에서 공유하되,
            필터링(sourceFilter)은 아래에서 이 인스턴스가 개별적으로 수행한다 */
-    fetchSourceRows(effectiveSourceSlug, depthGte, depthLte, outerRelationIds, innerRelationId)
+    fetchSourceRows(effectiveSourceSlug, depthGte, depthLte, outerRelationIds, innerRelationId, widget.sourceFilter)
       .then((rows) => {
         if (cancelled) return;
         /* flattenPageDataItem으로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */

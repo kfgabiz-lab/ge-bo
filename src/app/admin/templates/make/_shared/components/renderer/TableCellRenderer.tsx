@@ -146,7 +146,7 @@ export function TableCellRenderer({
       const justifyCls =
         col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start";
       return (
-        <div className={`flex items-center gap-1 flex-wrap ${justifyCls}`}>
+        <div className={`flex items-center gap-1 flex-nowrap ${justifyCls}`}>
           {/* 프리셋 버튼 — edit → delete 고정 순서. preview 모드에서는 SubList 3버튼과 동일하게 모두 비활성화 처리 */}
           {(col.actions || []).includes("edit") && (
             <button

@@ -311,7 +311,10 @@ export function TableRenderer({
                     <td
                       key={col.id}
                       className="px-4 py-3 max-w-[200px] overflow-hidden"
-                      style={{ textAlign: col.align }}
+                      style={{
+                        textAlign: col.align,
+                        width: col.width ? `${col.width}${col.widthUnit || "px"}` : undefined,
+                      }}
                     >
                       <TableCellRenderer mode="preview" col={col} rowIndex={rowIdx} />
                     </td>
@@ -365,7 +368,10 @@ export function TableRenderer({
                       <td
                         key={col.id}
                         className="px-4 py-3 max-w-[200px] overflow-hidden"
-                        style={{ textAlign: col.align }}
+                        style={{
+                          textAlign: col.align,
+                          width: col.width ? `${col.width}${col.widthUnit || "px"}` : undefined,
+                        }}
                       >
                         <TableCellRenderer
                           mode="live"
