@@ -849,6 +849,15 @@ export const validateSubListRows = (
             return false;
           }
           /* minLength/maxLength/pattern은 dateRange에 의미가 없으므로 검사하지 않음 */
+          /* 자체 범위 검증 — 시작이 종료보다 늦으면 차단 (validateFormFields의 dateRange 검증과 동일) */
+          if (valFrom && valTo && valFrom > valTo) {
+            toast.warning(
+              t
+                ? t("common.validation.date_range_invalid", { label: String(label) })
+                : `'${label}' 종료일이 시작일보다 이전일 수 없습니다.`
+            );
+            return false;
+          }
           /* 필드간 대소비교 검증 — compareExpr 설정 시에만 동작, 비교 대상은 같은 SubList의 다른 컬럼으로 한정 */
           if (col.compareExpr) {
             const getSelfValue = (part?: "from" | "to") => resolveSubListCompareValue(col, row, part);
