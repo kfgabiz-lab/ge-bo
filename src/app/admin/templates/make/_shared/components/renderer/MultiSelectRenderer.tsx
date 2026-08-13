@@ -155,10 +155,19 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
 function buildLabel(item: OptionItem, widget: MultiSelectWidget): string {
   const outerRelationIds = widget.contentRelation?.outer?.relationIds;
   if (outerRelationIds && outerRelationIds.length > 0) {
-    const relMultiLabel = outerRelationIds
-      .flatMap((id) => extractFetchedRelItems(item as Record<string, unknown>, id, undefined))
-      .join(" > ");
-    if (relMultiLabel) return relMultiLabel;
+    /* relation별 값 배열 — 같은 제품이 카테고리 여러 경로에 매핑된 경우 각 relation이 다건(배열)을 반환한다.
+       flatMap으로 그냥 이어붙이면 서로 다른 경로의 depth가 뒤섞이므로, index로 짝지어(zip)
+       relation 순서(depth1 > depth2 > ...)대로 경로를 복원한 뒤, 경로가 여러 개면 쉼표로 구분한다. */
+    const perRelationValues = outerRelationIds.map((id) =>
+      extractFetchedRelItems(item as Record<string, unknown>, id, undefined)
+    );
+    const pathCount = Math.max(0, ...perRelationValues.map((v) => v.length));
+    const paths: string[] = [];
+    for (let i = 0; i < pathCount; i++) {
+      const parts = perRelationValues.map((v) => v[i]).filter((v): v is string => Boolean(v));
+      if (parts.length > 0) paths.push(parts.join(" > "));
+    }
+    if (paths.length > 0) return paths.join(", ");
   }
   if ((widget.sourceMode ?? "call") === "relation" && widget.sourceRelationSlugId) {
     const raw = item[`_fetchedRel${widget.sourceRelationSlugId}`];
