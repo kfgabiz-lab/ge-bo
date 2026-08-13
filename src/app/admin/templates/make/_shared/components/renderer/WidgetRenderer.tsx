@@ -57,6 +57,7 @@ if (typeof document !== "undefined") {
 }
 import api, { getApiErrorMessage } from "@/lib/api";
 import { waitForSitesLoaded } from "@/store/use-site-store";
+import { waitForServerClock } from "@/store/use-server-clock-store";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
 import { CodeGroupDef } from "../../types";
 import type { SearchFieldConfig } from "../../types";
@@ -93,6 +94,7 @@ import {
   resolveAccessor,
   buildSearchFieldsMap,
   buildSearchQueryParams,
+  buildDateRangeStatusParam,
   validateSearchDateRange,
   extractSubListRows,
   extractMultiSelectSelection,
@@ -144,7 +146,7 @@ async function fetchAndMapFieldValues(
   const existingFileIds: Record<string, number[]> = {};
 
   if (editId == null) {
-    await waitForSitesLoaded();
+    await Promise.all([waitForSitesLoaded(), waitForServerClock()]);
   }
 
   fields.forEach((f) => {
@@ -1016,6 +1018,8 @@ export function WidgetRenderer({
         const reqParams: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) reqParams.sort = `${sk},${sd}`;
         Object.assign(reqParams, buildSearchQueryParams(searchFields, sv));
+        const drsKeys = buildDateRangeStatusParam(tw.columns);
+        if (drsKeys) reqParams.drsKeys = drsKeys;
         const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
         const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
         setPopupTableDataMap((prev) => ({
@@ -1132,6 +1136,8 @@ export function WidgetRenderer({
         const reqParams: Record<string, string> = { page: "0", size: String(pageSize) };
         if (dir && accessor) reqParams.sort = `${accessor},${dir}`;
         Object.assign(reqParams, buildSearchQueryParams(searchFields, sv));
+        const drsKeys = buildDateRangeStatusParam(tw.columns);
+        if (drsKeys) reqParams.drsKeys = drsKeys;
         const res = await api.get(`/page-data/${tw.connectedSlug}`, { params: reqParams });
         const rows = (res.data.content as Parameters<typeof flattenPageDataItem>[0][]).map(flattenPageDataItem);
         setPopupTableDataMap((prev) => ({

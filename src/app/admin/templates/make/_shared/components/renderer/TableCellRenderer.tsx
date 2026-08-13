@@ -288,20 +288,33 @@ export function TableCellRenderer({
         const previewTexts = [beforeLabel, inRangeLabel, afterLabel];
         return <span className="text-sm text-slate-600">{previewTexts[rowIndex % 3]}</span>;
       }
-      /* live: 연결된 dateRange 컬럼의 _from/_to 분리 값으로 오늘 날짜 비교 → 상태 텍스트 반환 */
-      const fromStr = col.linkedDateRangeKey ? String(row[col.linkedDateRangeKey + "_from"] ?? "") : "";
-      const toStr = col.linkedDateRangeKey ? String(row[col.linkedDateRangeKey + "_to"] ?? "") : "";
-      if (!fromStr && !toStr) return <span className="text-sm text-slate-400">-</span>;
-      /* rangeSubType에 맞는 현재 시각 포맷으로 비교 기준 산출 — 저장값(input value)과 동일 포맷이어야 함 */
-      const subType = col.linkedRangeSubType ?? "date";
-      const nowStr = formatNowBySubType(subType);
+      /* live: BE가 drsKeys 요청으로 미리 계산해 내려준 _drs_{rangeKey} 값을 우선 사용,
+       * 없으면(entity 모드 등) 기존 클라이언트 계산으로 폴백 */
+      const rangeKey = col.linkedDateRangeKey;
+      const beStatus = rangeKey ? row[`_drs_${rangeKey}`] : undefined;
+
       let statusText = "-";
-      if (fromStr && nowStr < fromStr) {
+      if (beStatus === "before") {
         statusText = beforeLabel;
-      } else if (fromStr && toStr && nowStr >= fromStr && nowStr <= toStr) {
+      } else if (beStatus === "in_range") {
         statusText = inRangeLabel;
-      } else if (toStr && nowStr > toStr) {
+      } else if (beStatus === "after") {
         statusText = afterLabel;
+      } else {
+        /* 기존 클라이언트 계산 폴백: 연결된 dateRange 컬럼의 _from/_to 분리 값으로 오늘 날짜 비교 */
+        const fromStr = col.linkedDateRangeKey ? String(row[col.linkedDateRangeKey + "_from"] ?? "") : "";
+        const toStr = col.linkedDateRangeKey ? String(row[col.linkedDateRangeKey + "_to"] ?? "") : "";
+        if (!fromStr && !toStr) return <span className="text-sm text-slate-400">-</span>;
+        /* rangeSubType에 맞는 현재 시각 포맷으로 비교 기준 산출 — 저장값(input value)과 동일 포맷이어야 함 */
+        const subType = col.linkedRangeSubType ?? "date";
+        const nowStr = formatNowBySubType(subType);
+        if (fromStr && nowStr < fromStr) {
+          statusText = beforeLabel;
+        } else if (fromStr && toStr && nowStr >= fromStr && nowStr <= toStr) {
+          statusText = inRangeLabel;
+        } else if (toStr && nowStr > toStr) {
+          statusText = afterLabel;
+        }
       }
       return <span className="text-sm text-slate-600">{statusText}</span>;
     }

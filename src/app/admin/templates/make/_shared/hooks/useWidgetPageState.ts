@@ -1,20 +1,6 @@
-﻿"use client";
+"use client";
 
 import type React from "react";
-
-/**
- * useWidgetPageState — 위젯 페이지 공통 상태 관리 훅
- *
- * /admin/widget/[slug]/page.tsx 와 TabRenderer 양쪽에서 공통으로 사용.
- * widgetItems를 받아 검색·테이블·폼·서브리스트·카테고리·파일업로드·멀티셀렉트 상태를 관리하고
- * PageGridRenderer에 필요한 모든 핸들러를 반환한다.
- *
- * 사용법:
- *   const state = useWidgetPageState(widgetItems, pageSlug);
- *   <PageGridRenderer mode="live" widgetItems={widgetItems} {...state.gridProps} />
- *
- * options.onGoBack: 저장/삭제 후 이동 처리. 운영 페이지는 router.back(), 탭은 undefined(이동 없음).
- */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLeaveCheck } from "./useLeaveCheck";
@@ -22,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
 import { useSiteStore } from "@/store/use-site-store";
+import { useServerClockStore } from "@/store/use-server-clock-store";
 import {
   buildDataJson,
   buildDataSavePayload,
@@ -41,6 +28,7 @@ import {
   parseActionParams,
   buildSearchFieldsMap,
   buildSearchQueryParams,
+  buildDateRangeStatusParam,
   extractSubListRows,
   extractMultiSelectSelection,
   evalWidgetHideCondition,
@@ -69,22 +57,10 @@ import type { ConnectedType } from "./useOutputMode";
 
 const DEFAULT_PAGE_SIZE = 10;
 
-/** widgetItems 배열을 평탄화하여 모든 위젯 반환 */
 export function flatWidgets(items: PageWidgetItem[]): AnyWidget[] {
   return items.flatMap((item) => item.contents.map((c) => c.widget));
 }
 
-/** 대상 위젯의 connectedSlug가 비어있을 때만 기본값을 채운다(fill-if-empty).
- * 위젯 자신이 이미 값을 가지면 그대로 둔다(개별 지정 우선). defaultSlug가 빈 값이면 원본 그대로 반환.
- * - 위젯 빌더(widget/page.tsx)의 저장 시점(handleSaveConfirm)에서 공용 사용
- * - live 렌더링(이 파일의 useWidgetPageState 훅)은 위젯에 connectedSlug가 없으면
- *   데이터 저장/조회를 조용히 스킵하므로, 빌더 쪽에서 반드시 이 함수로 stamp 되어야 함
- * - item.contents 2단 구조로 순회(flatWidgets와 동일 구조, 탭 내부 재귀는 하지 않음 — 기존 동작 유지)
- * @param widgetItems  원본 위젯 목록 (불변 — 새 배열을 반환)
- * @param defaultSlug  비어있는 위젯에 채울 기본 slug
- * @param targetTypes  적용 대상 위젯 타입 (기본: form/table/sublist/multiselect 전부)
- * @example stampConnectedSlug(widgetItems, 'banner-list') // 대상 타입 중 connectedSlug 없는 위젯만 'banner-list'로 채움
- */
 export function stampConnectedSlug<
   W extends { type: string; connectedSlug?: string },
   C extends { widget: W },
@@ -105,58 +81,20 @@ export function stampConnectedSlug<
   })) as T[];
 }
 
-/* buildSearchFieldsMap — utils.ts로 이동(공용 함수, 팝업 레벨과 공유). 위 import 참조 */
-
-/** 훅 옵션 */
 interface UseWidgetPageStateOptions {
-  /** 저장/삭제 후 페이지 이동 콜백. 운영 페이지는 router.back(), 탭은 undefined(이동 없음). */
   onGoBack?: () => void;
-  /**
-   * URL ?id / ?group_id 기반 수정 모드 활성화 — widgetSub/page.tsx 전용
-   * true 시: URL 파라미터에서 id/group_id 감지 → 기존 데이터 자동 복원
-   */
   enableUrlEditMode?: boolean;
-  /**
-   * 탭 데이터 네임스페이스 키 (TabItem.contentKey)
-   * 설정 시 buildDataJson 결과를 해당 키로 감싸서 저장:
-   *   data_json = { [contentKey]: { ...폼데이터 } }
-   * 수정 시 기존 data_json을 GET → 현재 탭 섹션만 교체 → PUT
-   */
   contentKey?: string;
-  /**
-   * 같은 slug를 사용하는 탭들이 공유하는 row id
-   * 최초 저장(POST) 후 생성된 id → 이후 탭 저장 시 해당 row를 수정 모드로 처리
-   */
   sharedDataId?: number | null;
-  /** 신규 저장(POST) 후 생성된 id와 connectedSlug를 상위(TabRenderer)로 전달 */
   onDataIdCreated?: (connectedSlug: string, id: number) => void;
-  /** 저장 성공(POST/PUT 모두) 시 상위(TabRenderer)로 알림 — savedTabSet 갱신용 */
   onSaved?: () => void;
-  /** 페이지 레벨 메인 연결 slug — buildDataJson _rel 분기 기준 */
   mainConnectedSlug?: string;
-  /** true: 폼 변경 후 이탈 시 confirm 다이얼로그 표시 */
   leaveCheck?: boolean;
-  /**
-   * 페이지 레벨 메인 연결 타입 — Table 위젯 데이터 조회 API 분기 기준
-   * 'entity' | 'data' 인 경우 mainConnectedSlug(및 이를 stamp 받은 Table.connectedSlug)가
-   * Slug Entity 코드생성 REST API(/api/v1/{slug})를 가리키므로 fetchTableData가 해당 API로 조회한다.
-   * 'none' | 'slug' | 미설정이면 기존과 동일하게 page_data API(/page-data/{slug})로 조회한다.
-   */
   connectedType?: ConnectedType;
-  /**
-   * entity 모드(connectedType='data')에서도 검색 파라미터를 서버로 전송할지 여부
-   * - 기본(false/미설정): entity 모드는 검색 파라미터를 전송하지 않음(codegen 엔티티 API는 검색 미지원 가정)
-   * - true: 이 화면만 opt-in — Slug Entity 경로 위에 수제 컨트롤러를 얹어 검색 파라미터를
-   *   정식 지원하는 경우(예: training-registrations) 사용. 다른 entity 화면 동작에는 영향 없음.
-   */
   entitySearchEnabled?: boolean;
+  menuId?: number | null;
 }
 
-/**
- * contentKey로 dataJson 섹션 탐색
- * - 1단계: 최상위에서 직접 탐색
- * - 2단계: 탭 중첩 구조({ tabKey: { contentKey: {...} } }) 자동 감지
- */
 function findSection(dataJson: Record<string, unknown>, contentKey: string | undefined): Record<string, unknown> {
   if (!contentKey) return dataJson;
   if (dataJson[contentKey] && typeof dataJson[contentKey] === "object") {
@@ -174,23 +112,6 @@ function findSection(dataJson: Record<string, unknown>, contentKey: string | und
   return dataJson;
 }
 
-/**
- * Form/SubList/MultiSelect/파일 메타를 dataJson에서 복원하는 공통 순수 함수
- *
- * enableUrlEditMode useEffect와 sharedDataId useEffect 양쪽에서 재사용.
- * 훅 외부에 위치하여 클로저 의존성 없이 동작한다.
- *
- * 사용법:
- *   await restoreFormDataFromJson(dataJson, forms, sublists, multiSels,
- *     setFormValuesMap, setSubListRowsMap,
- *     setMultiSelectValuesMap, setMultiSelectExtraFieldValuesMap,
- *     setExistingFileMetaMap, setImgBlobUrls, isEntity, t);
- *
- * @param isEntity  true면 entity 연결 페이지 — 파일 메타/blob 조회를 page_file 시스템
- *                  (/page-files/meta, /page-files/{id}) 대신 file_meta 시스템
- *                  (/file-meta, /file-meta/{id}/download)으로 수행한다. (buildDataJson의
- *                  isEntity 파라미터와 동일한 패턴, 미전달 시 false = page_data 모드 그대로 동작)
- */
 async function restoreFormDataFromJson(
   dataJson: Record<string, unknown>,
   forms: FormWidget[],
@@ -216,8 +137,6 @@ async function restoreFormDataFromJson(
       const key = f.fieldKey || f.label;
       if (!key) return;
       if (f.type === "dateRange" || f.type === "yearMonthRange") {
-        /* dateRange/yearMonthRange 복원 키 — fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 키로 복원,
-           미지정 시 기존처럼 dataJson에서 _from/_to 분리 키로 복원(buildDataJson과 대칭) */
         const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
         const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
         if (fromVal === undefined && toVal === undefined) {
@@ -227,8 +146,6 @@ async function restoreFormDataFromJson(
           if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
         }
       } else if (f.type === "address") {
-        /* address(주소검색) 복원 — buildDataJson과 대칭: fieldKey/fieldKey_lat/fieldKey_lng 3개
-           flat 키에서 각각 복원한다 (dateRange의 _from/_to 복원과 동일한 패턴) */
         const hasAddressVal =
           section[key] !== undefined || section[key + "_lat"] !== undefined || section[key + "_lng"] !== undefined;
         if (!hasAddressVal) {
@@ -257,13 +174,11 @@ async function restoreFormDataFromJson(
     });
   });
 
-  /* SubList 행 복원 */
   sublists.forEach((sw) => {
     const rows = extractSubListRows(dataJson, sw.contentKey);
     setSubListRowsMap((prev) => ({ ...prev, [sw.widgetId]: rows }));
   });
 
-  /* MultiSelect 값 복원 */
   multiSels.forEach((mw) => {
     const result = extractMultiSelectSelection(dataJson, mw.contentKey, mw.connectedSlug);
     if (result.kind === "none") return;
@@ -273,7 +188,6 @@ async function restoreFormDataFromJson(
     }
   });
 
-  /* 파일 메타 + blob URL 복원 */
   try {
     const fileIds: number[] = [];
     const collectIds = (obj: Record<string, unknown>) => {
@@ -285,8 +199,6 @@ async function restoreFormDataFromJson(
     collectIds(dataJson);
 
     if (fileIds.length > 0) {
-      /* entity 모드: file_meta 전용 API 사용 — 응답 필드명이 origName이 아닌 originalName(camelCase)
-       * 이라 조회 직후 기존 { id, origName, fileSize } 형태로 맞춰 이후 로직은 공용으로 재사용한다. */
       const metaList = isEntity
         ? await api.get("/file-meta", { params: { ids: fileIds.join(",") } }).then((r) =>
             (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[]).map((m) => ({
@@ -305,9 +217,6 @@ async function restoreFormDataFromJson(
           if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
           const ids = section[f.fieldKey];
           if (!Array.isArray(ids)) return;
-          /* 배치 메타 조회(/page-files/meta 또는 /file-meta) 응답에 없는 id는 서버에 실제로
-           * 존재하지 않는 레코드(예: 저장 전 삭제된 파일의 dangling 참조) — 유령 placeholder를
-           * 만들지 않고 건너뛴다. */
           metaByFieldId[f.id] = (ids as number[])
             .map((id) => {
               const m = metaList.find((m) => m.id === id);
@@ -328,18 +237,9 @@ async function restoreFormDataFromJson(
         setExistingFileMetaMap((prev) => ({ ...prev, [fw.widgetId]: metaByFieldId }));
       });
     }
-  } catch {
-    /* 파일 없으면 조용히 처리 */
-  }
+  } catch {}
 }
 
-/**
- * dataJson에서 _fetchedRel{id} 최상위 키만 추출 — FormRenderer의 rowData 확장용
- *
- * 사용법:
- *   const fetchRelData = extractFetchRelData(dataJson);
- *   // → { _fetchedRel8: { form1: { title: 'Electronics' } }, ... }
- */
 function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   Object.entries(dataJson).forEach(([key, val]) => {
@@ -350,11 +250,6 @@ function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, 
   return result;
 }
 
-/**
- * Content-Disposition 응답 헤더에서 파일명을 추출한다. — handleApiCall의 파일다운로드(downloadFile) 전용.
- * `filename*=UTF-8''인코딩값`(RFC 5987) 형태를 우선 확인하고, 없으면 `filename="값"` 형태를 확인한다.
- * 둘 다 없으면 null을 반환한다(호출부에서 폴백 파일명을 사용).
- */
 function parseContentDispositionFilename(disposition?: string): string | null {
   if (!disposition) return null;
   const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
@@ -374,88 +269,58 @@ export function useWidgetPageState(
   pageSlug?: string,
   options?: UseWidgetPageStateOptions
 ) {
-  /* URL 파라미터 — 폼 필드 초기값 세팅용 */
   const searchParams = useSearchParams();
   const { t } = useI18n();
 
-  /* 이탈 감지 — leaveCheck 옵션이 true일 때만 활성화 */
   const { markDirty, markClean, confirmLeave } = useLeaveCheck(options?.leaveCheck ?? false);
 
-  /* 페이지 레벨 메인 연결이 Slug Entity API(/api/v1/{slug})를 가리키는지 여부 —
-   * connectedType이 'data'면 Table 위젯이 entity REST API로 데이터를 조회한다. */
   const pageIsEntity = options?.connectedType === "data";
 
-  /* 사이트 시간대 로드 완료 여부 — 날짜 기본값 계산은 이 값이 true가 될 때까지 대기 */
   const sitesLoaded = useSiteStore((s) => s.sitesLoaded);
+  const clockReady = useServerClockStore((s) => s.status === "synced" || s.status === "failed");
 
-  /* 검색 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>({});
   const searchValuesRef = useRef<Record<string, string>>({});
 
-  /* 테이블 */
   const [tableDataMap, setTableDataMap] = useState<Record<string, PageTableData>>({});
   const tableDataMapRef = useRef<Record<string, PageTableData>>({});
   const [sortKeyMap, setSortKeyMap] = useState<Record<string, string | null>>({});
   const [sortDirMap, setSortDirMap] = useState<Record<string, "asc" | "desc">>({});
-  /* 테이블 행 선택 — key: tableWidget.widgetId, value: 선택된 행 ID 배열 */
   const [tableSelectedRowsMap, setTableSelectedRowsMap] = useState<Record<string, number[]>>({});
 
-  /* 폼 */
   const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
 
-  /* 서브리스트 */
   const [subListRowsMap, setSubListRowsMap] = useState<Record<string, SubListRow[]>>({});
 
-  /* 카테고리 */
   const [categorySelections, setCategorySelections] = useState<Record<string, number | null>>({});
 
-  /* 파일 업로드 — Form 위젯용 */
   const [fileValuesMap, setFileValuesMap] = useState<Record<string, Record<string, File[]>>>({});
-  /** widgetId → fieldId → 기존 파일 메타 (수정 모드) */
   const [existingFileMetaMap, setExistingFileMetaMap] = useState<
     Record<string, Record<string, { id: number; origName: string; fileSize: number }[]>>
   >({});
-  /** fileId → blob URL 캐시 (이미지 필드 미리보기용) */
   const [imgBlobUrls, setImgBlobUrls] = useState<Record<number, string>>({});
-  /** SubList 파일 — widgetId → rowId → colId → 새로 선택한 파일 목록 */
   const [subListFileMap, setSubListFileMap] = useState<Record<string, Record<string, Record<string, File[]>>>>({});
-  /**
-   * 삭제 대기 중인 기존 파일 ID 모음(X 버튼 클릭 시점에는 서버에서 즉시 삭제하지 않고 보류) —
-   * handleContentAction 저장 성공 시점에 일괄 커밋(DELETE)한다. 저장하지 않고 이탈하면
-   * 서버 파일은 그대로 유지된다. useCallback 클로저의 stale 값 문제를 피하기 위해 ref로 관리.
-   */
   const pendingDeleteFileIdsRef = useRef<Set<number>>(new Set());
 
-  /* 멀티셀렉트 */
   const [multiSelectValuesMap, setMultiSelectValuesMap] = useState<Record<string, number[]>>({});
-  /** widgetId → itemId → fieldKey → value */
   const [multiSelectExtraFieldValuesMap, setMultiSelectExtraFieldValuesMap] = useState<
     Record<string, Record<number, Record<string, string>>>
   >({});
 
-  /* 수정 모드 group_id (신규 저장 후 다음 저장 시 수정 모드로 처리) */
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
 
-  /* URL 파라미터 중 폼에 없는 값 — 저장 시 dataJson에 병합 (enableUrlEditMode 전용) */
   const [urlParamSaveExtras, setUrlParamSaveExtras] = useState<Record<string, unknown>>({});
 
-  /** widgetId → _fetchedRel{id} 원본 데이터 맵 — FormRenderer rowData 구성용 */
   const [formFetchRelMap, setFormFetchRelMap] = useState<Record<string, Record<string, unknown>>>({});
 
-  /* ── API 연동 — action-button connType='api' 전용 ──
-   * 페이지 로드 시 1회 활성 API 정보 목록을 조회해 캐싱한다.
-   * (위젯 빌더 widget/page.tsx의 apiInfoOptions 조회와 동일한 패턴 — mount 1회 useEffect) */
   const [apiInfoOptions, setApiInfoOptions] = useState<ApiInfoOption[]>([]);
   useEffect(() => {
     api
       .get("/api-infos/active")
       .then((res) => setApiInfoOptions(res.data || []))
-      .catch(() => {
-        /* 조회 실패 시 빈 배열 유지 — 버튼 클릭 시 "연결된 API 없음" 안내로 처리 */
-      });
+      .catch(() => {});
   }, []);
 
-  /* 테이블 데이터 fetch */
   const fetchTableData = useCallback(
     async ({
       tableWidget,
@@ -466,8 +331,6 @@ export function useWidgetPageState(
       sk,
       sd = "asc",
       append = false,
-      /* 미지정 시 페이지 레벨 connectedType 기준값을 그대로 사용 — 호출부(검색/정렬/페이징 등)를
-       * 일일이 수정하지 않아도 페이지가 entity 연결이면 모든 Table 조회가 자동으로 entity API를 탄다. */
       isEntity = pageIsEntity,
     }: {
       tableWidget: TableWidget;
@@ -478,7 +341,6 @@ export function useWidgetPageState(
       sk?: string | null;
       sd?: "asc" | "desc";
       append?: boolean;
-      /** true면 page_data API 대신 Slug Entity 코드생성 REST API(/api/v1/{slug})로 조회 */
       isEntity?: boolean;
     }) => {
       const wid = tableWidget.widgetId;
@@ -503,12 +365,6 @@ export function useWidgetPageState(
         const params: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) params.sort = `${sk},${sd}`;
 
-        /* entity API는 기본적으로 검색조건 파라미터를 지원하지 않으므로 page/size/sort만 전송한다.
-         * (page_data 전용 검색 파라미터 구성은 entity 모드에서는 건너뛴다)
-         * 단, entitySearchEnabled(opt-in) 옵션이 켜진 화면은 entity 모드여도 검색 파라미터를 그대로 전송한다 —
-         * Slug Entity 경로 위에 검색을 정식 지원하는 수제 컨트롤러를 얹은 화면 전용(다른 entity 화면은 영향 없음).
-         * 검색 필드 → API 파라미터 변환 규칙은 공용 함수(buildSearchQueryParams)로 관리 —
-         * 팝업 레벨(WidgetRenderer)도 동일 함수를 사용해 동일한 변환 규칙을 공유한다. */
         if (!isEntity || options?.entitySearchEnabled) {
           Object.assign(params, buildSearchQueryParams(searchFields, sv));
         }
@@ -521,11 +377,16 @@ export function useWidgetPageState(
           params.fetchRelationIds = tableWidget.contentRelation.outer.relationIds.join(",");
         }
 
-        /* entity 모드: /api/v1/{slug} (Slug Entity 코드생성 REST API) — 그 외: 기존 page_data API */
-        const url = isEntity ? entityApiPath(connectedSlug) : `/page-data/${connectedSlug}`;
-        const res = await api.get(url, { params });
+        const drsKeys = buildDateRangeStatusParam(tableWidget.columns);
+        if (drsKeys) params.drsKeys = drsKeys;
 
-        /* 페이징 envelope 필드명이 API마다 달라 entity 모드일 때만 먼저 정규화(number → page 등)한다 */
+        const url = isEntity ? entityApiPath(connectedSlug) : `/page-data/${connectedSlug}`;
+        const menuIdHeader =
+          !isEntity && connectedSlug === pageSlug && options?.menuId != null
+            ? { "X-Menu-Id": String(options.menuId) }
+            : undefined;
+        const res = await api.get(url, { params, headers: menuIdHeader });
+
         const envelope = isEntity ? normalizeEntityPageEnvelope(res.data) : res.data;
 
         const rows = isEntity
@@ -564,10 +425,9 @@ export function useWidgetPageState(
         }));
       }
     },
-    [t, pageIsEntity]
+    [t, pageIsEntity, pageSlug, options?.menuId]
   );
 
-  /* widgetItems 변경 시 Table 위젯 초기 데이터 자동 fetch */
   useEffect(() => {
     if (!widgetItems.length) return;
     const fieldsMap = buildSearchFieldsMap(widgetItems);
@@ -580,23 +440,17 @@ export function useWidgetPageState(
     });
   }, [widgetItems, fetchTableData]);
 
-  /* tableDataMap ref 동기화 — handleLoadMore 클로저에서 최신값 참조 */
   useEffect(() => {
     tableDataMapRef.current = tableDataMap;
   }, [tableDataMap]);
 
-  /* widgetItems 로드 후 폼 필드 기본값 + URL 파라미터 초기화
-   * 우선순위: URL 파라미터 > defaultValue/defaultDate/defaultOptionValue 등
-   */
   useEffect(() => {
     if (!widgetItems.length) return;
 
     const formWidgets = flatWidgets(widgetItems).filter((w) => w.type === "form") as FormWidget[];
 
-    /* 공통 함수로 모든 타입의 기본값 초기화 */
     const patch = initFormDefaultValues(formWidgets, t);
 
-    /* URL 파라미터가 있으면 기본값 위로 오버라이드 */
     formWidgets.forEach((fw) => {
       (fw.fields ?? []).forEach((f) => {
         const fieldKey = f.fieldKey || f.label;
@@ -620,10 +474,9 @@ export function useWidgetPageState(
     });
   }, [widgetItems, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Search 위젯 날짜·옵션 기본값 초기화 — widgetSub 페이지 패턴 지원 */
   useEffect(() => {
     if (!widgetItems.length) return;
-    if (!sitesLoaded) return;
+    if (!sitesLoaded || !clockReady) return;
     const initVals: Record<string, string> = {};
     flatWidgets(widgetItems).forEach((w) => {
       if (w.type !== "search") return;
@@ -634,11 +487,9 @@ export function useWidgetPageState(
             (f.type === "date" || f.type === "yearMonth") &&
             (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)
           ) {
-            /* dateSubType에 따라 날짜 포맷 분기 (yearMonth 기존 타입은 yearMonth subType으로 처리) */
             const subType = f.type === "yearMonth" ? "yearMonth" : (f.dateSubType ?? "date");
             let val = "";
             if (f.defaultToday) {
-              /* 오늘날짜 ON: 활성 사이트 timezone 기준 오늘 날짜를 subType 포맷으로 반환 */
               val = formatNowBySubType(subType);
             } else {
               val =
@@ -648,10 +499,8 @@ export function useWidgetPageState(
             }
             if (val) initVals[f.id] = val;
           } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
-            /* rangeSubType에 따라 날짜 포맷 분기 */
             const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
             const isRangeTimeBased = subType === "time" || subType === "timeSec";
-            /* 오늘날짜는 시작·종료 각각 독립 토글 — 켜진 쪽만 활성 사이트 timezone 기준 오늘 값으로 대체 */
             const start = f.defaultStartToday
               ? formatNowBySubType(subType)
               : isRangeTimeBased
@@ -666,7 +515,6 @@ export function useWidgetPageState(
                 : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
                   ? calcDateOffset(f.defaultEndDateOffset, subType)
                   : (f.defaultEndDate ?? "");
-            /* dateRange/yearMonthRange: from/to 분리 저장 */
             if (start) initVals[f.id + "_from"] = start;
             if (end) initVals[f.id + "_to"] = end;
           } else if ((f.type === "select" || f.type === "radio" || f.type === "checkbox") && f.defaultOptionValue) {
@@ -680,9 +528,8 @@ export function useWidgetPageState(
       setSearchValues((prev) => ({ ...initVals, ...prev }));
       searchValuesRef.current = { ...initVals, ...searchValuesRef.current };
     }
-  }, [widgetItems, sitesLoaded]);
+  }, [widgetItems, sitesLoaded, clockReady]);
 
-  /* URL ?id / ?group_id 기반 수정 모드 — enableUrlEditMode: true 시 동작 */
   useEffect(() => {
     if (!options?.enableUrlEditMode || !widgetItems.length) return;
 
@@ -694,7 +541,6 @@ export function useWidgetPageState(
     const queryGroupId = searchParams.get("group_id");
     const queryId = searchParams.get("id");
 
-    /** URL 파라미터 → 폼 필드 세팅, 폼에 없는 값은 urlParamSaveExtras에 보관 */
     const applyUrlParams = () => {
       const SKIP = new Set(["id", "group_id", "_paramSave"]);
       const isParamSave = searchParams.get("_paramSave") === "true";
@@ -751,9 +597,6 @@ export function useWidgetPageState(
         ].filter((s): s is string => !!s)
       );
       slugSet.forEach((s) => {
-        /* entity 모드: entity는 group_id 개념이 없어(단일 id만 존재) URL의 group_id 값을
-         * 그대로 entity 단건 id로 취급해 조회한다 — page_data 모드는 기존 group 조회 그대로 유지
-         * 조회 직후 restoreEntityDateFields로 날짜/일시 필드를 FE input이 기대하는 로컬 문자열로 변환한다 */
         const fetchPromise = pageIsEntity
           ? api.get(entityItemPath(s, queryGroupId)).then((r) => {
               const dateFieldMeta = buildEntityDateFieldMeta(
@@ -788,8 +631,6 @@ export function useWidgetPageState(
       const connectedSlug =
         formWidgets[0]?.connectedSlug ?? multiSelWidgets[0]?.connectedSlug ?? sublistWidgets[0]?.connectedSlug;
       if (connectedSlug) {
-        /* entity 모드: /api/v1/{slug}/{id} 단건 조회 + normalizeEntityRow로 케이싱 별칭 부여
-         * + restoreEntityDateFields로 날짜/일시 필드를 FE input이 기대하는 로컬 문자열로 변환 */
         const fetchPromise = pageIsEntity
           ? api.get(entityItemPath(connectedSlug, Number(queryId))).then((r) => {
               const dateFieldMeta = buildEntityDateFieldMeta(formWidgets.flatMap((fw) => fw.fields));
@@ -814,7 +655,6 @@ export function useWidgetPageState(
               pageIsEntity,
               t
             );
-            // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
             const fetchRelData = extractFetchRelData(dataJson);
             if (Object.keys(fetchRelData).length > 0) {
               formWidgets.forEach((fw) => {
@@ -826,21 +666,16 @@ export function useWidgetPageState(
           .catch(() => toast.error(t("common.error.load_existing_data")));
       }
     } else {
-      /* 신규 모드 — 기본값 초기화 */
       setCurrentGroupId(null);
       setMultiSelectValuesMap({});
-      /* 날짜 기본값(defaultToday 등)은 사이트 시간대 로드 완료 후에만 계산 */
-      if (sitesLoaded) {
+      if (sitesLoaded && clockReady) {
         setFormValuesMap(initFormDefaultValues(formWidgets, t));
       }
       applyUrlParams();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgetItems, searchParams, options?.enableUrlEditMode, sitesLoaded]);
+  }, [widgetItems, searchParams, options?.enableUrlEditMode, sitesLoaded, clockReady]);
 
-  /* 수정 모드 초기 데이터 로드 — sharedDataId(탭 공유 row id) 있을 때
-   * Form/SubList/MultiSelect 모두 restoreFormDataFromJson 공통 함수로 복원
-   */
   useEffect(() => {
     if (!widgetItems.length) return;
     const id = options?.sharedDataId ?? null;
@@ -855,8 +690,6 @@ export function useWidgetPageState(
     const connectedSlug = forms[0].connectedSlug;
     if (!connectedSlug) return;
 
-    /* entity 모드: /api/v1/{slug}/{id} 단건 조회 + normalizeEntityRow로 케이싱 별칭 부여
-     * + restoreEntityDateFields로 날짜/일시 필드를 FE input이 기대하는 로컬 문자열로 변환 */
     const fetchPromise = pageIsEntity
       ? api.get(entityItemPath(connectedSlug, id)).then((r) => {
           const dateFieldMeta = buildEntityDateFieldMeta(forms.flatMap((fw) => fw.fields));
@@ -880,7 +713,6 @@ export function useWidgetPageState(
           pageIsEntity,
           t
         );
-        // _fetchedRel{id} 추출 후 각 Form 위젯에 매핑
         const fetchRelData = extractFetchRelData(rawDataJson);
         if (Object.keys(fetchRelData).length > 0) {
           forms.forEach((fw) => {
@@ -892,7 +724,6 @@ export function useWidgetPageState(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgetItems, options?.sharedDataId]);
 
-  /* 검색 값 업데이트 */
   const updateSearchValue = useCallback((id: string, val: string) => {
     setSearchValues((prev) => {
       const next = { ...prev, [id]: val };
@@ -901,13 +732,11 @@ export function useWidgetPageState(
     });
   }, []);
 
-  /* 검색 실행 */
   const handleSearch = useCallback(
     (searchWidgetId: string) => {
       const fieldsMap = buildSearchFieldsMap(widgetItems);
       const sv = searchValuesRef.current;
 
-      /* dateRange 최대 조회 기간 검증 — 초과 시 API 호출 차단 */
       const searchFields = fieldsMap[searchWidgetId] ?? [];
       if (!validateSearchDateRange(searchFields, sv, t)) return;
 
@@ -931,7 +760,6 @@ export function useWidgetPageState(
     [widgetItems, sortKeyMap, sortDirMap, fetchTableData, t]
   );
 
-  /* 검색 초기화 */
   const handleReset = useCallback(
     (searchWidgetId: string) => {
       setSearchValues({});
@@ -949,7 +777,6 @@ export function useWidgetPageState(
     [widgetItems, fetchTableData]
   );
 
-  /* 페이지 이동 */
   const handlePageChange = useCallback(
     (tableWidgetId: string, page: number) => {
       const fieldsMap = buildSearchFieldsMap(widgetItems);
@@ -971,7 +798,6 @@ export function useWidgetPageState(
     [widgetItems, sortKeyMap, sortDirMap, fetchTableData]
   );
 
-  /* 정렬 변경 */
   const handleSortChange = useCallback(
     (tableWidgetId: string, accessor: string, dir: "asc" | "desc" | null) => {
       const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
@@ -982,8 +808,6 @@ export function useWidgetPageState(
       if (!tableWidget?.connectedSlug) return;
       const searchFields = tableWidget.connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
 
-      /* _pathMap 참조해 단순 fieldKey → 실제 JSONB 경로로 변환
-       * row마다 구조가 다를 수 있으므로 모든 row를 순회해 유효한 경로를 첫 번째로 사용 */
       let resolvedSk = sk;
       if (sk) {
         const rows = tableDataMap[tableWidgetId]?.rows ?? [];
@@ -1009,7 +833,6 @@ export function useWidgetPageState(
     [widgetItems, fetchTableData, tableDataMap]
   );
 
-  /* 폼 값 업데이트 */
   const updateFormValue = useCallback(
     (widgetId: string, fieldId: string, value: string) => {
       setFormValuesMap((prev) => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: value } }));
@@ -1022,11 +845,6 @@ export function useWidgetPageState(
     setFormValuesMap((prev) => ({ ...prev, [widgetId]: { ...(prev[widgetId] ?? {}), [fieldId]: value } }));
   }, []);
 
-  /**
-   * 파일 선택 핸들러
-   * - rowId 없음: Form 위젯 파일 → fileValuesMap
-   * - rowId 있음: SubList 행 파일 → subListFileMap
-   */
   const handleFileChange = useCallback(
     (widgetId: string, fieldId: string, files: File[], rowId?: string) => {
       if (rowId !== undefined) {
@@ -1051,11 +869,6 @@ export function useWidgetPageState(
     [markDirty]
   );
 
-  /**
-   * 기존 파일 삭제 — 서버 DELETE는 저장 성공 시점까지 보류(pendingDeleteFileIdsRef)하고
-   * 여기서는 로컬 상태(existingFileMetaMap/imgBlobUrls)만 즉시 갱신한다.
-   * 실제 삭제 커밋은 handleContentAction의 슬러그 그룹 저장 반복이 모두 끝난 직후 1회 수행된다.
-   */
   const handleRemoveExisting = useCallback(
     (widgetId: string, fieldId: string, fileId: number) => {
       pendingDeleteFileIdsRef.current.add(fileId);
@@ -1076,29 +889,17 @@ export function useWidgetPageState(
     [markDirty]
   );
 
-  /**
-   * 컨텐츠(Form + SubList + MultiSelect) 저장/삭제 — 완전 버전
-   *
-   * [설계 원칙]
-   * - connectedContentWidgetIds 내 위젯들을 connectedSlug 기준으로 그룹핑
-   * - 같은 slug에 속한 Form + SubList + MultiSelect를 ONE page_data 레코드에 통합 저장
-   * - 파일 필드: fieldKey 값에 파일 ID 배열 직접 저장
-   * - goBackAfterAction: options.onGoBack 콜백 호출 (탭은 undefined → 페이지 이탈 없음)
-   */
   const handleContentAction = useCallback(
     async (
       connectedContentWidgetIds: string[],
       action: "save" | "delete",
       goBackAfterAction?: boolean,
       resolvedFormValuesMap?: Record<string, Record<string, string>>,
-      /** action-button 설정의 위젯별 검증 규칙 ID 맵 (key=위젯ID) — connType='content' 전용 */
       contentValidationRuleIds?: Record<string, number[]>
     ) => {
-      /* resolvedFormValuesMap: PageGridRenderer가 crossTab 값 병합 후 전달 — 없으면 내부 formValuesMap 사용 */
       const mapToUse = resolvedFormValuesMap ?? formValuesMap;
       const allFlat = flatWidgets(widgetItems);
 
-      /* 대상 위젯 수집 — form / sublist / multiselect */
       const targetWidgets = connectedContentWidgetIds
         .map((wid) =>
           allFlat.find(
@@ -1111,7 +912,6 @@ export function useWidgetPageState(
 
       if (targetWidgets.length === 0) return;
 
-      /* slug별 그룹핑 */
       const slugGroupsMap = new Map<string, (FormWidget | SubListWidget | MultiSelectWidget)[]>();
       for (const w of targetWidgets) {
         const s = (w as FormWidget | SubListWidget | MultiSelectWidget).connectedSlug;
@@ -1121,14 +921,11 @@ export function useWidgetPageState(
       }
       if (slugGroupsMap.size === 0) return;
 
-      /* 수정 모드 구분
-       * URL params 우선, 없으면 sharedDataId(탭 공유 row id) 확인 */
       const storedGroupId = searchParams.get("group_id") ?? currentGroupId;
       const storedId = searchParams.get("id") ? Number(searchParams.get("id")) : (options?.sharedDataId ?? null);
       const isUpdate = !!(storedGroupId || storedId);
 
       try {
-        /* ── DELETE ── */
         if (action === "delete") {
           if (!isUpdate) {
             toast.info(t("common.info.no_data_to_delete"));
@@ -1138,7 +935,6 @@ export function useWidgetPageState(
 
           const firstSlug = slugGroupsMap.keys().next().value!;
           if (pageIsEntity) {
-            /* entity 모드: group_id 개념이 없어 storedId 우선, 없으면 storedGroupId를 id로 취급 */
             const entityRecordId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
             if (entityRecordId) await api.delete(entityItemPath(firstSlug, entityRecordId));
           } else if (storedGroupId) {
@@ -1152,9 +948,6 @@ export function useWidgetPageState(
           return;
         }
 
-        /* ── SAVE ── */
-
-        /* 유효성 검사 — cross-form hideCondition 평가를 위해 전체 values/keyToId 통합 구성 */
         const allFormValues = Object.assign({}, ...Object.values(mapToUse)) as Record<string, string>;
         const allFieldKeyToId: Record<string, string> = {};
         const allFieldLabels: Record<string, string> = {};
@@ -1166,7 +959,6 @@ export function useWidgetPageState(
               if (!f.fieldKey) return;
               allFieldKeyToId[f.fieldKey] = f.id;
               allFieldLabels[f.fieldKey] = String((f.labelMsgKey && t ? t(f.labelMsgKey) : f.label) || f.fieldKey);
-              /* contentKey.fieldKey 형식 추가 — cross-form 명시 참조용 */
               if (fw.contentKey) allFieldKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
             });
           });
@@ -1188,7 +980,6 @@ export function useWidgetPageState(
             return;
         }
 
-        /* SubList 유효성 검사 — required/minLength/maxLength/pattern/파일제한 */
         const subWidgetsForValidation = targetWidgets.filter((w) => w.type === "sublist") as Array<{
           type: string;
           widgetId?: string;
@@ -1209,7 +1000,6 @@ export function useWidgetPageState(
         )
           return;
 
-        /* MultiSelect 유효성 검사 — required=true인데 선택값이 없으면 저장 중단 */
         for (const w of targetWidgets) {
           if (w.type !== "multiselect") continue;
           const mw = w as MultiSelectWidget;
@@ -1224,29 +1014,21 @@ export function useWidgetPageState(
           }
         }
 
-        /* mainConnectedSlug가 있으면 전체 위젯을 하나의 slug로 통합 저장 */
         const slugGroups = options?.mainConnectedSlug
           ? [[options.mainConnectedSlug, targetWidgets] as [string, (FormWidget | SubListWidget | MultiSelectWidget)[]]]
           : Array.from(slugGroupsMap.entries());
 
-        /* group_id 결정 */
         const groupId = slugGroups.length > 1 ? (storedGroupId ?? crypto.randomUUID()) : undefined;
 
-        /* slug 그룹별 반복 저장 */
         for (let groupIdx = 0; groupIdx < slugGroups.length; groupIdx++) {
           const [connectedSlug, widgets] = slugGroups[groupIdx];
           const isFirstSlugGroup = groupIdx === 0;
           const newFileIdsByFieldId: Record<string, number[]> = {};
 
-          /* 이 slug 그룹에 속한 위젯들의 검증 규칙 ID를 모두 모아 중복 제거 — 위젯별로 각각 설정된 규칙이 있을 수 있음 */
           const groupValidationRuleIds = contentValidationRuleIds
             ? [...new Set(widgets.flatMap((w) => contentValidationRuleIds[(w as { widgetId: string }).widgetId] ?? []))]
             : [];
 
-          /* 1. 파일 업로드
-           * entity 모드는 file_meta 전용 업로드 API(/file-meta/upload) 사용 —
-           * templateSlug/fieldKey는 page_data 전용 파라미터라 file_meta 쪽에는 없으므로
-           * file 필드만 전송한다. page_data 모드는 기존 /page-files/upload 그대로 유지. */
           for (const w of widgets) {
             if (w.type !== "form") continue;
             const fw = w as FormWidget;
@@ -1275,7 +1057,6 @@ export function useWidgetPageState(
             }
           }
 
-          /* 2. SubList rows 처리 — 파일 업로드 포함 */
           const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
           for (const w of widgets) {
             if (w.type !== "sublist") continue;
@@ -1308,7 +1089,6 @@ export function useWidgetPageState(
             processedSubListRowsMap[sw.widgetId] = processedRows;
           }
 
-          /* 3. formFileIdsMap 구성 — 기존 메타 ID + 신규 업로드 ID 합산 */
           const formFileIdsMap: Record<string, Record<string, number[]>> = {};
           for (const w of widgets) {
             if (w.type !== "form") continue;
@@ -1321,7 +1101,6 @@ export function useWidgetPageState(
             }
           }
 
-          /* 4. multiSelect 맵 구성 */
           const multiSelectMap: Record<string, number[]> = {};
           for (const w of widgets) {
             if (w.type !== "multiselect") continue;
@@ -1329,9 +1108,6 @@ export function useWidgetPageState(
             multiSelectMap[mw.widgetId] = multiSelectValuesMap[mw.widgetId] ?? [];
           }
 
-          /* 5. dataJson 구성
-           * pageIsEntity=true(entity 연결 페이지)면 contentKey가 있어도 flat 저장 —
-           * entity 저장 바디는 중첩 객체를 지원하지 않음(buildDataJson isEntity 파라미터 참고) */
           const { dataJson, pkKeys } = buildDataJson(
             widgets as Parameters<typeof buildDataJson>[0],
             mapToUse,
@@ -1344,7 +1120,6 @@ export function useWidgetPageState(
             pageIsEntity
           );
 
-          /* 5-1. urlParamSaveExtras 병합 — enableUrlEditMode 시 폼에 없던 URL 파라미터를 dataJson에 추가 */
           if (Object.keys(urlParamSaveExtras).length > 0) {
             Object.entries(urlParamSaveExtras).forEach(([key, val]) => {
               if (val !== null && typeof val === "object" && !Array.isArray(val)) {
@@ -1361,15 +1136,10 @@ export function useWidgetPageState(
             });
           }
 
-          /* 6. 저장 (생성 or 수정) */
           let savedDataId: number;
 
           if (pageIsEntity) {
-            /* entity 모드: page_data 전용 개념(group_id 조회/contentKey 병합)을 거치지 않고
-             * dataJson을 flat entity DTO 바디로 변환해 단건 CRUD만 수행한다.
-             * entity는 group_id 개념이 없어 storedId 우선, 없으면 storedGroupId를 id로 취급한다. */
             const entityRecordId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
-            /* 이 slug 그룹에 속한 Form 위젯들의 fields에서 날짜/일시 필드 메타를 뽑아 변환에 사용 */
             const dateFieldMeta = buildEntityDateFieldMeta(
               widgets.filter((w) => w.type === "form").flatMap((w) => (w as FormWidget).fields)
             );
@@ -1380,10 +1150,8 @@ export function useWidgetPageState(
             } else {
               const res = await api.post(entityApiPath(connectedSlug), entityBody);
               savedDataId = res.data.id;
-              /* 신규 저장 후 생성된 id와 connectedSlug를 TabRenderer로 전달 (sharedDataId 공유) */
               options?.onDataIdCreated?.(connectedSlug, savedDataId);
             }
-            /* POST/PUT 모두 성공 시 저장 완료 알림 — savedTabSet 갱신용 */
             options?.onSaved?.();
           } else {
             const slugStoredId = storedGroupId
@@ -1393,11 +1161,6 @@ export function useWidgetPageState(
                   .catch(() => null)
               : storedId;
 
-            /**
-             * contentKey 방식(탭 데이터 네임스페이스)인 경우:
-             * - 수정: 기존 data_json GET → 현재 탭 섹션만 교체 → PUT (다른 탭 섹션 보존)
-             * - 신규: { [contentKey]: {...폼데이터} } 로 감싸서 POST
-             */
             let finalDataJson = dataJson;
             if (options?.contentKey) {
               let baseDataJson: Record<string, unknown> = {};
@@ -1405,11 +1168,8 @@ export function useWidgetPageState(
                 try {
                   const getRes = await api.get(`/page-data/${connectedSlug}/${slugStoredId}`);
                   baseDataJson = (getRes.data.dataJson ?? {}) as Record<string, unknown>;
-                } catch {
-                  /* 기존 데이터 없으면 빈 객체로 시작 */
-                }
+                } catch {}
               }
-              /* 탭키 없이 폼 섹션 직접 merge (다른 탭 섹션 보존) */
               finalDataJson = { ...baseDataJson, ...dataJson };
             }
 
@@ -1436,20 +1196,12 @@ export function useWidgetPageState(
                 })
               );
               savedDataId = res.data.id;
-              /* group_id가 새로 생성된 경우 상태에 저장 */
               if (groupId && !storedGroupId) setCurrentGroupId(groupId);
-              /* 탭 신규 저장 후 생성된 id와 connectedSlug를 TabRenderer로 전달 (sharedDataId 공유) */
               options?.onDataIdCreated?.(connectedSlug, savedDataId);
             }
-            /* POST/PUT 모두 성공 시 저장 완료 알림 — savedTabSet 갱신용 */
             options?.onSaved?.();
           }
 
-          /* 7. 업로드 파일 → page_data 레코드 연결
-           * entity 모드는 이 연결(link) 단계 자체가 필요 없다 — 업로드된 파일ID를 dataJson에 담아
-           * entity 바디로 저장하는 것 자체가 이미 연결이며(buildEntityRequestBody가 처리), entity
-           * row id를 page_data id인 것처럼 PATCH하면 서로 다른 테이블 간 id 이름공간이 충돌할 위험이
-           * 있으므로 entity 모드에서는 이 블록 전체를 건너뛴다. */
           if (!pageIsEntity) {
             const allNewIds = Object.values(newFileIdsByFieldId).flat();
             if (allNewIds.length > 0) {
@@ -1464,7 +1216,6 @@ export function useWidgetPageState(
             }
           }
 
-          /* 8. 저장 후 파일 메타 재조회 */
           try {
             const fileIds: number[] = [];
             const collectIds = (obj: Record<string, unknown>) => {
@@ -1476,9 +1227,6 @@ export function useWidgetPageState(
             collectIds(dataJson);
 
             if (fileIds.length > 0) {
-              /* entity 모드: file_meta 전용 API 사용 — 응답 필드명이 origName이 아닌
-               * originalName(camelCase)이라 조회 직후 기존 { id, origName, fileSize } 형태로
-               * 맞춰 이후 로직은 공용으로 재사용한다. (restoreFormDataFromJson과 동일 패턴) */
               const metaList = pageIsEntity
                 ? await api
                     .get("/file-meta", { params: { ids: fileIds.join(",") } })
@@ -1508,15 +1256,12 @@ export function useWidgetPageState(
                   if (!f.fieldKey || !FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
                   const ids = section[f.fieldKey];
                   if (!Array.isArray(ids)) return;
-                  /* 배치 메타 조회 응답에 없는 id는 실제로 존재하지 않는 레코드 — 유령 placeholder를
-                   * 만들지 않고 건너뛴다(restoreFormDataFromJson과 동일 정책). */
                   metaByFieldId[f.id] = (ids as number[])
                     .map((id) => {
                       const m = metaList.find((m) => m.id === id);
                       return m ? { id: m.id, origName: m.origName, fileSize: m.fileSize } : null;
                     })
                     .filter((m): m is { id: number; origName: string; fileSize: number } => m !== null);
-                  /* 이미지/동영상/미디어 타입은 blob URL 생성 */
                   if (imageFieldIds.has(f.id) || f.type === "video" || f.type === "media") {
                     (ids as number[]).forEach((id) => {
                       if (imgBlobUrls[id]) return;
@@ -1537,13 +1282,9 @@ export function useWidgetPageState(
                 setExistingFileMetaMap((prev) => ({ ...prev, [fw.widgetId]: metaByFieldId }));
               }
             }
-          } catch {
-            /* 파일 메타 갱신 실패는 조용히 처리 */
-          }
-        } /* slug 그룹 반복 끝 */
+          } catch {}
+        }
 
-        /* 삭제 대기 중이던 기존 파일 일괄 커밋 — 모든 slug 그룹 저장이 끝난 뒤 1회만 실행.
-         * 개별 파일 삭제 실패는 로그만 남기고 저장 자체(성공 toast)에는 영향을 주지 않는다. */
         if (pendingDeleteFileIdsRef.current.size > 0) {
           const fileIdsToDelete = Array.from(pendingDeleteFileIdsRef.current);
           for (const fileId of fileIdsToDelete) {
@@ -1590,23 +1331,17 @@ export function useWidgetPageState(
     ]
   );
 
-  /**
-   * 데이터저장 버튼 핸들러 — connType='datasave' 전용
-   * form/sublist/multiselect/table 위젯 데이터를 dataSaveSlug 엔드포인트에 신규 저장
-   */
   const handleDataSave = useCallback(
     async (
       connectedContentWidgetIds: string[],
       dataSaveSlug: string,
       goBackAfterAction?: boolean,
       paramSave?: string,
-      /** action-button 설정의 검증 규칙 ID 목록 — connType='datasave' 전용, 요청 바디에 그대로 포함 */
       validationRuleIds?: number[]
     ) => {
       if (!dataSaveSlug) return;
       const allFlat = flatWidgets(widgetItems);
 
-      /* 대상 위젯 수집 — form / sublist / multiselect / table */
       const targetWidgets = connectedContentWidgetIds
         .map((wid) =>
           allFlat.find(
@@ -1622,7 +1357,6 @@ export function useWidgetPageState(
         return;
       }
 
-      /* 유효성 검사 — form / sublist / multiselect / table 통합 */
       if (
         !validateDataSaveWidgets({
           targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"],
@@ -1648,7 +1382,6 @@ export function useWidgetPageState(
       try {
         let anySaved = false;
 
-        /* form / sublist / multiselect → 파일 업로드 + dataJson 저장 */
         if (nonTableWidgets.length > 0) {
           const { formFileIdsMap, processedSubListRowsMap, allNewIds } = await processFormFilesAndSubList({
             targetWidgets: nonTableWidgets as Parameters<typeof processFormFilesAndSubList>[0]["targetWidgets"],
@@ -1689,7 +1422,6 @@ export function useWidgetPageState(
           anySaved = true;
         }
 
-        /* table 위젯 행 저장 — 선택된 행(enableRowSelection=true) 또는 전체 행 */
         for (const tw of tableWidgets) {
           const allRows = tableDataMapRef.current[tw.widgetId]?.rows ?? [];
           const selectedIds = tableSelectedRowsMap[tw.widgetId] ?? [];
@@ -1742,38 +1474,11 @@ export function useWidgetPageState(
     ]
   );
 
-  /* 엑셀 다운로드/API 연동 검색조건 포함 옵션 공용 — hideCondition 충족 필드 제외
-   * fetchTableData와 동일한 공용 함수(buildSearchQueryParams)로 변환 규칙 통일
-   * (BE PageDataService.exportAll도 search()와 동일한 appendWhereConditions/bindSearchParams를
-   *  공유하므로 condexpr_/condval_ 등 모든 파라미터를 동일하게 지원 — 별도 BE 대응 불필요) */
   const currentSearchParams = useMemo(() => {
     const fieldsMap = buildSearchFieldsMap(widgetItems);
     return buildSearchQueryParams(Object.values(fieldsMap).flat(), searchValues);
   }, [searchValues, widgetItems]);
 
-  /**
-   * API 연동 실행 핸들러 — connType='api' 전용 (live 모드 전용, preview에서는 절대 호출 금지)
-   *
-   * [이중 모드]
-   * - mode1 (apiInfoId 미선택 = undefined): api_info 조회 없이, 선택한 Form(main)/SubList(sub)을
-   *   id 유무로 판단해 entity 엔드포인트에 직접 생성(POST)/수정(PUT)한다.
-   * - mode2 (apiInfoId 선택): 선택한 api_info 한 건만 호출한다. 자식 SubList 자동 체이닝은 없음 —
-   *   POST/PUT/PATCH이고 컨텐츠 위젯이 선택된 경우 선택 위젯 전체를 하나의 flat 바디로 합쳐 보낸다.
-   *   (구 버전에서 apiInfo.connectedEntity + Form 선택 시 자동으로 자식 SubList를 체이닝 저장하던
-   *   동작은 제거됨 — 그 용도는 이제 mode1로 대체한다.)
-   *
-   * @param apiInfoId  action-button 설정에서 선택한 api_info.id. 미선택(undefined)이면 mode1으로 동작.
-   * @param paramsStr  action-button 설정의 params 문자열 — mode2 전용 (예: "id='1',status='use'")
-   * @param connectedContentWidgetIds  action-button 설정에서 선택한 위젯 widgetId 배열 (Table 제외).
-   *   mode2는 Form/SubList/MultiSelect가 대상이지만, mode1은 Form/SubList만 대상으로 삼고
-   *   MultiSelect는 그대로 무시한다(§ActionButtonField.tsx apiContentWidgets가 mode1일 때
-   *   미리 MultiSelect를 목록에서 제외하므로 선택 자체가 불가능하다).
-   * @param downloadFile  true면 응답을 파일 다운로드로 처리한다(mode2 전용 — apiInfoId 미선택(mode1)은
-   *   항상 entity CRUD라 파일 개념이 없음). blob 응답을 받아 브라우저 다운로드를 트리거하고,
-   *   성공 토스트 대신 다운로드 자체로 완료를 표시한다.
-   * @param includeSearchParams  true면 현재 화면 검색조건(currentSearchParams)을 요청 params에 병합한다
-   *   (mode2 전용). 동일 키는 고정 params(restParams)가 검색조건을 덮어쓴다.
-   */
   const handleApiCall = useCallback(
     async (
       apiInfoId: number | undefined,
@@ -1782,7 +1487,6 @@ export function useWidgetPageState(
       downloadFile?: boolean,
       includeSearchParams?: boolean
     ) => {
-      /* ── mode1: apiInfoId 미선택 — 선택한 Form(main)/SubList(sub)을 id 유무로 직접 entity CRUD ── */
       if (apiInfoId == null) {
         if (!connectedContentWidgetIds || connectedContentWidgetIds.length === 0) {
           toast.warning(t("common.widget.no_content"));
@@ -1800,7 +1504,6 @@ export function useWidgetPageState(
 
         if (targetWidgets.length === 0) return;
 
-        /* 유효성 검사 — handleDataSave와 동일 공통함수 재사용 */
         if (
           !validateDataSaveWidgets({
             targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"],
@@ -1815,8 +1518,6 @@ export function useWidgetPageState(
         )
           return;
 
-        /* main = 선택된 Form 중 첫 번째, sub = main과 다른 connectedSlug를 쓰는 SubList
-         * — mode2에서 쓰던 부모/자식 분류 기준(§02.builder_data_process.md)과 동일 */
         const formWidgets = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
         const mainWidget = formWidgets[0];
         if (!mainWidget?.connectedSlug) {
@@ -1830,14 +1531,11 @@ export function useWidgetPageState(
             (w as SubListWidget).connectedSlug !== mainWidget.connectedSlug
         ) as SubListWidget[];
 
-        /* 페이지가 이미 들고 있는 현재 레코드 식별자 — handleContentAction(1047~1051행)과 동일 판별 기준.
-         * URL ?id / ?group_id 우선, 없으면 탭 공유 sharedDataId 확인 */
         const storedGroupId = searchParams.get("group_id") ?? currentGroupId;
         const storedId = searchParams.get("id") ? Number(searchParams.get("id")) : (options?.sharedDataId ?? null);
         const existingParentId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
 
         try {
-          /* 파일 업로드 + SubList 행 가공 — main/sub 전체를 한 번에 처리(최신 fileIds 반영) */
           const { formFileIdsMap, processedSubListRowsMap } = await processFormFilesAndSubList({
             targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]["targetWidgets"],
             fileValuesMap,
@@ -1847,7 +1545,6 @@ export function useWidgetPageState(
             dataSaveSlug: mainWidget.connectedSlug,
           });
 
-          /* 부모(main Form) 저장 바디 — entity 저장은 flat 바디만 지원(isEntity=true) */
           const { dataJson } = buildDataJson(
             formWidgets as Parameters<typeof buildDataJson>[0],
             formValuesMap,
@@ -1864,7 +1561,6 @@ export function useWidgetPageState(
             buildEntityDateFieldMeta(formWidgets.flatMap((fw) => fw.fields))
           );
 
-          /* id 유무로 생성(POST)/수정(PUT) 자동 판단 */
           let parentId: number;
           if (existingParentId) {
             await api.put(entityItemPath(mainWidget.connectedSlug, existingParentId), entityBody);
@@ -1874,9 +1570,6 @@ export function useWidgetPageState(
             parentId = res.data.id;
           }
 
-          /* 자식(sub SubList) 각 행 — 기존행(id가 number)은 PUT, 신규행(id가 UUID 문자열)은 POST.
-           * (SubListRenderer가 새 행에는 crypto.randomUUID() 문자열을, 서버에서 복원한 기존 행에는
-           * number id를 채워 넣는 규칙을 그대로 이용해 생성/수정을 구분한다.) */
           const warnings: string[] = [];
           let childOkCount = 0;
           let childFailCount = 0;
@@ -1890,8 +1583,6 @@ export function useWidgetPageState(
             const rows = processedSubListRowsMap[sw.widgetId] ?? [];
             const dateFieldMeta = buildSubListEntityDateFieldMeta(sw.columns ?? []);
             for (const row of rows) {
-              /* row에는 SubList 내부 관리용 id 필드가 섞여 있다(신규=UUID 문자열, 기존=number).
-               * 자식 entity 요청 DTO에는 id 필드가 없어 그대로 보내면 거부되므로 제거 후 전송한다. */
               const { id: rowId, ...rowData } = row;
               const rowBody = buildEntityRequestBody({ ...rowData, [sw.parentIdField]: parentId }, dateFieldMeta);
               try {
@@ -1921,13 +1612,6 @@ export function useWidgetPageState(
         return;
       }
 
-      /* ── mode2: apiInfoId 선택 — 캐싱된 API 정보(apiInfoOptions)를 찾아 그 한 건만 호출 ──
-       * - urlPattern의 "/api/v1" 접두사는 axios baseURL과 중복되므로 제거
-       * - urlPattern에 "{key}" 형태 path 변수가 있으면 파라미터 값으로 치환(사용된 키는 나머지 파라미터에서 제거)
-       * - method가 GET/DELETE면 나머지 파라미터를 쿼리스트링으로, POST/PUT/PATCH면 요청 바디로 전송
-       * - method가 POST/PUT/PATCH이고 connectedContentWidgetIds(Form/SubList/MultiSelect)가 선택된 경우,
-       *   handleDataSave와 동일하게 파일 업로드+SubList 가공 → dataJson 구성 후 요청 바디에 함께 실어 보낸다
-       *   (선택 위젯 데이터가 base, 고정 params가 오버레이 — 동일 key는 params가 우선) */
       const apiInfo = apiInfoOptions.find((a) => a.id === apiInfoId);
       if (!apiInfo) {
         console.warn(`[handleApiCall] 연결된 API 정보를 찾을 수 없습니다. apiInfoId=${apiInfoId}`);
@@ -1935,15 +1619,12 @@ export function useWidgetPageState(
         return;
       }
 
-      /* 파라미터 문자열 파싱 — row 컨텍스트 없음(빈 객체) → "key='값'" 고정값 형태만 유효하게 동작 */
       const parsedParams = parseActionParams(paramsStr, {});
 
-      /* baseURL(/api/v1)과 중복되지 않도록 urlPattern 앞의 /api/v1 접두사 제거 */
       let url = apiInfo.urlPattern.startsWith("/api/v1")
         ? apiInfo.urlPattern.slice("/api/v1".length)
         : apiInfo.urlPattern;
 
-      /* {key} 형태 path 변수를 파싱된 파라미터 값으로 치환 — 치환에 사용한 키는 나머지 파라미터에서 제거 */
       const restParams: Record<string, string> = { ...parsedParams };
       url = url.replace(/\{([^}]+)\}/g, (matched, key: string) => {
         if (!(key in restParams)) return matched;
@@ -1952,7 +1633,6 @@ export function useWidgetPageState(
         return encodeURIComponent(val);
       });
 
-      /* 검색조건 포함 옵션 — 고정 params(restParams)가 우선, 동일 키는 고정값이 검색조건을 덮어씀 */
       const finalParams: Record<string, string> = includeSearchParams
         ? { ...currentSearchParams, ...restParams }
         : restParams;
@@ -1960,8 +1640,6 @@ export function useWidgetPageState(
       const method = (apiInfo.method || "GET").toUpperCase();
       const isBodyMethod = method === "POST" || method === "PUT" || method === "PATCH";
 
-      /* 연결된 컨텐츠 위젯(Form/SubList/MultiSelect) 데이터 수집 — POST/PUT/PATCH에서만 적용.
-       * mode2는 자식 SubList 자동 체이닝 없이 항상 선택 위젯 전체를 하나의 flat 바디로 합쳐 보낸다. */
       let contentBody: Record<string, unknown> = {};
 
       if (isBodyMethod && connectedContentWidgetIds && connectedContentWidgetIds.length > 0) {
@@ -1977,7 +1655,6 @@ export function useWidgetPageState(
           .filter(Boolean) as (FormWidget | SubListWidget | MultiSelectWidget)[];
 
         if (targetWidgets.length > 0) {
-          /* 유효성 검사 — handleDataSave와 동일 공통함수 재사용 (Table 제외이므로 tableSelectedRowsMap 미전달) */
           if (
             !validateDataSaveWidgets({
               targetWidgets: targetWidgets as Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"],
@@ -1994,14 +1671,12 @@ export function useWidgetPageState(
 
           const formWidgetsForParent = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
 
-          /* 파일 업로드 + SubList 행 가공 — buildDataJson 이전에 반드시 먼저 실행 (최신 fileIds 반영) */
           const { formFileIdsMap, processedSubListRowsMap } = await processFormFilesAndSubList({
             targetWidgets: targetWidgets as Parameters<typeof processFormFilesAndSubList>[0]["targetWidgets"],
             fileValuesMap,
             existingFileMetaMap,
             subListRowsMap,
             subListFileMap,
-            /* 임의 API 엔드포인트라 저장 대상 slug가 없음 — 업로드 파일 메타 구분용으로 현재 페이지 slug 사용 */
             dataSaveSlug: pageSlug ?? "",
           });
 
@@ -2012,14 +1687,6 @@ export function useWidgetPageState(
             multiSelectMap[mw.widgetId] = multiSelectValuesMap[mw.widgetId] ?? [];
           }
 
-          /* apiInfo.connectedEntity가 있으면 entity 저장 API(예: TestDataController)이므로
-           * contentKey 유무와 무관하게 항상 flat 바디로 보내야 함(entity 저장 바디는 중첩 객체 미지원).
-           * connectedEntity가 없는 일반 외부 API는 기존과 동일하게 contentKey 기준 nested 처리 유지.
-           *
-           * mainConnectedSlug는 "현재 페이지 자체의 entity 연결 slug" — API연동(connType='api')은
-           * 페이지와 무관한 임의의 다른 API를 호출하는 것이므로 여기서는 절대 전달하면 안 됨.
-           * 전달하면 buildDataJson의 _rel 분기(utils.ts)가 선택 위젯의 connectedSlug를 페이지의
-           * mainConnectedSlug와 비교해 엉뚱하게 _rel로 감싸버릴 수 있음. */
           const { dataJson } = buildDataJson(
             targetWidgets as Parameters<typeof buildDataJson>[0],
             formValuesMap,
@@ -2032,10 +1699,6 @@ export function useWidgetPageState(
             !!apiInfo.connectedEntity
           );
 
-          /* connectedEntity가 있으면 entity 요청 DTO가 기대하는 camelCase 필드명 + 날짜 오프셋 포맷으로
-           * 변환해서 보내야 한다 — handleContentAction의 entity 저장 분기(§02.builder_data_process.md)와
-           * 동일한 패턴. 변환 없이 fieldKey(snake_case 등) 그대로 보내면 codegen DTO가 알 수 없는
-           * 필드로 요청을 거부한다. connectedEntity가 없는 일반 외부 API는 기존과 동일하게 그대로 사용. */
           contentBody = apiInfo.connectedEntity
             ? buildEntityRequestBody(
                 dataJson,
@@ -2047,8 +1710,6 @@ export function useWidgetPageState(
 
       try {
         if (downloadFile) {
-          /* 파일다운로드 모드 — blob 응답으로 받아 성공 토스트 대신 브라우저 다운로드를 트리거한다.
-             (다운로드 트리거 방식은 WidgetRenderer.tsx의 doExcelDownload와 동일한 패턴 재사용) */
           const res = await api.request({
             method,
             url,
@@ -2058,7 +1719,6 @@ export function useWidgetPageState(
               : { data: { ...contentBody, ...finalParams } }),
           });
 
-          /* Content-Disposition 헤더에 파일명이 있으면 그걸 사용, 없으면 apiInfo.name 기반으로 폴백 */
           const disposition = res.headers?.["content-disposition"] as string | undefined;
           const filename = parseContentDispositionFilename(disposition) ?? `${apiInfo.name || "download"}.xlsx`;
 
@@ -2074,7 +1734,6 @@ export function useWidgetPageState(
           await api.request({ method, url, params: finalParams });
           toast.success(`${apiInfo.name} 요청이 완료되었습니다.`);
         } else {
-          /* 위젯 데이터(contentBody)가 base, 고정 params(restParams)가 오버레이 */
           await api.request({ method, url, data: { ...contentBody, ...finalParams } });
           toast.success(`${apiInfo.name} 요청이 완료되었습니다.`);
         }
@@ -2102,7 +1761,6 @@ export function useWidgetPageState(
     ]
   );
 
-  /* 테이블 전체 새로고침 */
   const handleRefresh = useCallback(() => {
     const fieldsMap = buildSearchFieldsMap(widgetItems);
     const sv = searchValuesRef.current;
@@ -2115,7 +1773,6 @@ export function useWidgetPageState(
     });
   }, [widgetItems, fetchTableData]);
 
-  /* 무한스크롤 다음 페이지 */
   const handleLoadMore = useCallback(
     (tableWidgetId: string) => {
       const td = tableDataMapRef.current[tableWidgetId];
@@ -2140,7 +1797,6 @@ export function useWidgetPageState(
     [widgetItems, sortKeyMap, sortDirMap, fetchTableData]
   );
 
-  /* 카테고리 선택 */
   const handleCategorySelect = useCallback((widgetId: string, selectedId: number | null) => {
     setCategorySelections((prev) => ({ ...prev, [widgetId]: selectedId }));
   }, []);
@@ -2166,7 +1822,6 @@ export function useWidgetPageState(
     []
   );
 
-  /* PageGridRenderer에 바로 spread할 수 있도록 묶어서 반환 */
   const gridProps = {
     searchValues,
     onSearchChange: updateSearchValue,
@@ -2197,20 +1852,16 @@ export function useWidgetPageState(
     pageSlug,
     currentSearchParams,
     leaveCheck: options?.leaveCheck ?? false,
-    /* 파일 업로드 */
     fileValuesMap,
     existingFileMetaMap,
     imgBlobUrls,
     onFileChange: handleFileChange,
     onRemoveExisting: handleRemoveExisting,
-    /* 멀티셀렉트 */
     multiSelectValuesMap,
     onMultiSelectChange: handleMultiSelectChange,
     multiSelectExtraFieldValuesMap,
     onMultiSelectExtraFieldChange: handleMultiSelectExtraFieldChange,
-    /* _fetchedRel{id} 데이터 맵 — FormRenderer rowData 확장용 */
     formFetchRelMap,
-    /* entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
     pageIsEntity,
   };
 

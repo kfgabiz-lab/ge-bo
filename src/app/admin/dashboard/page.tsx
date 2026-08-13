@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
-import PageLayout from "@/components/layout/page-layout";
+import PageLayout, { findMenuById } from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
 import {
   WidgetRenderer,
@@ -18,6 +18,8 @@ import { validateSearchDateRange } from "@/app/admin/templates/make/_shared/util
 import { useI18n } from "@/hooks/use-i18n";
 import api from "@/lib/api";
 import { useCodeStore } from "@/store/use-code-store";
+import { useAuthStore } from "@/store/auth-store";
+import { useMenuStore } from "@/store/use-menu-store";
 import type { CodeGroupDef } from "@/app/admin/templates/make/_shared/types";
 import { CircleCountCard } from "./CircleCountCard";
 
@@ -163,6 +165,12 @@ export default function DashboardPage() {
   const { t } = useI18n();
   const router = useRouter();
   const { groups: codeGroups, fetchGroups } = useCodeStore();
+
+  const adminInfo = useAuthStore((s) => s.adminInfo);
+  const navMenus = useMenuStore((s) => s.navMenus);
+  const hasTrainingMenu = !!findMenuById(navMenus, 200);
+  const isSuperAdminOrAbove = adminInfo?.role === "SUPER_ADMIN" || adminInfo?.isSystem === true;
+  const showSearchBar = hasTrainingMenu || isSuperAdminOrAbove;
 
   useEffect(() => {
     fetchGroups();
@@ -398,68 +406,76 @@ export default function DashboardPage() {
 
   return (
     <PageLayout title="대시보드" mode="live">
-      <GridCell colSpan={12} rowSpan={2}>
-        <WidgetRenderer
-          mode="live"
-          widget={SEARCH_WIDGET}
-          contentColSpan={12}
-          searchValues={searchValues}
-          onSearchChange={handleSearchChange}
-          onSearch={handleSearch}
-          onReset={handleReset}
-        />
-      </GridCell>
+      {showSearchBar && (
+        <GridCell colSpan={12} rowSpan={2}>
+          <WidgetRenderer
+            mode="live"
+            widget={SEARCH_WIDGET}
+            contentColSpan={12}
+            searchValues={searchValues}
+            onSearchChange={handleSearchChange}
+            onSearch={handleSearch}
+            onReset={handleReset}
+          />
+        </GridCell>
+      )}
 
-      <GridCell colSpan={6} rowSpan={4}>
-        <TrainingSummarySection
-          title="정기 Training 신청 내역"
-          href={trainingHref("01", regularTrainingType)}
-          totalLabel="전체"
-          counts={regularCounts}
-          loading={summaryLoading}
-          trainingType={regularTrainingType}
-          onTrainingTypeChange={setRegularTrainingType}
-          codeGroups={codeGroups}
-        />
-      </GridCell>
+      {hasTrainingMenu && (
+        <GridCell colSpan={6} rowSpan={4}>
+          <TrainingSummarySection
+            title="정기 Training 신청 내역"
+            href={trainingHref("01", regularTrainingType)}
+            totalLabel="전체"
+            counts={regularCounts}
+            loading={summaryLoading}
+            trainingType={regularTrainingType}
+            onTrainingTypeChange={setRegularTrainingType}
+            codeGroups={codeGroups}
+          />
+        </GridCell>
+      )}
 
-      <GridCell colSpan={6} rowSpan={4}>
-        <TrainingSummarySection
-          title="비정기 Training 신청 내역"
-          href={trainingHref("02", irregularTrainingType)}
-          totalLabel="전체"
-          counts={irregularCounts}
-          loading={summaryLoading}
-          trainingType={irregularTrainingType}
-          onTrainingTypeChange={setIrregularTrainingType}
-          codeGroups={codeGroups}
-        />
-      </GridCell>
+      {hasTrainingMenu && (
+        <GridCell colSpan={6} rowSpan={4}>
+          <TrainingSummarySection
+            title="비정기 Training 신청 내역"
+            href={trainingHref("02", irregularTrainingType)}
+            totalLabel="전체"
+            counts={irregularCounts}
+            loading={summaryLoading}
+            trainingType={irregularTrainingType}
+            onTrainingTypeChange={setIrregularTrainingType}
+            codeGroups={codeGroups}
+          />
+        </GridCell>
+      )}
 
-      <GridCell colSpan={12} rowSpan={6}>
-        <RendererContainer bgColor="#ffffff">
-          <div className="h-full w-full flex flex-col gap-3 p-5">
-            <Link href={errorLogHref} className="flex items-center gap-1.5 group flex-shrink-0">
-              <h2 className="text-sm font-bold text-slate-900">에러 로그 현황</h2>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
-            </Link>
-            <div className="flex-1 min-h-0">
-              <WidgetRenderer
-                mode="live"
-                widget={ERROR_TABLE_WIDGET}
-                contentColSpan={12}
-                tableData={errorTableData}
-                tableLoading={errorLoading}
-                totalElements={errorTotalElements}
-                totalPages={errorTotalPages}
-                currentPage={errorCurrentPage}
-                onPageChange={handleErrorPageChange}
-                onRowClick={handleErrorRowClick}
-              />
+      {isSuperAdminOrAbove && (
+        <GridCell colSpan={12} rowSpan={6}>
+          <RendererContainer bgColor="#ffffff">
+            <div className="h-full w-full flex flex-col gap-3 p-5">
+              <Link href={errorLogHref} className="flex items-center gap-1.5 group flex-shrink-0">
+                <h2 className="text-sm font-bold text-slate-900">에러 로그 현황</h2>
+                <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
+              </Link>
+              <div className="flex-1 min-h-0">
+                <WidgetRenderer
+                  mode="live"
+                  widget={ERROR_TABLE_WIDGET}
+                  contentColSpan={12}
+                  tableData={errorTableData}
+                  tableLoading={errorLoading}
+                  totalElements={errorTotalElements}
+                  totalPages={errorTotalPages}
+                  currentPage={errorCurrentPage}
+                  onPageChange={handleErrorPageChange}
+                  onRowClick={handleErrorRowClick}
+                />
+              </div>
             </div>
-          </div>
-        </RendererContainer>
-      </GridCell>
+          </RendererContainer>
+        </GridCell>
+      )}
     </PageLayout>
   );
 }

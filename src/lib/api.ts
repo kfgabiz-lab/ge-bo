@@ -1,4 +1,4 @@
-﻿import axios, { InternalAxiosRequestConfig } from "axios";
+import axios, { InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
 import { useSiteStore } from "@/store/use-site-store";
 
@@ -8,15 +8,8 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
 
 const BASE_URL = "/api/v1";
 
-/* 동시 401 race condition 방지 — refresh는 한 번만 실행, 나머지는 대기 */
 let refreshPromise: Promise<string> | null = null;
 
-/**
- * Axios 기본 인스턴스
- * - Access Token: Zustand 메모리에서 읽어 자동 첨부 (localStorage 미사용)
- * - withCredentials: Refresh Token httpOnly 쿠키 자동 전송
- * - 401 응답 시 /auth/refresh로 토큰 갱신 후 원래 요청 재시도
- */
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 60000,
@@ -24,7 +17,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// 요청 인터셉터: Access Token + 활성 사이트 ID 자동 첨부
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().accessToken;
@@ -40,11 +32,20 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터: 401 발생 시 Refresh Token 쿠키로 갱신 후 재시도
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config as RetryableConfig;
+
+    if (
+      error.response?.status === 403 &&
+      (original?.url?.includes("/page-data/") || original?.url?.includes("/page-templates/by-slug/"))
+    ) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/bo/admin/no-permission";
+      }
+      return Promise.reject(error);
+    }
 
     if (
       error.response?.status === 401 &&
@@ -54,7 +55,6 @@ api.interceptors.response.use(
     ) {
       original._retry = true;
       try {
-        /* 이미 refresh 진행 중이면 동일한 Promise 대기, 아니면 새로 시작 */
         if (!refreshPromise) {
           refreshPromise = api
             .post("/auth/refresh", {}, { withCredentials: true })
@@ -71,7 +71,6 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${accessToken}`;
         return api(original);
       } catch {
-        // Refresh 실패 시 로그아웃 처리
         refreshPromise = null;
         await api.post("/auth/logout", {}, { withCredentials: true }).catch(() => {});
         useAuthStore.getState().logout();
@@ -85,12 +84,6 @@ api.interceptors.response.use(
   }
 );
 
-/**
- * axios 에러 응답에서 BE가 내려준 구체적 에러 메시지를 추출.
- * BE(GlobalExceptionHandler)는 에러 시 { status, error, message, timestamp } 형태로 응답한다.
- * message가 없으면 fallback 문구를 반환한다 — catch 블록에서
- * toast.error(getApiErrorMessage(err, '기본 문구')) 형태로 사용.
- */
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
   return message || fallback;

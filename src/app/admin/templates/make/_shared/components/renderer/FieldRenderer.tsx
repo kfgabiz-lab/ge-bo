@@ -1269,12 +1269,7 @@ export function FieldRenderer({
       /* offset 기반 기본값 계산 — 서브타입에 따라 포맷 분기 */
       const calcRangeDefault = (offset?: number, date?: string): string => {
         if (offset !== undefined && offset !== 0) {
-          const d = new Date();
-          d.setDate(d.getDate() - offset);
-          const iso = d.toISOString();
-          if (subType === "yearMonth") return iso.slice(0, 7);
-          if (subType === "datetime") return iso.slice(0, 16);
-          return iso.slice(0, 10);
+          return calcDateOffset(offset, subType);
         }
         return date ?? "";
       };

@@ -6,8 +6,9 @@ import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useSiteStore } from "@/store/use-site-store";
+import { serverNowMs } from "@/store/use-server-clock-store";
 import { FILE_FIELD_TYPES } from "./constants";
-import type { DateSubType, CodeGroupDef } from "./types";
+import type { DateSubType, CodeGroupDef, TableColumnConfig } from "./types";
 import { buildFetchKey } from "./components/builder/fields/utils";
 
 /** getDateParts가 반환하는 시각의 연/월/일/시/분/초 문자열 조각 */
@@ -75,7 +76,7 @@ function getDateParts(date: Date): NowParts {
 
 /** 현재 시각을 "활성 사이트의 timezone" 기준 연/월/일/시/분/초 문자열로 분해 (getDateParts 참고) */
 function getNowParts(): NowParts {
-  return getDateParts(new Date());
+  return getDateParts(new Date(serverNowMs()));
 }
 
 /**
@@ -2557,18 +2558,21 @@ export function buildSearchQueryParams(
       const paramKey = f.fieldKey || f.label;
       const from = sv[f.id + "_from"];
       const to = sv[f.id + "_to"];
+      const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
+      const fromParam = f.defaultStartToday && from === formatNowBySubType(subType) ? "today()" : from;
+      const toParam = f.defaultEndToday && to === formatNowBySubType(subType) ? "today()" : to;
       if (paramKey) {
         /* singleDateRange=true: 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터 전송 */
         if (f.singleDateRange) {
-          if (from?.trim()) params[`${paramKey}_gte`] = from;
-          if (to?.trim()) params[`${paramKey}_lte`] = to;
+          if (from?.trim()) params[`${paramKey}_gte`] = fromParam;
+          if (to?.trim()) params[`${paramKey}_lte`] = toParam;
         } else if (f.fieldKey2) {
           /* fieldKey2 지정 시 시작=fieldKey/종료=fieldKey2 파라미터명 그대로 전송 (자동유도 폴백 대신) */
           if (from?.trim()) params[paramKey] = from;
           if (to?.trim()) params[f.fieldKey2] = to;
         } else {
-          if (from?.trim()) params[`${paramKey}_from`] = from;
-          if (to?.trim()) params[`${paramKey}_to`] = to;
+          if (from?.trim()) params[`${paramKey}_from`] = fromParam;
+          if (to?.trim()) params[`${paramKey}_to`] = toParam;
         }
       }
       return;
@@ -2611,4 +2615,22 @@ export function buildSearchQueryParams(
   });
 
   return params;
+}
+
+/**
+ * Table 위젯 컬럼 중 cellType==='dateRangeStatus'인 컬럼들의 linkedDateRangeKey를 모아
+ * BE가 파생 필드(`_drs_{rangeKey}`)를 계산해 내려주도록 요청하는 `drsKeys` 파라미터 값을 만든다.
+ * 페이지 레벨(useWidgetPageState.fetchTableData)과 팝업 레벨(WidgetRenderer) 양쪽에서 공유.
+ *
+ * @param columns Table 위젯의 컬럼 설정 목록
+ * @returns 콤마로 join한 linkedDateRangeKey 목록. 대상 컬럼이 없으면 undefined
+ * @example const drsKeys = buildDateRangeStatusParam(tableWidget.columns);
+ *          if (drsKeys) params.drsKeys = drsKeys;
+ */
+export function buildDateRangeStatusParam(columns: TableColumnConfig[]): string | undefined {
+  const keys = columns
+    .filter((col) => col.cellType === "dateRangeStatus" && col.linkedDateRangeKey)
+    .map((col) => col.linkedDateRangeKey as string);
+  const uniqueKeys = Array.from(new Set(keys));
+  return uniqueKeys.length > 0 ? uniqueKeys.join(",") : undefined;
 }
