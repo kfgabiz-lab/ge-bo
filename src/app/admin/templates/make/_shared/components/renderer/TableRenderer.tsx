@@ -73,6 +73,8 @@ interface TableRendererProps {
   onSort?: (accessor: string, dir: "asc" | "desc" | null) => void;
   codeGroups?: CodeGroupDef[];
   handlers?: TableActionHandlers;
+  /** 지정 시 행 클릭으로 이동 등 동작 수행 (live 모드 전용, 미지정 시 기존 동작 유지) */
+  onRowClick?: (row: Record<string, unknown>) => void;
   /* live 모드 페이지네이션 전용 (preview에서는 pageSize가 샘플 행 수로 사용됨) */
   pageSize?: number; // 페이지당 행 수
   totalElements?: number; // 총 데이터 건수
@@ -99,6 +101,7 @@ export function TableRenderer({
   onSort,
   codeGroups = [],
   handlers,
+  onRowClick,
   pageSize = PREVIEW_ROW_COUNT,
   totalElements = 0,
   totalPages = 0,
@@ -346,7 +349,8 @@ export function TableRenderer({
                 return (
                   <tr
                     key={rowId || rowIdx}
-                    className={`border-b border-slate-100 last:border-0 transition-all ${isSelected ? "bg-slate-50" : "hover:bg-slate-50/50"}`}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={`border-b border-slate-100 last:border-0 transition-all ${isSelected ? "bg-slate-50" : "hover:bg-slate-50/50"}${onRowClick ? " cursor-pointer" : ""}`}
                   >
                     {/* live 체크박스 — 개별 행 선택 */}
                     {enableRowSelection && (

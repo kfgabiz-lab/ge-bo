@@ -131,7 +131,7 @@ export default function SitesPage() {
   const totalPages = Math.ceil(sites.length / PAGE_SIZE);
 
   const handleSort = useCallback((accessor: string, dir: "asc" | "desc" | null) => {
-    setSortKey(accessor);
+    setSortKey(dir ? accessor : null);
     if (dir) setSortDir(dir);
     setCurrentPage(0);
   }, []);

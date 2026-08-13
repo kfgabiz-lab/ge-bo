@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
 import PageLayout from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
@@ -20,9 +21,10 @@ import { useCodeStore } from "@/store/use-code-store";
 import type { CodeGroupDef } from "@/app/admin/templates/make/_shared/types";
 import { CircleCountCard } from "./CircleCountCard";
 
-const ERROR_PAGE_SIZE = 5;
+const ERROR_PAGE_SIZE = 10;
 
 interface DashboardErrorLogItem {
+  id: number;
   createdAt: string;
   httpStatus: string;
   errorCode: string;
@@ -159,6 +161,7 @@ function TrainingSummarySection({
 
 export default function DashboardPage() {
   const { t } = useI18n();
+  const router = useRouter();
   const { groups: codeGroups, fetchGroups } = useCodeStore();
 
   useEffect(() => {
@@ -218,6 +221,7 @@ export default function DashboardPage() {
       const res = await api.get<ErrorLogPageResponse>("/error-logs", { params });
       setErrorItems(
         res.data.content.map((item) => ({
+          id: item.id,
           createdAt: item.createdAt ? item.createdAt.slice(0, 19).replace("T", " ") : "-",
           httpStatus: String(item.httpStatus),
           errorCode: item.errorCode ?? "-",
@@ -342,7 +346,32 @@ export default function DashboardPage() {
     []
   );
 
-  const errorTableData = useMemo(() => errorItems as unknown as Record<string, unknown>[], [errorItems]);
+  const goErrorLogDetail = useCallback(
+    (id: number) => {
+      router.push(`/admin/logs/error/${id}`);
+    },
+    [router]
+  );
+
+  const handleErrorRowClick = useCallback(
+    (row: Record<string, unknown>) => {
+      const id = row._id as number;
+      if (id) goErrorLogDetail(id);
+    },
+    [goErrorLogDetail]
+  );
+
+  const errorTableData = useMemo(
+    () =>
+      errorItems.map((item) => ({
+        _id: item.id,
+        createdAt: item.createdAt,
+        httpStatus: item.httpStatus,
+        errorCode: item.errorCode,
+        message: item.message,
+      })) as unknown as Record<string, unknown>[],
+    [errorItems]
+  );
 
   const handleErrorPageChange = useCallback(
     (page: number) => {
@@ -425,6 +454,7 @@ export default function DashboardPage() {
                 totalPages={errorTotalPages}
                 currentPage={errorCurrentPage}
                 onPageChange={handleErrorPageChange}
+                onRowClick={handleErrorRowClick}
               />
             </div>
           </div>

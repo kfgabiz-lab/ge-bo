@@ -255,7 +255,7 @@ export default function AdminAccountsPage() {
   }, []);
 
   const handleSort = useCallback((accessor: string, dir: "asc" | "desc" | null) => {
-    setSortKey(accessor);
+    setSortKey(dir ? accessor : null);
     if (dir) setSortDir(dir);
   }, []);
 

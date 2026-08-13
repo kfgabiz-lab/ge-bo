@@ -257,6 +257,8 @@ interface WidgetRendererProps {
 
   /* ── live 모드 전용 — table ── */
   handlers?: TableActionHandlers;
+  /** 지정 시 행 클릭으로 이동 등 동작 수행 (미지정 시 기존 동작 유지) */
+  onRowClick?: (row: Record<string, unknown>) => void;
   /** 행 다중선택 체크박스 활성화 여부 */
   enableRowSelection?: boolean;
   /** 현재 선택된 행 ID 배열 */
@@ -396,6 +398,7 @@ export function WidgetRenderer({
   onRemoveExisting,
   /* table */
   handlers,
+  onRowClick,
   enableRowSelection,
   selectedRowIds,
   onRowsSelect,
@@ -2095,6 +2098,7 @@ export function WidgetRenderer({
           columns={widget.columns}
           codeGroups={codeGroups}
           handlers={wrappedHandlers}
+          onRowClick={onRowClick}
           enableRowSelection={widget.enableRowSelection}
           selectedRowIds={selectedRowIds}
           onRowsSelect={onRowsSelect}
