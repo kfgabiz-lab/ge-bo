@@ -317,6 +317,82 @@ function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProp
 }
 
 /* ─────────────────────────────────────────────
+   표 크기 입력 팝업 컴포넌트
+───────────────────────────────────────────── */
+interface TableSizeDialogProps {
+  onInsert: (rows: number, cols: number) => void;
+  onClose: () => void;
+}
+
+function TableSizeDialog({ onInsert, onClose }: TableSizeDialogProps) {
+  const [rows, setRows] = useState(3);
+  const [cols, setCols] = useState(3);
+
+  const handleInsert = () => {
+    const clampedRows = Math.min(Math.max(rows, 1), 20);
+    const clampedCols = Math.min(Math.max(cols, 1), 20);
+    onInsert(clampedRows, clampedCols);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-xl w-[320px] overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+          <span className="text-sm font-semibold text-slate-800">표 삽입</span>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-sm text-slate-500 mb-1">행(row)</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={rows}
+                onChange={(e) => setRows(Number(e.target.value))}
+                className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm text-slate-500 mb-1">열(column)</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={cols}
+                onChange={(e) => setCols(Number(e.target.value))}
+                onKeyDown={(e) => e.key === "Enter" && handleInsert()}
+                className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleInsert}
+              className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded hover:bg-slate-700 transition-colors"
+            >
+              삽입
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    툴바 버튼 공통 컴포넌트
 ───────────────────────────────────────────── */
 interface ToolbarButtonProps {
@@ -370,12 +446,37 @@ function PreviewPanel({ html }: PreviewPanelProps) {
 }
 
 /* ─────────────────────────────────────────────
+   현재 커서가 속한 표의 실제 행/열 개수 계산
+   — editor.can().deleteRow()/deleteColumn()는 dispatch 없이 호출(dry-run)될 때
+     prosemirror-tables가 마지막 1행/1열 제약을 검사하지 않아 항상 true를 반환하므로
+     신뢰할 수 없다. 표 노드를 직접 순회해 판단한다.
+───────────────────────────────────────────── */
+function getTableDimensions(editor: NonNullable<ReturnType<typeof useEditor>>) {
+  const { $from } = editor.state.selection;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    const node = $from.node(depth);
+    if (node.type.name === "table") {
+      const rowCount = node.childCount;
+      let colCount = 0;
+      if (rowCount > 0) {
+        node.child(0).forEach((cell) => {
+          colCount += (cell.attrs.colspan as number) || 1;
+        });
+      }
+      return { rowCount, colCount };
+    }
+  }
+  return null;
+}
+
+/* ─────────────────────────────────────────────
    에디터 툴바 컴포넌트
 ───────────────────────────────────────────── */
 interface EditorToolbarProps {
   editor: ReturnType<typeof useEditor>;
   onImageOpen: () => void;
   onLinkOpen: () => void;
+  onTableOpen: () => void;
   showSourceView: boolean;
   onToggleSourceView: () => void;
   showTextMode: boolean;
@@ -388,6 +489,7 @@ function EditorToolbar({
   editor,
   onImageOpen,
   onLinkOpen,
+  onTableOpen,
   showSourceView,
   onToggleSourceView,
   showTextMode,
@@ -433,11 +535,6 @@ function EditorToolbar({
     }
   };
 
-  /* 3x3 헤더 포함 테이블 삽입 */
-  const handleInsertTable = () => {
-    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-  };
-
   const handleAddRowBefore = () => {
     editor.chain().focus().addRowBefore().run();
   };
@@ -446,8 +543,14 @@ function EditorToolbar({
     editor.chain().focus().addRowAfter().run();
   };
 
+  /* 마지막 남은 행은 deleteRow가 불가하므로(표 최소 1행 제약) 표 전체 삭제로 대체 */
   const handleDeleteRow = () => {
-    editor.chain().focus().deleteRow().run();
+    const dimensions = getTableDimensions(editor);
+    if (dimensions && dimensions.rowCount <= 1) {
+      editor.chain().focus().deleteTable().run();
+    } else {
+      editor.chain().focus().deleteRow().run();
+    }
   };
 
   const handleAddColumnBefore = () => {
@@ -458,8 +561,14 @@ function EditorToolbar({
     editor.chain().focus().addColumnAfter().run();
   };
 
+  /* 마지막 남은 열은 deleteColumn이 불가하므로(표 최소 1열 제약) 표 전체 삭제로 대체 */
   const handleDeleteColumn = () => {
-    editor.chain().focus().deleteColumn().run();
+    const dimensions = getTableDimensions(editor);
+    if (dimensions && dimensions.colCount <= 1) {
+      editor.chain().focus().deleteTable().run();
+    } else {
+      editor.chain().focus().deleteColumn().run();
+    }
   };
 
   const handleDeleteTable = () => {
@@ -568,7 +677,7 @@ function EditorToolbar({
       <ToolbarDivider />
 
       {/* ── 그룹4: 테이블, 이미지, 링크 ── */}
-      <ToolbarButton onClick={handleInsertTable} title="테이블 삽입 (3×3)">
+      <ToolbarButton onClick={onTableOpen} title="테이블 삽입">
         <TableIcon size={14} />
       </ToolbarButton>
 
@@ -580,7 +689,11 @@ function EditorToolbar({
         <ArrowDownToLine size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={handleDeleteRow} disabled={!tableCommandState?.canDeleteRow} title="행 삭제">
+      <ToolbarButton
+        onClick={handleDeleteRow}
+        disabled={!tableCommandState?.isInTable}
+        title="행 삭제 (마지막 행이면 표 삭제)"
+      >
         <Trash2 size={14} />
       </ToolbarButton>
 
@@ -600,7 +713,11 @@ function EditorToolbar({
         <ArrowRightToLine size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={handleDeleteColumn} disabled={!tableCommandState?.canDeleteColumn} title="열 삭제">
+      <ToolbarButton
+        onClick={handleDeleteColumn}
+        disabled={!tableCommandState?.isInTable}
+        title="열 삭제 (마지막 열이면 표 삭제)"
+      >
         <Trash2 size={14} className="rotate-90" />
       </ToolbarButton>
 
@@ -760,6 +877,8 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
   const [showImageDialog, setShowImageDialog] = useState(false);
   /* 링크 팝업 표시 여부 */
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  /* 표 삽입 팝업 표시 여부 */
+  const [showTableDialog, setShowTableDialog] = useState(false);
   /* HTML 소스뷰 표시 여부 */
   const [showSourceView, setShowSourceView] = useState(false);
   /* 소스뷰 textarea 편집 값 */
@@ -881,6 +1000,15 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
     setShowLinkDialog(false);
   }, [editor]);
 
+  /* 표 삽입 처리 — 입력받은 행/열 개수로 삽입 */
+  const handleTableInsert = useCallback(
+    (rows: number, cols: number) => {
+      editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+      setShowTableDialog(false);
+    },
+    [editor]
+  );
+
   /* 현재 커서 위치의 링크 href (팝업 초기값) */
   const currentLinkHref: string = editor?.getAttributes("link").href ?? "";
 
@@ -972,6 +1100,7 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
         editor={editor}
         onImageOpen={() => setShowImageDialog(true)}
         onLinkOpen={() => setShowLinkDialog(true)}
+        onTableOpen={() => setShowTableDialog(true)}
         showSourceView={showSourceView}
         onToggleSourceView={handleToggleSourceView}
         showTextMode={showTextMode}
@@ -1027,6 +1156,9 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
 
       {/* 미리보기 패널 — 하단에 인라인으로 펼쳐지는 패널(모달 아님) */}
       {showPreview && <PreviewPanel html={previewHtml} />}
+
+      {/* 표 삽입 팝업 */}
+      {showTableDialog && <TableSizeDialog onInsert={handleTableInsert} onClose={() => setShowTableDialog(false)} />}
 
       {/* 이미지 삽입 팝업 */}
       {showImageDialog && <ImageDialog onInsert={handleImageInsert} onClose={() => setShowImageDialog(false)} />}
