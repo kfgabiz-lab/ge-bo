@@ -60,6 +60,10 @@ export default function ErrorLogPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  /* 정렬 상태 */
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
   const buildInitialSearch = (): Record<string, string> => ({
     f1: "",
     f2: "",
@@ -76,14 +80,14 @@ export default function ErrorLogPage() {
 
   /* ── 목록 API 호출 ── */
   const fetchList = useCallback(
-    async (page = 0, search = appliedSearch) => {
+    async (page = 0, search = appliedSearch, sk = sortKey, sd = sortDir) => {
       setLoading(true);
       try {
         /* API 파라미터 구성 */
         const params: Record<string, string> = {
           page: String(page),
           size: String(PAGE_SIZE),
-          sort: "createdAt,desc",
+          sort: sk ? `${sk},${sd}` : "createdAt,desc",
         };
 
         /* 상태코드 — 숫자로 변환 가능한 경우만 전달 */
@@ -119,7 +123,7 @@ export default function ErrorLogPage() {
         setLoading(false);
       }
     },
-    [appliedSearch]
+    [appliedSearch, sortKey, sortDir]
   );
 
   /* 초기 로드 */
@@ -201,7 +205,7 @@ export default function ErrorLogPage() {
           accessor: "createdAt",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
           width: 160,
         },
         {
@@ -210,7 +214,7 @@ export default function ErrorLogPage() {
           accessor: "httpStatus",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
           width: 90,
         },
         {
@@ -219,7 +223,7 @@ export default function ErrorLogPage() {
           accessor: "method",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
           width: 80,
         },
         {
@@ -228,7 +232,7 @@ export default function ErrorLogPage() {
           accessor: "errorCode",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
         },
         {
           id: "c5",
@@ -236,7 +240,7 @@ export default function ErrorLogPage() {
           accessor: "requestUrl",
           cellType: "text",
           align: "left",
-          sortable: false,
+          sortable: true,
         },
         {
           id: "c6",
@@ -244,7 +248,7 @@ export default function ErrorLogPage() {
           accessor: "message",
           cellType: "text",
           align: "left",
-          sortable: false,
+          sortable: true,
         },
         {
           id: "c7",
@@ -252,7 +256,7 @@ export default function ErrorLogPage() {
           accessor: "clientIp",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
           width: 120,
         },
         {
@@ -261,7 +265,7 @@ export default function ErrorLogPage() {
           accessor: "loginUser",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
           width: 150,
         },
         {
@@ -301,6 +305,18 @@ export default function ErrorLogPage() {
   const handlePageChange = useCallback(
     (page: number) => {
       fetchList(page, appliedSearch);
+    },
+    [fetchList, appliedSearch]
+  );
+
+  /* ── 정렬 변경 핸들러 ── */
+  const handleSort = useCallback(
+    (accessor: string, dir: "asc" | "desc" | null) => {
+      const nextKey = dir ? accessor : null;
+      const nextDir = dir ?? "desc";
+      setSortKey(nextKey);
+      setSortDir(nextDir);
+      fetchList(0, appliedSearch, nextKey, nextDir);
     },
     [fetchList, appliedSearch]
   );
@@ -361,6 +377,9 @@ export default function ErrorLogPage() {
           totalPages={totalPages}
           currentPage={currentPage}
           onPageChange={handlePageChange}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
           handlers={handlers}
         />
       </GridCell>

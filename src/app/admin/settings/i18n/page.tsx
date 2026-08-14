@@ -181,7 +181,7 @@ export default function I18nPage() {
 
   /* 정렬 변경 */
   const handleSort = useCallback((accessor: string, dir: "asc" | "desc" | null) => {
-    setSortKey(accessor);
+    setSortKey(dir ? accessor : null);
     if (dir) setSortDir(dir);
   }, []);
 
@@ -215,9 +215,18 @@ export default function I18nPage() {
   );
 
   /* 테이블 데이터 — active를 string으로 변환 (badge cellType 호환) */
+  const sortedItems = useMemo(() => {
+    if (!sortKey) return items;
+    return [...items].sort((a, b) => {
+      const aVal = String(a[sortKey as keyof MessageResource] ?? "");
+      const bVal = String(b[sortKey as keyof MessageResource] ?? "");
+      return sortDir === "asc" ? aVal.localeCompare(bVal, "ko") : bVal.localeCompare(aVal, "ko");
+    });
+  }, [items, sortKey, sortDir]);
+
   const tableData = useMemo(
     () =>
-      items.map((item) => ({
+      sortedItems.map((item) => ({
         _id: item.id,
         key: item.key,
         ko: item.ko,
@@ -226,7 +235,7 @@ export default function I18nPage() {
         active: String(item.active),
         createdAt: item.createdAt ? item.createdAt.replace("T", " ").substring(0, 16) : "",
       })) as unknown as Record<string, unknown>[],
-    [items]
+    [sortedItems]
   );
 
   return (

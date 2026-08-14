@@ -43,6 +43,10 @@ export default function SearchMgmtPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  /* 정렬 상태 */
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
   /* 공통코드 스토어 — 테이블의 분류 컬럼이 코드값을 이름으로 변환할 때 사용 */
   const { groups: codeGroups, fetchGroups } = useCodeStore();
 
@@ -58,13 +62,13 @@ export default function SearchMgmtPage() {
 
   /* ── 목록 조회 — 실제 API 호출 (서버 페이징) ── */
   const fetchList = useCallback(
-    async (page = 0, search = appliedSearch) => {
+    async (page = 0, search = appliedSearch, sk = sortKey, sd = sortDir) => {
       setLoading(true);
       try {
         const params: Record<string, string> = {
           page: String(page),
           size: String(PAGE_SIZE),
-          sort: "createdAt,desc",
+          sort: sk ? `${sk},${sd}` : "createdAt,desc",
         };
         if (search.f1) {
           params.url = search.f1;
@@ -81,7 +85,7 @@ export default function SearchMgmtPage() {
         setLoading(false);
       }
     },
-    [appliedSearch]
+    [appliedSearch, sortKey, sortDir]
   );
 
   /* 초기 로드 */
@@ -143,7 +147,7 @@ export default function SearchMgmtPage() {
           accessor: "pageSection",
           cellType: "text",
           align: "center",
-          sortable: false,
+          sortable: true,
           codeGroupCode: PAGE_SECTION_GROUP_CODE,
           displayAs: "text",
           width: 120,
@@ -154,7 +158,7 @@ export default function SearchMgmtPage() {
           accessor: "url",
           cellType: "text",
           align: "left",
-          sortable: false,
+          sortable: true,
         },
         {
           id: "c2",
@@ -214,6 +218,18 @@ export default function SearchMgmtPage() {
   const handlePageChange = useCallback(
     (page: number) => {
       fetchList(page, appliedSearch);
+    },
+    [fetchList, appliedSearch]
+  );
+
+  /* ── 정렬 변경 핸들러 ── */
+  const handleSort = useCallback(
+    (accessor: string, dir: "asc" | "desc" | null) => {
+      const nextKey = dir ? accessor : null;
+      const nextDir = dir ?? "desc";
+      setSortKey(nextKey);
+      setSortDir(nextDir);
+      fetchList(0, appliedSearch, nextKey, nextDir);
     },
     [fetchList, appliedSearch]
   );
@@ -278,6 +294,9 @@ export default function SearchMgmtPage() {
           totalPages={totalPages}
           currentPage={currentPage}
           onPageChange={handlePageChange}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
           handlers={handlers}
           codeGroups={codeGroups}
         />
