@@ -168,7 +168,7 @@ export default function DashboardPage() {
 
   const adminInfo = useAuthStore((s) => s.adminInfo);
   const navMenus = useMenuStore((s) => s.navMenus);
-  const hasTrainingMenu = !!findMenuById(navMenus, 200);
+  const hasTrainingMenu = !!findMenuById(navMenus, 232);
   const isSuperAdminOrAbove = adminInfo?.role === "SUPER_ADMIN" || adminInfo?.isSystem === true;
   const showSearchBar = hasTrainingMenu || isSuperAdminOrAbove;
 
@@ -247,8 +247,9 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!hasTrainingMenu && !isSuperAdminOrAbove) return;
     fetchSummary(appliedSearch, regularTrainingType, irregularTrainingType);
-  }, [appliedSearch, regularTrainingType, irregularTrainingType, fetchSummary]);
+  }, [appliedSearch, regularTrainingType, irregularTrainingType, fetchSummary, hasTrainingMenu, isSuperAdminOrAbove]);
 
   useEffect(() => {
     fetchErrorLog(0, appliedSearch);

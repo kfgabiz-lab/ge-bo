@@ -1,6 +1,7 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth-store";
 import { useSiteStore } from "@/store/use-site-store";
+import { useNavigationStore } from "@/store/use-navigation-store";
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -41,8 +42,13 @@ api.interceptors.response.use(
       error.response?.status === 403 &&
       (original?.url?.includes("/page-data/") || original?.url?.includes("/page-templates/by-slug/"))
     ) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/bo/admin/no-permission";
+      if (typeof window !== "undefined" && window.location.pathname !== "/bo/admin/no-permission") {
+        const navigate = useNavigationStore.getState().navigate;
+        if (navigate) {
+          navigate("/admin/no-permission");
+        } else {
+          window.location.href = "/bo/admin/no-permission";
+        }
       }
       return Promise.reject(error);
     }
