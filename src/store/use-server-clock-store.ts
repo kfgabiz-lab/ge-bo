@@ -43,28 +43,3 @@ export async function syncServerClock(): Promise<void> {
     useServerClockStore.setState({ status: "failed" });
   }
 }
-
-const WAIT_FOR_SERVER_CLOCK_TIMEOUT_MS = 5000;
-
-export function waitForServerClock(): Promise<void> {
-  const status = useServerClockStore.getState().status;
-  if (status === "synced" || status === "failed") {
-    return Promise.resolve();
-  }
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      clearTimeout(timer);
-      resolve();
-    };
-    const unsubscribe = useServerClockStore.subscribe((state) => {
-      if (state.status === "synced" || state.status === "failed") {
-        finish();
-      }
-    });
-    const timer = setTimeout(finish, WAIT_FOR_SERVER_CLOCK_TIMEOUT_MS);
-  });
-}
