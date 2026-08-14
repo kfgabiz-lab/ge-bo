@@ -199,7 +199,7 @@ export function TableRenderer({
   return (
     /* RendererContainer — h-full w-full + 테두리 공통 처리
            scroll+live: flex-col 추가로 내부 스크롤 레이아웃 활성화 */
-    <RendererContainer className={`bg-white${isScroll && !isPreview ? " flex flex-col" : ""}`}>
+    <RendererContainer className={`bg-white${!isPreview ? " flex flex-col" : ""}`}>
       {/* 총 건수 / 표시 범위 (preview: 샘플값, live: 실제값) */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
         <p className="text-xs text-slate-500">
@@ -229,7 +229,7 @@ export function TableRenderer({
        */}
       <div
         ref={isScroll && !isPreview ? scrollContainerRef : undefined}
-        className={`overflow-x-auto${isScroll && !isPreview ? " flex-1 overflow-y-auto" : ""}`}
+        className={`overflow-x-auto${!isPreview ? " flex-1 overflow-y-auto" : ""}`}
       >
         <table className="w-full text-sm">
           {/* ── 헤더 ── */}
@@ -426,7 +426,7 @@ export function TableRenderer({
 
       {/* 페이지네이션 (scroll 모드 제외 / preview: 샘플 3페이지 disabled, live: totalPages >= 1이면 항상 표시) */}
       {!isScroll && (isPreview || totalPages >= 1) && (
-        <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
+        <div className="flex-shrink-0 flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
           <button
             disabled={isPreview || currentPage === 0}
             onClick={() => onPageChange?.(currentPage - 1)}

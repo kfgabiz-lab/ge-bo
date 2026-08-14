@@ -579,7 +579,7 @@ export default function TrainingRequestListPage() {
 
   return (
     <PageLayout mode="live">
-      <GridCell colSpan={12} rowSpan={4}>
+      <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer
           mode="live"
           widget={SEARCH_WIDGET}
