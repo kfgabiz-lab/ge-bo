@@ -38,10 +38,7 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config as RetryableConfig;
 
-    if (
-      error.response?.status === 403 &&
-      (original?.url?.includes("/page-data/") || original?.url?.includes("/page-templates/by-slug/"))
-    ) {
+    if (error.response?.status === 403) {
       if (typeof window !== "undefined" && window.location.pathname !== "/bo/admin/no-permission") {
         const navigate = useNavigationStore.getState().navigate;
         if (navigate) {

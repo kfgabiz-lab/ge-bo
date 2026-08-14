@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { useMenuStore } from "@/store/use-menu-store";
 import { useI18nStore } from "@/store/use-i18n-store";
-import { syncServerClock, startServerClockAutoSync } from "@/store/use-server-clock-store";
+import { syncServerClock } from "@/store/use-server-clock-store";
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,7 +20,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchMessages();
     syncServerClock();
-    return startServerClockAutoSync();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { isSidebarCollapsed } = useMenuStore();

@@ -252,8 +252,9 @@ export default function DashboardPage() {
   }, [appliedSearch, regularTrainingType, irregularTrainingType, fetchSummary, hasTrainingMenu, isSuperAdminOrAbove]);
 
   useEffect(() => {
+    if (!isSuperAdminOrAbove) return;
     fetchErrorLog(0, appliedSearch);
-  }, [appliedSearch, fetchErrorLog]);
+  }, [appliedSearch, fetchErrorLog, isSuperAdminOrAbove]);
 
   const SEARCH_WIDGET: SearchWidget = useMemo(
     () => ({

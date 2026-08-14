@@ -28,7 +28,7 @@ export function serverNowMs(): number {
   return Date.now();
 }
 
-async function attemptSync(): Promise<boolean> {
+export async function syncServerClock(): Promise<void> {
   useServerClockStore.setState({ status: "syncing" });
   const t0 = performance.now();
   try {
@@ -39,22 +39,8 @@ async function attemptSync(): Promise<boolean> {
       anchorPerfMs: t1,
       status: "synced",
     });
-    return true;
   } catch {
     useServerClockStore.setState({ status: "failed" });
-    return false;
-  }
-}
-
-const RETRY_DELAYS_MS = [3000, 10000];
-
-export async function syncServerClock(): Promise<void> {
-  const ok = await attemptSync();
-  if (ok) return;
-  for (const delay of RETRY_DELAYS_MS) {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    const retried = await attemptSync();
-    if (retried) return;
   }
 }
 
@@ -81,31 +67,4 @@ export function waitForServerClock(): Promise<void> {
     });
     const timer = setTimeout(finish, WAIT_FOR_SERVER_CLOCK_TIMEOUT_MS);
   });
-}
-
-const AUTO_SYNC_INTERVAL_MS = 30 * 60 * 1000;
-const VISIBILITY_SYNC_THROTTLE_MS = 60 * 1000;
-
-export function startServerClockAutoSync(): () => void {
-  let lastSyncAt = performance.now();
-
-  const handleVisibilityChange = () => {
-    if (document.visibilityState !== "visible") return;
-    if (performance.now() - lastSyncAt < VISIBILITY_SYNC_THROTTLE_MS) return;
-    lastSyncAt = performance.now();
-    syncServerClock();
-  };
-
-  const intervalId = setInterval(() => {
-    if (document.visibilityState === "hidden") return;
-    lastSyncAt = performance.now();
-    syncServerClock();
-  }, AUTO_SYNC_INTERVAL_MS);
-
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-
-  return () => {
-    clearInterval(intervalId);
-    document.removeEventListener("visibilitychange", handleVisibilityChange);
-  };
 }
