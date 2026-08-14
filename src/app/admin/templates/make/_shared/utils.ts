@@ -1092,6 +1092,8 @@ function parseConcatTokens(expr: string, row: Record<string, unknown>): string {
     .join("");
 }
 
+const RESERVED_ROW_KEYS = new Set(["id", "groupId", "count", "createdAt", "createdBy", "updatedAt", "updatedBy"]);
+
 /**
  * API 응답 단일 item → 테이블 표시용 row 변환 (공통)
  *
@@ -1141,8 +1143,9 @@ export function flattenPageDataItem(item: {
       Object.entries(section as Record<string, unknown>).forEach(([k, v]) => {
         if (keyCount[k] === 1) {
           flatExtra[k] = v;
-          /* 단순 fieldKey → 실제 JSONB 경로 기록 */
-          _pathMap[k] = `${sectionKey}.${k}`;
+          if (!RESERVED_ROW_KEYS.has(k)) {
+            _pathMap[k] = `${sectionKey}.${k}`;
+          }
         }
       });
     });

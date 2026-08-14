@@ -273,7 +273,7 @@ interface WidgetRendererProps {
   tableLoading?: boolean;
   sortKey?: string | null;
   sortDir?: "asc" | "desc";
-  onSort?: (accessor: string, dir: "asc" | "desc" | null) => void;
+  onSort?: (accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => void;
   totalElements?: number;
   totalPages?: number;
   currentPage?: number;
@@ -508,6 +508,7 @@ export function WidgetRenderer({
   const [popupTableDataMap, setPopupTableDataMap] = useState<Record<string, PageTableData>>({});
   const [popupSortKeyMap, setPopupSortKeyMap] = useState<Record<string, string | null>>({});
   const [popupSortDirMap, setPopupSortDirMap] = useState<Record<string, "asc" | "desc">>({});
+  const [popupSortExprMap, setPopupSortExprMap] = useState<Record<string, string | undefined>>({});
   /* 팝업 내 테이블 행 선택 — widgetId → 선택된 행 ID 배열 */
   const [popupTableSelectedRowsMap, setPopupTableSelectedRowsMap] = useState<Record<string, number[]>>({});
   /* paramSave extras — 폼에 없는 파라미터 임시 보관 (저장 버튼 클릭 시 dataJson에 병합) */
@@ -745,6 +746,7 @@ export function WidgetRenderer({
       setPopupTableDataMap({});
       setPopupSortKeyMap({});
       setPopupSortDirMap({});
+      setPopupSortExprMap({});
       setPopupTableSelectedRowsMap({});
       setPopupSearchValuesMap({});
 
@@ -990,6 +992,7 @@ export function WidgetRenderer({
       const pageSize = tw.pageSize || 10;
       const sk = popupSortKeyMap[widgetId];
       const sd = popupSortDirMap[widgetId] ?? "asc";
+      const sortExpr = popupSortExprMap[widgetId];
       /* 이 테이블에 연결된 검색 위젯(connectedSearchIds)의 필드 정의 + 값 → API 쿼리 파라미터
        * (page 레벨 useWidgetPageState.fetchTableData와 동일한 공용 함수로 변환 규칙 공유) */
       const fieldsMap = buildSearchFieldsMap(
@@ -1017,6 +1020,7 @@ export function WidgetRenderer({
       try {
         const reqParams: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) reqParams.sort = `${sk},${sd}`;
+        if (sk && sortExpr) reqParams.sortExpr = sortExpr;
         Object.assign(reqParams, buildSearchQueryParams(searchFields, sv));
         const drsKeys = buildDateRangeStatusParam(tw.columns);
         if (drsKeys) reqParams.drsKeys = drsKeys;
@@ -1053,7 +1057,7 @@ export function WidgetRenderer({
         }));
       }
     },
-    [popupCfg, popupSortKeyMap, popupSortDirMap, popupSearchValuesMap]
+    [popupCfg, popupSortKeyMap, popupSortDirMap, popupSortExprMap, popupSearchValuesMap]
   );
 
   /**
@@ -1101,9 +1105,10 @@ export function WidgetRenderer({
 
   /* 팝업 내 테이블 정렬 변경 핸들러 */
   const handlePopupSortChange = useCallback(
-    async (widgetId: string, accessor: string, dir: "asc" | "desc" | null) => {
+    async (widgetId: string, accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => {
       setPopupSortKeyMap((prev) => ({ ...prev, [widgetId]: dir === null ? null : accessor }));
       if (dir) setPopupSortDirMap((prev) => ({ ...prev, [widgetId]: dir }));
+      setPopupSortExprMap((prev) => ({ ...prev, [widgetId]: dir ? dataExpr : undefined }));
       const tw = popupCfg?.widgetItems
         .flatMap((item) => item.contents)
         .find((c) => (c.widget as { widgetId?: string })?.widgetId === widgetId && c.widget?.type === "table")
@@ -1135,6 +1140,7 @@ export function WidgetRenderer({
       try {
         const reqParams: Record<string, string> = { page: "0", size: String(pageSize) };
         if (dir && accessor) reqParams.sort = `${accessor},${dir}`;
+        if (dir && accessor && dataExpr) reqParams.sortExpr = dataExpr;
         Object.assign(reqParams, buildSearchQueryParams(searchFields, sv));
         const drsKeys = buildDateRangeStatusParam(tw.columns);
         if (drsKeys) reqParams.drsKeys = drsKeys;

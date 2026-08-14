@@ -109,8 +109,8 @@ interface PageGridRendererProps {
   tableDataMap?: Record<string, PageTableData>;
   sortKeyMap?: Record<string, string | null>;
   sortDirMap?: Record<string, "asc" | "desc">;
-  /** (widgetId, accessor, dir) 형태로 호출 */
-  onSort?: (widgetId: string, accessor: string, dir: "asc" | "desc" | null) => void;
+  /** (widgetId, accessor, dir, dataExpr) 형태로 호출 — dataExpr은 계산식 컬럼(TableColumnConfig.data)일 때만 전달 */
+  onSort?: (widgetId: string, accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => void;
   /** (widgetId, page) 형태로 호출 */
   onPageChange?: (widgetId: string, page: number) => void;
   /** (widgetId) 형태로 호출 */
@@ -528,7 +528,7 @@ export function PageGridRenderer({
                       tableLoading={td?.loading}
                       sortKey={sortKeyMap?.[wid] ?? null}
                       sortDir={sortDirMap?.[wid] ?? "asc"}
-                      onSort={(accessor, dir) => onSort?.(wid, accessor, dir)}
+                      onSort={(accessor, dir, dataExpr) => onSort?.(wid, accessor, dir, dataExpr)}
                       totalElements={td?.totalElements}
                       totalPages={td?.totalPages}
                       currentPage={td?.currentPage}

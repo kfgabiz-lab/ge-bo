@@ -70,7 +70,7 @@ interface TableRendererProps {
   isLoading?: boolean;
   sortKey?: string | null;
   sortDir?: "asc" | "desc";
-  onSort?: (accessor: string, dir: "asc" | "desc" | null) => void;
+  onSort?: (accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => void;
   codeGroups?: CodeGroupDef[];
   handlers?: TableActionHandlers;
   /** 지정 시 행 클릭으로 이동 등 동작 수행 (live 모드 전용, 미지정 시 기존 동작 유지) */
@@ -275,7 +275,7 @@ export function TableRenderer({
                                 : sortDir === "asc"
                                   ? "desc"
                                   : null;
-                              onSort?.(col.accessor, nextDir);
+                              onSort?.(col.accessor, nextDir, col.data);
                             }
                           : undefined
                       }

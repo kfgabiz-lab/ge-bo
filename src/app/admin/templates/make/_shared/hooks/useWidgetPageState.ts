@@ -286,6 +286,7 @@ export function useWidgetPageState(
   const tableDataMapRef = useRef<Record<string, PageTableData>>({});
   const [sortKeyMap, setSortKeyMap] = useState<Record<string, string | null>>({});
   const [sortDirMap, setSortDirMap] = useState<Record<string, "asc" | "desc">>({});
+  const [sortExprMap, setSortExprMap] = useState<Record<string, string | undefined>>({});
   const [tableSelectedRowsMap, setTableSelectedRowsMap] = useState<Record<string, number[]>>({});
 
   const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
@@ -330,6 +331,7 @@ export function useWidgetPageState(
       page = 0,
       sk,
       sd = "asc",
+      sortExpr,
       append = false,
       isEntity = pageIsEntity,
     }: {
@@ -340,6 +342,7 @@ export function useWidgetPageState(
       page?: number;
       sk?: string | null;
       sd?: "asc" | "desc";
+      sortExpr?: string;
       append?: boolean;
       isEntity?: boolean;
     }) => {
@@ -364,6 +367,7 @@ export function useWidgetPageState(
         const pageSize = tableWidget.pageSize || DEFAULT_PAGE_SIZE;
         const params: Record<string, string> = { page: String(page), size: String(pageSize) };
         if (sk) params.sort = `${sk},${sd}`;
+        if (sk && sortExpr && !isEntity) params.sortExpr = sortExpr;
 
         if (!isEntity || options?.entitySearchEnabled) {
           Object.assign(params, buildSearchQueryParams(searchFields, sv));
@@ -754,10 +758,11 @@ export function useWidgetPageState(
           page: 0,
           sk: sortKeyMap[(w as TableWidget).widgetId] ?? undefined,
           sd: sortDirMap[(w as TableWidget).widgetId] ?? "asc",
+          sortExpr: sortExprMap[(w as TableWidget).widgetId],
         });
       });
     },
-    [widgetItems, sortKeyMap, sortDirMap, fetchTableData, t]
+    [widgetItems, sortKeyMap, sortDirMap, sortExprMap, fetchTableData, t]
   );
 
   const handleReset = useCallback(
@@ -793,14 +798,17 @@ export function useWidgetPageState(
         page,
         sk: sortKeyMap[tableWidgetId] ?? undefined,
         sd: sortDirMap[tableWidgetId] ?? "asc",
+        sortExpr: sortExprMap[tableWidgetId],
       });
     },
-    [widgetItems, sortKeyMap, sortDirMap, fetchTableData]
+    [widgetItems, sortKeyMap, sortDirMap, sortExprMap, fetchTableData]
   );
 
   const handleSortChange = useCallback(
-    (tableWidgetId: string, accessor: string, dir: "asc" | "desc" | null) => {
+    (tableWidgetId: string, accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => {
       const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
+      const sortExpr = dir ? dataExpr : undefined;
+      setSortExprMap((prev) => ({ ...prev, [tableWidgetId]: sortExpr }));
       const fieldsMap = buildSearchFieldsMap(widgetItems);
       const tableWidget = flatWidgets(widgetItems).find(
         (w) => w.type === "table" && (w as TableWidget).widgetId === tableWidgetId
@@ -828,6 +836,7 @@ export function useWidgetPageState(
         page: 0,
         sk: resolvedSk,
         sd,
+        sortExpr,
       });
     },
     [widgetItems, fetchTableData, tableDataMap]
@@ -1791,10 +1800,11 @@ export function useWidgetPageState(
         page: td.nextPage,
         sk: sortKeyMap[tableWidgetId] ?? undefined,
         sd: sortDirMap[tableWidgetId] ?? "asc",
+        sortExpr: sortExprMap[tableWidgetId],
         append: true,
       });
     },
-    [widgetItems, sortKeyMap, sortDirMap, fetchTableData]
+    [widgetItems, sortKeyMap, sortDirMap, sortExprMap, fetchTableData]
   );
 
   const handleCategorySelect = useCallback((widgetId: string, selectedId: number | null) => {
