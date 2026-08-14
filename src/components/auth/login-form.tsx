@@ -42,7 +42,7 @@ export default function LoginForm() {
           .string()
           .min(1, t("validation.id.required"))
           .max(30, t("validation.id.max"))
-          .regex(/^[a-zA-Z0-9]+$/, t("validation.id.pattern")),
+          .regex(/^[a-zA-Z0-9.]+$/, t("validation.id.pattern")),
         password: z.string().min(4, t("validation.password.min")),
       }),
     [t]
