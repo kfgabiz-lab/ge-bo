@@ -97,7 +97,7 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
     if (!pathname) return;
     if (isRecordDetailRoute(pathname)) return;
     if (!findMenuByUrl(navMenusData || [], pathname)) {
-      router.replace("/admin/no-permission");
+      // router.replace("/admin/no-permission");
     }
   }, [mode, pathname, isSystemAdmin, navMenusData, navMenusLoading, navMenusError, router]);
 
