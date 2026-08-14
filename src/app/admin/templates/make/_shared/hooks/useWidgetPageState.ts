@@ -775,6 +775,10 @@ export function useWidgetPageState(
         if (!(w as TableWidget).connectedSearchIds.includes(searchWidgetId)) return;
         const connectedSlug = (w as TableWidget).connectedSlug;
         if (!connectedSlug) return;
+        const tableWidgetId = (w as TableWidget).widgetId;
+        setSortKeyMap((prev) => ({ ...prev, [tableWidgetId]: null }));
+        setSortDirMap((prev) => ({ ...prev, [tableWidgetId]: "asc" }));
+        setSortExprMap((prev) => ({ ...prev, [tableWidgetId]: undefined }));
         const searchFields = (w as TableWidget).connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
         fetchTableData({ tableWidget: w as TableWidget, connectedSlug, searchFields, sv: {}, page: 0 });
       });
