@@ -1,11 +1,13 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ROW_HEIGHT } from "./grid-cell";
 import { PageGridContainer } from "./page-grid-container";
 import { useMenuStore, MenuItem } from "@/store/use-menu-store";
 import { usePageTitleStore } from "@/store/use-page-title-store";
+import { useAuthStore } from "@/store/auth-store";
+import { useNavMenusQuery } from "@/hooks/use-menu-queries";
 import { useI18n } from "@/hooks/use-i18n";
 
 /** navMenus 트리에서 현재 pathname과 일치하는 메뉴 항목 반환 */
@@ -73,8 +75,23 @@ interface PageLayoutProps {
 
 export default function PageLayout({ title, description, mode = "live", noGrid = false, children }: PageLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const navMenus = useMenuStore((state) => state.navMenus);
   const { t } = useI18n();
+
+  const isSystemAdmin = useAuthStore((s) => s.adminInfo?.isSystem ?? false);
+  const { data: navMenusData, isLoading: navMenusLoading, isError: navMenusError } = useNavMenusQuery();
+
+  useEffect(() => {
+    if (mode !== "live") return;
+    if (navMenusLoading || navMenusError) return;
+    if (isSystemAdmin) return;
+    if (pathname === "/admin/dashboard") return;
+    if (!pathname) return;
+    if (!findMenuByUrl(navMenusData || [], pathname)) {
+      router.replace("/admin/no-permission");
+    }
+  }, [mode, pathname, isSystemAdmin, navMenusData, navMenusLoading, navMenusError, router]);
 
   /* 빌더에서 설정한 페이지 제목 (메뉴명 없을 때 폴백) */
   const pageTitle = usePageTitleStore((s) => s.pageTitle);
