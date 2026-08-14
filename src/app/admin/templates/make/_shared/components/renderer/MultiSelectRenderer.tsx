@@ -147,48 +147,85 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   }, obj);
 }
 
-/* ── 유틸: 옵션 항목 표시 텍스트 생성 ──
+/* ── 옵션 항목의 표시행(row) 1건 — 라벨 텍스트 + 그 행을 선택/해제할 때 쓸 고유 값 ── */
+interface LabelPathEntry {
+  path: string;
+  /** 체크박스 토글/선택 상태 판단에 쓰는 값 — 매핑(depth3) 고유 id가 있으면 그 값, 없으면 opt.id(기존 동작 그대로) */
+  selectionId: number;
+}
+
+/* ── 유틸: 옵션 항목을 "행 목록"으로 생성 ──
+ * - outerRelationIds(depth별 relation 조합): 같은 제품이 카테고리 여러 경로에 매핑된 경우
+ *   relation별 값이 다건(배열)로 내려온다. index로 짝지어(zip) relation 순서(depth1 > depth2 > ...)대로
+ *   경로를 복원하며, 경로가 여러 개면 옵션/선택목록에서 별도 행(row)으로 표시한다.
+ *   같은 인덱스의 매핑(depth3) 고유 id는 BE가 `_fetchedRel{outerRelationIds[0]}_mappingId`에 라벨과
+ *   동일 순서로 내려주므로, 그 값이 있으면 selectionId로 써서 행마다 독립적으로 선택/해제되게 한다
+ *   (id가 없으면 — 미매핑 등 예외 케이스 — opt.id로 폴백, 기존 동작과 동일).
  * - sourceMode='relation': item['_fetchedRel{sourceRelationSlugId}'] 값을 그대로 사용
  *   (BE가 카테고리 계층이면 categoryDepth/categoryDepthFrom 기준으로 이미 ' > '로 합쳐서 내려준 문자열)
- *   다건 매칭(배열)이면 formatFetchedRelValue 공통함수로 구분자 합침 (TableCellRenderer와 동일 패턴)
- * - sourceMode='call'(기본): labelFields로 지정한 필드들을 dot notation으로 읽어 ' > '로 연결 (기존 동작 그대로) */
-function buildLabel(item: OptionItem, widget: MultiSelectWidget): string {
+ *   다건 매칭(배열)이면 formatFetchedRelValue 공통함수로 구분자 합침 (TableCellRenderer와 동일 패턴,
+ *   이 경로는 현재 프로젝트에서 사용 중인 위젯이 없어 행 분리 대상에서 제외 — outerRelationIds만 적용)
+ * - sourceMode='call'(기본): labelFields로 지정한 필드들을 dot notation으로 읽어 ' > '로 연결 (기존 동작 그대로)
+ * 위 두 경로(relation 단일값, labelFields)는 항상 1건이며 selectionId는 항상 opt.id다. */
+function buildLabelPathEntries(item: OptionItem, widget: MultiSelectWidget): LabelPathEntry[] {
   const outerRelationIds = widget.contentRelation?.outer?.relationIds;
   if (outerRelationIds && outerRelationIds.length > 0) {
-    /* relation별 값 배열 — 같은 제품이 카테고리 여러 경로에 매핑된 경우 각 relation이 다건(배열)을 반환한다.
-       flatMap으로 그냥 이어붙이면 서로 다른 경로의 depth가 뒤섞이므로, index로 짝지어(zip)
-       relation 순서(depth1 > depth2 > ...)대로 경로를 복원한 뒤, 경로가 여러 개면 쉼표로 구분한다. */
     const perRelationValues = outerRelationIds.map((id) =>
       extractFetchedRelItems(item as Record<string, unknown>, id, undefined)
     );
+    const mappingIdRaw =
+      outerRelationIds[0] !== undefined
+        ? (item as Record<string, unknown>)[`_fetchedRel${outerRelationIds[0]}_mappingId`]
+        : undefined;
+    const mappingIds = Array.isArray(mappingIdRaw)
+      ? (mappingIdRaw as unknown[]).map((v) => Number(v))
+      : mappingIdRaw !== undefined && mappingIdRaw !== null
+        ? [Number(mappingIdRaw)]
+        : [];
     const pathCount = Math.max(0, ...perRelationValues.map((v) => v.length));
-    const paths: string[] = [];
+    const entries: LabelPathEntry[] = [];
     for (let i = 0; i < pathCount; i++) {
       const parts = perRelationValues.map((v) => v[i]).filter((v): v is string => Boolean(v));
-      if (parts.length > 0) paths.push(parts.join(" > "));
+      if (parts.length > 0) {
+        const mappingId = mappingIds[i];
+        entries.push({
+          path: parts.join(" > "),
+          selectionId: Number.isFinite(mappingId) ? mappingId : item.id,
+        });
+      }
     }
-    if (paths.length > 0) return paths.join(", ");
+    if (entries.length > 0) return entries;
   }
   if ((widget.sourceMode ?? "call") === "relation" && widget.sourceRelationSlugId) {
     const raw = item[`_fetchedRel${widget.sourceRelationSlugId}`];
     if (Array.isArray(raw)) {
-      return formatFetchedRelValue(
-        raw,
-        item as Record<string, unknown>,
-        widget.sourceRelationSlugId,
-        undefined,
-        "ONE_LINE"
-      );
+      return [
+        {
+          path: formatFetchedRelValue(
+            raw,
+            item as Record<string, unknown>,
+            widget.sourceRelationSlugId,
+            undefined,
+            "ONE_LINE"
+          ),
+          selectionId: item.id,
+        },
+      ];
     }
     /* fetch_fields 미설정 relation을 잘못 선택한 경우 Map 전체가 내려올 수 있음 — 빈 문자열로 방어 (TableCellRenderer와 동일 가드) */
-    return raw == null || typeof raw === "object" ? "" : String(raw);
+    return [{ path: raw == null || typeof raw === "object" ? "" : String(raw), selectionId: item.id }];
   }
   const labelFields = widget.labelFields || "name";
-  return labelFields
-    .split(",")
-    .map((f) => String(getNestedValue(item as Record<string, unknown>, f.trim()) ?? ""))
-    .filter(Boolean)
-    .join(" > ");
+  return [
+    {
+      path: labelFields
+        .split(",")
+        .map((f) => String(getNestedValue(item as Record<string, unknown>, f.trim()) ?? ""))
+        .filter(Boolean)
+        .join(" > "),
+      selectionId: item.id,
+    },
+  ];
 }
 
 /**
@@ -339,14 +376,20 @@ export function MultiSelectRenderer({
     [selected, onChange]
   );
 
-  /* ── 필터링된 옵션 ── */
+  /* ── 필터링된 옵션 — 행(경로) 중 하나라도 검색어를 포함하면 옵션 전체를 남긴다 ── */
   const filteredOptions = options.filter((opt) => {
     if (!search) return true;
-    return buildLabel(opt, widget).toLowerCase().includes(search.toLowerCase());
+    return buildLabelPathEntries(opt, widget).some((entry) => entry.path.toLowerCase().includes(search.toLowerCase()));
   });
 
-  /* ── 선택된 옵션 (태그 표시용) ── */
-  const selectedOptions = options.filter((opt) => selected.includes(opt.id));
+  /* ── 선택된 행(태그 표시용) — 행(카테고리 매핑) 단위로 선택 여부를 판단한다.
+     한 제품이 여러 카테고리에 매핑된 경우 그중 일부 행만 선택된 상태가 있을 수 있어, opt 단위가 아니라
+     행(entry) 단위로 필터링한다 (opt.id로만 걸러내면 부분 선택 상태를 표현할 수 없다) */
+  const selectedEntries = options.flatMap((opt) =>
+    buildLabelPathEntries(opt, widget)
+      .map((entry, pathIdx) => ({ opt, entry, pathIdx }))
+      .filter(({ entry }) => selected.includes(entry.selectionId))
+  );
 
   return (
     <RendererContainer showBorder={widget.showBorder ?? true} bgColor={widget.bgColor}>
@@ -415,25 +458,27 @@ export function MultiSelectRenderer({
               {filteredOptions.length === 0 ? (
                 <li className="px-3 py-2 text-xs text-slate-400 text-center">{t("common.table.no_data")}</li>
               ) : (
-                filteredOptions.map((opt) => {
-                  const isChecked = selected.includes(opt.id);
-                  return (
-                    <li key={opt.id}>
+                /* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
+                   별도 행(row)으로 나열한다 — 매핑(depth3) 고유 id가 있으면 행별로 독립 토글되고,
+                   없는 일반 옵션은 기존과 동일하게 opt.id 기준으로 전체가 함께 토글된다 */
+                filteredOptions.flatMap((opt) =>
+                  buildLabelPathEntries(opt, widget).map((entry, pathIdx) => (
+                    <li key={`${opt.id}-${pathIdx}`}>
                       <label
                         className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`}
                       >
                         <input
                           type="checkbox"
-                          checked={isChecked}
+                          checked={selected.includes(entry.selectionId)}
                           disabled={isPreview}
-                          onChange={() => !isPreview && toggleItem(opt.id)}
+                          onChange={() => !isPreview && toggleItem(entry.selectionId)}
                           className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
                         />
-                        <span className="text-sm text-slate-700">{buildLabel(opt, widget)}</span>
+                        <span className="text-sm text-slate-700">{entry.path}</span>
                       </label>
                     </li>
-                  );
-                })
+                  ))
+                )
               )}
             </ul>
           </PortalDropdown>
@@ -444,10 +489,13 @@ export function MultiSelectRenderer({
              바깥 wrapper에만 높이 제한 + 세로 스크롤을 둔다.
              (flex-col 컨테이너 자체에 max-height를 주면 그 자식 row들이 flex-shrink로 찌그러지므로,
               반드시 별도 block 레벨 wrapper로 감싸서 안쪽 flex-col은 원래 크기 그대로 유지시킨다) */}
-        {selectedOptions.length > 0 && (
+        {selectedEntries.length > 0 && (
           <div className="max-h-56 overflow-y-auto">
             <div className="flex flex-col gap-1.5">
-              {selectedOptions.map((opt) => {
+              {/* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
+                  별도 행(row)으로 나열한다 — 추가입력필드는 같은 opt.id 값을 공유(제품 단위 데이터이므로 동일하게 표시),
+                  X버튼은 매핑(depth3) 고유 id가 있으면 그 행만 선택 해제하고, 없는 일반 옵션은 기존처럼 opt.id 전체가 해제됨 */}
+              {selectedEntries.map(({ opt, entry, pathIdx }) => {
                 const extraFields = widget.extraFields ?? [];
                 /* position='left'인 필드만 좌측 그룹, 그 외(right 및 미설정)는 우측 그룹 */
                 const leftFields = extraFields.filter((ef) => ef.position === "left");
@@ -456,7 +504,7 @@ export function MultiSelectRenderer({
 
                 return (
                   <div
-                    key={opt.id}
+                    key={`${opt.id}-${pathIdx}`}
                     className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
                   >
                     {/* 좌측 추가 입력 필드 */}
@@ -467,9 +515,7 @@ export function MultiSelectRenderer({
                     {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
 
                     {/* 항목명 — 고정 너비로 잘림 방지 */}
-                    <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
-                      {buildLabel(opt, widget)}
-                    </span>
+                    <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">{entry.path}</span>
 
                     {/* 항목명 ↔ 우측 필드 구분선 */}
                     {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
@@ -482,7 +528,7 @@ export function MultiSelectRenderer({
                     <button
                       type="button"
                       disabled={isPreview}
-                      onClick={() => removeItem(opt.id)}
+                      onClick={() => removeItem(entry.selectionId)}
                       className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
                     >
                       <X className="w-3 h-3" />

@@ -240,8 +240,12 @@ export const showValidationError = (errors: string[]): void => {
  * @param rhsVal 우변 비교 값 (리터럴 문자열)
  */
 function evalConditionOp(lhsVal: string, op: string, rhsVal: string): boolean {
-  if (op === "!=") return lhsVal !== rhsVal;
-  if (op === "=") return lhsVal === rhsVal;
+  /* 콤마 다중값(체크박스: "001,002") 지원 — 포함 여부로 판단.
+     단일값 필드는 콤마가 없어 완전일치와 결과가 동일(하위호환, 동작 변화 없음) */
+  if (op === "!=" || op === "=") {
+    const matches = lhsVal.split(",").includes(rhsVal);
+    return op === "=" ? matches : !matches;
+  }
 
   /* 날짜/시간 형식 비교 — formatNowBySubType 출력·필드 저장값 모두 zero-padded ISO 포맷이라
        사전식(lexicographic) 문자열 비교로 날짜 순서가 정확히 맞음 (today() 지원 위해 숫자 변환보다 먼저 분기) */
@@ -1816,13 +1820,20 @@ export function extractMultiSelectSelection(
   const raw = (connectedSlug ? rel?.[connectedSlug] : undefined) ?? dataJson[contentKey];
   if (!Array.isArray(raw)) return { kind: "none" };
   if (raw.length > 0 && typeof raw[0] === "object" && raw[0] !== null && "id" in (raw[0] as object)) {
-    const items = raw as { id: number; [key: string]: unknown }[];
+    const items = raw as { id: number; depth3?: number; [key: string]: unknown }[];
     const extraFieldValues: Record<number, Record<string, string>> = {};
     items.forEach((item) => {
       const { id, ...fields } = item;
       extraFieldValues[id] = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? "")]));
     });
-    return { kind: "objects", ids: items.map((i) => i.id), extraFieldValues };
+    /* 같은 제품이 카테고리 여러 곳에 매핑된 경우 id(제품id)만으로는 매핑을 구분 못 하므로,
+       매핑(depth3) 고유 id가 있으면 그 값을 선택 식별자로 쓴다(BE의 depth3 기준 그룹핑과 동일 기준 —
+       PageDataService.groupSnapshotEntriesByProductId 참고). 없으면 기존처럼 id(제품id) 그대로 사용 */
+    return {
+      kind: "objects",
+      ids: items.map((i) => (typeof i.depth3 === "number" && i.depth3 > 0 ? i.depth3 : i.id)),
+      extraFieldValues,
+    };
   }
   return { kind: "ids", ids: (raw as unknown[]).filter((x) => typeof x === "number") as number[] };
 }
