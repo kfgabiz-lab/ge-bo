@@ -34,6 +34,13 @@ export function findMenuById(menus: MenuItem[], id: number): MenuItem | undefine
   return undefined;
 }
 
+/** 레코드 상세 라우트 판별 — 마지막 세그먼트가 숫자 PK인 목록 하위 상세/수정 페이지
+ *  (개별 메뉴 등록 없이도 동작하도록 URL 구조로 일반화 — 실제 접근 권한은 bo-api 인가가 판단) */
+function isRecordDetailRoute(pathname: string): boolean {
+  const last = pathname.split("/").pop();
+  return !!last && /^\d+$/.test(last);
+}
+
 /**
  * PageLayout — 12칸 그리드 기반 공통 페이지 레이아웃
  *
@@ -88,6 +95,7 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
     if (isSystemAdmin) return;
     if (pathname === "/admin/dashboard") return;
     if (!pathname) return;
+    if (isRecordDetailRoute(pathname)) return;
     if (!findMenuByUrl(navMenusData || [], pathname)) {
       router.replace("/admin/no-permission");
     }
