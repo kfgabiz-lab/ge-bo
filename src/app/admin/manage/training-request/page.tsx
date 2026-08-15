@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageLayout from "@/components/layout/page-layout";
 import { GridCell } from "@/components/layout/grid-cell";
@@ -133,6 +133,42 @@ export default function TrainingRequestListPage() {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  const lastDateRangeRef = useRef<{ from: string; to: string } | null>(null);
+  const prevPeriodTypeRef = useRef(searchValues.periodType);
+
+  useEffect(() => {
+    const activeFieldId = PERIOD_FIELD_BY_TYPE[searchValues.periodType] ?? "createdRange";
+    const from = searchValues[`${activeFieldId}_from`];
+    const to = searchValues[`${activeFieldId}_to`];
+    if (from && to) {
+      lastDateRangeRef.current = { from, to };
+    }
+  }, [
+    searchValues.periodType,
+    searchValues.createdRange_from,
+    searchValues.createdRange_to,
+    searchValues.scheduleStartRange_from,
+    searchValues.scheduleStartRange_to,
+    searchValues.scheduleEndRange_from,
+    searchValues.scheduleEndRange_to,
+  ]);
+
+  useEffect(() => {
+    const prevType = prevPeriodTypeRef.current;
+    const currType = searchValues.periodType;
+    prevPeriodTypeRef.current = currType;
+
+    if (prevType === currType || !lastDateRangeRef.current) return;
+
+    const activeFieldId = PERIOD_FIELD_BY_TYPE[currType] ?? "createdRange";
+    const restore = lastDateRangeRef.current;
+    setSearchValues((sv) => ({
+      ...sv,
+      [`${activeFieldId}_from`]: restore.from,
+      [`${activeFieldId}_to`]: restore.to,
+    }));
+  }, [searchValues.periodType]);
 
   /* 검색값 → 실제 API 쿼리 파라미터 변환 (검색기간구분에 따라 해당 dateRange만 반영) */
   const buildApiParams = useCallback((search: Record<string, string>, sk: string | null, sd?: "asc" | "desc") => {
