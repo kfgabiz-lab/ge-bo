@@ -1315,6 +1315,22 @@ export function getColumnRelationIds(col: { relationSlugId?: number; relationSlu
   return result;
 }
 
+const FETCH_SORT_ACCESSOR_RE = /^_fetchedRel(\d+)((?:\.[A-Za-z0-9_]+)*)$/;
+
+export function resolveFetchSortKey(
+  columns: { accessor: string; relationSlugId?: number; relationSlugIds?: number[] }[] | undefined,
+  sortKey: string
+): string {
+  const matched = FETCH_SORT_ACCESSOR_RE.exec(sortKey);
+  if (!matched) return sortKey;
+  const col = columns?.find((c) => c.accessor === sortKey);
+  if (!col) return sortKey;
+  const ids = getColumnRelationIds(col);
+  if (ids.length <= 1) return sortKey;
+  const suffix = matched[2] ?? "";
+  return ids.map((id) => `_fetchedRel${id}${suffix}`).join("|");
+}
+
 /**
  * 공통코드 상세 1건 → 화면 표시 라벨 변환
  * - nameMsgKey가 있으면 다국어 번역(t) 결과, 없으면 name(한글 고정값) 그대로 반환
@@ -2549,6 +2565,72 @@ export function buildSearchFieldsMap(
 }
 
 /**
+ * 검색필드 1개가 searchValues에서 차지하는 값 키 목록.
+ * dateRange/yearMonthRange는 시작/종료가 분리 저장되므로 `${id}_from`/`${id}_to` 2개,
+ * 그 외 타입은 `id` 1개. buildSearchQueryParams와 동일한 키 규약을 공유하기 위한 공통 함수.
+ *
+ * @example getSearchFieldValueKeys(dateRangeField) // ['periodType_from', 'periodType_to']
+ */
+export function getSearchFieldValueKeys(f: import("./types").SearchFieldConfig): string[] {
+  if (f.type === "dateRange" || f.type === "yearMonthRange") {
+    return [`${f.id}_from`, `${f.id}_to`];
+  }
+  return [f.id];
+}
+
+/**
+ * 검색필드 1개의 "초기 상태" 기본값을 계산한다.
+ * useWidgetPageState.ts의 검색 기본값 초기화 effect와 hideCondition 리셋 훅(useHiddenSearchFieldReset)
+ * 양쪽에서 동일한 기본값 계산 규칙을 공유하기 위해 분리한 공통 함수.
+ * (기존 useWidgetPageState.ts 이펙트 내부의 필드별 if/else-if 로직을 그대로 이동 — 동작 동일)
+ *
+ * @example buildSearchFieldDefaultValues(dateRangeField) // { 'periodType_from': '2026-07-16', 'periodType_to': '2026-08-15' }
+ */
+export function buildSearchFieldDefaultValues(f: import("./types").SearchFieldConfig): Record<string, string> {
+  const vals: Record<string, string> = {};
+  if (
+    (f.type === "date" || f.type === "yearMonth") &&
+    (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)
+  ) {
+    const subType = f.type === "yearMonth" ? "yearMonth" : (f.dateSubType ?? "date");
+    let val = "";
+    if (f.defaultToday) {
+      val = formatNowBySubType(subType);
+    } else {
+      val =
+        f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0
+          ? calcDateOffset(f.defaultDateOffset, subType)
+          : (f.defaultDate ?? "");
+    }
+    if (val) vals[f.id] = val;
+  } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
+    const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
+    const isRangeTimeBased = subType === "time" || subType === "timeSec";
+    const start = f.defaultStartToday
+      ? formatNowBySubType(subType)
+      : isRangeTimeBased
+        ? (f.defaultStartDate ?? "")
+        : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
+          ? calcDateOffset(f.defaultStartDateOffset, subType)
+          : (f.defaultStartDate ?? "");
+    const end = f.defaultEndToday
+      ? formatNowBySubType(subType)
+      : isRangeTimeBased
+        ? (f.defaultEndDate ?? "")
+        : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
+          ? calcDateOffset(f.defaultEndDateOffset, subType)
+          : (f.defaultEndDate ?? "");
+    if (start) vals[f.id + "_from"] = start;
+    if (end) vals[f.id + "_to"] = end;
+  } else if ((f.type === "select" || f.type === "radio" || f.type === "checkbox") && f.defaultOptionValue) {
+    vals[f.id] = f.defaultOptionValue;
+  } else if (f.defaultValue) {
+    vals[f.id] = f.defaultValue;
+  }
+  return vals;
+}
+
+/**
  * 검색 필드 정의 + 값(fieldId 기준)을 API 쿼리 파라미터로 변환한다.
  * 페이지 레벨(useWidgetPageState.fetchTableData)과 팝업 레벨(WidgetRenderer) 양쪽에서
  * 동일한 검색→테이블 파라미터 변환 규칙을 공유하기 위한 공통 함수.
@@ -2656,4 +2738,14 @@ export function buildDateRangeStatusParam(columns: TableColumnConfig[]): string 
     .map((col) => col.linkedDateRangeKey as string);
   const uniqueKeys = Array.from(new Set(keys));
   return uniqueKeys.length > 0 ? uniqueKeys.join(",") : undefined;
+}
+
+export function buildDateRangeStatusSortExpr(col: TableColumnConfig): string | undefined {
+  if (col.cellType !== "dateRangeStatus" || !col.linkedDateRangeKey) return undefined;
+  const isTimeBased =
+    col.linkedRangeSubType === "datetime" || col.linkedRangeSubType === "time" || col.linkedRangeSubType === "timeSec";
+  const nowToken = isTimeBased ? "now()" : "today()";
+  const fromKey = `${col.linkedDateRangeKey}_from`;
+  const toKey = `${col.linkedDateRangeKey}_to`;
+  return `${fromKey}>${nowToken}?'1':${toKey}<${nowToken}?'3':'2'`;
 }

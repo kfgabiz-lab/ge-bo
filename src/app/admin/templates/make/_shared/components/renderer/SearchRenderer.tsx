@@ -34,6 +34,7 @@ import { SearchRowConfig, CodeGroupDef } from "../../types";
 import { evalFieldCondition, buildKeyToId } from "../../utils";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
+import { useHiddenSearchFieldReset } from "./useHiddenSearchFieldReset";
 import type { RendererMode } from "./types";
 import { useI18n } from "@/hooks/use-i18n";
 
@@ -65,19 +66,20 @@ export function SearchRenderer({
   const isPreview = mode === "preview";
   const { t } = useI18n();
 
+  /* 모든 행의 필드를 한 번만 평탄화 — keyToId/rowData/hiddenMap이 공유 */
+  const flatFields = useMemo(() => rows.flatMap((row) => row.fields), [rows]);
+
   /* fieldKey → fieldId 역매핑 — hideCondition/disableCondition 평가용 (공통함수로 분리) */
-  const keyToId = useMemo(() => buildKeyToId(rows.flatMap((row) => row.fields)), [rows]);
+  const keyToId = useMemo(() => buildKeyToId(flatFields), [flatFields]);
 
   /* optionFilter의 "$fieldKey" 참조용 — fieldKey → 현재 선택값 맵 (SlugOptionSelect/SlugAutocompleteInput에 전달) */
   const rowData = useMemo(() => {
     const map: Record<string, unknown> = {};
-    rows
-      .flatMap((row) => row.fields)
-      .forEach((f) => {
-        if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? "";
-      });
+    flatFields.forEach((f) => {
+      if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? "";
+    });
     return map;
-  }, [rows, values]);
+  }, [flatFields, values]);
 
   /* live 모드에서 hideCondition 충족 시 해당 필드 숨김 */
   const shouldHide = (fieldKey: string | undefined, hideCondition: string | undefined): boolean =>
@@ -86,6 +88,19 @@ export function SearchRenderer({
   /* live 모드에서 disableCondition 충족 시 해당 필드 비활성화 */
   const shouldDisable = (disableCondition: string | undefined): boolean =>
     !isPreview && !!disableCondition && evalFieldCondition(disableCondition, keyToId, values);
+
+  /* fieldId → 숨김 여부 맵 — 렌더 분기(shouldHide)와 잔존값 리셋 훅이 동일한 판정을 공유하는 단일 소스 */
+  const hiddenMap = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    flatFields.forEach((f) => {
+      map[f.id] = shouldHide(f.fieldKey, f.hideCondition);
+    });
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flatFields, keyToId, values, isPreview]);
+
+  /* 보임 → 숨김 전환 시 해당 필드 값을 기본값(없으면 빈값)으로 되돌림 — 훅 규칙상 아래 조건부 return보다 위에서 호출 */
+  useHiddenSearchFieldReset({ isPreview, fields: flatFields, hiddenMap, values, onChangeValues });
 
   /* 행이 없을 때 — preview는 안내 텍스트, live는 null */
   if (!rows.length) {
@@ -127,7 +142,7 @@ export function SearchRenderer({
           }
         >
           {row.fields.map((field) => {
-            if (shouldHide(field.fieldKey, field.hideCondition)) return null;
+            if (hiddenMap[field.id]) return null;
             return (
               <div key={field.id} className={COL_SPAN[Math.min(field.colSpan ?? 1, cols)] ?? "col-span-1"}>
                 <FieldRenderer
@@ -198,7 +213,7 @@ export function SearchRenderer({
         {rows.map((row) => (
           <SearchRow key={row.id} cols={row.cols}>
             {row.fields.map((field) => {
-              if (shouldHide(field.fieldKey, field.hideCondition)) return null;
+              if (hiddenMap[field.id]) return null;
               return (
                 <SearchField
                   key={field.id}

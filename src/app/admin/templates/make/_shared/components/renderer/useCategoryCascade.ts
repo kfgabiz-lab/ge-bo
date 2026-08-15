@@ -363,15 +363,18 @@ export function useCategoryCascade({
         for (let i = idx + 1; i < depthCount; i++) next[i] = [];
         return next;
       });
-      /* 부모로 값을 올리기 전에 "우리가 만든 변화"임을 기록 — 다음 렌더에서 value prop이
+      /* 부모로 넘길 값 — 이 depth를 지운 경우(selectedValue==="")엔 카테고리 조건 전체가 사라지는 게
+         아니라 바로 위 depth에 남아있는 선택값으로 되돌아가야 한다(상위 카테고리 조건 유지).
+         부모로 값을 올리기 전에 "우리가 만든 변화"임을 기록 — 다음 렌더에서 value prop이
          이 값으로 내려와도 위 리셋 감지 effect가 다시 손대지 않도록 함 */
-      lastOwnValueRef.current = selectedValue;
-      onChange?.(selectedValue);
+      const emittedValue = selectedValue || (idx > 0 ? depthValues[idx - 1] : "");
+      lastOwnValueRef.current = emittedValue;
+      onChange?.(emittedValue);
       if (selectedValue && idx < depthCount - 1) {
         loadDepthOptions(idx + 1, selectedValue);
       }
     },
-    [depthCount, onChange, loadDepthOptions]
+    [depthCount, onChange, loadDepthOptions, depthValues]
   );
 
   /* 상위 depth 미선택 시 하위 depth는 비활성 */

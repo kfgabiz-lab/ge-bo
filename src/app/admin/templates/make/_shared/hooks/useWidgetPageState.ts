@@ -19,8 +19,7 @@ import {
   applySortChange,
   initFormDefaultValues,
   computeFieldDefaultValue,
-  formatNowBySubType,
-  calcDateOffset,
+  buildSearchFieldDefaultValues,
   validateDataSaveWidgets,
   saveTableRows,
   processFormFilesAndSubList,
@@ -29,9 +28,11 @@ import {
   buildSearchFieldsMap,
   buildSearchQueryParams,
   buildDateRangeStatusParam,
+  buildDateRangeStatusSortExpr,
   extractSubListRows,
   extractMultiSelectSelection,
   evalWidgetHideCondition,
+  resolveFetchSortKey,
 } from "../utils";
 import {
   entityApiPath,
@@ -366,7 +367,7 @@ export function useWidgetPageState(
       try {
         const pageSize = tableWidget.pageSize || DEFAULT_PAGE_SIZE;
         const params: Record<string, string> = { page: String(page), size: String(pageSize) };
-        if (sk) params.sort = `${sk},${sd}`;
+        if (sk) params.sort = `${resolveFetchSortKey(tableWidget.columns, sk)},${sd}`;
         if (sk && sortExpr && !isEntity) params.sortExpr = sortExpr;
 
         if (!isEntity || options?.entitySearchEnabled) {
@@ -487,45 +488,7 @@ export function useWidgetPageState(
       (w.rows as { fields: SearchFieldConfig[] }[])
         .flatMap((r) => r.fields)
         .forEach((f: SearchFieldConfig) => {
-          if (
-            (f.type === "date" || f.type === "yearMonth") &&
-            (f.defaultToday || f.defaultDateOffset !== undefined || f.defaultDate)
-          ) {
-            const subType = f.type === "yearMonth" ? "yearMonth" : (f.dateSubType ?? "date");
-            let val = "";
-            if (f.defaultToday) {
-              val = formatNowBySubType(subType);
-            } else {
-              val =
-                f.defaultDateOffset !== undefined && f.defaultDateOffset !== 0
-                  ? calcDateOffset(f.defaultDateOffset, subType)
-                  : (f.defaultDate ?? "");
-            }
-            if (val) initVals[f.id] = val;
-          } else if (f.type === "dateRange" || f.type === "yearMonthRange") {
-            const subType = f.rangeSubType ?? (f.type === "yearMonthRange" ? "yearMonth" : "date");
-            const isRangeTimeBased = subType === "time" || subType === "timeSec";
-            const start = f.defaultStartToday
-              ? formatNowBySubType(subType)
-              : isRangeTimeBased
-                ? (f.defaultStartDate ?? "")
-                : f.defaultStartDateOffset !== undefined && f.defaultStartDateOffset !== 0
-                  ? calcDateOffset(f.defaultStartDateOffset, subType)
-                  : (f.defaultStartDate ?? "");
-            const end = f.defaultEndToday
-              ? formatNowBySubType(subType)
-              : isRangeTimeBased
-                ? (f.defaultEndDate ?? "")
-                : f.defaultEndDateOffset !== undefined && f.defaultEndDateOffset !== 0
-                  ? calcDateOffset(f.defaultEndDateOffset, subType)
-                  : (f.defaultEndDate ?? "");
-            if (start) initVals[f.id + "_from"] = start;
-            if (end) initVals[f.id + "_to"] = end;
-          } else if ((f.type === "select" || f.type === "radio" || f.type === "checkbox") && f.defaultOptionValue) {
-            initVals[f.id] = f.defaultOptionValue;
-          } else if (f.defaultValue) {
-            initVals[f.id] = f.defaultValue;
-          }
+          Object.assign(initVals, buildSearchFieldDefaultValues(f));
         });
     });
     if (Object.keys(initVals).length > 0) {
@@ -811,12 +774,14 @@ export function useWidgetPageState(
   const handleSortChange = useCallback(
     (tableWidgetId: string, accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => {
       const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
-      const sortExpr = dir ? dataExpr : undefined;
-      setSortExprMap((prev) => ({ ...prev, [tableWidgetId]: sortExpr }));
       const fieldsMap = buildSearchFieldsMap(widgetItems);
       const tableWidget = flatWidgets(widgetItems).find(
         (w) => w.type === "table" && (w as TableWidget).widgetId === tableWidgetId
       ) as TableWidget | undefined;
+      const sortCol = tableWidget?.columns.find((c) => c.accessor === accessor);
+      const resolvedDataExpr = dataExpr || (sortCol ? buildDateRangeStatusSortExpr(sortCol) : undefined);
+      const sortExpr = dir ? resolvedDataExpr : undefined;
+      setSortExprMap((prev) => ({ ...prev, [tableWidgetId]: sortExpr }));
       if (!tableWidget?.connectedSlug) return;
       const searchFields = tableWidget.connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
 
