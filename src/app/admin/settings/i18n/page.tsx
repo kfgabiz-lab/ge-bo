@@ -64,15 +64,15 @@ const TABLE_WIDGET: TableWidget = {
   connectedSearchIds: ["i18n-search"],
   columns: [
     { id: "c1", header: "Key", accessor: "key", cellType: "text", align: "left", sortable: true, width: 200 },
-    { id: "c2", header: "한국어", accessor: "ko", cellType: "text", align: "left", sortable: false },
-    { id: "c3", header: "영어", accessor: "en", cellType: "text", align: "left", sortable: false },
+    { id: "c2", header: "한국어", accessor: "ko", cellType: "text", align: "left", sortable: true },
+    { id: "c3", header: "영어", accessor: "en", cellType: "text", align: "left", sortable: true },
     {
       id: "c4",
       header: "유형",
       accessor: "resourceType",
       cellType: "badge",
       align: "center",
-      sortable: false,
+      sortable: true,
       width: 80,
       cellOptions: [
         { value: "WORD", text: "단어", color: "blue" },
@@ -85,7 +85,7 @@ const TABLE_WIDGET: TableWidget = {
       accessor: "active",
       cellType: "badge",
       align: "center",
-      sortable: false,
+      sortable: true,
       width: 90,
       cellOptions: [
         { value: "true", text: "사용", color: "green" },
@@ -136,7 +136,7 @@ export default function I18nPage() {
 
   /* 검색 파라미터 → fetchItems 호출용 변환 */
   const buildSearchParams = useCallback(
-    (search: Record<string, string>, page: number) => ({
+    (search: Record<string, string>, page: number, sk: string | null, sd: "asc" | "desc") => ({
       key: search.f1 ?? "",
       ko: search.f2 ?? "",
       en: search.f3 ?? "",
@@ -144,13 +144,14 @@ export default function I18nPage() {
       active: search.f5 ?? "전체",
       page,
       size: PAGE_SIZE,
+      sort: sk ? `${sk},${sd}` : undefined,
     }),
     []
   );
 
   /* 페이지 진입 시 목록 조회 */
   useEffect(() => {
-    fetchItems(buildSearchParams(INITIAL_SEARCH, 0));
+    fetchItems(buildSearchParams(INITIAL_SEARCH, 0, null, "asc"));
   }, [fetchItems, buildSearchParams]);
 
   /* 검색 필드 변경 */
@@ -161,42 +162,47 @@ export default function I18nPage() {
   /* 검색 버튼 */
   const handleSearch = useCallback(() => {
     setAppliedSearch({ ...searchValues });
-    fetchItems(buildSearchParams(searchValues, 0));
-  }, [searchValues, fetchItems, buildSearchParams]);
+    fetchItems(buildSearchParams(searchValues, 0, sortKey, sortDir));
+  }, [searchValues, fetchItems, buildSearchParams, sortKey, sortDir]);
 
   /* 초기화 버튼 */
   const handleReset = useCallback(() => {
     setSearchValues(INITIAL_SEARCH);
     setAppliedSearch(INITIAL_SEARCH);
-    fetchItems(buildSearchParams(INITIAL_SEARCH, 0));
-  }, [fetchItems, buildSearchParams]);
+    fetchItems(buildSearchParams(INITIAL_SEARCH, 0, sortKey, sortDir));
+  }, [fetchItems, buildSearchParams, sortKey, sortDir]);
 
   /* 페이지 변경 */
   const handlePageChange = useCallback(
     (page: number) => {
-      fetchItems(buildSearchParams(appliedSearch, page));
+      fetchItems(buildSearchParams(appliedSearch, page, sortKey, sortDir));
     },
-    [appliedSearch, fetchItems, buildSearchParams]
+    [appliedSearch, fetchItems, buildSearchParams, sortKey, sortDir]
   );
 
-  /* 정렬 변경 */
-  const handleSort = useCallback((accessor: string, dir: "asc" | "desc" | null) => {
-    setSortKey(dir ? accessor : null);
-    if (dir) setSortDir(dir);
-  }, []);
+  const handleSort = useCallback(
+    (accessor: string, dir: "asc" | "desc" | null) => {
+      const nextSortKey = dir ? accessor : null;
+      const nextSortDir = dir ?? sortDir;
+      setSortKey(nextSortKey);
+      if (dir) setSortDir(nextSortDir);
+      fetchItems(buildSearchParams(appliedSearch, 0, nextSortKey, nextSortDir));
+    },
+    [appliedSearch, buildSearchParams, fetchItems, sortDir]
+  );
 
   /* 삭제 확인 */
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
     try {
       await deleteItem(deleteTarget.id);
-      fetchItems(buildSearchParams(appliedSearch, currentPage));
+      fetchItems(buildSearchParams(appliedSearch, currentPage, sortKey, sortDir));
     } catch {
       /* 오류는 store에서 toast 처리 */
     } finally {
       setDeleteTarget(null);
     }
-  }, [deleteTarget, deleteItem, fetchItems, buildSearchParams, appliedSearch, currentPage]);
+  }, [deleteTarget, deleteItem, fetchItems, buildSearchParams, appliedSearch, currentPage, sortKey, sortDir]);
 
   /* 테이블 액션 핸들러 */
   const handlers: TableActionHandlers = useMemo(
@@ -214,19 +220,9 @@ export default function I18nPage() {
     [items, openDrawer]
   );
 
-  /* 테이블 데이터 — active를 string으로 변환 (badge cellType 호환) */
-  const sortedItems = useMemo(() => {
-    if (!sortKey) return items;
-    return [...items].sort((a, b) => {
-      const aVal = String(a[sortKey as keyof MessageResource] ?? "");
-      const bVal = String(b[sortKey as keyof MessageResource] ?? "");
-      return sortDir === "asc" ? aVal.localeCompare(bVal, "ko") : bVal.localeCompare(aVal, "ko");
-    });
-  }, [items, sortKey, sortDir]);
-
   const tableData = useMemo(
     () =>
-      sortedItems.map((item) => ({
+      items.map((item) => ({
         _id: item.id,
         key: item.key,
         ko: item.ko,
@@ -235,7 +231,7 @@ export default function I18nPage() {
         active: String(item.active),
         createdAt: item.createdAt ? item.createdAt.replace("T", " ").substring(0, 16) : "",
       })) as unknown as Record<string, unknown>[],
-    [sortedItems]
+    [items]
   );
 
   return (

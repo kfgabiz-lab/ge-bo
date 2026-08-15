@@ -36,7 +36,7 @@ type UpdateFormData = z.infer<typeof updateSchema>;
 /* ── 컴포넌트 ── */
 
 export const MessageResourceDrawer = () => {
-  const { isDrawerOpen, closeDrawer, selectedItem, createItem, updateItem, isLoading, fetchItems } =
+  const { isDrawerOpen, closeDrawer, selectedItem, createItem, updateItem, isLoading, refetch } =
     useMessageResourceStore();
 
   /* 수정 모드 여부 */
@@ -68,9 +68,6 @@ export const MessageResourceDrawer = () => {
     }
   }, [selectedItem, isDrawerOpen]);
 
-  /* 기본 검색 파라미터 (목록 새로고침용) */
-  const defaultSearch = { key: "", ko: "", en: "", active: "전체", page: 0, size: 10, resourceType: "전체" };
-
   /* validation 실패 시 첫 번째 에러 메시지를 toast로 표시 */
   const onCreateError = (errors: typeof createForm.formState.errors) => {
     const first = Object.values(errors)[0];
@@ -85,7 +82,7 @@ export const MessageResourceDrawer = () => {
   const onCreateSubmit = async (data: CreateFormData) => {
     try {
       await createItem({ key: data.key, ko: data.ko, en: data.en, resourceType: data.resourceType });
-      fetchItems(defaultSearch);
+      refetch();
     } catch {
       /* 오류는 store에서 toast 처리 */
     }
@@ -101,7 +98,7 @@ export const MessageResourceDrawer = () => {
         active: data.active,
         resourceType: data.resourceType,
       });
-      fetchItems(defaultSearch);
+      refetch();
     } catch {
       /* 오류는 store에서 toast 처리 */
     }
