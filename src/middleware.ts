@@ -22,7 +22,9 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
 
   /*
-   * Google Maps, YouTube, 구글 루커 스튜디오 연동을 차단하므로 적용하지 않습니다.
+   * COEP(Cross-Origin-Embedder-Policy) 미적용:
+   * require-corp, credentialless 둘 다 구글 루커 스튜디오/유튜브·Vimeo/구글 지도 임베드가 깨짐.
+   * 2026-07-27, 2026-08-14 재검증 완료(둘 다 실패). 보안점검 예외 등록 필요.
    *
    * response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
    */
@@ -46,20 +48,25 @@ function badRequest(): NextResponse {
 
 /**
  * Next.js 미들웨어 — 요청 레벨 1차 방어
- * AppScan XSS 테스트 대응: 루트 경로의 위험 문자 패턴/비정상 메소드 차단
+ * AppScan XSS 테스트 대응: 위험 문자 패턴/비정상 메소드 차단
+ *
+ * 존재하지 않는 경로(404)라도 Next.js RSC 하이드레이션 페이로드
+ * (self.__next_f.push(...))에 요청 URL이 그대로 반영되므로
+ * (NAHP_BO_20260727 보고서: /moderation.php, /nodes/OOB_DAVWindow.html 등),
+ * 쿼리스트링 검사는 루트 경로뿐 아니라 모든 경로에 적용한다.
+ * 단, 비-GET/HEAD 메소드 차단은 Next.js Server Action(POST) 동작을
+ * 막지 않도록 루트 경로로 한정한다.
  */
 export function middleware(request: NextRequest): NextResponse {
   const { pathname, searchParams } = request.nextUrl;
 
-  if (pathname === "/") {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return badRequest();
-    }
+  if (pathname === "/" && request.method !== "GET" && request.method !== "HEAD") {
+    return badRequest();
+  }
 
-    for (const [key, value] of searchParams.entries()) {
-      if (suspiciousPattern.test(key) || suspiciousPattern.test(value)) {
-        return badRequest();
-      }
+  for (const [key, value] of searchParams.entries()) {
+    if (suspiciousPattern.test(key) || suspiciousPattern.test(value)) {
+      return badRequest();
     }
   }
 
