@@ -435,15 +435,34 @@ export function useWidgetPageState(
 
   useEffect(() => {
     if (!widgetItems.length) return;
+    if (!sitesLoaded || !clockReady) return;
+
+    const initVals: Record<string, string> = {};
+    flatWidgets(widgetItems).forEach((w) => {
+      if (w.type !== "search") return;
+      (w.rows as { fields: SearchFieldConfig[] }[])
+        .flatMap((r) => r.fields)
+        .forEach((f: SearchFieldConfig) => {
+          Object.assign(initVals, buildSearchFieldDefaultValues(f));
+        });
+    });
+
+    let effectiveSv = searchValuesRef.current;
+    if (Object.keys(initVals).length > 0) {
+      effectiveSv = { ...initVals, ...searchValuesRef.current };
+      searchValuesRef.current = effectiveSv;
+      setSearchValues((prev) => ({ ...initVals, ...prev }));
+    }
+
     const fieldsMap = buildSearchFieldsMap(widgetItems);
     flatWidgets(widgetItems).forEach((w) => {
       if (w.type !== "table") return;
       const connectedSlug = (w as TableWidget).connectedSlug;
       if (!connectedSlug) return;
       const searchFields = (w as TableWidget).connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
-      fetchTableData({ tableWidget: w as TableWidget, connectedSlug, searchFields, sv: {} });
+      fetchTableData({ tableWidget: w as TableWidget, connectedSlug, searchFields, sv: effectiveSv });
     });
-  }, [widgetItems, fetchTableData]);
+  }, [widgetItems, sitesLoaded, clockReady, fetchTableData]);
 
   useEffect(() => {
     tableDataMapRef.current = tableDataMap;
@@ -478,24 +497,6 @@ export function useWidgetPageState(
       return next;
     });
   }, [widgetItems, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!widgetItems.length) return;
-    if (!sitesLoaded || !clockReady) return;
-    const initVals: Record<string, string> = {};
-    flatWidgets(widgetItems).forEach((w) => {
-      if (w.type !== "search") return;
-      (w.rows as { fields: SearchFieldConfig[] }[])
-        .flatMap((r) => r.fields)
-        .forEach((f: SearchFieldConfig) => {
-          Object.assign(initVals, buildSearchFieldDefaultValues(f));
-        });
-    });
-    if (Object.keys(initVals).length > 0) {
-      setSearchValues((prev) => ({ ...initVals, ...prev }));
-      searchValuesRef.current = { ...initVals, ...searchValuesRef.current };
-    }
-  }, [widgetItems, sitesLoaded, clockReady]);
 
   useEffect(() => {
     if (!options?.enableUrlEditMode || !widgetItems.length) return;
@@ -1457,6 +1458,24 @@ export function useWidgetPageState(
     return buildSearchQueryParams(Object.values(fieldsMap).flat(), searchValues);
   }, [searchValues, widgetItems]);
 
+  const tableSortParams = useMemo(() => {
+    const result: Record<string, { sort: string; sortExpr?: string }> = {};
+    flatWidgets(widgetItems).forEach((w) => {
+      if (w.type !== "table") return;
+      const tableWidget = w as TableWidget;
+      const sk = sortKeyMap[tableWidget.widgetId];
+      if (!sk) return;
+      const sd = sortDirMap[tableWidget.widgetId] ?? "asc";
+      const sortExpr = sortExprMap[tableWidget.widgetId];
+      const entry: { sort: string; sortExpr?: string } = {
+        sort: `${resolveFetchSortKey(tableWidget.columns, sk)},${sd}`,
+      };
+      if (sortExpr && !pageIsEntity) entry.sortExpr = sortExpr;
+      result[tableWidget.widgetId] = entry;
+    });
+    return result;
+  }, [widgetItems, sortKeyMap, sortDirMap, sortExprMap, pageIsEntity]);
+
   const handleApiCall = useCallback(
     async (
       apiInfoId: number | undefined,
@@ -1611,8 +1630,11 @@ export function useWidgetPageState(
         return encodeURIComponent(val);
       });
 
+      const firstTableWidget = flatWidgets(widgetItems).find((w) => w.type === "table") as TableWidget | undefined;
+      const currentTableSortParams = firstTableWidget ? tableSortParams[firstTableWidget.widgetId] : undefined;
+
       const finalParams: Record<string, string> = includeSearchParams
-        ? { ...currentSearchParams, ...restParams }
+        ? { ...currentSearchParams, ...currentTableSortParams, ...restParams }
         : restParams;
 
       const method = (apiInfo.method || "GET").toUpperCase();
@@ -1734,6 +1756,7 @@ export function useWidgetPageState(
       searchParams,
       currentGroupId,
       currentSearchParams,
+      tableSortParams,
       markClean,
       t,
     ]
@@ -1830,6 +1853,7 @@ export function useWidgetPageState(
     onRefresh: handleRefresh,
     pageSlug,
     currentSearchParams,
+    tableSortParams,
     leaveCheck: options?.leaveCheck ?? false,
     fileValuesMap,
     existingFileMetaMap,

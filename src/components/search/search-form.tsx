@@ -76,7 +76,7 @@ export function SearchForm({
 
           {/* 액션 버튼 */}
           {!hideActions && (
-            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-slate-50 border-t border-slate-100 rounded-b-xl">
+            <div className="flex items-center justify-end gap-2 px-4 py-2 bg-white border-t border-slate-100 rounded-b-xl">
               <button
                 onClick={onReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"

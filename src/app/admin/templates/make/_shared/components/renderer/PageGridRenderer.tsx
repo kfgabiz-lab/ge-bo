@@ -168,6 +168,7 @@ interface PageGridRendererProps {
    * Space 버튼의 엑셀 다운로드 시 동일 필터 조건으로 전체 데이터 추출에 사용
    */
   currentSearchParams?: Record<string, string>;
+  tableSortParams?: Record<string, { sort: string; sortExpr?: string }>;
   /** URL 쿼리 파라미터 — hideCondition/disableCondition에서 URL 파라미터 참조용 (key → value) */
   urlParams?: Record<string, string>;
   /** cross-tab 데이터생성 공유값 — TabRenderer가 관리, 다른 탭 폼 필드 실시간 반영용 (fieldId → value) */
@@ -231,6 +232,7 @@ export function PageGridRenderer({
   multiSelectExtraFieldValuesMap,
   onMultiSelectExtraFieldChange,
   currentSearchParams,
+  tableSortParams,
   urlParams,
   crossTabFormValues,
   onCrossTabFormChange,
@@ -555,6 +557,7 @@ export function PageGridRenderer({
                       /* 엑셀 다운로드 */
                       tableWidgetsMap={tableWidgetsMap}
                       currentSearchParams={currentSearchParams}
+                      tableSortParams={tableSortParams}
                       /* _fetchedRel{id} 데이터 — Form 위젯 relationSlugId 연결 데이터 표시용 */
                       fetchRelData={formFetchRelMap?.[wid]}
                       /* entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */

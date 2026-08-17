@@ -316,6 +316,7 @@ interface WidgetRendererProps {
    * page.tsx에서 관리 중인 searchParams 상태를 그대로 전달
    */
   currentSearchParams?: Record<string, string>;
+  tableSortParams?: Record<string, { sort: string; sortExpr?: string }>;
   /**
    * preview 모드 전용 — 엑셀 다운로드 버튼 클릭 시 호출 (builder-contents-layout 팝업 UI 미리보기용)
    */
@@ -429,6 +430,7 @@ export function WidgetRenderer({
   /* 엑셀 다운로드 */
   tableWidgetsMap,
   currentSearchParams,
+  tableSortParams,
   onExcelDownloadPreview,
   /* 팝업 컨텍스트 */
   dataSlug,
@@ -618,6 +620,12 @@ export function WidgetRenderer({
         delete searchQuery["page"];
         delete searchQuery["size"];
 
+        const sortParams = tableSortParams?.[tableWidgetId];
+        if (sortParams) {
+          searchQuery.sort = sortParams.sort;
+          if (sortParams.sortExpr) searchQuery.sortExpr = sortParams.sortExpr;
+        }
+
         /* entity 연결 페이지면 page-data export 대신 entity 전용 CSV export로 분기
                (entity는 page-data와 달리 xlsx 없이 CSV만 지원 — format/URL/확장자만 다르고
                 headers/keys/dateFormats/codeMaps/searchQuery 조립·다운로드 트리거는 완전히 동일하게 재사용) */
@@ -655,7 +663,7 @@ export function WidgetRenderer({
         toast.error(t("common.error.excel"));
       }
     },
-    [tableWidgetsMap, currentSearchParams, codeGroups, t, isEntity]
+    [tableWidgetsMap, currentSearchParams, tableSortParams, codeGroups, t, isEntity]
   );
 
   /**
@@ -1201,8 +1209,8 @@ export function WidgetRenderer({
           toast.success(t("common.deleted"));
           onRefresh?.();
           handlePopupClose();
-        } catch {
-          toast.error(t("common.error.delete"));
+        } catch (err) {
+          toast.error(getApiErrorMessage(err, t("common.error.delete")));
         }
         return;
       }
@@ -1877,8 +1885,8 @@ export function WidgetRenderer({
                 await api.delete(`/page-data/${connectedSlug}/${id}`);
                 toast.success(t("common.deleted"));
                 onRefresh?.();
-              } catch {
-                toast.error(t("common.error.delete"));
+              } catch (err) {
+                toast.error(getApiErrorMessage(err, t("common.error.delete")));
               }
             }
           : undefined),
