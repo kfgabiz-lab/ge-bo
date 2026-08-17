@@ -198,6 +198,27 @@ function TemplateUrlPicker({ onSelect }: { onSelect: (url: string, name: string)
   );
 }
 
+const PROTECTED_ROOT_MENU_ID = 212;
+
+function isMenuUnderProtectedRoot(menus: MenuItem[], menuId: number): boolean {
+  const findRoot = (items: MenuItem[]): MenuItem | undefined => {
+    for (const item of items) {
+      if (item.id === PROTECTED_ROOT_MENU_ID) return item;
+      if (item.children?.length) {
+        const found = findRoot(item.children);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  const containsId = (node: MenuItem, id: number): boolean => {
+    if (node.id === id) return true;
+    return !!node.children?.some((c) => containsId(c, id));
+  };
+  const root = findRoot(menus);
+  return !!root && containsId(root, menuId);
+}
+
 /* ── validation 함수 (t 파라미터 주입으로 다국어 처리) ── */
 const validateUrl = (value: string, t: (key: string) => string): string => {
   if (!value) return "";
@@ -740,6 +761,7 @@ function CreateMenuForm({
 /* ══════════════════════════════════════ */
 export function MenuDetail() {
   const {
+    menus,
     selectedMenu,
     updateMenu,
     deleteMenu,
@@ -923,6 +945,7 @@ export function MenuDetail() {
 
   const isParent = !selectedMenu.parentId;
   const hasChildren = !!(selectedMenu.children && selectedMenu.children.length > 0);
+  const isProtectedMenu = isMenuUnderProtectedRoot(menus, selectedMenu.id);
   /* Meta Title/Description — FO 탭 + 2Depth 이상(부모 존재)에서만 노출 */
   const showMeta = activeTab === "FO" && !isParent;
   /* URL 유무로 폴더/프로그램 판단 */
@@ -1135,7 +1158,7 @@ export function MenuDetail() {
         {/* 역할별 접근 권한 */}
         <div className="px-5 pb-5">
           <div className="border-t border-slate-100 mb-5" />
-          <MenuRoleMatrix />
+          <MenuRoleMatrix isProtected={isProtectedMenu} />
         </div>
       </div>
     </div>
