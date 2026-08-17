@@ -10,7 +10,6 @@ import { useAuthStore } from "@/store/auth-store";
 import { useNavMenusQuery } from "@/hooks/use-menu-queries";
 import { useI18n } from "@/hooks/use-i18n";
 
-/** navMenus 트리에서 현재 pathname과 일치하는 메뉴 항목 반환 */
 export function findMenuByUrl(menus: MenuItem[], pathname: string): MenuItem | null {
   for (const item of menus) {
     if (item.url === pathname) return item;
@@ -22,7 +21,6 @@ export function findMenuByUrl(menus: MenuItem[], pathname: string): MenuItem | n
   return null;
 }
 
-/** navMenus 트리에서 id가 일치하는 메뉴 항목 반환 */
 export function findMenuById(menus: MenuItem[], id: number): MenuItem | undefined {
   for (const item of menus) {
     if (item.id === id) return item;
@@ -34,48 +32,15 @@ export function findMenuById(menus: MenuItem[], id: number): MenuItem | undefine
   return undefined;
 }
 
-/** 레코드 상세 라우트 판별 — 마지막 세그먼트가 숫자 PK인 목록 하위 상세/수정 페이지
- *  (개별 메뉴 등록 없이도 동작하도록 URL 구조로 일반화 — 실제 접근 권한은 bo-api 인가가 판단) */
 function isRecordDetailRoute(pathname: string): boolean {
   const last = pathname.split("/").pop();
   return !!last && /^\d+$/.test(last);
 }
 
-/**
- * PageLayout — 12칸 그리드 기반 공통 페이지 레이아웃
- *
- * 빌더 미리보기 + 실제 생성 페이지 모두에서 동일하게 사용한다.
- * 한 곳만 수정하면 모든 페이지에 동일하게 반영된다.
- *
- * - mode='preview' : 빌더 미리보기용. showGrid 기본값 true
- * - mode='live'    : 실제 서비스 페이지. showGrid 기본값 false
- * - g 키           : 격자 가이드라인 on/off 토글 (preview/live 모두 동작)
- * - showGrid=true  : 격자선 + 테두리 + 배경색 표시 (모드 구분 없이 동일)
- * - showGrid=false : 격자선 없음, 테두리 없음, 배경 없음
- *
- * @example
- * // 빌더 미리보기
- * <PageLayout mode="preview">
- *   <GridCell colSpan={12} rowSpan={2}>
- *     <WidgetRenderer mode="preview" widget={searchWidget} />
- *   </GridCell>
- * </PageLayout>
- *
- * // 실제 페이지
- * <PageLayout title="게시판 목록" mode="live">
- *   <GridCell colSpan={12} rowSpan={2}>
- *     <WidgetRenderer mode="live" widget={searchWidget} />
- *   </GridCell>
- * </PageLayout>
- */
-
 interface PageLayoutProps {
   title?: string;
-  /** 페이지 제목 아래 표시되는 설명 (메뉴 관리에서 입력) */
   description?: string;
-  /** preview: 빌더 미리보기 (격자 기본 표시) / live: 실제 서비스 페이지 (격자 기본 숨김) */
   mode?: "preview" | "live";
-  /** true이면 PageGridContainer 없이 children을 직접 렌더링 — 자체 레이아웃 페이지용 */
   noGrid?: boolean;
   children: React.ReactNode;
 }
@@ -101,12 +66,9 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
     }
   }, [mode, pathname, isSystemAdmin, navMenusData, navMenusLoading, navMenusError, router]);
 
-  /* 빌더에서 설정한 페이지 제목 (메뉴명 없을 때 폴백) */
   const pageTitle = usePageTitleStore((s) => s.pageTitle);
 
-  /* mode="live"일 때 현재 URL로 메뉴명/설명 자동 조회 — title prop 우선 */
   const autoMenu = mode === "live" ? findMenuByUrl(navMenus, pathname || "") : null;
-  /* 우선순위: title prop > 메뉴명(nameMsgKey 우선) > 빌더 pageTitle */
   const autoMenuName = autoMenu ? (autoMenu.nameMsgKey ? t(autoMenu.nameMsgKey) : autoMenu.name) : undefined;
   const autoMenuDesc = autoMenu
     ? autoMenu.descriptionMsgKey
@@ -116,10 +78,8 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
   const displayTitle = title ?? autoMenuName ?? (mode === "live" ? pageTitle : undefined);
   const displayDescription = description ?? autoMenuDesc;
 
-  /* 격자 표시 여부 — preview는 기본 true, live는 기본 false */
   const [showGrid, setShowGrid] = useState(mode === "preview");
 
-  /* g 키로 격자 가이드라인 토글 (input/textarea/select 포커스 중엔 무시) */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName.toLowerCase();
@@ -130,8 +90,6 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  /* showGrid=true일 때 격자선 + 테두리 + 배경색 — 모드 구분 없이 동일하게 적용 */
-  /* showGrid=true 일 때 격자선 배경 — PageGridContainer 위에 겹쳐 표시 */
   const overlayStyle: React.CSSProperties = showGrid
     ? {
         backgroundImage: `
@@ -142,7 +100,6 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
       }
     : {};
 
-  /* showGrid 상태가 테두리/배경을 결정 */
   const wrapCls = showGrid ? "border border-slate-200 rounded-lg bg-slate-50" : "";
 
   return (
