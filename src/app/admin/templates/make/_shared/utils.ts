@@ -1647,13 +1647,20 @@ export function buildDataJson(
     return !currentContentKeys.has(generationKey.split(".")[0]);
   };
 
+  const pageKeyToId: Record<string, string> = {};
+  widgets.forEach((w) => {
+    if (w.type !== "form") return;
+    (w.fields ?? []).forEach((f) => {
+      if (f.fieldKey) pageKeyToId[f.fieldKey] = f.id;
+    });
+  });
+
   for (const w of widgets) {
     if (w.type === "form") {
       const rawValues = formValuesMap[w.widgetId ?? ""] ?? {};
       const fileIds = formFileIdsMap[w.widgetId ?? ""] ?? {};
       const section: Record<string, unknown> = {};
-      /* hideCondition 평가용 fieldKey → fieldId 역매핑 */
-      const keyToId: Record<string, string> = {};
+      const keyToId: Record<string, string> = { ...pageKeyToId };
       (w.fields ?? []).forEach((f) => {
         if (f.fieldKey) keyToId[f.fieldKey] = f.id;
       });
