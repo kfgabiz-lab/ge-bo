@@ -19,7 +19,7 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   response.headers.set("Cross-Origin-Resource-Policy", "same-origin");
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
   response.headers.set("X-Frame-Options", "SAMEORIGIN");
-  response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+  response.headers.set("Content-Security-Policy", "frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
 
   /*
    * COEP(Cross-Origin-Embedder-Policy) 미적용:
@@ -57,6 +57,28 @@ function badRequest(): NextResponse {
  * 단, 비-GET/HEAD 메소드 차단은 Next.js Server Action(POST) 동작을
  * 막지 않도록 루트 경로로 한정한다.
  */
+/*
+ * Azure App Service 앞단(플랫폼 프론트엔드)이 실제 접속 IP를 X-Forwarded-For의
+ * 마지막 값으로 붙여준다 — 클라이언트가 헤더에 값을 미리 넣어 보내도 앞쪽에 이어붙여질
+ * 뿐이므로, 마지막 값만 취하면 위조 불가능한 실제 접속 IP를 얻을 수 있다.
+ * 이 값으로 헤더 전체를 덮어써서 /api/v1 rewrite 대상(API 서버)에는 검증된 단일 IP만 전달한다.
+ */
+function withTrustedForwardedFor(request: NextRequest): Headers {
+  const headers = new Headers(request.headers);
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const realIp = forwardedFor
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .pop();
+    if (realIp) {
+      headers.set("x-forwarded-for", realIp);
+    }
+  }
+  return headers;
+}
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname, searchParams } = request.nextUrl;
 
@@ -70,7 +92,7 @@ export function middleware(request: NextRequest): NextResponse {
     }
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers: withTrustedForwardedFor(request) } });
 }
 
 export const config = {
