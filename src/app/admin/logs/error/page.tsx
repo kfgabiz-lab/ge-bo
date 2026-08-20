@@ -157,28 +157,36 @@ export default function ErrorLogPage() {
               id: "f1",
               type: "input",
               label: "상태코드",
+              labelMsgKey: "dashboard.label.statusCode",
               colSpan: 1,
               placeholder: "예: 500",
+              placeholderMsgKey: "log.placeholder.httpStatus500",
             },
             {
               id: "f2",
               type: "input",
               label: "에러코드",
+              labelMsgKey: "dashboard.label.errorCode",
               colSpan: 1,
               placeholder: "에러코드 입력",
+              placeholderMsgKey: "log.placeholder.errorCode",
             },
             {
               id: "f3",
               type: "input",
               label: "사용자",
+              labelMsgKey: "log.label.loginUser",
               colSpan: 1,
               placeholder: "로그인 사용자",
+              placeholderMsgKey: "log.placeholder.loginUser",
             },
             {
               id: "f4",
               type: "dateRange",
               label: "발생일",
+              labelMsgKey: "log.label.occurredDate",
               label2: "종료일",
+              label2MsgKey: "common.label.endDate",
               colSpan: 1,
             },
           ],
@@ -202,6 +210,7 @@ export default function ErrorLogPage() {
         {
           id: "c1",
           header: "발생일시",
+          headerMsgKey: "dashboard.label.occurredAt",
           accessor: "createdAt",
           cellType: "text",
           align: "center",
@@ -211,6 +220,7 @@ export default function ErrorLogPage() {
         {
           id: "c2",
           header: "상태코드",
+          headerMsgKey: "dashboard.label.statusCode",
           accessor: "httpStatus",
           cellType: "text",
           align: "center",
@@ -220,6 +230,7 @@ export default function ErrorLogPage() {
         {
           id: "c3",
           header: "메서드",
+          headerMsgKey: "log.label.method",
           accessor: "method",
           cellType: "text",
           align: "center",
@@ -229,6 +240,7 @@ export default function ErrorLogPage() {
         {
           id: "c4",
           header: "에러코드",
+          headerMsgKey: "dashboard.label.errorCode",
           accessor: "errorCode",
           cellType: "text",
           align: "center",
@@ -237,6 +249,7 @@ export default function ErrorLogPage() {
         {
           id: "c5",
           header: "요청 URL",
+          headerMsgKey: "log.label.requestUrl",
           accessor: "requestUrl",
           cellType: "text",
           align: "left",
@@ -245,6 +258,7 @@ export default function ErrorLogPage() {
         {
           id: "c6",
           header: "메시지",
+          headerMsgKey: "dashboard.label.message",
           accessor: "message",
           cellType: "text",
           align: "left",
@@ -253,6 +267,7 @@ export default function ErrorLogPage() {
         {
           id: "c7",
           header: "요청자 IP",
+          headerMsgKey: "log.label.clientIp",
           accessor: "clientIp",
           cellType: "text",
           align: "center",
@@ -262,6 +277,7 @@ export default function ErrorLogPage() {
         {
           id: "c8",
           header: "사용자",
+          headerMsgKey: "log.label.loginUser",
           accessor: "loginUser",
           cellType: "text",
           align: "center",
@@ -271,6 +287,7 @@ export default function ErrorLogPage() {
         {
           id: "c9",
           header: "상세",
+          headerMsgKey: "common.btn.detail",
           accessor: "_actions",
           cellType: "actions",
           align: "center",

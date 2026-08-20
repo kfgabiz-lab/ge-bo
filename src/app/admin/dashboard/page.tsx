@@ -67,6 +67,7 @@ const TRAINING_TYPE_FIELD: SearchFieldConfig = {
   label: "",
   colSpan: 1,
   placeholder: "전체",
+  placeholderMsgKey: "common.label.all",
   codeGroupCode: "TRAININGTYPE",
   options: ["In-Person:001", "Virtual:002"],
 };
@@ -126,6 +127,7 @@ function TrainingSummarySection({
   onTrainingTypeChange,
   codeGroups,
 }: TrainingSummarySectionProps) {
+  const { t } = useI18n();
   return (
     <RendererContainer bgColor="#ffffff">
       <div className="h-full w-full flex flex-col gap-4 p-5">
@@ -151,9 +153,9 @@ function TrainingSummarySection({
         ) : (
           <div className="flex-1 flex items-center justify-center gap-10">
             <CircleCountCard label={totalLabel} count={counts.total} emphasis />
-            <CircleCountCard label="Engineering Training" count={counts.engineering} />
-            <CircleCountCard label="Service Training" count={counts.service} />
-            <CircleCountCard label="Sales Training" count={counts.sales} />
+            <CircleCountCard label={t("common.label.engineeringTraining")} count={counts.engineering} />
+            <CircleCountCard label={t("common.label.serviceTraining")} count={counts.service} />
+            <CircleCountCard label={t("common.label.salesTraining")} count={counts.sales} />
           </div>
         )}
       </div>
@@ -318,7 +320,8 @@ export default function DashboardPage() {
       columns: [
         {
           id: "c1",
-          header: "발생일시",
+          header: "",
+          headerMsgKey: "dashboard.label.occurredAt",
           accessor: "createdAt",
           cellType: "text",
           align: "center",
@@ -327,7 +330,8 @@ export default function DashboardPage() {
         },
         {
           id: "c2",
-          header: "상태코드",
+          header: "",
+          headerMsgKey: "dashboard.label.statusCode",
           accessor: "httpStatus",
           cellType: "text",
           align: "center",
@@ -336,7 +340,8 @@ export default function DashboardPage() {
         },
         {
           id: "c3",
-          header: "에러코드",
+          header: "",
+          headerMsgKey: "dashboard.label.errorCode",
           accessor: "errorCode",
           cellType: "text",
           align: "center",
@@ -345,7 +350,8 @@ export default function DashboardPage() {
         },
         {
           id: "c4",
-          header: "메시지",
+          header: "",
+          headerMsgKey: "dashboard.label.message",
           accessor: "message",
           cellType: "text",
           align: "left",
@@ -407,7 +413,7 @@ export default function DashboardPage() {
   }, [appliedSearch]);
 
   return (
-    <PageLayout title="대시보드" mode="live">
+    <PageLayout mode="live">
       {showSearchBar && (
         <GridCell colSpan={12} rowSpan={2}>
           <WidgetRenderer
@@ -425,9 +431,9 @@ export default function DashboardPage() {
       {hasTrainingMenu && (
         <GridCell colSpan={6} rowSpan={4}>
           <TrainingSummarySection
-            title="정기 Training 신청 내역"
+            title={t("dashboard.label.regularTrainingHistory")}
             href={trainingHref("01", regularTrainingType)}
-            totalLabel="전체"
+            totalLabel={t("common.label.all")}
             counts={regularCounts}
             loading={summaryLoading}
             trainingType={regularTrainingType}
@@ -440,9 +446,9 @@ export default function DashboardPage() {
       {hasTrainingMenu && (
         <GridCell colSpan={6} rowSpan={4}>
           <TrainingSummarySection
-            title="비정기 Training 신청 내역"
+            title={t("dashboard.label.irregularTrainingHistory")}
             href={trainingHref("02", irregularTrainingType)}
-            totalLabel="전체"
+            totalLabel={t("common.label.all")}
             counts={irregularCounts}
             loading={summaryLoading}
             trainingType={irregularTrainingType}
@@ -457,7 +463,7 @@ export default function DashboardPage() {
           <RendererContainer bgColor="#ffffff">
             <div className="h-full w-full flex flex-col gap-3 p-5">
               <Link href={errorLogHref} className="flex items-center gap-1.5 group flex-shrink-0">
-                <h2 className="text-sm font-bold text-slate-900">에러 로그 현황</h2>
+                <h2 className="text-sm font-bold text-slate-900">{t("dashboard.label.errorLogStatus")}</h2>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
               </Link>
               <div className="flex-1 min-h-0">
