@@ -37,8 +37,6 @@ interface FieldBaseProps {
   labelMsgKey?: string;
   /** 설명 다국어 키 */
   descriptionMsgKey?: string;
-  /** 라벨 선택 입력 여부 — true 시 라벨 입력란의 * 숨김 */
-  labelOptional?: boolean;
   /** 한 줄 배치 모드 (공간영역 등에서 사용) */
   compact?: boolean;
   /** ColSpan/RowSpan 입력란 숨김 — SubList 컬럼처럼 colSpan 개념이 없는 경우 사용 */
@@ -108,7 +106,6 @@ export function FieldBase(props: FieldBaseProps) {
     rowSpan,
     rowSpanConfig,
     autoFocus,
-    labelOptional,
     compact,
     hideColSpan,
     hideConditionFields,
@@ -168,9 +165,7 @@ export function FieldBase(props: FieldBaseProps) {
       {/* 라벨 행 — labelSideSlot 있으면 오른쪽에 슬롯(연결 Slug 등), 없으면 기존 Key */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={LABEL_CLS}>
-            {showLabel2 ? "라벨 1" : "라벨"} {!labelOptional && <span className="text-red-400">*</span>}
-          </label>
+          <label className={LABEL_CLS}>{showLabel2 ? "라벨 1" : "라벨"}</label>
           {i18nMode ? (
             /* 다국어 키 모드 — MessageKeySelector */
             <MessageKeySelector
@@ -260,9 +255,7 @@ export function FieldBase(props: FieldBaseProps) {
       {/* 라벨 2 (dateRange 전용) */}
       {showLabel2 && (
         <div>
-          <label className={LABEL_CLS}>
-            라벨 2 <span className="text-red-400">*</span>
-          </label>
+          <label className={LABEL_CLS}>라벨 2</label>
           {i18nMode ? (
             <MessageKeySelector
               value={props.label2MsgKey ?? ""}
