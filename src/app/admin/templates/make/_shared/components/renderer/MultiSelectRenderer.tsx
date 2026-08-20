@@ -21,7 +21,7 @@
  *   <MultiSelectRenderer mode="live" widget={widget} selectedIds={ids} onChange={setIds} />
  */
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChevronDown, X, Search } from "lucide-react";
 import api from "@/lib/api";
 import { RendererContainer } from "./RendererContainer";
@@ -376,11 +376,31 @@ export function MultiSelectRenderer({
     [selected, onChange]
   );
 
-  /* ── 필터링된 옵션 — 행(경로) 중 하나라도 검색어를 포함하면 옵션 전체를 남긴다 ── */
-  const filteredOptions = options.filter((opt) => {
-    if (!search) return true;
-    return buildLabelPathEntries(opt, widget).some((entry) => entry.path.toLowerCase().includes(search.toLowerCase()));
-  });
+  /* ── 옵션 → 행(opt+entry) 단위로 평탄화 — 동일 텍스트를 가진 서로 다른 옵션 간 중복 제거는
+     opt 단위로는 표현할 수 없어(하나의 옵션이 여러 행을 가질 수 있음), 행 단위로 먼저 펼쳐야 한다 ── */
+  const flattenedRows = useMemo(
+    () =>
+      options.flatMap((opt) => buildLabelPathEntries(opt, widget).map((entry, pathIdx) => ({ opt, entry, pathIdx }))),
+    [options, widget]
+  );
+
+  /* ── 검색어 필터링 — 행(경로) 단위로 검색어를 포함하는 행만 남긴다 ── */
+  const searchedRows = useMemo(() => {
+    if (!search) return flattenedRows;
+    const q = search.toLowerCase();
+    return flattenedRows.filter(({ entry }) => entry.path.toLowerCase().includes(q));
+  }, [flattenedRows, search]);
+
+  /* ── 텍스트 중복 제거 — dedupeByText 사용 시 표시 텍스트(path)가 동일한 행은 처음 1건만 남긴다 ── */
+  const displayRows = useMemo(() => {
+    if (!widget.dedupeByText) return searchedRows;
+    const seen = new Set<string>();
+    return searchedRows.filter(({ entry }) => {
+      if (seen.has(entry.path)) return false;
+      seen.add(entry.path);
+      return true;
+    });
+  }, [searchedRows, widget.dedupeByText]);
 
   /* ── 선택된 행(태그 표시용) — 행(카테고리 매핑) 단위로 선택 여부를 판단한다.
      한 제품이 여러 카테고리에 매핑된 경우 그중 일부 행만 선택된 상태가 있을 수 있어, opt 단위가 아니라
@@ -466,30 +486,28 @@ export function MultiSelectRenderer({
 
               {/* 옵션 목록 */}
               <ul className="max-h-48 overflow-y-auto py-1">
-                {filteredOptions.length === 0 ? (
+                {displayRows.length === 0 ? (
                   <li className="px-3 py-2 text-xs text-slate-400 text-center">{t("common.table.no_data")}</li>
                 ) : (
                   /* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
                    별도 행(row)으로 나열한다 — 매핑(depth3) 고유 id가 있으면 행별로 독립 토글되고,
                    없는 일반 옵션은 기존과 동일하게 opt.id 기준으로 전체가 함께 토글된다 */
-                  filteredOptions.flatMap((opt) =>
-                    buildLabelPathEntries(opt, widget).map((entry, pathIdx) => (
-                      <li key={`${opt.id}-${pathIdx}`}>
-                        <label
-                          className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected.includes(entry.selectionId)}
-                            disabled={isPreview}
-                            onChange={() => !isPreview && toggleItem(entry.selectionId)}
-                            className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
-                          />
-                          <span className="text-sm text-slate-700">{entry.path}</span>
-                        </label>
-                      </li>
-                    ))
-                  )
+                  displayRows.map(({ opt, entry, pathIdx }) => (
+                    <li key={`${opt.id}-${pathIdx}`}>
+                      <label
+                        className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(entry.selectionId)}
+                          disabled={isPreview}
+                          onChange={() => !isPreview && toggleItem(entry.selectionId)}
+                          className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
+                        />
+                        <span className="text-sm text-slate-700">{entry.path}</span>
+                      </label>
+                    </li>
+                  ))
                 )}
               </ul>
             </PortalDropdown>

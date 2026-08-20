@@ -9,12 +9,12 @@
  * const accept = FILE_TYPE_PRESETS.image; // '.jpg,.jpeg,...'
  */
 export const FILE_TYPE_PRESETS = {
-    /** 문서 형식 */
-    doc:   '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.hwp',
-    /** 이미지 형식 */
-    image: '.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp',
-    /** 동영상 형식 */
-    video: '.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v',
+  /** 문서 형식 */
+  doc: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.hwp",
+  /** 이미지 형식 */
+  image: ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp",
+  /** 동영상 형식 */
+  video: ".mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v",
 } as const;
 
 /**
@@ -32,11 +32,23 @@ export const FILE_TYPE_PRESETS = {
  * @example
  * FILE_FIELD_TYPES.includes(f.type) // true면 파일 업로드 필드
  */
-export const FILE_FIELD_TYPES = ['file', 'image', 'video', 'media'] as const;
-export type FileFieldType = typeof FILE_FIELD_TYPES[number];
+export const FILE_FIELD_TYPES = ["file", "image", "video", "media"] as const;
+export type FileFieldType = (typeof FILE_FIELD_TYPES)[number];
 
 export const FILE_TYPE_LABELS: Record<keyof typeof FILE_TYPE_PRESETS, string> = {
-    doc:   FILE_TYPE_PRESETS.doc.replace(/\./g, '').replace(/,/g, ', '),
-    image: FILE_TYPE_PRESETS.image.replace(/\./g, '').replace(/,/g, ', '),
-    video: FILE_TYPE_PRESETS.video.replace(/\./g, '').replace(/,/g, ', '),
+  doc: FILE_TYPE_PRESETS.doc.replace(/\./g, "").replace(/,/g, ", "),
+  image: FILE_TYPE_PRESETS.image.replace(/\./g, "").replace(/,/g, ", "),
+  video: FILE_TYPE_PRESETS.video.replace(/\./g, "").replace(/,/g, ", "),
 };
+
+/**
+ * select 필드 기본 placeholder "전체" 단일 출처
+ *
+ * FieldRenderer, SearchBuilder 모두 여기서 import하여 사용.
+ * 값이 바뀌어도 이 파일만 수정하면 전체 반영된다.
+ *
+ * @example
+ * import { SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from '../../constants';
+ */
+export const SELECT_ALL_PLACEHOLDER = "전체";
+export const SELECT_ALL_MSG_KEY = "common.label.all";

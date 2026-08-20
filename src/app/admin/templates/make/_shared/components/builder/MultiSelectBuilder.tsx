@@ -10,6 +10,7 @@
  *   - title         : 위젯 상단 타이틀
  *   - description   : 타이틀 아래 설명
  *   - labelFields   : 표시 필드 — 쉼표 구분, ' > ' 연결 (예: "name,dept")
+ *   - dedupeByText  : 옵션 드롭다운 텍스트 중복 제거 여부
  *   - showBorder    : 테두리 표시 여부
  *   - bgColor       : 바탕색
  *   - extraFields   : 선택 항목별 추가 입력 필드 목록 (DnD 순서 변경 / 추가 / 삭제)
@@ -476,6 +477,15 @@ export function MultiSelectBuilder({
             onChange={(e) => onChange({ ...widget, sourceFilter: e.target.value || undefined })}
             placeholder="예: status=1,type=Y"
             className={INPUT_CLS}
+          />
+        </div>
+
+        <div>
+          <label className={LABEL_CLS}>텍스트 중복 제거</label>
+          <ToggleRow
+            label={(widget.dedupeByText ?? false) ? "사용" : "미사용"}
+            value={widget.dedupeByText ?? false}
+            onChange={(v) => onChange({ ...widget, dedupeByText: v })}
           />
         </div>
 

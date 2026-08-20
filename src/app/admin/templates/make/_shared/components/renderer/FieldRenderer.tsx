@@ -31,7 +31,7 @@ const TiptapEditor = dynamic(() => import("@/components/common/tiptap-editor"), 
 import { ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { SearchFieldConfig, CodeGroupDef } from "../../types";
 import { inputCls, selectCls } from "../../styles";
-import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS } from "../../constants";
+import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS, SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from "../../constants";
 import { SelectArrow } from "../SelectArrow";
 
 /** bytes → 사람이 읽기 쉬운 단위로 변환 (1MB 미만이면 KB, 이상이면 MB) */
@@ -1103,9 +1103,10 @@ export function FieldRenderer({
 
     /* ── select ── */
     case "select": {
-      const selectPlaceholder = field.placeholderMsgKey
-        ? t(field.placeholderMsgKey)
-        : field.placeholder || t("common.select.placeholder");
+      let selectPlaceholder: string;
+      if (field.placeholderMsgKey) selectPlaceholder = t(field.placeholderMsgKey);
+      else if (field.placeholder?.trim() === SELECT_ALL_PLACEHOLDER) selectPlaceholder = t(SELECT_ALL_MSG_KEY);
+      else selectPlaceholder = field.placeholder || t("common.select.placeholder");
 
       /* autocomplete + live 모드: 실제 자동완성 동작 */
       if (field.selectType === "autocomplete" && !isPreview) {
