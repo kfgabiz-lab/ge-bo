@@ -427,7 +427,7 @@ export default function DashboardPage() {
       <GridCell colSpan={12} rowSpan={14}>
         <RendererContainer bgColor="#ffffff">
           <div className="h-full w-full flex flex-col gap-3 p-5">
-            <h2 className="text-sm font-bold text-slate-900 flex-shrink-0">통계</h2>
+            <h2 className="text-sm font-bold text-slate-900 flex-shrink-0">{t("common.label.statistics")}</h2>
             <div className="flex-1 min-h-0">
               <iframe
                 title="Google Looker Studio Report"
