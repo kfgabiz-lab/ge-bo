@@ -11,6 +11,7 @@ import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/re
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 
 /* ── 타입 ── */
 
@@ -38,10 +39,17 @@ export default function AdminDetailPage() {
   const router = useRouter();
   const { t } = useI18n();
   const id = params.id as string;
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [adminData, setAdminData] = useState<AdminDetail | null>(null);
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(t("admin.title.edit"));
+    return () => setPageTitle("");
+  }, [t, setPageTitle]);
 
   /* 폼 값 — isActive는 'true'/'false' 문자열로 관리 */
   const [formValues, setFormValues] = useState<Record<string, string>>({
@@ -343,7 +351,7 @@ export default function AdminDetailPage() {
   }
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={t("admin.title.edit")}>
       {/* 기본 정보 폼 */}
       <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer

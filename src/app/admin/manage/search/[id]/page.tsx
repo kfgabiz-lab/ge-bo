@@ -10,6 +10,7 @@ import { useCodeStore } from "@/store/use-code-store";
 import { useMenusQuery } from "@/hooks/use-menu-queries";
 import type { MenuItem } from "@/store/use-menu-store";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 import api from "@/lib/api";
 
 /* 트리 구조인 FO 메뉴를 셀렉트 옵션용으로 평탄화 — url 없는 상위 분류 메뉴는 연결 대상에서 제외 */
@@ -63,6 +64,13 @@ export default function SearchMgmtDetailPage() {
   const routeId = params.id as string;
   const isNew = routeId === "new";
   const { t } = useI18n();
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(isNew ? t("search.title.new") : t("search.title.edit"));
+    return () => setPageTitle("");
+  }, [isNew, t, setPageTitle]);
 
   /* 실제 저장된 부모 id — 신규 등록 전에는 null */
   const [savedId, setSavedId] = useState<number | null>(isNew ? null : Number(routeId));
@@ -214,7 +222,7 @@ export default function SearchMgmtDetailPage() {
   }
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={isNew ? t("search.title.new") : t("search.title.edit")}>
       {/* URL + 분류 + 사용여부 — 분류 입력이 추가되어 rowSpan 을 1 늘리고, 아래 목록에서 1 줄인다(전체 높이 유지) */}
       <GridCell colSpan={12} rowSpan={3}>
         <div className="h-full space-y-4 rounded-lg border border-slate-200 bg-white p-5">

@@ -10,6 +10,7 @@ import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { useSiteManagementStore } from "@/store/use-site-management-store";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 
 /* ── 상수 ── */
 /* 시간대(timezone) select 옵션 — "라벨:값(IANA timezone)" 형식, 서비스 대상 국가 위주로 큐레이션 */
@@ -64,11 +65,18 @@ export default function SiteDetailPage() {
   const { t } = useI18n();
   const id = params.id as string;
   const isNew = id === "new";
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   const { createSite, updateSite } = useSiteManagementStore();
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(isNew ? t("site.title.new") : t("site.title.edit"));
+    return () => setPageTitle("");
+  }, [isNew, t, setPageTitle]);
 
   const [formValues, setFormValues] = useState<Record<string, string>>({
     nameMsgKey: "",
@@ -263,7 +271,7 @@ export default function SiteDetailPage() {
   }
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={isNew ? t("site.title.new") : t("site.title.edit")}>
       {/* 폼 위젯 */}
       <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer

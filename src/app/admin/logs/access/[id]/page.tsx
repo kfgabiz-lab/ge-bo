@@ -7,6 +7,8 @@ import { GridCell } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
+import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 import api from "@/lib/api";
 
 /* ── 접속이력 상세 타입 ── */
@@ -25,9 +27,17 @@ export default function LoginLogDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { t } = useI18n();
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   const [loading, setLoading] = useState(true);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(t("log.label.accessLogDetail"));
+    return () => setPageTitle("");
+  }, [t, setPageTitle]);
 
   /* 상세 데이터 로드 */
   useEffect(() => {
@@ -153,7 +163,7 @@ export default function LoginLogDetailPage() {
   if (loading) return null;
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={t("log.label.accessLogDetail")}>
       {/* 기본 정보 + 브라우저 정보 통합 */}
       <GridCell colSpan={12} rowSpan={10}>
         <WidgetRenderer
