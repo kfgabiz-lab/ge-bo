@@ -7,28 +7,32 @@ import { z } from "zod";
 import { X, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useMessageResourceStore } from "@/store/use-message-resource-store";
+import { useI18n } from "@/hooks/use-i18n";
 
-/* ── Zod 스키마 ── */
+/* ── Zod 스키마 팩토리 — t 주입으로 메시지 다국어 처리 ── */
 
-/* 등록 스키마 */
-const createSchema = z.object({
-  key: z
-    .string()
-    .min(1, "번역 키를 입력해주세요.")
-    .max(255, "번역 키는 255자 이하여야 합니다.")
-    .regex(/^[a-zA-Z0-9.]+$/, "번역 키는 영문, 숫자, 점(.)만 입력 가능합니다."),
-  ko: z.string().min(1, "한국어를 입력해주세요.").max(500, "한국어는 500자 이하여야 합니다."),
-  en: z.string().max(500, "영어는 500자 이하여야 합니다.").optional(),
-  resourceType: z.enum(["WORD", "SENTENCE"]),
-});
+const buildCreateSchema = (t: (key: string) => string) =>
+  z.object({
+    key: z
+      .string()
+      .min(1, t("validation.i18n.keyRequired"))
+      .max(255, t("validation.i18n.keyMaxLength"))
+      .regex(/^[a-zA-Z0-9.]+$/, t("validation.i18n.keyFormat")),
+    ko: z.string().min(1, t("validation.i18n.koreanRequired")).max(500, t("validation.i18n.koreanMaxLength")),
+    en: z.string().max(500, t("validation.i18n.englishMaxLength")).optional(),
+    resourceType: z.enum(["WORD", "SENTENCE"]),
+  });
 
-/* 수정 스키마 — key 제외 */
-const updateSchema = z.object({
-  ko: z.string().min(1, "한국어를 입력해주세요.").max(500, "한국어는 500자 이하여야 합니다."),
-  en: z.string().max(500, "영어는 500자 이하여야 합니다.").optional(),
-  active: z.boolean(),
-  resourceType: z.enum(["WORD", "SENTENCE"]),
-});
+const buildUpdateSchema = (t: (key: string) => string) =>
+  z.object({
+    ko: z.string().min(1, t("validation.i18n.koreanRequired")).max(500, t("validation.i18n.koreanMaxLength")),
+    en: z.string().max(500, t("validation.i18n.englishMaxLength")).optional(),
+    active: z.boolean(),
+    resourceType: z.enum(["WORD", "SENTENCE"]),
+  });
+
+const createSchema = buildCreateSchema((key) => key);
+const updateSchema = buildUpdateSchema((key) => key);
 
 type CreateFormData = z.infer<typeof createSchema>;
 type UpdateFormData = z.infer<typeof updateSchema>;
@@ -38,19 +42,20 @@ type UpdateFormData = z.infer<typeof updateSchema>;
 export const MessageResourceDrawer = () => {
   const { isDrawerOpen, closeDrawer, selectedItem, createItem, updateItem, isLoading, refetch } =
     useMessageResourceStore();
+  const { t } = useI18n();
 
   /* 수정 모드 여부 */
   const isEdit = !!selectedItem;
 
   /* 등록 폼 */
   const createForm = useForm<CreateFormData>({
-    resolver: zodResolver(createSchema),
+    resolver: zodResolver(buildCreateSchema(t)),
     defaultValues: { key: "", ko: "", en: "", resourceType: "WORD" },
   });
 
   /* 수정 폼 */
   const updateForm = useForm<UpdateFormData>({
-    resolver: zodResolver(updateSchema),
+    resolver: zodResolver(buildUpdateSchema(t)),
     defaultValues: { ko: "", en: "", active: true, resourceType: "WORD" },
   });
 
@@ -119,9 +124,11 @@ export const MessageResourceDrawer = () => {
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e8eaed]">
           <div>
-            <h2 className="text-sm font-bold text-[#111827]">{isEdit ? "항목 수정" : "항목 추가"}</h2>
+            <h2 className="text-sm font-bold text-[#111827]">
+              {isEdit ? t("i18n.title.editItem") : t("i18n.btn.addItem")}
+            </h2>
             <p className="text-sm text-[#9ca3af] mt-0.5">
-              {isEdit ? "다국어 항목 정보를 수정합니다." : "새로운 다국어 항목을 등록합니다."}
+              {isEdit ? t("i18n.desc.editItem") : t("i18n.desc.createItem")}
             </p>
           </div>
           <button
@@ -140,12 +147,14 @@ export const MessageResourceDrawer = () => {
             className="flex-1 overflow-y-auto px-5 py-5 space-y-5"
           >
             <section className="space-y-4">
-              <p className="text-sm font-semibold text-[#9ca3af] uppercase tracking-widest">항목 정보</p>
+              <p className="text-sm font-semibold text-[#9ca3af] uppercase tracking-widest">
+                {t("i18n.label.itemInfo")}
+              </p>
 
               {/* 유형 선택 — 단어 / 문장 */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-[#374151]">
-                  유형 <span className="text-red-500">*</span>
+                  {t("common.label.type")} <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   {(["WORD", "SENTENCE"] as const).map((type) => (
@@ -159,7 +168,7 @@ export const MessageResourceDrawer = () => {
                           : "border-[#e2e4e9] text-[#374151] hover:border-[#c4c9d4]"
                       }`}
                     >
-                      {type === "WORD" ? "단어" : "문장"}
+                      {type === "WORD" ? t("i18n.type.word") : t("i18n.type.sentence")}
                     </button>
                   ))}
                 </div>
@@ -167,7 +176,7 @@ export const MessageResourceDrawer = () => {
 
               {/* Key — 수정 불가 */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[#374151]">Key</label>
+                <label className="text-sm font-medium text-[#374151]">{t("i18n.label.key")}</label>
                 <div className="relative">
                   <input
                     value={selectedItem?.key ?? ""}
@@ -175,14 +184,14 @@ export const MessageResourceDrawer = () => {
                     className="w-full text-sm border border-[#e2e4e9] rounded-lg px-3 py-2 bg-[#f9fafb] text-[#9ca3af] font-mono cursor-not-allowed pr-9"
                   />
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#d1d5db]" />
-                  <p className="text-[11px] text-[#9ca3af] mt-1">번역 키는 변경할 수 없습니다.</p>
+                  <p className="text-[11px] text-[#9ca3af] mt-1">{t("i18n.notice.keyReadonly")}</p>
                 </div>
               </div>
 
               {/* 한국어 */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-[#374151]">
-                  한국어 <span className="text-red-500">*</span>
+                  {t("i18n.label.korean")} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   {...updateForm.register("ko")}
@@ -193,7 +202,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 영어 */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[#374151]">영어</label>
+                <label className="text-sm font-medium text-[#374151]">{t("i18n.label.english")}</label>
                 <textarea
                   {...updateForm.register("en")}
                   rows={3}
@@ -203,7 +212,7 @@ export const MessageResourceDrawer = () => {
 
               {/* 사용여부 토글 — 수정 모드에서만 노출 */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[#374151]">사용여부</label>
+                <label className="text-sm font-medium text-[#374151]">{t("common.label.isActive")}</label>
                 <button
                   type="button"
                   onClick={() => updateForm.setValue("active", !updateForm.watch("active"))}
@@ -212,7 +221,7 @@ export const MessageResourceDrawer = () => {
                   <span
                     className={`text-xs font-semibold ${updateForm.watch("active") ? "text-[#4361ee]" : "text-[#374151]"}`}
                   >
-                    {updateForm.watch("active") ? "사용" : "미사용"}
+                    {updateForm.watch("active") ? t("common.status.active") : t("common.status.inactive")}
                   </span>
                   <div
                     className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${updateForm.watch("active") ? "bg-[#4361ee]" : "bg-[#e2e4e9]"}`}
@@ -232,12 +241,14 @@ export const MessageResourceDrawer = () => {
             className="flex-1 overflow-y-auto px-5 py-5 space-y-5"
           >
             <section className="space-y-4">
-              <p className="text-sm font-semibold text-[#9ca3af] uppercase tracking-widest">항목 정보</p>
+              <p className="text-sm font-semibold text-[#9ca3af] uppercase tracking-widest">
+                {t("i18n.label.itemInfo")}
+              </p>
 
               {/* 유형 선택 — 단어 / 문장 */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-[#374151]">
-                  유형 <span className="text-red-500">*</span>
+                  {t("common.label.type")} <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   {(["WORD", "SENTENCE"] as const).map((type) => (
@@ -251,7 +262,7 @@ export const MessageResourceDrawer = () => {
                           : "border-[#e2e4e9] text-[#374151] hover:border-[#c4c9d4]"
                       }`}
                     >
-                      {type === "WORD" ? "단어" : "문장"}
+                      {type === "WORD" ? t("i18n.type.word") : t("i18n.type.sentence")}
                     </button>
                   ))}
                 </div>
@@ -260,11 +271,11 @@ export const MessageResourceDrawer = () => {
               {/* Key */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-[#374151]">
-                  Key <span className="text-red-500">*</span>
+                  {t("i18n.label.key")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   {...createForm.register("key")}
-                  placeholder="예: BTN.SAVE"
+                  placeholder={t("i18n.placeholder.keyExample")}
                   className={`w-full text-sm border rounded-lg px-3 py-2 font-mono focus:outline-none focus:ring-2 focus:ring-[#4361ee]/15 focus:border-[#4361ee] transition-all ${createForm.formState.errors.key ? "border-red-400 bg-red-50" : "border-[#e2e4e9]"}`}
                 />
               </div>
@@ -272,23 +283,23 @@ export const MessageResourceDrawer = () => {
               {/* 한국어 */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-[#374151]">
-                  한국어 <span className="text-red-500">*</span>
+                  {t("i18n.label.korean")} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   {...createForm.register("ko")}
                   rows={3}
-                  placeholder="한국어 텍스트를 입력하세요."
+                  placeholder={t("i18n.placeholder.koreanInput")}
                   className={`w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4361ee]/15 focus:border-[#4361ee] transition-all resize-none ${createForm.formState.errors.ko ? "border-red-400 bg-red-50" : "border-[#e2e4e9]"}`}
                 />
               </div>
 
               {/* 영어 */}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[#374151]">영어</label>
+                <label className="text-sm font-medium text-[#374151]">{t("i18n.label.english")}</label>
                 <textarea
                   {...createForm.register("en")}
                   rows={3}
-                  placeholder="영어 텍스트를 입력하세요. (선택)"
+                  placeholder={t("i18n.placeholder.englishInput")}
                   className={`w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4361ee]/15 focus:border-[#4361ee] transition-all resize-none ${createForm.formState.errors.en ? "border-red-400 bg-red-50" : "border-[#e2e4e9]"}`}
                 />
               </div>
@@ -303,7 +314,7 @@ export const MessageResourceDrawer = () => {
             onClick={closeDrawer}
             className="flex-1 py-2.5 text-sm font-semibold text-[#374151] border border-[#e2e4e9] rounded-lg hover:bg-[#f4f5f7] transition-all"
           >
-            취소
+            {t("common.btn.cancel")}
           </button>
           <button
             type="button"
@@ -318,9 +329,9 @@ export const MessageResourceDrawer = () => {
             {isLoading ? (
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : isEdit ? (
-              "저장"
+              t("common.btn.save")
             ) : (
-              "등록"
+              t("search.btn.register")
             )}
           </button>
         </div>

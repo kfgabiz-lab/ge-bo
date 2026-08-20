@@ -119,8 +119,10 @@ export default function SearchMgmtPage() {
               id: "f1",
               type: "input",
               label: "URL",
+              labelMsgKey: "popup.label.url",
               colSpan: 1,
               placeholder: "URL 입력",
+              placeholderMsgKey: "search.label.urlInput",
             },
           ],
         },
@@ -144,6 +146,7 @@ export default function SearchMgmtPage() {
           /* 분류 — codeGroupCode 연동으로 코드값(MARKETS 등)이 이름(Markets)으로 표시된다 */
           id: "c0",
           header: "분류",
+          headerMsgKey: "training.label.category",
           accessor: "pageSection",
           cellType: "text",
           align: "center",
@@ -155,6 +158,7 @@ export default function SearchMgmtPage() {
         {
           id: "c1",
           header: "URL",
+          headerMsgKey: "popup.label.url",
           accessor: "url",
           cellType: "text",
           align: "left",
@@ -163,6 +167,7 @@ export default function SearchMgmtPage() {
         {
           id: "c2",
           header: "수정",
+          headerMsgKey: "common.btn.edit",
           accessor: "_actions",
           cellType: "actions",
           align: "center",
@@ -187,6 +192,7 @@ export default function SearchMgmtPage() {
           id: "s1",
           type: "action-button",
           label: "등록",
+          labelMsgKey: "search.btn.register",
           colSpan: 1,
           color: "black",
           connType: "close",

@@ -10,6 +10,7 @@ import type { TableActionHandlers } from "@/app/admin/templates/make/_shared/com
 import { useMessageResourceStore, MessageResource } from "@/store/use-message-resource-store";
 import { MessageResourceDrawer } from "@/components/i18n/message-resource-drawer";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { useI18n } from "@/hooks/use-i18n";
 
 /* ── 상수 ── */
 
@@ -26,11 +27,49 @@ const SEARCH_WIDGET: SearchWidget = {
       id: "r1",
       cols: 5,
       fields: [
-        { id: "f1", type: "input", label: "Key", colSpan: 1, placeholder: "Key 검색" },
-        { id: "f2", type: "input", label: "한국어", colSpan: 1, placeholder: "한국어 검색" },
-        { id: "f3", type: "input", label: "영어", colSpan: 1, placeholder: "영어 검색" },
-        { id: "f4", type: "select", label: "유형", colSpan: 1, options: ["전체", "단어", "문장"] },
-        { id: "f5", type: "select", label: "사용여부", colSpan: 1, options: ["전체", "사용", "미사용"] },
+        {
+          id: "f1",
+          type: "input",
+          label: "Key",
+          labelMsgKey: "i18n.label.key",
+          colSpan: 1,
+          placeholder: "Key 검색",
+          placeholderMsgKey: "i18n.placeholder.keySearch",
+        },
+        {
+          id: "f2",
+          type: "input",
+          label: "한국어",
+          labelMsgKey: "i18n.label.korean",
+          colSpan: 1,
+          placeholder: "한국어 검색",
+          placeholderMsgKey: "i18n.placeholder.koreanSearch",
+        },
+        {
+          id: "f3",
+          type: "input",
+          label: "영어",
+          labelMsgKey: "i18n.label.english",
+          colSpan: 1,
+          placeholder: "영어 검색",
+          placeholderMsgKey: "i18n.placeholder.englishSearch",
+        },
+        {
+          id: "f4",
+          type: "select",
+          label: "유형",
+          labelMsgKey: "common.label.type",
+          colSpan: 1,
+          options: ["전체", "단어", "문장"],
+        },
+        {
+          id: "f5",
+          type: "select",
+          label: "사용여부",
+          labelMsgKey: "common.label.isActive",
+          colSpan: 1,
+          options: ["전체", "사용", "미사용"],
+        },
       ],
     },
   ],
@@ -47,6 +86,7 @@ const SPACE_WIDGET: SpaceWidget = {
       id: "s1",
       type: "action-button",
       label: "항목 추가",
+      labelMsgKey: "i18n.btn.addItem",
       colSpan: 1,
       color: "black",
       connType: "close",
@@ -63,12 +103,38 @@ const TABLE_WIDGET: TableWidget = {
   pageSize: PAGE_SIZE,
   connectedSearchIds: ["i18n-search"],
   columns: [
-    { id: "c1", header: "Key", accessor: "key", cellType: "text", align: "left", sortable: true, width: 200 },
-    { id: "c2", header: "한국어", accessor: "ko", cellType: "text", align: "left", sortable: true },
-    { id: "c3", header: "영어", accessor: "en", cellType: "text", align: "left", sortable: true },
+    {
+      id: "c1",
+      header: "Key",
+      headerMsgKey: "i18n.label.key",
+      accessor: "key",
+      cellType: "text",
+      align: "left",
+      sortable: true,
+      width: 200,
+    },
+    {
+      id: "c2",
+      header: "한국어",
+      headerMsgKey: "i18n.label.korean",
+      accessor: "ko",
+      cellType: "text",
+      align: "left",
+      sortable: true,
+    },
+    {
+      id: "c3",
+      header: "영어",
+      headerMsgKey: "i18n.label.english",
+      accessor: "en",
+      cellType: "text",
+      align: "left",
+      sortable: true,
+    },
     {
       id: "c4",
       header: "유형",
+      headerMsgKey: "common.label.type",
       accessor: "resourceType",
       cellType: "badge",
       align: "center",
@@ -82,6 +148,7 @@ const TABLE_WIDGET: TableWidget = {
     {
       id: "c5",
       header: "사용여부",
+      headerMsgKey: "common.label.isActive",
       accessor: "active",
       cellType: "badge",
       align: "center",
@@ -95,6 +162,7 @@ const TABLE_WIDGET: TableWidget = {
     {
       id: "c6",
       header: "등록일",
+      headerMsgKey: "common.label.createdAt",
       accessor: "createdAt",
       cellType: "text",
       align: "center",
@@ -104,6 +172,7 @@ const TABLE_WIDGET: TableWidget = {
     {
       id: "c7",
       header: "관리",
+      headerMsgKey: "common.label.manage",
       accessor: "_actions",
       cellType: "actions",
       align: "center",
@@ -122,6 +191,7 @@ const INITIAL_SEARCH: Record<string, string> = { f1: "", f2: "", f3: "", f4: "�
 export default function I18nPage() {
   const { items, totalElements, totalPages, currentPage, isLoading, fetchItems, deleteItem, openDrawer } =
     useMessageResourceStore();
+  const { t } = useI18n();
 
   /* 검색 상태 */
   const [searchValues, setSearchValues] = useState<Record<string, string>>(INITIAL_SEARCH);
@@ -283,9 +353,9 @@ export default function I18nPage() {
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDeleteConfirm}
-        title="항목 삭제"
-        description={`'${deleteTarget?.key}' 항목을 삭제하시겠습니까?`}
-        confirmText="삭제하기"
+        title={t("i18n.title.deleteItem")}
+        description={t("i18n.confirm.deleteItem", { key: deleteTarget?.key ?? "" })}
+        confirmText={t("i18n.btn.deleteConfirm")}
         variant="danger"
       />
     </>

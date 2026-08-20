@@ -400,7 +400,7 @@ function MenuForm({
           {/* 🌐 다국어 모드 토글 */}
           <button
             type="button"
-            title={i18nMode ? "직접 입력 모드로 전환" : "다국어 키 모드로 전환"}
+            title={i18nMode ? t("menu.title.switchToManualInput") : t("menu.title.switchToI18nMode")}
             onClick={toggleI18nMode}
             className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ${
               i18nMode
@@ -409,7 +409,7 @@ function MenuForm({
             }`}
           >
             <Globe className="w-3 h-3" />
-            {i18nMode ? "다국어" : "직접입력"}
+            {i18nMode ? t("menu.btn.i18nMode") : t("search.btn.manualInput")}
           </button>
         </div>
         {i18nMode ? (

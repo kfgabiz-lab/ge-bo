@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "@/hooks/use-i18n";
 
 interface PrivacyReasonModalProps {
   /** 확인 버튼 클릭 시 호출 — reason: 입력된 사유 */
@@ -18,12 +19,13 @@ const MAX_LENGTH = 50;
  * - 확인 시 onConfirm(reason) 호출
  */
 export function PrivacyReasonModal({ onConfirm, onCancel }: PrivacyReasonModalProps) {
+  const { t } = useI18n();
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
 
   const handleConfirm = () => {
     if (reason.length < MIN_LENGTH) {
-      setError(`최소 ${MIN_LENGTH}자 이상 입력해주세요.`);
+      setError(t("common.validation.minLengthOnly", { min: String(MIN_LENGTH) }));
       return;
     }
     onConfirm(reason.trim());
@@ -41,11 +43,11 @@ export function PrivacyReasonModal({ onConfirm, onCancel }: PrivacyReasonModalPr
       <div className="w-[480px] rounded-lg bg-white shadow-xl">
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">다운로드 사유</h2>
+          <h2 className="text-base font-semibold text-slate-900">{t("common.label.downloadReason")}</h2>
           <button
             onClick={onCancel}
             className="text-slate-400 hover:text-slate-600 transition-colors"
-            aria-label="닫기"
+            aria-label={t("common.btn.close")}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -55,12 +57,12 @@ export function PrivacyReasonModal({ onConfirm, onCancel }: PrivacyReasonModalPr
 
         {/* 본문 */}
         <div className="px-5 py-5 space-y-3">
-          <p className="text-sm text-slate-600">개인정보를 다운로드 하는 경우 사유 확인 이 필요합니다.</p>
+          <p className="text-sm text-slate-600">{t("common.description.privacyDownloadReason")}</p>
           <div>
             <textarea
               value={reason}
               onChange={(e) => handleChange(e.target.value)}
-              placeholder={`최소 ${MIN_LENGTH}자 이상 입력`}
+              placeholder={t("common.placeholder.minLength", { min: String(MIN_LENGTH) })}
               rows={3}
               className={`w-full resize-none rounded border px-3 py-2 text-sm outline-none transition-colors
                                 ${
@@ -84,13 +86,13 @@ export function PrivacyReasonModal({ onConfirm, onCancel }: PrivacyReasonModalPr
             onClick={onCancel}
             className="rounded px-4 py-2 text-sm font-medium bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
           >
-            취소
+            {t("common.btn.cancel")}
           </button>
           <button
             onClick={handleConfirm}
             className="rounded px-4 py-2 text-sm font-medium bg-slate-800 text-white hover:bg-slate-900 transition-colors"
           >
-            확인
+            {t("common.btn.confirm")}
           </button>
         </div>
       </div>
