@@ -391,6 +391,16 @@ export function MultiSelectRenderer({
       .filter(({ entry }) => selected.includes(entry.selectionId))
   );
 
+  const fieldAlign = widget.fieldAlign ?? "left";
+  const fieldWidthStyle: React.CSSProperties | undefined =
+    typeof widget.fieldColSpan === "number" && widget.fieldColSpan >= 1 && widget.fieldColSpan < 12
+      ? {
+          width: `${(widget.fieldColSpan / 12) * 100}%`,
+          marginLeft: fieldAlign === "center" || fieldAlign === "right" ? "auto" : undefined,
+          marginRight: fieldAlign === "center" ? "auto" : undefined,
+        }
+      : undefined;
+
   return (
     <RendererContainer showBorder={widget.showBorder ?? true} bgColor={widget.bgColor}>
       <div className="p-3 flex flex-col gap-3 h-full">
@@ -409,136 +419,140 @@ export function MultiSelectRenderer({
           </p>
         )}
 
-        {/* 드롭다운 영역 */}
-        <div ref={containerRef} className="relative">
-          {/* 토글 버튼 */}
-          <button
-            ref={buttonRef}
-            type="button"
-            disabled={isPreview}
-            onClick={() => setIsOpen((prev) => !prev)}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-300 rounded-md bg-white text-sm hover:border-slate-400 transition-colors disabled:cursor-default"
-          >
-            <span className={selected.length > 0 ? "text-slate-800" : "text-slate-400"}>
-              {selected.length > 0
-                ? t("common.multiselect.selected_count", { count: String(selected.length) })
-                : widget.placeholderMsgKey
-                  ? t(widget.placeholderMsgKey)
-                  : (widget.placeholder ?? t("common.multiselect.placeholder"))}
-            </span>
-            <ChevronDown
-              className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-            />
-          </button>
+        <div className={fieldWidthStyle ? "flex flex-col gap-3" : "contents"} style={fieldWidthStyle}>
+          {/* 드롭다운 영역 */}
+          <div ref={containerRef} className="relative">
+            {/* 토글 버튼 */}
+            <button
+              ref={buttonRef}
+              type="button"
+              disabled={isPreview}
+              onClick={() => setIsOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-300 rounded-md bg-white text-sm hover:border-slate-400 transition-colors disabled:cursor-default"
+            >
+              <span className={selected.length > 0 ? "text-slate-800" : "text-slate-400"}>
+                {selected.length > 0
+                  ? t("common.multiselect.selected_count", { count: String(selected.length) })
+                  : widget.placeholderMsgKey
+                    ? t(widget.placeholderMsgKey)
+                    : (widget.placeholder ?? t("common.multiselect.placeholder"))}
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+              />
+            </button>
 
-          {/* 드롭다운 패널 — Portal(body)로 렌더링하여 부모 overflow에 잘리지 않음. preview는 버튼 disabled라 열리지 않음 */}
-          <PortalDropdown
-            open={isOpen}
-            anchorRef={buttonRef}
-            onOutsideClick={() => setIsOpen(false)}
-            className="bg-white border border-slate-200 rounded-md shadow-lg"
-          >
-            {/* 검색 입력 */}
-            <div className="p-2 border-b border-slate-100">
-              <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded border border-slate-200">
-                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <input
-                  type="text"
-                  disabled={isPreview}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t("common.input.search_placeholder")}
-                  className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
-                />
+            {/* 드롭다운 패널 — Portal(body)로 렌더링하여 부모 overflow에 잘리지 않음. preview는 버튼 disabled라 열리지 않음 */}
+            <PortalDropdown
+              open={isOpen}
+              anchorRef={buttonRef}
+              onOutsideClick={() => setIsOpen(false)}
+              className="bg-white border border-slate-200 rounded-md shadow-lg"
+            >
+              {/* 검색 입력 */}
+              <div className="p-2 border-b border-slate-100">
+                <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded border border-slate-200">
+                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <input
+                    type="text"
+                    disabled={isPreview}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t("common.input.search_placeholder")}
+                    className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* 옵션 목록 */}
-            <ul className="max-h-48 overflow-y-auto py-1">
-              {filteredOptions.length === 0 ? (
-                <li className="px-3 py-2 text-xs text-slate-400 text-center">{t("common.table.no_data")}</li>
-              ) : (
-                /* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
+              {/* 옵션 목록 */}
+              <ul className="max-h-48 overflow-y-auto py-1">
+                {filteredOptions.length === 0 ? (
+                  <li className="px-3 py-2 text-xs text-slate-400 text-center">{t("common.table.no_data")}</li>
+                ) : (
+                  /* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
                    별도 행(row)으로 나열한다 — 매핑(depth3) 고유 id가 있으면 행별로 독립 토글되고,
                    없는 일반 옵션은 기존과 동일하게 opt.id 기준으로 전체가 함께 토글된다 */
-                filteredOptions.flatMap((opt) =>
-                  buildLabelPathEntries(opt, widget).map((entry, pathIdx) => (
-                    <li key={`${opt.id}-${pathIdx}`}>
-                      <label
-                        className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(entry.selectionId)}
-                          disabled={isPreview}
-                          onChange={() => !isPreview && toggleItem(entry.selectionId)}
-                          className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
-                        />
-                        <span className="text-sm text-slate-700">{entry.path}</span>
-                      </label>
-                    </li>
-                  ))
-                )
-              )}
-            </ul>
-          </PortalDropdown>
-        </div>
+                  filteredOptions.flatMap((opt) =>
+                    buildLabelPathEntries(opt, widget).map((entry, pathIdx) => (
+                      <li key={`${opt.id}-${pathIdx}`}>
+                        <label
+                          className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(entry.selectionId)}
+                            disabled={isPreview}
+                            onChange={() => !isPreview && toggleItem(entry.selectionId)}
+                            className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
+                          />
+                          <span className="text-sm text-slate-700">{entry.path}</span>
+                        </label>
+                      </li>
+                    ))
+                  )
+                )}
+              </ul>
+            </PortalDropdown>
+          </div>
 
-        {/* 선택된 항목 목록 — [좌측 필드][항목명][우측 필드][X버튼] 1줄 배치
+          {/* 선택된 항목 목록 — [좌측 필드][항목명][우측 필드][X버튼] 1줄 배치
              선택 개수가 늘어나면 위젯이 놓인 그리드 셀 높이를 넘어서서 잘리므로(그리드 셀 자체엔 스크롤이 없음),
              바깥 wrapper에만 높이 제한 + 세로 스크롤을 둔다.
              (flex-col 컨테이너 자체에 max-height를 주면 그 자식 row들이 flex-shrink로 찌그러지므로,
               반드시 별도 block 레벨 wrapper로 감싸서 안쪽 flex-col은 원래 크기 그대로 유지시킨다) */}
-        {selectedEntries.length > 0 && (
-          <div className="max-h-56 overflow-y-auto">
-            <div className="flex flex-col gap-1.5">
-              {/* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
+          {selectedEntries.length > 0 && (
+            <div className="max-h-56 overflow-y-auto">
+              <div className="flex flex-col gap-1.5">
+                {/* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
                   별도 행(row)으로 나열한다 — 추가입력필드는 같은 opt.id 값을 공유(제품 단위 데이터이므로 동일하게 표시),
                   X버튼은 매핑(depth3) 고유 id가 있으면 그 행만 선택 해제하고, 없는 일반 옵션은 기존처럼 opt.id 전체가 해제됨 */}
-              {selectedEntries.map(({ opt, entry, pathIdx }) => {
-                const extraFields = widget.extraFields ?? [];
-                /* position='left'인 필드만 좌측 그룹, 그 외(right 및 미설정)는 우측 그룹 */
-                const leftFields = extraFields.filter((ef) => ef.position === "left");
-                const rightFields = extraFields.filter((ef) => ef.position !== "left");
-                const itemVals = extraFieldValues[opt.id] ?? {};
+                {selectedEntries.map(({ opt, entry, pathIdx }) => {
+                  const extraFields = widget.extraFields ?? [];
+                  /* position='left'인 필드만 좌측 그룹, 그 외(right 및 미설정)는 우측 그룹 */
+                  const leftFields = extraFields.filter((ef) => ef.position === "left");
+                  const rightFields = extraFields.filter((ef) => ef.position !== "left");
+                  const itemVals = extraFieldValues[opt.id] ?? {};
 
-                return (
-                  <div
-                    key={`${opt.id}-${pathIdx}`}
-                    className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
-                  >
-                    {/* 좌측 추가 입력 필드 */}
-                    {leftFields.length > 0 &&
-                      renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
-
-                    {/* 좌측 필드 ↔ 항목명 구분선 */}
-                    {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
-
-                    {/* 항목명 — 고정 너비로 잘림 방지 */}
-                    <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">{entry.path}</span>
-
-                    {/* 항목명 ↔ 우측 필드 구분선 */}
-                    {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
-
-                    {/* 우측 추가 입력 필드 */}
-                    {rightFields.length > 0 &&
-                      renderExtraFieldGroup(rightFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
-
-                    {/* X버튼 — 오른쪽 끝 고정 */}
-                    <button
-                      type="button"
-                      disabled={isPreview}
-                      onClick={() => removeItem(entry.selectionId)}
-                      className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
+                  return (
+                    <div
+                      key={`${opt.id}-${pathIdx}`}
+                      className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
+                      {/* 좌측 추가 입력 필드 */}
+                      {leftFields.length > 0 &&
+                        renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
+
+                      {/* 좌측 필드 ↔ 항목명 구분선 */}
+                      {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
+
+                      {/* 항목명 — 고정 너비로 잘림 방지 */}
+                      <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
+                        {entry.path}
+                      </span>
+
+                      {/* 항목명 ↔ 우측 필드 구분선 */}
+                      {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
+
+                      {/* 우측 추가 입력 필드 */}
+                      {rightFields.length > 0 &&
+                        renderExtraFieldGroup(rightFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
+
+                      {/* X버튼 — 오른쪽 끝 고정 */}
+                      <button
+                        type="button"
+                        disabled={isPreview}
+                        onClick={() => removeItem(entry.selectionId)}
+                        className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </RendererContainer>
   );

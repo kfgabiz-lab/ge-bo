@@ -390,6 +390,39 @@ export function MultiSelectBuilder({
           />
         </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>ColSpan (가로)</label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={widget.fieldColSpan ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onChange({
+                  ...widget,
+                  fieldColSpan: raw === "" ? undefined : Math.max(1, Math.min(12, Number(raw) || 1)),
+                });
+              }}
+              placeholder="자동(12)"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>정렬</label>
+            <select
+              value={widget.fieldAlign ?? "left"}
+              onChange={(e) => onChange({ ...widget, fieldAlign: e.target.value as "left" | "center" | "right" })}
+              className={INPUT_CLS}
+            >
+              <option value="left">좌측</option>
+              <option value="center">중앙</option>
+              <option value="right">우측</option>
+            </select>
+          </div>
+        </div>
+
         {/* 옵션 소스 — 호출(직접 slug 조회) / 연동(slug-relation 경유 조회) 선택 (2:8) */}
         <div className="grid grid-cols-10 gap-2">
           {/* 소스 모드 선택 — 2/10 */}

@@ -319,6 +319,8 @@ export interface MultiSelectWidget {
   required?: boolean; // 필수 여부 (true: 최소 1개 이상 선택해야 저장 가능)
   showBorder?: boolean;
   bgColor?: string;
+  fieldColSpan?: number;
+  fieldAlign?: "left" | "center" | "right";
   /** 선택된 항목마다 인라인으로 표시할 추가 입력 필드 목록 */
   extraFields?: MultiSelectExtraField[];
   /** 동적 HIDE 조건 — live 모드에서 다른 필드 값 기준으로 이 위젯을 숨김
