@@ -9,6 +9,7 @@ import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { useCodeStore } from "@/store/use-code-store";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 import api from "@/lib/api";
 
 /* ── 이메일 발송 이력 상세 타입 ── */
@@ -30,10 +31,17 @@ export default function EmailSendHisDetailPage() {
   const id = params.id as string;
   const { groups: codeGroups, fetchGroups } = useCodeStore();
   const { t } = useI18n();
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   const [loading, setLoading] = useState(true);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(t("email.label.emailSendHistoryDetail"));
+    return () => setPageTitle("");
+  }, [t, setPageTitle]);
 
   useEffect(() => {
     fetchGroups();
@@ -219,7 +227,7 @@ export default function EmailSendHisDetailPage() {
   if (loading) return null;
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={t("email.label.emailSendHistoryDetail")}>
       <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer
           mode="live"
