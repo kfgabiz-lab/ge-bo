@@ -31,7 +31,7 @@ import { useMemo } from "react";
 import { Search, RotateCcw } from "lucide-react";
 import { SearchForm, SearchRow, SearchField, isEnterSearchTrigger } from "@/components/search";
 import { SearchRowConfig, CodeGroupDef } from "../../types";
-import { evalFieldCondition, buildKeyToId } from "../../utils";
+import { evalFieldCondition, buildKeyToId, resolveSearchFieldLabel } from "../../utils";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import { useHiddenSearchFieldReset } from "./useHiddenSearchFieldReset";
@@ -217,14 +217,7 @@ export function SearchRenderer({
               return (
                 <SearchField
                   key={field.id}
-                  /* dateRange: label ~ label2 형식으로 표시 / msgKey 우선 처리 */
-                  label={
-                    field.type === "dateRange" || field.type === "yearMonthRange"
-                      ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : field.label2 || ""}`
-                      : field.labelMsgKey
-                        ? t(field.labelMsgKey)
-                        : field.label || undefined
-                  }
+                  label={resolveSearchFieldLabel(field, t)}
                   colSpan={field.colSpan}
                   required={field.required}
                   description={field.descriptionMsgKey ? t(field.descriptionMsgKey) : field.description}

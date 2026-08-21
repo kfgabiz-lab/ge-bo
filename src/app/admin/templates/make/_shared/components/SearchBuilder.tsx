@@ -15,7 +15,7 @@ import { useSlugRelations } from "../hooks/useSlugRelations";
 import { Plus, Trash2, GripVertical, ChevronUp, ChevronDown, X, Pencil } from "lucide-react";
 import { CodeGroupDef, SearchFieldType, SearchFieldConfig, SearchRowConfig } from "../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { needsOptions as sharedNeedsOptions, createIdGenerator } from "../utils";
+import { needsOptions as sharedNeedsOptions, createIdGenerator, resolveSearchFieldLabel } from "../utils";
 import { SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from "../constants";
 import { useBuilderI18nMode } from "../contexts/BuilderI18nModeContext";
 import { RowHeader } from "./RowHeader";
@@ -637,11 +637,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                       {field.type}
                                     </span>
                                     <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
-                                      {field.type === "dateRange" || field.type === "yearMonthRange"
-                                        ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : field.label2 || ""}`
-                                        : field.labelMsgKey
-                                          ? t(field.labelMsgKey)
-                                          : field.label}
+                                      {resolveSearchFieldLabel(field, t)}
                                     </span>
                                     {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
                                     {field.excludeFromSearch && (
