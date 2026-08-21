@@ -60,7 +60,9 @@ const SEARCH_WIDGET: SearchWidget = {
           label: "유형",
           labelMsgKey: "common.label.type",
           colSpan: 1,
-          options: ["전체", "단어", "문장"],
+          placeholder: "전체",
+          placeholderMsgKey: "common.label.all",
+          options: ["i18n.label.word:WORD", "i18n.label.sentence:SENTENCE"],
         },
         {
           id: "f5",
@@ -68,7 +70,9 @@ const SEARCH_WIDGET: SearchWidget = {
           label: "사용여부",
           labelMsgKey: "common.label.isActive",
           colSpan: 1,
-          options: ["전체", "사용", "미사용"],
+          placeholder: "전체",
+          placeholderMsgKey: "common.label.all",
+          options: ["common.status.active:true", "common.status.inactive:false"],
         },
       ],
     },
@@ -141,8 +145,8 @@ const TABLE_WIDGET: TableWidget = {
       sortable: true,
       width: 80,
       cellOptions: [
-        { value: "WORD", text: "단어", color: "blue" },
-        { value: "SENTENCE", text: "문장", color: "purple" },
+        { value: "WORD", text: "단어", textMsgKey: "i18n.label.word", color: "blue" },
+        { value: "SENTENCE", text: "문장", textMsgKey: "i18n.label.sentence", color: "purple" },
       ],
     },
     {
@@ -155,8 +159,8 @@ const TABLE_WIDGET: TableWidget = {
       sortable: true,
       width: 90,
       cellOptions: [
-        { value: "true", text: "사용", color: "green" },
-        { value: "false", text: "미사용", color: "gray" },
+        { value: "true", text: "사용", textMsgKey: "common.status.active", color: "green" },
+        { value: "false", text: "미사용", textMsgKey: "common.status.inactive", color: "gray" },
       ],
     },
     {
@@ -184,7 +188,7 @@ const TABLE_WIDGET: TableWidget = {
 };
 
 /** 검색 필드 초기값 */
-const INITIAL_SEARCH: Record<string, string> = { f1: "", f2: "", f3: "", f4: "전체", f5: "전체" };
+const INITIAL_SEARCH: Record<string, string> = { f1: "", f2: "", f3: "", f4: "", f5: "" };
 
 /* ── 페이지 컴포넌트 ── */
 
@@ -210,8 +214,8 @@ export default function I18nPage() {
       key: search.f1 ?? "",
       ko: search.f2 ?? "",
       en: search.f3 ?? "",
-      resourceType: search.f4 ?? "전체",
-      active: search.f5 ?? "전체",
+      resourceType: search.f4 ?? "",
+      active: search.f5 ?? "",
       page,
       size: PAGE_SIZE,
       sort: sk ? `${sk},${sd}` : undefined,

@@ -100,7 +100,7 @@ export function TableCellRenderer({
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium ${shapeCls} ${BADGE_CLS[opt.color] || BADGE_CLS.slate}`}
           >
             {col.showIcon && <span className={`w-1.5 h-1.5 rounded-full ${BADGE_DOT[opt.color] || BADGE_DOT.slate}`} />}
-            {opt.text}
+            {opt.textMsgKey ? t(opt.textMsgKey) : opt.text}
           </span>
         );
       }
@@ -115,7 +115,7 @@ export function TableCellRenderer({
           {col.showIcon && (
             <span className={`w-1.5 h-1.5 rounded-full ${BADGE_DOT[liveOpt.color] || BADGE_DOT.slate}`} />
           )}
-          {liveOpt.text}
+          {liveOpt.textMsgKey ? t(liveOpt.textMsgKey) : liveOpt.text}
         </span>
       );
     }
