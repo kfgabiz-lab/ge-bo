@@ -268,11 +268,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
   /** 추가 버튼 비활성화 여부 */
   const isAddDisabled = (): boolean => {
     if (!pendingType || !pendingValues) return true;
-    const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options, linkedDateRangeKey } =
-      pendingValues;
-    if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
-    if ((pendingType === "dateRange" || pendingType === "yearMonthRange") && !label2?.trim() && !label2MsgKey?.trim())
-      return true;
+    const { fieldKey, codeGroupCode, options, linkedDateRangeKey } = pendingValues;
+    if (!fieldKey?.trim()) return true;
     if (pendingType === "dateRangeStatus" && !linkedDateRangeKey?.trim()) return true;
     if (needsOptions(pendingType)) {
       const hasCodeGroup = !!codeGroupCode;
