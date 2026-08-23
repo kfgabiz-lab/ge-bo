@@ -15,7 +15,9 @@ import { useSlugRelations } from "../hooks/useSlugRelations";
 import { Plus, Trash2, GripVertical, ChevronUp, ChevronDown, X, Pencil } from "lucide-react";
 import { CodeGroupDef, SearchFieldType, SearchFieldConfig, SearchRowConfig } from "../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { needsOptions as sharedNeedsOptions, createIdGenerator } from "../utils";
+import { needsOptions as sharedNeedsOptions, createIdGenerator, resolveSearchFieldLabel } from "../utils";
+import { SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from "../constants";
+import { useBuilderI18nMode } from "../contexts/BuilderI18nModeContext";
 import { RowHeader } from "./RowHeader";
 import { FieldPickerTypeList } from "./FieldPickerTypeList";
 import { DndContext } from "@dnd-kit/core";
@@ -100,6 +102,7 @@ const uid = createIdGenerator("sb");
 
 export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
   const { t } = useI18n();
+  const { i18nMode } = useBuilderI18nMode();
 
   /* ── DnD: rows prop을 그대로 쓰되, 변경 시 onChange 호출 ── */
   const rowsSetter = useCallback<React.Dispatch<React.SetStateAction<SearchRowConfig[]>>>(
@@ -265,11 +268,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
   /** 추가 버튼 비활성화 여부 */
   const isAddDisabled = (): boolean => {
     if (!pendingType || !pendingValues) return true;
-    const { label, labelMsgKey, label2, label2MsgKey, fieldKey, codeGroupCode, options, linkedDateRangeKey } =
-      pendingValues;
-    if ((!label.trim() && !labelMsgKey?.trim()) || !fieldKey?.trim()) return true;
-    if ((pendingType === "dateRange" || pendingType === "yearMonthRange") && !label2?.trim() && !label2MsgKey?.trim())
-      return true;
+    const { fieldKey, codeGroupCode, options, linkedDateRangeKey } = pendingValues;
+    if (!fieldKey?.trim()) return true;
     if (pendingType === "dateRangeStatus" && !linkedDateRangeKey?.trim()) return true;
     if (needsOptions(pendingType)) {
       const hasCodeGroup = !!codeGroupCode;
@@ -367,6 +367,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       joinSlaveKey,
     } = pendingValues;
 
+    const isDefaultAllSelect = pendingType === "select" && !placeholder?.trim();
+
     const newField: SearchFieldConfig = {
       id: uid(),
       type: pendingType,
@@ -380,8 +382,9 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       fieldKey2:
         pendingType === "dateRange" || pendingType === "yearMonthRange" ? fieldKey2?.trim() || undefined : undefined,
       placeholder:
-        placeholder?.trim() || (pendingType === "input" ? "입력하세요" : pendingType === "select" ? "전체" : ""),
-      placeholderMsgKey: placeholderMsgKey?.trim() || undefined,
+        placeholder?.trim() ||
+        (pendingType === "input" ? "입력하세요" : pendingType === "select" ? SELECT_ALL_PLACEHOLDER : ""),
+      placeholderMsgKey: placeholderMsgKey?.trim() || (isDefaultAllSelect && i18nMode ? SELECT_ALL_MSG_KEY : undefined),
       description: description?.trim() || undefined,
       descriptionMsgKey: descriptionMsgKey?.trim() || undefined,
       colSpan: colSpan as 1 | 2 | 3 | 4 | 5,
@@ -634,11 +637,7 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                       {field.type}
                                     </span>
                                     <span className="text-[11px] font-medium text-slate-700 truncate flex-1">
-                                      {field.type === "dateRange" || field.type === "yearMonthRange"
-                                        ? `${field.labelMsgKey ? t(field.labelMsgKey) : field.label} ~ ${field.label2MsgKey ? t(field.label2MsgKey) : field.label2 || ""}`
-                                        : field.labelMsgKey
-                                          ? t(field.labelMsgKey)
-                                          : field.label}
+                                      {resolveSearchFieldLabel(field, t)}
                                     </span>
                                     {field.required && <span className="text-red-500 text-[10px] font-bold">*</span>}
                                     {field.excludeFromSearch && (

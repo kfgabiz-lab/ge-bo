@@ -340,6 +340,7 @@ export type CellType =
 /** 셀 옵션 (badge용) */
 export interface CellOption {
   text: string;
+  textMsgKey?: string; // badge 텍스트 다국어 키 (있으면 t(key), 없으면 text 표시)
   value: string;
   color: string;
 }

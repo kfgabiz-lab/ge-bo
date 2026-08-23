@@ -41,7 +41,7 @@ export function useHiddenSearchFieldReset({
         return;
       }
 
-      if (!wasHidden && isHidden) {
+      if (!wasHidden && isHidden && f.type !== "dateRange" && f.type !== "yearMonthRange") {
         const defaults = buildSearchFieldDefaultValues(f);
         getSearchFieldValueKeys(f).forEach((key) => {
           const target = defaults[key] ?? "";

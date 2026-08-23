@@ -25,6 +25,15 @@ import { CircleCountCard } from "./CircleCountCard";
 
 const ERROR_PAGE_SIZE = 10;
 
+/**
+ * 통계 리포트 embed URL — 지금은 개발 서버 도메인에서만 임베드 허용된 리포트라 하드코딩된 기본값을 씀.
+ * 운영 배포 시에는 운영 도메인이 Looker Studio 공유 설정에 허용 도메인으로 등록된 별도 리포트 URL을
+ * NEXT_PUBLIC_DASHBOARD_REPORT_URL 환경변수로 주입해서 교체한다 (코드 수정 불필요).
+ */
+const DASHBOARD_REPORT_URL =
+  process.env.NEXT_PUBLIC_DASHBOARD_REPORT_URL ??
+  "https://datastudio.google.com/embed/reporting/b5c26230-9ca5-480b-96f0-343318ccd141/page/H6p6F";
+
 interface DashboardErrorLogItem {
   id: number;
   createdAt: string;
@@ -67,6 +76,7 @@ const TRAINING_TYPE_FIELD: SearchFieldConfig = {
   label: "",
   colSpan: 1,
   placeholder: "전체",
+  placeholderMsgKey: "common.label.all",
   codeGroupCode: "TRAININGTYPE",
   options: ["In-Person:001", "Virtual:002"],
 };
@@ -126,6 +136,7 @@ function TrainingSummarySection({
   onTrainingTypeChange,
   codeGroups,
 }: TrainingSummarySectionProps) {
+  const { t } = useI18n();
   return (
     <RendererContainer bgColor="#ffffff">
       <div className="h-full w-full flex flex-col gap-4 p-5">
@@ -151,9 +162,9 @@ function TrainingSummarySection({
         ) : (
           <div className="flex-1 flex items-center justify-center gap-10">
             <CircleCountCard label={totalLabel} count={counts.total} emphasis />
-            <CircleCountCard label="Engineering Training" count={counts.engineering} />
-            <CircleCountCard label="Service Training" count={counts.service} />
-            <CircleCountCard label="Sales Training" count={counts.sales} />
+            <CircleCountCard label={t("common.label.engineeringTraining")} count={counts.engineering} />
+            <CircleCountCard label={t("common.label.serviceTraining")} count={counts.service} />
+            <CircleCountCard label={t("common.label.salesTraining")} count={counts.sales} />
           </div>
         )}
       </div>
@@ -318,7 +329,8 @@ export default function DashboardPage() {
       columns: [
         {
           id: "c1",
-          header: "발생일시",
+          header: "",
+          headerMsgKey: "dashboard.label.occurredAt",
           accessor: "createdAt",
           cellType: "text",
           align: "center",
@@ -327,7 +339,8 @@ export default function DashboardPage() {
         },
         {
           id: "c2",
-          header: "상태코드",
+          header: "",
+          headerMsgKey: "dashboard.label.statusCode",
           accessor: "httpStatus",
           cellType: "text",
           align: "center",
@@ -336,7 +349,8 @@ export default function DashboardPage() {
         },
         {
           id: "c3",
-          header: "에러코드",
+          header: "",
+          headerMsgKey: "dashboard.label.errorCode",
           accessor: "errorCode",
           cellType: "text",
           align: "center",
@@ -345,7 +359,8 @@ export default function DashboardPage() {
         },
         {
           id: "c4",
-          header: "메시지",
+          header: "",
+          headerMsgKey: "dashboard.label.message",
           accessor: "message",
           cellType: "text",
           align: "left",
@@ -407,7 +422,27 @@ export default function DashboardPage() {
   }, [appliedSearch]);
 
   return (
-    <PageLayout title="대시보드" mode="live">
+    <PageLayout mode="live">
+      {/* 통계 리포트 — Google Looker Studio 임베드 */}
+      <GridCell colSpan={12} rowSpan={14}>
+        <RendererContainer bgColor="#ffffff">
+          <div className="h-full w-full flex flex-col gap-3 p-5">
+            <h2 className="text-sm font-bold text-slate-900 flex-shrink-0">{t("common.label.statistics")}</h2>
+            <div className="flex-1 min-h-0">
+              <iframe
+                title="Google Looker Studio Report"
+                src={DASHBOARD_REPORT_URL}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                allowFullScreen
+                sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              />
+            </div>
+          </div>
+        </RendererContainer>
+      </GridCell>
+
       {showSearchBar && (
         <GridCell colSpan={12} rowSpan={2}>
           <WidgetRenderer
@@ -425,9 +460,9 @@ export default function DashboardPage() {
       {hasTrainingMenu && (
         <GridCell colSpan={6} rowSpan={4}>
           <TrainingSummarySection
-            title="정기 Training 신청 내역"
+            title={t("dashboard.label.regularTrainingHistory")}
             href={trainingHref("01", regularTrainingType)}
-            totalLabel="전체"
+            totalLabel={t("common.label.all")}
             counts={regularCounts}
             loading={summaryLoading}
             trainingType={regularTrainingType}
@@ -440,9 +475,9 @@ export default function DashboardPage() {
       {hasTrainingMenu && (
         <GridCell colSpan={6} rowSpan={4}>
           <TrainingSummarySection
-            title="비정기 Training 신청 내역"
+            title={t("dashboard.label.irregularTrainingHistory")}
             href={trainingHref("02", irregularTrainingType)}
-            totalLabel="전체"
+            totalLabel={t("common.label.all")}
             counts={irregularCounts}
             loading={summaryLoading}
             trainingType={irregularTrainingType}
@@ -457,7 +492,7 @@ export default function DashboardPage() {
           <RendererContainer bgColor="#ffffff">
             <div className="h-full w-full flex flex-col gap-3 p-5">
               <Link href={errorLogHref} className="flex items-center gap-1.5 group flex-shrink-0">
-                <h2 className="text-sm font-bold text-slate-900">에러 로그 현황</h2>
+                <h2 className="text-sm font-bold text-slate-900">{t("dashboard.label.errorLogStatus")}</h2>
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" />
               </Link>
               <div className="flex-1 min-h-0">

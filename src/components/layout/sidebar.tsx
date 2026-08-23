@@ -35,7 +35,7 @@ const MenuItemComponent = ({
   const hasChildren = item.children && item.children.length > 0;
   const hasUrl = item.url && item.url.length > 0;
 
-  const isDirectActive = hasUrl && item.url === pathname;
+  const isDirectActive = hasUrl && (item.url === pathname || (pathname?.startsWith(`${item.url}/`) ?? false));
   const isChildActive =
     hasChildren &&
     item.children?.some(

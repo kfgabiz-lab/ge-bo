@@ -294,6 +294,8 @@ export interface MultiSelectWidget {
   /** sourceSlug 옵션 필터 조건식 — 공통함수 evalConditionExpr 재사용 (콤마 다중조건 AND, =·!=·<·>·<=·>=·today() 지원)
    *  flattenPageDataItem 기준 flat key로 평가, 조건에 맞는 행만 옵션으로 추출 (미설정 시 전체 표시) */
   sourceFilter?: string;
+  /** 옵션 드롭다운에서 표시 텍스트(라벨 경로)가 동일한 행을 1건만 남김 — 하단 선택 태그 목록에는 적용되지 않음 */
+  dedupeByText?: boolean;
   /** 옵션 소스 모드 — 'call'(기본): sourceSlug 호출 slug에서 직접 조회 (기존 동작)
    *  'relation': sourceRelationSlugId로 지정한 slug-relation(FETCH)을 통해 연동 조회
    *  미설정 시(레거시 데이터) 'call'로 취급 — 기존 저장 데이터는 수정 없이 그대로 동작 */

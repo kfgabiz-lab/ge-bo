@@ -8,6 +8,8 @@ import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/re
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { useCodeStore } from "@/store/use-code-store";
+import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 import api from "@/lib/api";
 
 /* ── 이메일 발송 이력 상세 타입 ── */
@@ -28,10 +30,18 @@ export default function EmailSendHisDetailPage() {
   const router = useRouter();
   const id = params.id as string;
   const { groups: codeGroups, fetchGroups } = useCodeStore();
+  const { t } = useI18n();
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   const [loading, setLoading] = useState(true);
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(t("email.label.emailSendHistoryDetail"));
+    return () => setPageTitle("");
+  }, [t, setPageTitle]);
 
   useEffect(() => {
     fetchGroups();
@@ -65,18 +75,18 @@ export default function EmailSendHisDetailPage() {
 
   const resend = useCallback(async () => {
     if (sendStatus !== "F") {
-      alert("발송 실패 건만 재발송할 수 있습니다.");
+      alert(t("email.alert.resendFailedOnly"));
       return;
     }
-    if (!window.confirm("이 이메일을 재발송하시겠습니까?")) return;
+    if (!window.confirm(t("email.confirm.resend"))) return;
     try {
       await api.post(`/email-send-his/${id}/resend`);
-      alert("재발송 요청을 처리했습니다.");
+      alert(t("email.alert.resendSuccess"));
       load();
     } catch {
-      alert("재발송 요청에 실패했습니다.");
+      alert(t("email.alert.resendFailed"));
     }
-  }, [id, sendStatus, load]);
+  }, [id, sendStatus, load, t]);
 
   /* 기본 정보 폼 위젯 */
   const INFO_FORM_WIDGET: FormWidget = useMemo(
@@ -85,13 +95,24 @@ export default function EmailSendHisDetailPage() {
       widgetId: "email-send-his-info-form",
       contentKey: "emailSendHisInfoForm",
       title: "이메일 발송 이력 상세",
+      titleMsgKey: "email.label.emailSendHistoryDetail",
       showBorder: true,
       fields: [
-        { id: "sentAt", type: "input", label: "발송일시", colSpan: 6, rowSpan: 1, fieldKey: "sentAt", readonly: true },
+        {
+          id: "sentAt",
+          type: "input",
+          label: "발송일시",
+          labelMsgKey: "email.label.sentAt",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "sentAt",
+          readonly: true,
+        },
         {
           id: "lastResendAt",
           type: "input",
           label: "최근재발송일시",
+          labelMsgKey: "email.label.lastResentAt",
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "lastResendAt",
@@ -101,6 +122,7 @@ export default function EmailSendHisDetailPage() {
           id: "sendStatus",
           type: "input",
           label: "발송상태",
+          labelMsgKey: "email.label.deliveryStatus",
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "sendStatus",
@@ -111,6 +133,7 @@ export default function EmailSendHisDetailPage() {
           id: "emailSendType",
           type: "input",
           label: "분류",
+          labelMsgKey: "email.label.emailSendType",
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "emailSendType",
@@ -121,6 +144,7 @@ export default function EmailSendHisDetailPage() {
           id: "emailSendDetailType",
           type: "input",
           label: "상세분류",
+          labelMsgKey: "email.label.subcategory",
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "emailSendDetailType",
@@ -131,6 +155,7 @@ export default function EmailSendHisDetailPage() {
           id: "recipientEmail",
           type: "input",
           label: "수신 이메일",
+          labelMsgKey: "email.label.recipientEmail",
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "recipientEmail",
@@ -140,6 +165,7 @@ export default function EmailSendHisDetailPage() {
           id: "subject",
           type: "input",
           label: "메일 제목",
+          labelMsgKey: "email.label.subject",
           colSpan: 12,
           rowSpan: 1,
           fieldKey: "subject",
@@ -157,12 +183,14 @@ export default function EmailSendHisDetailPage() {
       widgetId: "email-send-his-content-form",
       contentKey: "emailSendHisContentForm",
       title: "메일 본문",
+      titleMsgKey: "email.label.mailBody",
       showBorder: true,
       fields: [
         {
           id: "content",
           type: "textarea",
           label: "본문(HTML)",
+          labelMsgKey: "email.label.contentHtml",
           colSpan: 12,
           rowSpan: 5,
           fieldKey: "content",
@@ -181,7 +209,17 @@ export default function EmailSendHisDetailPage() {
       widgetId: "email-send-his-detail-space",
       align: "right",
       showBorder: false,
-      items: [{ id: "s1", type: "action-button", label: "목록으로", colSpan: 1, color: "gray", connType: "close" }],
+      items: [
+        {
+          id: "s1",
+          type: "action-button",
+          label: "목록으로",
+          labelMsgKey: "log.btn.backToList",
+          colSpan: 1,
+          color: "gray",
+          connType: "close",
+        },
+      ],
     }),
     []
   );
@@ -189,7 +227,7 @@ export default function EmailSendHisDetailPage() {
   if (loading) return null;
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={t("email.label.emailSendHistoryDetail")}>
       <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer
           mode="live"
@@ -219,7 +257,7 @@ export default function EmailSendHisDetailPage() {
             onClick={resend}
             className="px-10 py-2.5 min-h-[40px] rounded-md text-xs font-bold whitespace-nowrap flex items-center justify-center shadow-sm bg-black hover:opacity-90 text-white transition-all"
           >
-            재발송
+            {t("email.btn.resend")}
           </button>
           <WidgetRenderer mode="live" widget={SPACE_WIDGET} contentColSpan={12} onClose={() => router.back()} />
         </div>

@@ -2585,6 +2585,25 @@ export function getSearchFieldValueKeys(f: import("./types").SearchFieldConfig):
   return [f.id];
 }
 
+export function resolveSearchFieldLabel(
+  f: import("./types").SearchFieldConfig,
+  t: (key: string, vars?: Record<string, string>) => string
+): string | undefined {
+  const resolve = (label: string | undefined, msgKey: string | undefined): string => {
+    const val = msgKey ? t(msgKey) : (label ?? "");
+    return val.trim();
+  };
+
+  if (f.type === "dateRange" || f.type === "yearMonthRange") {
+    const start = resolve(f.label, f.labelMsgKey);
+    const end = resolve(f.label2, f.label2MsgKey);
+    if (start && end) return `${start} ~ ${end}`;
+    return start || end || undefined;
+  }
+
+  return resolve(f.label, f.labelMsgKey) || undefined;
+}
+
 /**
  * 검색필드 1개의 "초기 상태" 기본값을 계산한다.
  * useWidgetPageState.ts의 검색 기본값 초기화 effect와 hideCondition 리셋 훅(useHiddenSearchFieldReset)

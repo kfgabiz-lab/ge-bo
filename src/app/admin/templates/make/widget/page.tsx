@@ -686,7 +686,7 @@ export default function PageBuilderPage() {
     const duplicates = allKeys.filter((k, i) => k && allKeys.indexOf(k) !== i);
     if (duplicates.length > 0) errors.push(`중복 Key: ${[...new Set(duplicates)].join(", ")}`);
 
-    /* 2) Search 필드 라벨/Key 필수 + 내부 중복 검사 */
+    /* 2) Search 필드 Key 필수 + 내부 중복 검사 */
     allContents.forEach((c) => {
       if (c.widget.type !== "search") return;
       const sw = c.widget as SearchWidget;
@@ -694,7 +694,6 @@ export default function PageBuilderPage() {
       const fieldKeys: string[] = [];
       sw.rows.forEach((row) => {
         row.fields.forEach((f) => {
-          if (!f.label?.trim() && !f.labelMsgKey?.trim()) errors.push(`[Search:${label}] 필드 라벨 미입력`);
           if (!f.fieldKey?.trim()) {
             errors.push(`[Search:${label}] 필드 Key 미입력`);
           } else {
@@ -708,16 +707,13 @@ export default function PageBuilderPage() {
         errors.push(`[Search:${label}] 중복 필드 Key: ${[...new Set(dupFieldKeys)].join(", ")}`);
     });
 
-    /* 3) Form 필드 라벨/Key 필수 + 내부 중복 검사 */
+    /* 3) Form 필드 Key 필수 + 내부 중복 검사 */
     allContents.forEach((c) => {
       if (c.widget.type !== "form") return;
       const fw = c.widget as FormWidget;
       const label = fw.contentKey || "?";
       const fieldKeys: string[] = [];
       fw.fields.forEach((f) => {
-        /* editor/hidden 타입은 라벨 불필요 — 나머지 타입만 필수 검사 */
-        if (f.type !== "editor" && f.type !== "hidden" && !f.label?.trim() && !f.labelMsgKey?.trim())
-          errors.push(`[Form:${label}] 필드 라벨 미입력`);
         if (!f.fieldKey?.trim()) {
           errors.push(`[Form:${label}] 필드 Key 미입력`);
         } else {

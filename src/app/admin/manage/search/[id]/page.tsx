@@ -9,6 +9,8 @@ import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { useCodeStore } from "@/store/use-code-store";
 import { useMenusQuery } from "@/hooks/use-menu-queries";
 import type { MenuItem } from "@/store/use-menu-store";
+import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 import api from "@/lib/api";
 
 /* 트리 구조인 FO 메뉴를 셀렉트 옵션용으로 평탄화 — url 없는 상위 분류 메뉴는 연결 대상에서 제외 */
@@ -61,6 +63,14 @@ export default function SearchMgmtDetailPage() {
   const router = useRouter();
   const routeId = params.id as string;
   const isNew = routeId === "new";
+  const { t } = useI18n();
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(isNew ? t("search.title.new") : t("search.title.edit"));
+    return () => setPageTitle("");
+  }, [isNew, t, setPageTitle]);
 
   /* 실제 저장된 부모 id — 신규 등록 전에는 null */
   const [savedId, setSavedId] = useState<number | null>(isNew ? null : Number(routeId));
@@ -114,7 +124,7 @@ export default function SearchMgmtDetailPage() {
         setSelectedMenuId(res.data.menuId ?? null);
         setTextList(res.data.texts.map(toTextEntry));
       } catch {
-        toast.error("데이터를 찾을 수 없습니다.");
+        toast.error(t("search.alert.dataNotFound"));
         router.back();
       } finally {
         setLoading(false);
@@ -127,7 +137,7 @@ export default function SearchMgmtDetailPage() {
        신규면 생성 후 해당 id로 URL만 교체(화면 이동 없음), 기존이면 그대로 갱신 */
   const handleRegister = useCallback(async () => {
     if (!url.trim()) {
-      toast.error("URL을 입력해주세요.");
+      toast.error(t("search.alert.urlRequired"));
       return;
     }
     setSaving(true);
@@ -157,7 +167,7 @@ export default function SearchMgmtDetailPage() {
           setTitleInput("");
           setTextInput("");
         }
-        toast.success("저장되었습니다.");
+        toast.success(t("common.saved"));
         return;
       }
 
@@ -179,46 +189,46 @@ export default function SearchMgmtDetailPage() {
 
       setSavedId(newId);
       setTextList(latestTexts.map(toTextEntry));
-      toast.success("등록되었습니다.");
+      toast.success(t("site.created"));
       router.replace(`/admin/manage/search/${newId}`);
     } catch {
-      toast.error("저장에 실패했습니다.");
+      toast.error(t("menu.save_error"));
     } finally {
       setSaving(false);
     }
-  }, [url, isActive, pageSection, inputMode, selectedMenuId, titleInput, textInput, savedId, router]);
+  }, [url, isActive, pageSection, inputMode, selectedMenuId, titleInput, textInput, savedId, router, t]);
 
   /* 검색텍스트 삭제 — 브라우저 기본 confirm으로 확인 후 실행 */
   const handleDeleteText = useCallback(
     async (entryId: number) => {
       if (!savedId) return;
-      if (!confirm("이 검색텍스트를 삭제하시겠습니까?")) return;
+      if (!confirm(t("search.confirm.deleteSearchText"))) return;
       try {
         await api.delete(`/search-manage/${savedId}/texts/${entryId}`);
         setTextList((prev) => prev.filter((e) => e.id !== entryId));
       } catch {
-        toast.error("검색텍스트 삭제에 실패했습니다.");
+        toast.error(t("search.alert.deleteFailed"));
       }
     },
-    [savedId]
+    [savedId, t]
   );
 
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <span className="text-sm text-slate-400">불러오는 중...</span>
+        <span className="text-sm text-slate-400">{t("common.loading")}</span>
       </div>
     );
   }
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={isNew ? t("search.title.new") : t("search.title.edit")}>
       {/* URL + 분류 + 사용여부 — 분류 입력이 추가되어 rowSpan 을 1 늘리고, 아래 목록에서 1 줄인다(전체 높이 유지) */}
       <GridCell colSpan={12} rowSpan={3}>
         <div className="h-full space-y-4 rounded-lg border border-slate-200 bg-white p-5">
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-700">URL</label>
+              <label className="block text-sm font-medium text-slate-700">{t("popup.label.url")}</label>
               <div className="flex gap-1 rounded-md border border-slate-200 p-0.5 text-xs">
                 <button
                   type="button"
@@ -227,14 +237,14 @@ export default function SearchMgmtDetailPage() {
                     inputMode === "manual" ? "bg-slate-900 text-white" : "text-slate-600"
                   }`}
                 >
-                  직접입력
+                  {t("search.btn.manualInput")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setInputMode("menu")}
                   className={`rounded px-2 py-1 ${inputMode === "menu" ? "bg-slate-900 text-white" : "text-slate-600"}`}
                 >
-                  메뉴선택
+                  {t("search.btn.selectMenu")}
                 </button>
               </div>
             </div>
@@ -249,7 +259,7 @@ export default function SearchMgmtDetailPage() {
                 }}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               >
-                <option value="">FO 메뉴 선택</option>
+                <option value="">{t("search.option.selectFoMenu")}</option>
                 {menuOptions.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
@@ -261,20 +271,20 @@ export default function SearchMgmtDetailPage() {
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="URL 입력"
+                placeholder={t("search.label.urlInput")}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
               />
             )}
           </div>
           {/* 분류 — URL(=search_manage) 단위 속성. 선택 입력이라 "선택 안 함" 허용 */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">분류</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">{t("training.label.category")}</label>
             <select
               value={pageSection}
               onChange={(e) => setPageSection(e.target.value)}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             >
-              <option value="">선택 안 함</option>
+              <option value="">{t("search.option.notSelected")}</option>
               {pageSectionOptions.map((d) => (
                 <option key={d.code} value={d.code}>
                   {d.name}
@@ -283,7 +293,7 @@ export default function SearchMgmtDetailPage() {
             </select>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-700">사용여부</span>
+            <span className="text-sm font-medium text-slate-700">{t("common.label.isActive")}</span>
             <ToggleSwitch checked={isActive} onChange={setIsActive} />
           </div>
         </div>
@@ -294,21 +304,21 @@ export default function SearchMgmtDetailPage() {
         <div className="h-full space-y-2 rounded-lg border border-slate-200 bg-white p-5">
           {/* 제목 — 선택 입력, 미입력 시 FO 검색결과에서 URL 이 대신 노출된다 */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">제목</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">{t("common.label.title")}</label>
             <input
               type="text"
               value={titleInput}
               onChange={(e) => setTitleInput(e.target.value)}
-              placeholder="제목 입력"
+              placeholder={t("search.placeholder.titleInput")}
               maxLength={200}
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
             />
           </div>
-          <label className="block text-sm font-medium text-slate-700">검색텍스트</label>
+          <label className="block text-sm font-medium text-slate-700">{t("search.label.searchText")}</label>
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            placeholder="검색용 텍스트를 입력하세요."
+            placeholder={t("search.placeholder.searchTextInput")}
             rows={3}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
           />
@@ -318,7 +328,7 @@ export default function SearchMgmtDetailPage() {
               onClick={() => router.push("/admin/manage/search")}
               className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              목록
+              {t("common.btn.list")}
             </button>
             <button
               type="button"
@@ -326,7 +336,7 @@ export default function SearchMgmtDetailPage() {
               disabled={saving}
               className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {savedId ? "저장" : "등록"}
+              {savedId ? t("common.btn.save") : t("search.btn.register")}
             </button>
           </div>
         </div>
@@ -337,7 +347,7 @@ export default function SearchMgmtDetailPage() {
       <GridCell colSpan={12} rowSpan={7}>
         <div className="h-full space-y-2 overflow-y-auto pr-1">
           {textList.length === 0 && (
-            <p className="p-4 text-center text-sm text-slate-400">등록된 검색텍스트가 없습니다.</p>
+            <p className="p-4 text-center text-sm text-slate-400">{t("search.empty.noSearchText")}</p>
           )}
           {textList.map((entry) => (
             <div
@@ -355,7 +365,7 @@ export default function SearchMgmtDetailPage() {
                 onClick={() => handleDeleteText(entry.id)}
                 className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
               >
-                삭제
+                {t("common.btn.delete")}
               </button>
             </div>
           ))}

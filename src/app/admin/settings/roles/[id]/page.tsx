@@ -10,6 +10,7 @@ import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/re
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { useI18n } from "@/hooks/use-i18n";
+import { usePageTitleStore } from "@/store/use-page-title-store";
 
 /* ── 타입 ── */
 
@@ -35,9 +36,16 @@ export default function RolesDetailPage() {
   const { t } = useI18n();
   const id = params.id as string;
   const isNew = id === "new";
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+
+  /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
+  useEffect(() => {
+    setPageTitle(isNew ? t("role.title.new") : t("role.title.edit"));
+    return () => setPageTitle("");
+  }, [isNew, t, setPageTitle]);
 
   /* fieldId → value 형태로 관리 (WidgetRenderer 규격) */
   const [formValues, setFormValues] = useState<Record<string, string>>({
@@ -219,7 +227,7 @@ export default function RolesDetailPage() {
   }
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" title={isNew ? t("role.title.new") : t("role.title.edit")}>
       {/* 폼 위젯 */}
       <GridCell colSpan={12} rowSpan={5}>
         <WidgetRenderer

@@ -151,21 +151,27 @@ export default function LoginLogPage() {
               id: "f1",
               type: "input",
               label: "결과",
+              labelMsgKey: "log.label.result",
               colSpan: 1,
               placeholder: "SUCCESS / FAIL",
+              placeholderMsgKey: "log.placeholder.resultFilter",
             },
             {
               id: "f2",
               type: "input",
               label: "ID",
+              labelMsgKey: "login.id.label",
               colSpan: 1,
               placeholder: "ID 입력",
+              placeholderMsgKey: "log.placeholder.idInput",
             },
             {
               id: "f3",
               type: "dateRange",
               label: "발생일시",
+              labelMsgKey: "dashboard.label.occurredAt",
               label2: "종료일",
+              label2MsgKey: "common.label.endDate",
               colSpan: 2,
             },
           ],
@@ -189,6 +195,7 @@ export default function LoginLogPage() {
         {
           id: "c1",
           header: "발생일시",
+          headerMsgKey: "dashboard.label.occurredAt",
           accessor: "createdAt",
           cellType: "text",
           align: "center",
@@ -198,6 +205,7 @@ export default function LoginLogPage() {
         {
           id: "c2",
           header: "ID",
+          headerMsgKey: "login.id.label",
           accessor: "loginEmail",
           cellType: "text",
           align: "left",
@@ -207,6 +215,7 @@ export default function LoginLogPage() {
         {
           id: "c3",
           header: "결과",
+          headerMsgKey: "log.label.result",
           accessor: "status",
           cellType: "text",
           align: "center",
@@ -216,6 +225,7 @@ export default function LoginLogPage() {
         {
           id: "c4",
           header: "실패사유",
+          headerMsgKey: "log.label.failReason",
           accessor: "failReason",
           cellType: "text",
           align: "center",
@@ -225,6 +235,7 @@ export default function LoginLogPage() {
         {
           id: "c5",
           header: "요청자 IP",
+          headerMsgKey: "log.label.clientIp",
           accessor: "clientIp",
           cellType: "text",
           align: "center",
@@ -234,6 +245,7 @@ export default function LoginLogPage() {
         {
           id: "c6",
           header: "상세",
+          headerMsgKey: "common.btn.detail",
           accessor: "_actions",
           cellType: "actions",
           align: "center",

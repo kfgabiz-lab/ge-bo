@@ -135,6 +135,7 @@ export default function EmailSendHisPage() {
               id: "f1",
               type: "select",
               label: "분류",
+              labelMsgKey: "email.label.emailSendType",
               fieldKey: "emailSendCategory",
               colSpan: 1,
               options: ["뉴스레터 신청:01", "정기 Training:02", "비정기 Training:03"],
@@ -144,6 +145,7 @@ export default function EmailSendHisPage() {
               id: "f2",
               type: "select",
               label: "상세분류",
+              labelMsgKey: "email.label.subcategory",
               colSpan: 1,
               options: ["Engineering Training 신청:01", "Service Training 신청:02", "Sales Training:03"],
               codeGroupCode: "TRAININGCOURSE",
@@ -154,6 +156,7 @@ export default function EmailSendHisPage() {
               id: "f3",
               type: "select",
               label: "발송상태",
+              labelMsgKey: "email.label.deliveryStatus",
               colSpan: 1,
               options: ["성공:S", "실패:F"],
               codeGroupCode: "SENDSTATUS",
@@ -162,14 +165,18 @@ export default function EmailSendHisPage() {
               id: "f4",
               type: "input",
               label: "수신 Email",
+              labelMsgKey: "email.label.recipientEmail",
               colSpan: 1,
               placeholder: "수신 Email을 입력하세요.",
+              placeholderMsgKey: "email.placeholder.searchEmailMessage",
             },
             {
               id: "f5",
               type: "dateRange",
               label: "발송일",
+              labelMsgKey: "email.label.sentDate",
               label2: "종료일",
+              label2MsgKey: "common.label.endDate",
               colSpan: 1,
             },
           ],
@@ -192,6 +199,7 @@ export default function EmailSendHisPage() {
         {
           id: "c1",
           header: "분류",
+          headerMsgKey: "email.label.emailSendType",
           accessor: "emailSendType",
           cellType: "text",
           align: "center",
@@ -203,6 +211,7 @@ export default function EmailSendHisPage() {
         {
           id: "c2",
           header: "상세분류",
+          headerMsgKey: "email.label.subcategory",
           accessor: "emailSendDetailType",
           cellType: "text",
           align: "center",
@@ -214,6 +223,7 @@ export default function EmailSendHisPage() {
         {
           id: "c3",
           header: "수신 Email",
+          headerMsgKey: "email.label.recipientEmail",
           accessor: "recipientEmail",
           cellType: "text",
           align: "left",
@@ -224,6 +234,7 @@ export default function EmailSendHisPage() {
         {
           id: "c4",
           header: "발송상태",
+          headerMsgKey: "email.label.deliveryStatus",
           accessor: "sendStatus",
           cellType: "text",
           align: "center",
@@ -235,6 +246,7 @@ export default function EmailSendHisPage() {
         {
           id: "c5",
           header: "발송일시",
+          headerMsgKey: "email.label.sentAt",
           accessor: "sentAt",
           cellType: "text",
           align: "center",
@@ -245,6 +257,7 @@ export default function EmailSendHisPage() {
         {
           id: "c6",
           header: "최근재발송일시",
+          headerMsgKey: "email.label.lastResentAt",
           accessor: "lastResendAt",
           cellType: "text",
           align: "center",
@@ -255,6 +268,7 @@ export default function EmailSendHisPage() {
         {
           id: "c7",
           header: "상세",
+          headerMsgKey: "common.btn.detail",
           accessor: "_actions",
           cellType: "actions",
           align: "center",

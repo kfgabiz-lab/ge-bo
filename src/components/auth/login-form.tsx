@@ -248,6 +248,7 @@ export default function LoginForm() {
               <ReCAPTCHA
                 ref={recaptchaRef}
                 sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
+                hl="en"
                 onChange={(token) => setRecaptchaToken(token)}
                 onExpired={() => {
                   setRecaptchaToken(null);

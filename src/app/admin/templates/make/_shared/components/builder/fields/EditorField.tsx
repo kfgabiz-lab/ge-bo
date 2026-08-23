@@ -22,7 +22,6 @@ export const EditorField = (props: FieldEditProps) => {
       colSpanMode={props.colSpanMode}
       rowSpan={values.rowSpan}
       rowSpanConfig={props.rowSpanConfig}
-      labelOptional
       isPk={values.isPk}
       required={values.required}
       description={values.description}

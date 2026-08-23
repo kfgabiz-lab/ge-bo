@@ -46,8 +46,8 @@ export interface MessageResourceSearchParams {
   key: string;
   ko: string;
   en: string;
-  active: string; /* '전체' | '사용' | '미사용' */
-  resourceType: string; /* '전체' | '단어' | '문장' */
+  active: string; /* '' | '전체' | '사용' | '미사용' — '' 또는 '전체'는 전체 조회 */
+  resourceType: string; /* '' | '전체' | '단어' | '문장' — '' 또는 '전체'는 전체 조회 */
   page: number;
   size: number;
   sort?: string;
