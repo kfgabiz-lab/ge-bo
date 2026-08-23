@@ -30,7 +30,16 @@ const WysiwygEditor = dynamic(() => import("@/components/common/wysiwyg-editor")
 const TiptapEditor = dynamic(() => import("@/components/common/tiptap-editor"), { ssr: false });
 import { ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { SearchFieldConfig, CodeGroupDef } from "../../types";
-import { inputCls, selectCls } from "../../styles";
+import {
+  inputCls,
+  selectCls,
+  fieldCharCountCls,
+  fieldCharCountPadCls,
+  fieldOptionGroupCls,
+  FIELD_LABEL_HEIGHT_PX,
+  FIELD_DESC_HEIGHT_PX,
+  FIELD_CELL_SLACK_PX,
+} from "../../styles";
 import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS } from "../../constants";
 import { SelectArrow } from "../SelectArrow";
 
@@ -58,15 +67,24 @@ import { toast } from "sonner";
 import { PortalDropdown } from "@/components/ui/portal-dropdown";
 
 /**
- * file/image/video/media/editor 필드의 실제 콘텐츠 영역 높이(px)를 계산한다.
- * - GridCell 실제 트랙 높이 공식(rowSpan × ROW_HEIGHT - GAP_SIZE)을 기준으로 하고,
- *   라벨이 차지하는 영역(있으면 44px, 없으면 24px)만큼을 뺀 나머지를 콘텐츠 높이로 사용한다.
- * - 라벨 유무는 FormRenderer.tsx가 실제 렌더링 조건으로 쓰는 `labelMsgKey || label`과 동일하게 판정한다.
- *   (label만 보면, labelMsgKey만 설정된 필드는 라벨이 그려지는데도 "라벨 없음"으로 잘못 계산되던 버그가 있었음)
+ * 필드 위쪽에 그려지는 라벨/설명이 차지하는 높이(px).
+ * 실제로 무엇을 그리는지는 호출하는 렌더러가 알고 있으므로, 렌더러가 직접 계산해 넘긴다.
+ * (SubListRenderer처럼 라벨·설명을 전혀 그리지 않는 렌더러는 자기 값을 명시한다)
  */
-function fieldContentHeight(field: SearchFieldConfig, rowSpan: number): number {
-  const hasLabel = !!(field.label || field.labelMsgKey);
-  return rowSpan * ROW_HEIGHT - GAP_SIZE - (hasLabel ? 44 : 24);
+export function fieldChromeHeight(hasLabel: boolean, hasDesc: boolean): number {
+  return (hasLabel ? FIELD_LABEL_HEIGHT_PX : 0) + (hasDesc ? FIELD_DESC_HEIGHT_PX : 0);
+}
+
+/**
+ * file/image/video/media/editor 필드의 실제 콘텐츠 영역 높이(px)를 계산한다.
+ * GridCell 실제 트랙 높이 공식(rowSpan × ROW_HEIGHT - GAP_SIZE)에서
+ * 라벨/설명 영역(chromeHeight)과 여유분을 뺀 나머지를 콘텐츠 높이로 사용한다.
+ */
+function fieldContentHeight(field: SearchFieldConfig, rowSpan: number, chromeHeight?: number): number {
+  const chrome =
+    chromeHeight ??
+    fieldChromeHeight(!!(field.label || field.labelMsgKey), !!(field.description || field.descriptionMsgKey));
+  return rowSpan * ROW_HEIGHT - GAP_SIZE - chrome - FIELD_CELL_SLACK_PX;
 }
 
 /**
@@ -194,6 +212,8 @@ interface FieldRendererProps {
   /** entity 연결 페이지 여부 — true면 파일 다운로드를 file_meta 시스템
    * (/file-meta/{id}/download)으로, 아니면 기존 page_file 시스템(/page-files/{id})으로 수행 */
   isEntity?: boolean;
+  /** 필드 위쪽 라벨/설명 영역 높이(px) — 미지정 시 field의 label/description 유무로 추정 */
+  contentChromeHeight?: number;
 }
 
 /**
@@ -959,7 +979,9 @@ export function FieldRenderer({
   forceDisabled = false,
   rowData,
   isEntity,
+  contentChromeHeight,
 }: FieldRendererProps) {
+  const contentHeight = (rowSpan: number) => fieldContentHeight(field, rowSpan, contentChromeHeight);
   const isPreview = mode === "preview";
   const { t } = useI18n();
   /* 탭 keep-alive 환경에서 radio name 충돌 방지 — 인스턴스별 고유 prefix */
@@ -1037,6 +1059,7 @@ export function FieldRenderer({
           />
         );
       }
+      const hasCharCount = !!(field.showCharCount && field.maxLength);
       const inputEl = (
         <input
           type="text"
@@ -1045,20 +1068,19 @@ export function FieldRenderer({
           placeholder={
             field.placeholderMsgKey ? t(field.placeholderMsgKey) : field.placeholder || t("common.input.placeholder")
           }
-          maxLength={field.showCharCount && field.maxLength ? field.maxLength : undefined}
-          className={`${inputCls}${readonlyCls}`}
+          maxLength={hasCharCount ? field.maxLength : undefined}
+          className={`${inputCls}${readonlyCls}${hasCharCount ? ` ${fieldCharCountPadCls}` : ""}`}
           value={value}
           onChange={isReadOnly ? undefined : (e) => onChange?.(e.target.value)}
         />
       );
-      /* 글자수 표시 ON + maxLength 설정된 경우: 카운터 표시 */
-      if (field.showCharCount && field.maxLength) {
+      if (hasCharCount) {
         return (
-          <div>
+          <div className="relative">
             {inputEl}
-            <div className="text-right text-[10px] text-slate-400 mt-0.5">
+            <span className={fieldCharCountCls}>
               {value.length}/{field.maxLength}
-            </div>
+            </span>
           </div>
         );
       }
@@ -1319,7 +1341,7 @@ export function FieldRenderer({
     case "radio": {
       const radioOpts = isPreview ? (field.options?.slice(0, 3) ?? ["옵션1:o1", "옵션2:o2"]) : opts;
       return (
-        <div className="flex items-center gap-4 py-2">
+        <div className={fieldOptionGroupCls}>
           {radioOpts.map((opt) => {
             const { text, value: val } = parseOpt(opt);
             return (
@@ -1349,7 +1371,7 @@ export function FieldRenderer({
       const cbOpts = isPreview ? (field.options?.slice(0, 3) ?? ["옵션1:o1", "옵션2:o2"]) : opts;
       const selected = (value || "").split(",").filter(Boolean);
       return (
-        <div className="flex items-center gap-4 py-2">
+        <div className={fieldOptionGroupCls}>
           {cbOpts.map((opt) => {
             const { text, value: val } = parseOpt(opt);
             const isChecked = selected.includes(val);
@@ -1549,7 +1571,7 @@ export function FieldRenderer({
     case "file": {
       /* rowSpan 기반 명시적 높이 계산 — editor 케이스와 동일한 방식 */
       const fileRowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 1;
-      const fileHeight = `${fieldContentHeight(field, fileRowSpan)}px`;
+      const fileHeight = `${contentHeight(fileRowSpan)}px`;
 
       /* validation 정보 (빌더 설정값 그대로 표시) */
       const maxCount = field.maxFileCount ?? 1;
@@ -1738,7 +1760,7 @@ export function FieldRenderer({
     case "image": {
       /* rowSpan 기반 명시적 높이 계산 */
       const imgRowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 2;
-      const imgHeight = `${fieldContentHeight(field, imgRowSpan)}px`;
+      const imgHeight = `${contentHeight(imgRowSpan)}px`;
 
       const imgMaxCount = field.maxFileCount ?? 1;
       const imgFormatInfo = t("common.field.image_format_info", { count: String(imgMaxCount) });
@@ -1860,7 +1882,7 @@ export function FieldRenderer({
               /* 셀 높이 = (컨테이너 높이 - 패딩 - 간격) ÷ 행 수 */
               const PAD_PX = 8; /* p-1: 4px × 2 */
               const GAP_PX = 4; /* gap-1: 4px */
-              const containerH = fieldContentHeight(field, imgRowSpan);
+              const containerH = contentHeight(imgRowSpan);
               const cellH = Math.floor((containerH - PAD_PX - GAP_PX * (rows - 1)) / rows);
 
               return (
@@ -1978,7 +2000,7 @@ export function FieldRenderer({
       const videoMode = field.videoMode ?? "url";
       /* rowSpan 기반 명시적 높이 계산 */
       const vidRowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 2;
-      const vidHeight = `${fieldContentHeight(field, vidRowSpan)}px`;
+      const vidHeight = `${contentHeight(vidRowSpan)}px`;
       /* URL 모드: 텍스트 입력 + embed 미리보기 */
       if (videoMode === "url") {
         const embedUrl = toEmbedUrl(value);
@@ -2090,7 +2112,7 @@ export function FieldRenderer({
         const rows = Math.max(1, Math.ceil(displayItems.length / cols));
         const PAD_PX = 8;
         const GAP_PX = 4;
-        const containerH = fieldContentHeight(field, vidRowSpan);
+        const containerH = contentHeight(vidRowSpan);
         const cellH = Math.floor((containerH - PAD_PX - GAP_PX * (rows - 1)) / rows);
 
         return (
@@ -2230,7 +2252,7 @@ export function FieldRenderer({
     case "media": {
       /* rowSpan 기반 명시적 높이 계산 */
       const mediaRowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 2;
-      const mediaHeightPx = fieldContentHeight(field, mediaRowSpan);
+      const mediaHeightPx = contentHeight(mediaRowSpan);
       const mediaHeight = `${mediaHeightPx}px`;
 
       /* 기능용 확장자 배열 — accept 문자열 생성에 사용 (FILE_TYPE_PRESETS 고정) */
@@ -2564,7 +2586,7 @@ export function FieldRenderer({
     case "editor": {
       /* rowSpan × ROW_HEIGHT 로 에디터 높이 계산 */
       const rowSpan = (field as unknown as { rowSpan?: number }).rowSpan ?? 3;
-      const editorHeight = `${fieldContentHeight(field, rowSpan)}px`;
+      const editorHeight = `${contentHeight(rowSpan)}px`;
       /* editorType: tiptap(기본) 또는 toast — 빌더 설정에서 선택 */
       const editorType = (field as unknown as { editorType?: "tiptap" | "toast" }).editorType ?? "tiptap";
       if (editorType === "toast") {
@@ -2666,7 +2688,7 @@ export function FieldRenderer({
         { label: afterLabel, val: "after" },
       ];
       return (
-        <div className="flex items-center gap-4 py-2">
+        <div className={fieldOptionGroupCls}>
           {statusOpts.map((opt) => (
             <label
               key={opt.val}

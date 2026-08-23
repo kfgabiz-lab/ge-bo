@@ -34,6 +34,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { LABEL_CLS, INPUT_CLS } from "./fields/_FieldBase";
 import { ToggleRow } from "./fields/_ToggleRow";
+import { BG_COLOR_OPTIONS } from "./SpaceBuilder";
 import { FieldPickerTypeList, FieldTypeItem } from "../FieldPickerTypeList";
 import {
   InputField,
@@ -182,7 +183,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
   if (updates.label2MsgKey !== undefined) patch.label2MsgKey = updates.label2MsgKey;
   if (updates.fieldKey !== undefined) patch.key = updates.fieldKey;
   if (updates.fieldKey2 !== undefined) patch.key2 = updates.fieldKey2;
-  if (updates.placeholder !== undefined) patch.placeholder = updates.placeholder;
+  if ("placeholder" in updates) patch.placeholder = updates.placeholder;
   if (updates.placeholderMsgKey !== undefined) patch.placeholderMsgKey = updates.placeholderMsgKey;
   if (updates.description !== undefined) patch.description = updates.description;
   if (updates.descriptionMsgKey !== undefined) patch.descriptionMsgKey = updates.descriptionMsgKey;
@@ -599,14 +600,64 @@ export function SubListBuilder({
           />
         </div>
 
-        {/* showBorder */}
-        <div>
-          <label className={LABEL_CLS}>테두리</label>
-          <ToggleRow
-            label={widget.showBorder !== false ? "표시" : "숨김"}
-            value={widget.showBorder !== false}
-            onChange={(v) => onChange({ ...widget, showBorder: v })}
-          />
+        {/* 테두리 | 바탕색 */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>테두리</label>
+            <ToggleRow
+              label={widget.showBorder !== false ? "표시" : "숨김"}
+              value={widget.showBorder !== false}
+              onChange={(v) => onChange({ ...widget, showBorder: v })}
+            />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>바탕색</label>
+            <select
+              value={widget.bgColor ?? "none"}
+              onChange={(e) => onChange({ ...widget, bgColor: e.target.value })}
+              className={INPUT_CLS}
+            >
+              {BG_COLOR_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* ColSpan(가로) | 정렬 */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={LABEL_CLS}>ColSpan (가로)</label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={widget.fieldColSpan ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onChange({
+                  ...widget,
+                  fieldColSpan: raw === "" ? undefined : Math.max(1, Math.min(12, Number(raw) || 1)),
+                });
+              }}
+              placeholder="자동(12)"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className={LABEL_CLS}>정렬</label>
+            <select
+              value={widget.fieldAlign ?? "left"}
+              onChange={(e) => onChange({ ...widget, fieldAlign: e.target.value as "left" | "center" | "right" })}
+              className={INPUT_CLS}
+            >
+              <option value="left">좌측</option>
+              <option value="center">중앙</option>
+              <option value="right">우측</option>
+            </select>
+          </div>
         </div>
       </section>
 

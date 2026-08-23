@@ -177,7 +177,7 @@ export function SpaceRenderer({
       {items.map((field) => (
         <div
           key={field.id}
-          className="flex items-center px-3 min-w-0"
+          className="flex items-center-safe px-3 min-w-0"
           style={{
             gridColumn: `span ${Math.min(field.colSpan ?? 1, contentColSpan)}`,
             gridRow: `span ${field.rowSpan ?? 1}`,

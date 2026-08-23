@@ -14,8 +14,6 @@ import { FieldEditProps } from "./types";
 import { FieldBase, INPUT_CLS, LABEL_CLS } from "./_FieldBase";
 import { FieldOptions } from "./_FieldOptions";
 import { ToggleRow } from "./_ToggleRow";
-import { MessageKeySelector } from "@/components/i18n/message-key-selector";
-import { useBuilderI18nMode } from "../../../contexts/BuilderI18nModeContext";
 import { selectCls } from "../../../styles";
 import { SlugSelectField } from "./SlugSelectField";
 
@@ -34,7 +32,6 @@ export function SelectField({
   slugOptions,
   fetchRelations = [],
 }: FieldEditProps) {
-  const { i18nMode } = useBuilderI18nMode();
   return (
     <div className="space-y-1.5">
       {/* 타입 선택 — selectbox(기본) 또는 autocomplete */}
@@ -63,6 +60,9 @@ export function SelectField({
         required={values.required}
         description={values.description}
         descriptionMsgKey={values.descriptionMsgKey}
+        placeholder={values.placeholder ?? ""}
+        placeholderMsgKey={values.placeholderMsgKey}
+        placeholderHint="예: 전체"
         readonly={values.readonly}
         hideCondition={values.hideCondition}
         disableCondition={values.disableCondition}
@@ -72,26 +72,6 @@ export function SelectField({
         slugEntityFields={slugEntityFields}
         onChange={onChange}
       />
-      {/* Placeholder */}
-      <div>
-        <label className={LABEL_CLS}>Placeholder</label>
-        {i18nMode ? (
-          <MessageKeySelector
-            value={values.placeholderMsgKey ?? ""}
-            onChange={(key) => onChange({ placeholderMsgKey: key })}
-            resourceType={undefined}
-            size="sm"
-          />
-        ) : (
-          <input
-            type="text"
-            value={values.placeholder || ""}
-            onChange={(e) => onChange({ placeholder: e.target.value })}
-            placeholder="예: 전체"
-            className={INPUT_CLS}
-          />
-        )}
-      </div>
       {/* 옵션 — SLUG 탭 포함 (select 전용) */}
       <FieldOptions
         options={values.options}

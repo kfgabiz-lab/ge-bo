@@ -49,6 +49,9 @@ interface FieldBaseProps {
   required?: boolean;
   /** 라벨 하단 설명 텍스트 */
   description?: string;
+  placeholder?: string;
+  placeholderMsgKey?: string;
+  placeholderHint?: string;
   /** PK 여부 — colSpanMode.type === 'input'(Form) 일 때만 표시, 미전달 시 체크박스 숨김 */
   isPk?: boolean;
   /** 읽기 전용 여부 — Form 빌더(input 모드)일 때만 표시 */
@@ -63,11 +66,8 @@ interface FieldBaseProps {
   excludeFromSearch?: boolean;
   /** Slug Entity 필드 목록 — 있을 때 Key 입력을 selectbox로 전환 (form 빌더 전용) */
   slugEntityFields?: { key: string | null; label: string }[];
-  /** 라벨 오른쪽 슬롯 — 전달 시 Key가 아래 행으로 이동 (InputField의 연결 Slug용) */
   labelSideSlot?: React.ReactNode;
-  /** Key 오른쪽 슬롯 — labelSideSlot 전달 시에만 나타나는 Data 입력 자리 (Key와 50:50 폭 공유) */
   keySideSlot?: React.ReactNode;
-  /** Key 아래 전체 폭 슬롯 — keySideSlot 대신 사용, Key를 단독 row로 분리하고 그 아래 전체 폭으로 표시 (TextField의 출력방식+Data용) */
   keySideSlotFullWidth?: React.ReactNode;
   onChange: (
     updates: Partial<{
@@ -88,6 +88,8 @@ interface FieldBaseProps {
       excludeFromSearch: boolean;
       description: string;
       descriptionMsgKey: string | undefined;
+      placeholder: string | undefined;
+      placeholderMsgKey: string | undefined;
     }>
   ) => void;
   onLabelKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -115,6 +117,9 @@ export function FieldBase(props: FieldBaseProps) {
     required,
     description,
     descriptionMsgKey,
+    placeholder,
+    placeholderMsgKey,
+    placeholderHint,
     isPk,
     readonly,
     saveConfirm,
@@ -136,7 +141,6 @@ export function FieldBase(props: FieldBaseProps) {
   /* 전역 다국어 모드 — SizeSettingPanel의 🌐 토글로 제어 */
   const { i18nMode } = useBuilderI18nMode();
 
-  /* Key 입력 요소 — labelSideSlot 있을 때 두 번째 행으로 이동되므로 변수로 추출 */
   const keyInputEl =
     slugEntityFields && slugEntityFields.length > 0 ? (
       <select
@@ -165,7 +169,6 @@ export function FieldBase(props: FieldBaseProps) {
 
   return (
     <>
-      {/* 라벨 행 — labelSideSlot 있으면 오른쪽에 슬롯(연결 Slug 등), 없으면 기존 Key */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={LABEL_CLS}>
@@ -193,68 +196,11 @@ export function FieldBase(props: FieldBaseProps) {
           )}
         </div>
         <div>
-          {labelSideSlot !== undefined ? (
-            /* labelSideSlot 있으면 슬롯 표시 (Key는 아래 행으로 이동) */
-            labelSideSlot
-          ) : (
-            /* 기존 동작 — Key 입력 */
-            <>
-              <label className={LABEL_CLS}>
-                Key <span className="text-red-400">*</span>
-              </label>
-              {keyInputEl}
-            </>
-          )}
+          <label className={LABEL_CLS}>
+            Key <span className="text-red-400">*</span>
+          </label>
+          {keyInputEl}
         </div>
-      </div>
-
-      {/* Key + Data 행 — labelSideSlot 있을 때만 추가 표시 */}
-      {labelSideSlot !== undefined &&
-        (keySideSlotFullWidth !== undefined ? (
-          /* keySideSlotFullWidth 전달 시 — Key 단독 row + 슬롯 내용 전체 폭 row로 분리 (TextField 등) */
-          <>
-            <div>
-              <label className={LABEL_CLS}>
-                Key <span className="text-red-400">*</span>
-              </label>
-              {keyInputEl}
-            </div>
-            {keySideSlotFullWidth}
-          </>
-        ) : (
-          /* 기존 동작 — Key : keySideSlot 50:50 (InputField의 Data 입력 등) */
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className={LABEL_CLS}>
-                Key <span className="text-red-400">*</span>
-              </label>
-              {keyInputEl}
-            </div>
-            <div>{keySideSlot}</div>
-          </div>
-        ))}
-
-      {/* 설명 텍스트 — 라벨 하단에 표시할 안내 문구 */}
-      <div>
-        <label className={LABEL_CLS}>
-          설명 <span className="text-slate-300 font-normal">(선택)</span>
-        </label>
-        {i18nMode ? (
-          <MessageKeySelector
-            value={descriptionMsgKey ?? ""}
-            onChange={(key) => onChange({ descriptionMsgKey: key })}
-            resourceType="SENTENCE"
-            size="sm"
-          />
-        ) : (
-          <input
-            type="text"
-            value={description ?? ""}
-            onChange={(e) => onChange({ description: e.target.value || undefined })}
-            placeholder="예: 설명을 입력 해주세요."
-            className={INPUT_CLS}
-          />
-        )}
       </div>
 
       {/* 라벨 2 (dateRange 전용) */}
@@ -374,7 +320,66 @@ export function FieldBase(props: FieldBaseProps) {
         </div>
       )}
 
-      {/* 필수항목 | 읽기전용(Form) or 검색제외(Search) | 저장컨펌(ActionButton) — ColSpan/RowSpan 바로 아래 한 줄 */}
+      <div>
+        <label className={LABEL_CLS}>
+          설명 <span className="text-slate-300 font-normal">(선택)</span>
+        </label>
+        {i18nMode ? (
+          <MessageKeySelector
+            value={descriptionMsgKey ?? ""}
+            onChange={(key) => onChange({ descriptionMsgKey: key })}
+            resourceType="SENTENCE"
+            size="sm"
+          />
+        ) : (
+          <input
+            type="text"
+            value={description ?? ""}
+            onChange={(e) => onChange({ description: e.target.value || undefined })}
+            placeholder="예: 설명을 입력 해주세요."
+            className={INPUT_CLS}
+          />
+        )}
+      </div>
+
+      {placeholder !== undefined && (
+        <div>
+          <label className={LABEL_CLS}>Placeholder</label>
+          {i18nMode ? (
+            <MessageKeySelector
+              value={placeholderMsgKey ?? ""}
+              onChange={(key) => onChange({ placeholderMsgKey: key })}
+              resourceType={undefined}
+              size="sm"
+            />
+          ) : (
+            <input
+              type="text"
+              value={placeholder}
+              onChange={(e) => onChange({ placeholder: e.target.value || undefined })}
+              placeholder={placeholderHint}
+              className={INPUT_CLS}
+            />
+          )}
+        </div>
+      )}
+
+      {labelSideSlot !== undefined &&
+        (keySideSlotFullWidth !== undefined ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div>{labelSideSlot}</div>
+              <div />
+            </div>
+            {keySideSlotFullWidth}
+          </>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div>{labelSideSlot}</div>
+            <div>{keySideSlot}</div>
+          </div>
+        ))}
+
       <div className={`grid gap-1 mt-1 ${saveConfirm !== undefined ? "grid-cols-3" : "grid-cols-2"}`}>
         <ToggleRow label="필수 항목" value={!!required} onChange={(v) => onChange({ required: v })} />
         {isFormMode ? (

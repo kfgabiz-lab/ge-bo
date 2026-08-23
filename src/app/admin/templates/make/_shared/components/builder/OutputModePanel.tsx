@@ -23,12 +23,14 @@
 import { useState } from "react";
 import { FileText, LayoutTemplate, PanelRight, Globe } from "lucide-react";
 import type { LayerType, LayerWidth } from "../../types";
-import type { OutputMode, ConnectedType } from "../../hooks/useOutputMode";
+import type { OutputMode, ConnectedType, PageRelationLink } from "../../hooks/useOutputMode";
 import { inputCls, selectCls } from "../../styles";
 import { SelectArrow } from "../SelectArrow";
 import { MessageKeySelector } from "@/components/i18n/message-key-selector";
 import { SlugSelectField, type SlugOption } from "./fields/SlugSelectField";
+import { RelationDirectionSelectField } from "./fields/RelationDirectionSelectField";
 import { EntityBuildButton } from "./EntityBuildButton";
+import { useSlugRelations } from "../../hooks/useSlugRelations";
 
 const LAYER_WIDTH_OPTIONS: { value: LayerWidth; label: string }[] = [
   { value: "sm", label: "Small — 380px" },
@@ -71,6 +73,8 @@ interface OutputModePanelProps {
   connectedType?: ConnectedType;
   /** 연결 타입 변경 핸들러 */
   onConnectedTypeChange?: (v: ConnectedType) => void;
+  pageRelations?: PageRelationLink[];
+  onPageRelationsChange?: (v: PageRelationLink[]) => void;
   /** entity/data 타입 + 연결 Entity(slug) 선택 시 빌드 버튼 클릭 핸들러 (widget 빌더 전용) */
   onBuildFromEntity?: () => void;
   onOutputModeChange: (v: OutputMode) => void;
@@ -105,6 +109,8 @@ export function OutputModePanel({
   onSinglePageChange,
   connectedType: connectedTypeProp,
   onConnectedTypeChange,
+  pageRelations = [],
+  onPageRelationsChange,
   onBuildFromEntity,
   onOutputModeChange,
   onPageTitleChange,
@@ -124,8 +130,16 @@ export function OutputModePanel({
    * 서로 다른 네임스페이스를 사용하므로, 타입이 실제로 바뀌면 항상 초기화한다(같은 타입으로 되돌아올 때만 유지). */
   const handleTypeChange = (type: ConnectedType) => {
     onConnectedTypeChange?.(type);
-    if (type !== connectedType) onMainConnectedSlugChange?.("");
+    if (type !== connectedType) {
+      onMainConnectedSlugChange?.("");
+      onPageRelationsChange?.([]);
+    }
   };
+
+  const allSlugRelations = useSlugRelations(!!onPageRelationsChange);
+  const pageRelationCandidates = allSlugRelations.filter(
+    (r) => r.masterSlug === mainConnectedSlug && r.relationDir === "FETCH"
+  );
 
   return (
     <>
@@ -297,6 +311,17 @@ export function OutputModePanel({
               </div>
             )}
           </div>
+
+          {onPageRelationsChange && (connectedType === "slug" || connectedType === "entity") && mainConnectedSlug && (
+            <div className="mt-3">
+              <RelationDirectionSelectField
+                label="연동 Slug"
+                value={pageRelations}
+                onChange={onPageRelationsChange}
+                relations={pageRelationCandidates}
+              />
+            </div>
+          )}
         </div>
       )}
 

@@ -237,6 +237,9 @@ export interface SubListWidget {
   maxRows?: number; // 최대 행 수 (0 = 제한 없음)
   required?: boolean; // 필수 여부 (true: 행이 1개 이상 있어야 저장 가능)
   showBorder?: boolean; // 테두리 표시 여부 (기본 true)
+  bgColor?: string; // 바탕색
+  fieldColSpan?: number; // 내부 컨텐츠 표시 폭 (1~11, 12 또는 미설정 시 전체 폭)
+  fieldAlign?: "left" | "center" | "right"; // fieldColSpan 지정 시 정렬 방향
   columns: SubListColumn[]; // 컬럼 설정 목록
   /**
    * 부모 연결 필드 — 이 SubList가 API연동(connType='api') 컨텐츠로 부모 Form과 함께 선택되고

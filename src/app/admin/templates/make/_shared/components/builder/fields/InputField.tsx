@@ -52,6 +52,8 @@ export function InputField({
         required={values.required}
         description={values.description}
         descriptionMsgKey={values.descriptionMsgKey}
+        placeholder={values.placeholder ?? ""}
+        placeholderMsgKey={values.placeholderMsgKey}
         readonly={values.readonly}
         hideCondition={values.hideCondition}
         disableCondition={values.disableCondition}
@@ -61,7 +63,6 @@ export function InputField({
         slugEntityFields={slugEntityFields}
         onChange={onChange}
         labelSideSlot={
-          /* 연결 Slug — 라벨 오른쪽 슬롯으로 배치 */
           <SlugSelectField
             label="연결 Slug"
             value={String(values.relationSlugId ?? "")}
@@ -103,8 +104,6 @@ export function InputField({
           </div>
         }
       />
-      {/* 조인 검색 연동 — 연결된 slug(예: product-data)의 필드 값으로 다른 목록(예: category-data)을 필터링.
-                라벨 오른쪽 슬롯의 "연결 Slug"(relationSlugId, FETCH 표시용 readonly 컬럼)와는 별개의 기능이다. */}
       <div className="space-y-1.5 pt-1 border-t border-slate-100">
         <span className="text-[10px] font-semibold text-slate-400 uppercase">조인 검색 연동</span>
         <SlugSelectField
@@ -132,25 +131,6 @@ export function InputField({
               className={`${INPUT_CLS} font-mono`}
             />
           </div>
-        )}
-      </div>
-      {/* Placeholder */}
-      <div>
-        <label className={LABEL_CLS}>Placeholder</label>
-        {i18nMode ? (
-          <MessageKeySelector
-            value={values.placeholderMsgKey ?? ""}
-            onChange={(key) => onChange({ placeholderMsgKey: key })}
-            resourceType={undefined}
-            size="sm"
-          />
-        ) : (
-          <input
-            type="text"
-            value={values.placeholder || ""}
-            onChange={(e) => onChange({ placeholder: e.target.value })}
-            className={INPUT_CLS}
-          />
         )}
       </div>
       {/* 기본값 */}

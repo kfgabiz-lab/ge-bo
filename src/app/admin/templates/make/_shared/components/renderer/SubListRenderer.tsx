@@ -27,6 +27,7 @@ import { RendererContainer } from "./RendererContainer";
 import { FieldRenderer } from "./FieldRenderer";
 import type { RendererMode, SubListWidget, SubListColumn } from "./types";
 import type { SearchFieldConfig, CodeGroupDef } from "../../types";
+import { FIELD_DESC_HEIGHT_PX } from "../../styles";
 import { useI18n } from "@/hooks/use-i18n";
 
 /* 파일 업로드가 필요한 컬럼 타입 */
@@ -52,6 +53,12 @@ interface SubListRendererProps {
 }
 
 /* ── SubListColumn → SearchFieldConfig 변환 유틸 ── */
+
+/**
+ * SubList 셀은 라벨·설명을 그리지 않지만, 파일/이미지 드롭존 높이는 기존 크기를 유지한다.
+ * (셀이 그리드 트랙이 아니라 테이블 td라 트랙 기준 계산이 그대로 들어맞지 않는다)
+ */
+const SUBLIST_CELL_CHROME_HEIGHT = FIELD_DESC_HEIGHT_PX;
 
 /**
  * SubListColumn을 FieldRenderer가 받는 SearchFieldConfig 형태로 변환한다.
@@ -179,8 +186,8 @@ export function SubListRenderer({
       });
     });
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
     if (allIds.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
       setExistingMetaMap({});
       return;
     }
@@ -340,9 +347,20 @@ export function SubListRenderer({
   const previewRows: SubListRow[] = [{ _rowId: "preview-1" }];
   const displayRows = mode === "preview" ? previewRows : rows;
 
+  /* fieldColSpan 지정 시 내부 컨텐츠 폭을 outer 대비 비율로 제한 + fieldAlign 방향으로 정렬 (MultiSelect와 동일 패턴) */
+  const fieldAlign = widget.fieldAlign ?? "left";
+  const fieldWidthStyle: React.CSSProperties | undefined =
+    typeof widget.fieldColSpan === "number" && widget.fieldColSpan >= 1 && widget.fieldColSpan < 12
+      ? {
+          width: `${(widget.fieldColSpan / 12) * 100}%`,
+          marginLeft: fieldAlign === "center" || fieldAlign === "right" ? "auto" : undefined,
+          marginRight: fieldAlign === "center" ? "auto" : undefined,
+        }
+      : undefined;
+
   return (
-    <RendererContainer showBorder={widget.showBorder ?? true}>
-      <div className="flex flex-col h-full">
+    <RendererContainer showBorder={widget.showBorder ?? true} bgColor={widget.bgColor}>
+      <div className="flex flex-col h-full" style={fieldWidthStyle}>
         {/* ── 헤더 영역 ── */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/60 gap-2 flex-shrink-0">
           {/* 왼쪽: 타이틀 + 행 수 */}
@@ -370,7 +388,7 @@ export function SubListRenderer({
         </div>
 
         {/* ── 테이블 ── */}
-        <div className="flex-1 overflow-auto min-h-0">
+        <div className="flex-1 overflow-auto min-h-0 border-r border-slate-200">
           <table className="w-full text-xs border-collapse table-auto">
             {/* 컬럼 헤더 */}
             <thead className="sticky top-0 z-10">
@@ -460,6 +478,7 @@ export function SubListRenderer({
                           <FieldRenderer
                             mode={mode}
                             field={toFieldConfig(col)}
+                            contentChromeHeight={SUBLIST_CELL_CHROME_HEIGHT}
                             /* dateRange는 value/onChange 대신 valueFrom/valueTo/onFromChange/onToChange로 배선 */
                             value={isRangeType ? undefined : String(row[col.key] ?? "")}
                             onChange={isRangeType ? undefined : (v) => handleRowChange(row._rowId, col.key, v)}

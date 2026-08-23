@@ -52,6 +52,7 @@ import {
   TimeField,
   AddressField,
   SlugSelectField,
+  HiddenField,
 } from "./fields";
 import type { FieldEditValues, SlugOption } from "./fields";
 // SpaceBuilder와 동일한 스타일 유틸 재사용
@@ -472,35 +473,12 @@ export function FormBuilder({
         return <AddressField {...props} />;
       case "textarea":
         return <FormTextareaField {...props} />;
-      /* hidden: KEY(fieldKey) + VALUE(defaultValue) 한 줄 배치 */
       case "hidden":
         return (
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className={LABEL_CLS}>
-                Key <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className={INPUT_CLS}
-                value={f.fieldKey ?? ""}
-                placeholder="예: depth"
-                onChange={(e) => updateField(f.id, { fieldKey: e.target.value })}
-              />
-            </div>
-            <div className="flex-1">
-              <label className={LABEL_CLS}>
-                Value <span className="text-slate-400 font-normal">(기본값)</span>
-              </label>
-              <input
-                type="text"
-                className={INPUT_CLS}
-                value={f.defaultValue ?? ""}
-                placeholder="예: 1"
-                onChange={(e) => updateField(f.id, { defaultValue: e.target.value || undefined })}
-              />
-            </div>
-          </div>
+          <HiddenField
+            values={{ fieldKey: f.fieldKey ?? "", defaultValue: f.defaultValue }}
+            onChange={(updates) => updateField(f.id, updates)}
+          />
         );
       default:
         return null;

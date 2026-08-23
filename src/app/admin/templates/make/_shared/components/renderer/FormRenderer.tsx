@@ -31,7 +31,7 @@ import { RendererContainer } from "./RendererContainer";
 import type { CodeGroupDef, SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
 import { applyDataGeneration, flattenPageDataItem, evalConditionExpr, buildKeyToId } from "../../utils";
-import { fieldLabelCls, fieldDescCls } from "../../styles";
+import { fieldLabelCls, fieldDescCls, fieldBodyCls } from "../../styles";
 
 /** flattenPageDataItem이 항상 붙이는 부가 키 — rowData 병합 시 제외 */
 const FLATTEN_META_KEYS = new Set(["_id", "_groupId", "_pathMap", "createdAt", "createdBy", "updatedAt", "updatedBy"]);
@@ -310,10 +310,11 @@ export function FormRenderer({
                 {f.required && <span className="text-red-500 ml-0.5">*</span>}
               </label>
             )}
-            {/* 설명 — descriptionMsgKey 우선, 없으면 description 직접 표시 */}
-            <p className={fieldDescCls}>{f.descriptionMsgKey ? t(f.descriptionMsgKey) : f.description}</p>
-            {/* 필드 렌더링 */}
-            <div className="flex-1 min-h-0">
+            {/* 설명 — descriptionMsgKey 우선, 없으면 description 직접 표시. 값 없으면 렌더링 스킵(공백 방지) */}
+            {(f.descriptionMsgKey || f.description) && (
+              <p className={fieldDescCls}>{f.descriptionMsgKey ? t(f.descriptionMsgKey) : f.description}</p>
+            )}
+            <div className={fieldBodyCls}>
               <FieldRenderer
                 mode={mode}
                 field={f as unknown as SearchFieldConfig}

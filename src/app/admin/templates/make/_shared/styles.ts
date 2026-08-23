@@ -24,3 +24,28 @@ export const fieldLabelCls = "block text-sm font-medium text-slate-700 flex-shri
 
 /** Form/Search 필드 서브타이틀(설명) 스타일 */
 export const fieldDescCls = "text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight truncate min-h-[18px]";
+
+/** Form 필드 본체 영역 스타일 — 여유가 있으면 세로 중앙, 넘치면 상단 정렬로 자동 폴백 */
+export const fieldBodyCls = "flex-1 min-h-0 flex flex-col justify-center-safe";
+
+/**
+ * radio/checkbox/dateRangeStatus 옵션 그룹 래퍼 — 옵션 줄 20px + pb 18px = input과 같은 38px 박스.
+ * py-* 대칭 padding으로 바꾸면 fieldBodyCls의 중앙정렬과 상쇄되어 라벨 간격이 전혀 안 바뀐다.
+ */
+export const fieldOptionGroupCls = "flex items-center gap-4 pb-[18px]";
+
+/** 글자수 카운터를 입력창 내부 우측에 겹쳐 배치 — 세로 흐름을 차지하지 않아 셀 높이에 영향 없음 */
+export const fieldCharCountCls =
+  "absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none";
+
+/** fieldCharCountCls와 겹치지 않도록 입력창 우측에 확보하는 여백 — inputCls의 px-3보다 뒤에 선언되어 padding-right를 덮어쓴다 */
+export const fieldCharCountPadCls = "pr-20";
+
+/** fieldLabelCls가 차지하는 실제 높이(px) — 클래스 변경 시 이 값도 함께 갱신 */
+export const FIELD_LABEL_HEIGHT_PX = 20;
+
+/** fieldDescCls가 차지하는 실제 높이(px) — min-h-[18px] + mb-0.5 */
+export const FIELD_DESC_HEIGHT_PX = 20;
+
+/** 필드 셀 하단 여유분(px) — 테두리·반올림 오차 흡수용 */
+export const FIELD_CELL_SLACK_PX = 4;

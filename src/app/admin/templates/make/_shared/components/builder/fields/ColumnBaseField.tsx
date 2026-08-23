@@ -1,18 +1,5 @@
 "use client";
 
-/**
- * ColumnBaseField — 컬럼 기본 설정 (헤더명, Key, 너비, 정렬, 정렬활성화)
- *
- * 모든 셀 타입에 공통으로 나타나는 기본 컬럼 설정 UI.
- * actions 타입은 헤더명/Key 숨김, 그 외 타입은 전체 표시.
- *
- * 사용법:
- *   // 편집 모드
- *   <ColumnBaseField values={col} onChange={patch => updateColumn(col.id, patch)} />
- *   // 추가 모드 (헤더명 자동 포커스)
- *   <ColumnBaseField values={pendingCol} onChange={patch => setPendingCol(prev => ({ ...prev!, ...patch }))} autoFocus />
- */
-
 import React from "react";
 import { ColEditProps } from "./col-types";
 import { INPUT_CLS, LABEL_CLS } from "./_FieldBase";
@@ -25,9 +12,7 @@ import { useBuilderI18nMode } from "../../../contexts/BuilderI18nModeContext";
 import type { SlugRelationOption } from "../../SearchBuilder";
 
 interface ColumnBaseFieldProps extends ColEditProps {
-  /** 추가 모드: 헤더명 input 자동 포커스 */
   autoFocus?: boolean;
-  /** 연결 가능한 FETCH 슬러그 목록 (TableBuilder에서 connectedSlug 기준으로 필터링하여 전달) */
   fetchRelations?: SlugRelationOption[];
 }
 
@@ -38,7 +23,7 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
   return (
     <div className="space-y-2">
       {!isActions && (
-        <>
+        <div className="grid grid-cols-2 gap-2">
           <div>
             <label className={LABEL_CLS}>
               헤더명 <span className="text-red-400">*</span>
@@ -60,32 +45,6 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
               />
             )}
           </div>
-
-          <RelationMultiSelectField
-            label="연결 Slug"
-            value={getColumnRelationIds(values)}
-            onChange={(ids) => {
-              const prevIds = getColumnRelationIds(values);
-              if (ids.length === 0) {
-                onChange({ relationSlugIds: undefined, relationSlugId: undefined });
-                return;
-              }
-              const patch: { relationSlugIds: number[]; relationSlugId: number; accessor?: string } = {
-                relationSlugIds: ids,
-                relationSlugId: ids[0],
-              };
-              if (prevIds.length === 0) {
-                patch.accessor = buildFetchKey(ids[0]);
-              } else if (prevIds[0] !== ids[0] && values.accessor === buildFetchKey(prevIds[0])) {
-                patch.accessor = buildFetchKey(ids[0]);
-              }
-              onChange(patch);
-            }}
-            relations={fetchRelations}
-            emptyLabel="연동 없음"
-          />
-
-          {/* Key — 단독 row */}
           <div>
             <label className={LABEL_CLS}>
               Key <span className="text-red-400">*</span>
@@ -97,17 +56,9 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
               className={`${INPUT_CLS} font-mono`}
             />
           </div>
-
-          {/* 출력방식 | Data — 3:7 비율 (다건 매칭 시 표시 방식 + 반복 평가할 표현식) */}
-          <FetchDisplayField
-            fetchDisplayMode={values.fetchDisplayMode}
-            data={values.data}
-            onChange={(patch) => onChange(patch)}
-          />
-        </>
+        </div>
       )}
 
-      {/* 너비(+단위) / 정렬 — 2열 그리드 */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={LABEL_CLS}>너비</label>
@@ -142,7 +93,40 @@ export function ColumnBaseField({ values, onChange, autoFocus, fetchRelations = 
         </div>
       </div>
 
-      {/* 정렬 활성화 체크박스 */}
+      {!isActions && (
+        <>
+          <RelationMultiSelectField
+            label="연결 Slug"
+            value={getColumnRelationIds(values)}
+            onChange={(ids) => {
+              const prevIds = getColumnRelationIds(values);
+              if (ids.length === 0) {
+                onChange({ relationSlugIds: undefined, relationSlugId: undefined });
+                return;
+              }
+              const patch: { relationSlugIds: number[]; relationSlugId: number; accessor?: string } = {
+                relationSlugIds: ids,
+                relationSlugId: ids[0],
+              };
+              if (prevIds.length === 0) {
+                patch.accessor = buildFetchKey(ids[0]);
+              } else if (prevIds[0] !== ids[0] && values.accessor === buildFetchKey(prevIds[0])) {
+                patch.accessor = buildFetchKey(ids[0]);
+              }
+              onChange(patch);
+            }}
+            relations={fetchRelations}
+            emptyLabel="연동 없음"
+          />
+
+          <FetchDisplayField
+            fetchDisplayMode={values.fetchDisplayMode}
+            data={values.data}
+            onChange={(patch) => onChange(patch)}
+          />
+        </>
+      )}
+
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"

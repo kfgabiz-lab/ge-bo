@@ -27,6 +27,9 @@ export const EditorField = (props: FieldEditProps) => {
       required={values.required}
       description={values.description}
       descriptionMsgKey={values.descriptionMsgKey}
+      placeholder={values.placeholder ?? ""}
+      placeholderMsgKey={values.placeholderMsgKey}
+      placeholderHint="내용을 입력하세요"
       readonly={values.readonly}
       hideCondition={values.hideCondition}
       disableCondition={values.disableCondition}
@@ -50,26 +53,6 @@ export const EditorField = (props: FieldEditProps) => {
               </label>
             ))}
           </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-slate-500 mb-1 block">Placeholder</label>
-          {i18nMode ? (
-            <MessageKeySelector
-              value={values.placeholderMsgKey ?? ""}
-              onChange={(key) => onChange({ placeholderMsgKey: key })}
-              resourceType={undefined}
-              size="sm"
-            />
-          ) : (
-            <input
-              type="text"
-              value={values.placeholder || ""}
-              onChange={(e) => onChange({ placeholder: e.target.value || undefined })}
-              placeholder="내용을 입력하세요"
-              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-slate-900"
-            />
-          )}
         </div>
 
         {/* 기본값 */}

@@ -1,4 +1,4 @@
-﻿'use client';
+﻿"use client";
 
 /**
  * ============================================================
@@ -10,58 +10,79 @@
  * ============================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
-    Plus, Trash2, X, Save, Wand2,
-    Search as SearchIcon, Table2, FileText,
-    AlignLeft, Layers, List, CheckSquare,
-    GripVertical, PanelTop, ShieldCheck,
-} from 'lucide-react';
+  Plus,
+  Trash2,
+  X,
+  Save,
+  Wand2,
+  Search as SearchIcon,
+  Table2,
+  FileText,
+  AlignLeft,
+  Layers,
+  List,
+  CheckSquare,
+  GripVertical,
+  PanelTop,
+  ShieldCheck,
+} from "lucide-react";
 
-import {
-    DndContext, closestCenter, PointerSensor,
-    useSensor, useSensors,
-} from '@dnd-kit/core';
-import {
-    arrayMove, SortableContext, verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import api from '@/lib/api';
-import { CommonBuilderDispatcher } from '../_shared/components/builder/CommonBuilderDispatcher';
-import { SizeSettingPanel } from '../_shared/components/builder/SizeSettingPanel';
-import { BuilderI18nModeProvider } from '../_shared/contexts/BuilderI18nModeContext';
-import { ContentRowHeader } from '../_shared/components/builder/ContentRowHeader';
-import { OutputModePanel } from '../_shared/components/builder/OutputModePanel';
-import { PreviewWrapper } from '../_shared/components/builder/PreviewWrapper';
-import { TemplateLoader } from '../_shared/components/builder/TemplateLoader';
-import { PageGridRenderer } from '../_shared/components/renderer';
-import { useOutputMode } from '../_shared/hooks/useOutputMode';
-import { useTemplateManagement } from '../_shared/hooks/useTemplateManagement';
-import type { SearchWidget, SpaceWidget, CategoryWidget, SubListWidget, MultiSelectWidget, TabWidget } from '../_shared/components/renderer';
-import type { TableWidget } from '../_shared/components/builder/TableBuilder';
-import type { FormWidget } from '../_shared/components/builder/FormBuilder';
-import { createIdGenerator, toSlug } from '../_shared/utils';
-import { buildFormFromEntity } from '../_shared/utils/entityBuild';
-import { stampConnectedSlug } from '../_shared/hooks/useWidgetPageState';
-import type { SlugEntityFieldItem } from '@/components/slug-entity/EntityList';
-import type { SlugOption } from '../_shared/components/builder/fields/SlugSelectField';
-import PageLayout from '@/components/layout/page-layout';
-import { SaveModal, RuleCreateModal } from '../_shared/components/TemplateModals';
-import { SortableRowWrapper } from '../_shared/components/DndWrappers';
-import { TemplateItem } from '../_shared/types';
-import { toast } from 'sonner';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import api from "@/lib/api";
+import { CommonBuilderDispatcher } from "../_shared/components/builder/CommonBuilderDispatcher";
+import { SizeSettingPanel } from "../_shared/components/builder/SizeSettingPanel";
+import { BuilderI18nModeProvider } from "../_shared/contexts/BuilderI18nModeContext";
+import { ContentRowHeader } from "../_shared/components/builder/ContentRowHeader";
+import { OutputModePanel } from "../_shared/components/builder/OutputModePanel";
+import { PreviewWrapper } from "../_shared/components/builder/PreviewWrapper";
+import { TemplateLoader } from "../_shared/components/builder/TemplateLoader";
+import { PageGridRenderer } from "../_shared/components/renderer";
+import { useOutputMode } from "../_shared/hooks/useOutputMode";
+import { useTemplateManagement } from "../_shared/hooks/useTemplateManagement";
+import type {
+  SearchWidget,
+  SpaceWidget,
+  CategoryWidget,
+  SubListWidget,
+  MultiSelectWidget,
+  TabWidget,
+} from "../_shared/components/renderer";
+import type { TableWidget } from "../_shared/components/builder/TableBuilder";
+import type { FormWidget } from "../_shared/components/builder/FormBuilder";
+import { createIdGenerator, toSlug } from "../_shared/utils";
+import { buildFormFromEntity } from "../_shared/utils/entityBuild";
+import { stampConnectedSlug } from "../_shared/hooks/useWidgetPageState";
+import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
+import type { SlugOption } from "../_shared/components/builder/fields/SlugSelectField";
+import PageLayout from "@/components/layout/page-layout";
+import { SaveModal, RuleCreateModal } from "../_shared/components/TemplateModals";
+import { SortableRowWrapper } from "../_shared/components/DndWrappers";
+import { TemplateItem } from "../_shared/types";
+import { toast } from "sonner";
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */
 /* ══════════════════════════════════════════ */
 
 /** 페이지 위젯 타입 */
-type PageWidgetType = 'search' | 'table' | 'form' | 'space' | 'category' | 'sublist' | 'multiselect' | 'tab';
+type PageWidgetType = "search" | "table" | "form" | "space" | "category" | "sublist" | "multiselect" | "tab";
 
 /* SearchWidget, SpaceItem, SpaceWidget → renderer/types에서 import */
 /* FormFieldItem, FormWidget → FormBuilder에서 import */
 
 /** 위젯 합집합 타입 */
-type PageWidget = SearchWidget | TableWidget | FormWidget | SpaceWidget | CategoryWidget | SubListWidget | MultiSelectWidget | TabWidget;
+type PageWidget =
+  | SearchWidget
+  | TableWidget
+  | FormWidget
+  | SpaceWidget
+  | CategoryWidget
+  | SubListWidget
+  | MultiSelectWidget
+  | TabWidget;
 
 /**
  * 위젯 셀 안에 배치되는 컨텐츠 아이템
@@ -69,10 +90,10 @@ type PageWidget = SearchWidget | TableWidget | FormWidget | SpaceWidget | Catego
  * — rowSpan: 높이 배수 (1 = 80px 단위)
  */
 interface PageContentItem {
-    id: string;
-    colSpan: number;    // 부모 위젯 col 기준 너비
-    rowSpan: number;    // 높이 배수
-    widget: PageWidget;
+  id: string;
+  colSpan: number; // 부모 위젯 col 기준 너비
+  rowSpan: number; // 높이 배수
+  widget: PageWidget;
 }
 
 /**
@@ -80,11 +101,11 @@ interface PageContentItem {
  * — row/col로 크기를 정하고, 내부에 여러 컨텐츠(PageContentItem)를 가짐
  */
 interface PageWidgetItem {
-    id: string;
-    colSpan: number;        // 가로 점유 칸 수 (1~12, 12칸 기준)
-    rowSpan: number;        // 세로 높이 배수 (1 = 80px)
-    contents: PageContentItem[];  // 셀 내 컨텐츠 목록
-    i18nMode?: boolean;     // 다국어 모드 저장값 (토글 시 기록)
+  id: string;
+  colSpan: number; // 가로 점유 칸 수 (1~12, 12칸 기준)
+  rowSpan: number; // 세로 높이 배수 (1 = 80px)
+  contents: PageContentItem[]; // 셀 내 컨텐츠 목록
+  i18nMode?: boolean; // 다국어 모드 저장값 (토글 시 기록)
 }
 
 /* ══════════════════════════════════════════ */
@@ -92,38 +113,97 @@ interface PageWidgetItem {
 /* ══════════════════════════════════════════ */
 
 /* ID 생성기 */
-const uid = createIdGenerator('pg');   // 범용 (row / col / field / button)
-const wuid = createIdGenerator('w');   // 위젯 widgetId 전용
+const uid = createIdGenerator("pg"); // 범용 (row / col / field / button)
+const wuid = createIdGenerator("w"); // 위젯 widgetId 전용
 
 /** 위젯 타입별 시각 메타 */
-const WIDGET_META: Record<PageWidgetType, {
+const WIDGET_META: Record<
+  PageWidgetType,
+  {
     label: string;
     color: string;
     bg: string;
     border: string;
     previewBg: string;
     desc: string;
-}> = {
-    search:   { label: 'Search',   color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',   previewBg: 'bg-blue-50/50',   desc: '검색폼 영역' },
-    table:    { label: 'Table',    color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', previewBg: 'bg-emerald-50/50', desc: '데이터 테이블' },
-    form:     { label: 'Form',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200',  previewBg: 'bg-violet-50/50',  desc: '폼 입력 영역' },
-    space:    { label: '공간영역', color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200',   previewBg: 'bg-amber-50/50',   desc: 'Text/Button 배치 영역' },
-    category: { label: '카테고리', color: 'text-cyan-700',   bg: 'bg-cyan-50',    border: 'border-cyan-200',    previewBg: 'bg-cyan-50/50',    desc: '카테고리 계층 관리' },
-    sublist:     { label: '서브리스트', color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200', previewBg: 'bg-indigo-50/50', desc: '다건 행 입력 목록' },
-    multiselect: { label: '다중선택',   color: 'text-teal-700',   bg: 'bg-teal-50',   border: 'border-teal-200',   previewBg: 'bg-teal-50/50',   desc: '체크박스 드롭다운 다중 선택' },
-    tab:         { label: '탭',         color: 'text-pink-700',   bg: 'bg-pink-50',   border: 'border-pink-200',   previewBg: 'bg-pink-50/50',   desc: '탭 컨텐츠 영역' },
+  }
+> = {
+  search: {
+    label: "Search",
+    color: "text-blue-700",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    previewBg: "bg-blue-50/50",
+    desc: "검색폼 영역",
+  },
+  table: {
+    label: "Table",
+    color: "text-emerald-700",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    previewBg: "bg-emerald-50/50",
+    desc: "데이터 테이블",
+  },
+  form: {
+    label: "Form",
+    color: "text-violet-700",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
+    previewBg: "bg-violet-50/50",
+    desc: "폼 입력 영역",
+  },
+  space: {
+    label: "공간영역",
+    color: "text-amber-700",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    previewBg: "bg-amber-50/50",
+    desc: "Text/Button 배치 영역",
+  },
+  category: {
+    label: "카테고리",
+    color: "text-cyan-700",
+    bg: "bg-cyan-50",
+    border: "border-cyan-200",
+    previewBg: "bg-cyan-50/50",
+    desc: "카테고리 계층 관리",
+  },
+  sublist: {
+    label: "서브리스트",
+    color: "text-indigo-700",
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    previewBg: "bg-indigo-50/50",
+    desc: "다건 행 입력 목록",
+  },
+  multiselect: {
+    label: "다중선택",
+    color: "text-teal-700",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+    previewBg: "bg-teal-50/50",
+    desc: "체크박스 드롭다운 다중 선택",
+  },
+  tab: {
+    label: "탭",
+    color: "text-pink-700",
+    bg: "bg-pink-50",
+    border: "border-pink-200",
+    previewBg: "bg-pink-50/50",
+    desc: "탭 컨텐츠 영역",
+  },
 };
 
 /** 위젯 타입별 아이콘 컴포넌트 */
 const WIDGET_ICON: Record<PageWidgetType, React.ReactNode> = {
-    search:   <SearchIcon className="w-3.5 h-3.5" />,
-    table:    <Table2 className="w-3.5 h-3.5" />,
-    form:     <FileText className="w-3.5 h-3.5" />,
-    space:    <AlignLeft className="w-3.5 h-3.5" />,
-    category:    <Layers      className="w-3.5 h-3.5" />,
-    sublist:     <List        className="w-3.5 h-3.5" />,
-    multiselect: <CheckSquare className="w-3.5 h-3.5" />,
-    tab:         <PanelTop    className="w-3.5 h-3.5" />,
+  search: <SearchIcon className="w-3.5 h-3.5" />,
+  table: <Table2 className="w-3.5 h-3.5" />,
+  form: <FileText className="w-3.5 h-3.5" />,
+  space: <AlignLeft className="w-3.5 h-3.5" />,
+  category: <Layers className="w-3.5 h-3.5" />,
+  sublist: <List className="w-3.5 h-3.5" />,
+  multiselect: <CheckSquare className="w-3.5 h-3.5" />,
+  tab: <PanelTop className="w-3.5 h-3.5" />,
 };
 
 /** 공간영역 버튼 색상 옵션 */
@@ -137,7 +217,7 @@ const WIDGET_ICON: Record<PageWidgetType, React.ReactNode> = {
  * (Table 연결 드롭다운, Button 타겟 드롭다운에서 사용)
  */
 const collectWidgets = (items: PageWidgetItem[], type: PageWidgetType): PageWidget[] =>
-    items.flatMap(i => i.contents.map(c => c.widget)).filter((w): w is PageWidget => w.type === type);
+  items.flatMap((i) => i.contents.map((c) => c.widget)).filter((w): w is PageWidget => w.type === type);
 
 /* ══════════════════════════════════════════ */
 /*  위젯 설정 패널 컴포넌트                     */
@@ -145,876 +225,1069 @@ const collectWidgets = (items: PageWidgetItem[], type: PageWidgetType): PageWidg
 
 /* 위젯 설정 패널은 이제 CommonBuilderDispatcher에서 공통으로 처리합니다. */
 
-
 /* ══════════════════════════════════════════ */
 /*  위젯 타입 선택 피커                         */
 /* ══════════════════════════════════════════ */
-const WidgetTypePicker = ({ onSelect, onCancel, title = '위젯 타입 선택' }: { onSelect: (t: PageWidgetType) => void; onCancel: () => void; title?: string }) => (
-    <div className="p-2 space-y-1.5">
-        <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-semibold text-slate-500">{title}</span>
-            <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="w-3.5 h-3.5" /></button>
-        </div>
-        <div className="grid grid-cols-1 gap-1">
-            {(Object.entries(WIDGET_META) as [PageWidgetType, typeof WIDGET_META[PageWidgetType]][]).map(([type, meta]) => (
-                <button
-                    key={type}
-                    onClick={() => onSelect(type)}
-                    className={`flex items-center gap-2 px-2.5 py-2 rounded-md border ${meta.bg} ${meta.border} hover:opacity-80 transition-all text-left`}
-                >
-                    <span className={meta.color}>{WIDGET_ICON[type]}</span>
-                    <div>
-                        <p className={`text-[11px] font-semibold ${meta.color}`}>{meta.label}</p>
-                        <p className="text-[10px] text-slate-400">{meta.desc}</p>
-                    </div>
-                </button>
-            ))}
-        </div>
+const WidgetTypePicker = ({
+  onSelect,
+  onCancel,
+  title = "위젯 타입 선택",
+}: {
+  onSelect: (t: PageWidgetType) => void;
+  onCancel: () => void;
+  title?: string;
+}) => (
+  <div className="p-2 space-y-1.5">
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-[10px] font-semibold text-slate-500">{title}</span>
+      <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
+        <X className="w-3.5 h-3.5" />
+      </button>
     </div>
+    <div className="grid grid-cols-1 gap-1">
+      {(Object.entries(WIDGET_META) as [PageWidgetType, (typeof WIDGET_META)[PageWidgetType]][]).map(([type, meta]) => (
+        <button
+          key={type}
+          onClick={() => onSelect(type)}
+          className={`flex items-center gap-2 px-2.5 py-2 rounded-md border ${meta.bg} ${meta.border} hover:opacity-80 transition-all text-left`}
+        >
+          <span className={meta.color}>{WIDGET_ICON[type]}</span>
+          <div>
+            <p className={`text-[11px] font-semibold ${meta.color}`}>{meta.label}</p>
+            <p className="text-[10px] text-slate-400">{meta.desc}</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  </div>
 );
-
 
 /* ══════════════════════════════════════════ */
 /*  메인 컴포넌트                               */
 /* ══════════════════════════════════════════ */
 
 export default function PageBuilderPage() {
+  /* ── 출력 모드 (page / layerpopup) — 공통 훅 사용 ── */
+  const om = useOutputMode();
 
-    /* ── 출력 모드 (page / layerpopup) — 공통 훅 사용 ── */
-    const om = useOutputMode();
+  /* ── 위젯 셀 목록 (flat 구조) ── */
+  const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
 
-    /* ── 위젯 셀 목록 (flat 구조) ── */
-    const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
+  /* ── 위젯 셀 편집 상태 ── */
+  const [editingItemId, setEditingItemId] = useState<string | null>(null); // 펼쳐진 위젯 셀 ID
+  const [editingContentId, setEditingContentId] = useState<string | null>(null); // 펼쳐진 컨텐츠 ID
 
-    /* ── 위젯 셀 편집 상태 ── */
-    const [editingItemId, setEditingItemId] = useState<string | null>(null); // 펼쳐진 위젯 셀 ID
-    const [editingContentId, setEditingContentId] = useState<string | null>(null); // 펼쳐진 컨텐츠 ID
+  /* ── 위젯 추가 플로우 (row/col 입력만) ── */
+  const [showAddWidget, setShowAddWidget] = useState(false); // 위젯 추가 입력창 표시
+  const [addRowSpan, setAddRowSpan] = useState(1); // 추가할 위젯 row 수
+  const [addColSpan, setAddColSpan] = useState(12); // 추가할 위젯 col 수 (max 12)
 
-    /* ── 위젯 추가 플로우 (row/col 입력만) ── */
-    const [showAddWidget, setShowAddWidget] = useState(false);  // 위젯 추가 입력창 표시
-    const [addRowSpan, setAddRowSpan] = useState(1);       // 추가할 위젯 row 수
-    const [addColSpan, setAddColSpan] = useState(12);      // 추가할 위젯 col 수 (max 12)
+  /* ── 컨텐츠 추가 플로우 (타입 선택 → 생성, col/row는 생성 후 패널에서 수정) ── */
+  const [addingContentToItemId, setAddingContentToItemId] = useState<string | null>(null);
 
-    /* ── 컨텐츠 추가 플로우 (타입 선택 → 생성, col/row는 생성 후 패널에서 수정) ── */
-    const [addingContentToItemId, setAddingContentToItemId] = useState<string | null>(null);
-
-    /* ── 레거시 다중위젯 템플릿 여부 — 불러왔을 때 이미 위젯이 2개 이상이었던 템플릿만 true.
+  /* ── 레거시 다중위젯 템플릿 여부 — 불러왔을 때 이미 위젯이 2개 이상이었던 템플릿만 true.
        신규 템플릿(기본값 false)과 원래 1개였던 템플릿은 위젯 셀 1개 제한이 계속 적용된다. ── */
-    const [isLegacyMultiWidget, setIsLegacyMultiWidget] = useState(false);
+  const [isLegacyMultiWidget, setIsLegacyMultiWidget] = useState(false);
 
-    /* ── 검증 규칙 생성 — BE ValidationRule API와 직접 연동하는 RuleCreateModal(자기완결형)을 여닫는 상태만 관리 ── */
-    const [showRuleModal, setShowRuleModal] = useState(false); // 검증 규칙 생성 모달 표시 여부
+  /* ── 검증 규칙 생성 — BE ValidationRule API와 직접 연동하는 RuleCreateModal(자기완결형)을 여닫는 상태만 관리 ── */
+  const [showRuleModal, setShowRuleModal] = useState(false); // 검증 규칙 생성 모달 표시 여부
 
-    /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
-    const tm = useTemplateManagement('PAGE');
+  /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
+  const tm = useTemplateManagement("PAGE");
 
-    /* ── Slug 레지스트리 — connectedSlug 드롭다운 용도 (entity 연결 정보 entityId/entityName 포함) ── */
-    const [slugOptions, setSlugOptions] = useState<{ id: number; slug: string; name: string; entityId?: number; entityName?: string }[]>([]);
-    useEffect(() => {
-        api.get('/slug-registry/active')
-            .then(res => setSlugOptions((res.data || []).filter((s: { type: string }) => s.type === 'PAGE_DATA')))
-            .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
-    }, []);
+  /* ── Slug 레지스트리 — connectedSlug 드롭다운 용도 (entity 연결 정보 entityId/entityName 포함) ── */
+  const [slugOptions, setSlugOptions] = useState<
+    { id: number; slug: string; name: string; entityId?: number; entityName?: string }[]
+  >([]);
+  useEffect(() => {
+    api
+      .get("/slug-registry/active")
+      .then((res) => setSlugOptions((res.data || []).filter((s: { type: string }) => s.type === "PAGE_DATA")))
+      .catch(() => {
+        /* 조회 실패 시 빈 배열 유지 */
+      });
+  }, []);
 
-    /* ── API 정보 — Space ActionButton API 연동 연결용 ── */
-    const [apiInfoOptions, setApiInfoOptions] = useState<{ id: number; name: string; method: string; urlPattern: string }[]>([]);
-    useEffect(() => {
-        api.get('/api-infos/active')
-            .then(res => setApiInfoOptions(res.data || []))
-            .catch(() => { /* 조회 실패 시 빈 배열 유지 */ });
-    }, []);
+  /* ── API 정보 — Space ActionButton API 연동 연결용 ── */
+  const [apiInfoOptions, setApiInfoOptions] = useState<
+    { id: number; name: string; method: string; urlPattern: string }[]
+  >([]);
+  useEffect(() => {
+    api
+      .get("/api-infos/active")
+      .then((res) => setApiInfoOptions(res.data || []))
+      .catch(() => {
+        /* 조회 실패 시 빈 배열 유지 */
+      });
+  }, []);
 
-    /* ── Data Entity 전체 목록 — SlugRegistry 연결 여부와 무관하게 SlugEntity 전체를 대상으로 한다.
+  /* ── Data Entity 전체 목록 — SlugRegistry 연결 여부와 무관하게 SlugEntity 전체를 대상으로 한다.
        (Slug Entity 타입은 slugOptions 중 entity가 연결된 slug만 쓰지만, Data Entity 타입은 이 목록을 쓴다) */
-    const [dataEntityOptions, setDataEntityOptions] = useState<SlugOption[]>([]);
-    useEffect(() => {
-        api.get('/slug-entity/active')
-            .then(res => setDataEntityOptions(res.data))
-            .catch(() => setDataEntityOptions([]));
-    }, []);
+  const [dataEntityOptions, setDataEntityOptions] = useState<SlugOption[]>([]);
+  useEffect(() => {
+    api
+      .get("/slug-entity/active")
+      .then((res) => setDataEntityOptions(res.data))
+      .catch(() => setDataEntityOptions([]));
+  }, []);
 
-    /* ── 선택된 연결 Entity(slug)의 entityId — connectedType에 따라 소스가 다르다 ──
+  /* ── 선택된 연결 Entity(slug)의 entityId — connectedType에 따라 소스가 다르다 ──
        - data: dataEntityOptions(SlugEntity 고유 slug 네임스페이스)에서 id를 직접 찾는다
        - entity(그 외): entity가 연결된 slug를 고르면 그 slug의 entityId를 사용한다 */
-    const selectedEntityId = om.connectedType === 'data'
-        ? dataEntityOptions.find(e => e.slug === om.mainConnectedSlug)?.id
-        : slugOptions.find(s => s.slug === om.mainConnectedSlug)?.entityId;
+  const selectedEntityId =
+    om.connectedType === "data"
+      ? dataEntityOptions.find((e) => e.slug === om.mainConnectedSlug)?.id
+      : slugOptions.find((s) => s.slug === om.mainConnectedSlug)?.entityId;
 
-    /* ── 선택된 Slug Entity 필드 목록 — fieldKey selectbox 및 빌드용 ── */
-    const [slugEntityFields, setSlugEntityFields] = useState<SlugEntityFieldItem[]>([]);
-    useEffect(() => {
-        if (!selectedEntityId) { setSlugEntityFields([]); return; }
-        api.get(`/slug-entity/${selectedEntityId}`)
-            .then(res => setSlugEntityFields(res.data.fields ?? []))
-            .catch(() => setSlugEntityFields([]));
-    }, [selectedEntityId]);
+  /* ── 선택된 Slug Entity 필드 목록 — fieldKey selectbox 및 빌드용 ── */
+  const [slugEntityFields, setSlugEntityFields] = useState<SlugEntityFieldItem[]>([]);
+  useEffect(() => {
+    if (!selectedEntityId) {
+      setSlugEntityFields([]);
+      return;
+    }
+    api
+      .get(`/slug-entity/${selectedEntityId}`)
+      .then((res) => setSlugEntityFields(res.data.fields ?? []))
+      .catch(() => setSlugEntityFields([]));
+  }, [selectedEntityId]);
 
-    /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
-    const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
-    useEffect(() => {
-        api.get('/page-templates')
-            .then(res => setMainLayerTemplates(res.data as TemplateItem[]))
-            .catch(() => { });
-    }, []);
+  /* ── 전체 템플릿 목록 — Space ActionButton / 페이지 연결용 (모든 타입 포함) ── */
+  const [mainLayerTemplates, setMainLayerTemplates] = useState<TemplateItem[]>([]);
+  useEffect(() => {
+    api
+      .get("/page-templates")
+      .then((res) => setMainLayerTemplates(res.data as TemplateItem[]))
+      .catch(() => {});
+  }, []);
 
-    /* ── 템플릿 불러오기 (페이지 고유 파싱 로직) ── */
-    const handleLoadSelect = (tpl: TemplateItem) => {
-        try {
-            const config = JSON.parse(tpl.configJson);
-            const loadedWidgetItems = config.widgetItems || [];
-            setWidgetItems(loadedWidgetItems);
-            /* 불러왔을 때 이미 위젯이 2개 이상이었던 템플릿만 레거시로 인정 → 계속 자유롭게 추가/삭제 허용 */
-            setIsLegacyMultiWidget(loadedWidgetItems.length >= 2);
-            om.restore(config);
-            setEditingItemId(null);
-            setEditingContentId(null);
-            setShowAddWidget(false);
-            setAddingContentToItemId(null);
-            setShowRuleModal(false);
-            tm.onLoadSuccess(tpl); /* 공통: currentTemplateId/Name 업데이트 + 드롭다운 닫기 + toast */
-        } catch {
-            import('sonner').then(({ toast }) => toast.error('설정 파일 파싱에 실패했습니다.'));
-        }
-    };
+  /* ── 템플릿 불러오기 (페이지 고유 파싱 로직) ── */
+  const handleLoadSelect = (tpl: TemplateItem) => {
+    try {
+      const config = JSON.parse(tpl.configJson);
+      const loadedWidgetItems = config.widgetItems || [];
+      setWidgetItems(loadedWidgetItems);
+      /* 불러왔을 때 이미 위젯이 2개 이상이었던 템플릿만 레거시로 인정 → 계속 자유롭게 추가/삭제 허용 */
+      setIsLegacyMultiWidget(loadedWidgetItems.length >= 2);
+      om.restore(config);
+      setEditingItemId(null);
+      setEditingContentId(null);
+      setShowAddWidget(false);
+      setAddingContentToItemId(null);
+      setShowRuleModal(false);
+      tm.onLoadSuccess(tpl); /* 공통: currentTemplateId/Name 업데이트 + 드롭다운 닫기 + toast */
+    } catch {
+      import("sonner").then(({ toast }) => toast.error("설정 파일 파싱에 실패했습니다."));
+    }
+  };
 
-    /* layerType이 'right'로 변경될 때 위젯/컨텐츠/내부필드 colSpan 초과분 자동 클램핑 */
-    useEffect(() => {
-        if (om.outputMode === 'layerpopup' && om.layerType === 'right') {
-            setWidgetItems(prev => prev.map(item => ({
-                ...item,
-                colSpan: Math.min(item.colSpan, 2),
-                contents: item.contents.map(c => ({
-                    ...c,
-                    colSpan: Math.min(c.colSpan, 2),
-                    widget: c.widget.type === 'form'
-                        ? { ...c.widget, fields: (c.widget as FormWidget).fields.map(f => ({ ...f, colSpan: Math.min(f.colSpan, 2) })) }
-                        : c.widget.type === 'space'
-                        ? { ...c.widget, items: (c.widget as SpaceWidget).items.map(i => ({ ...i, colSpan: Math.min(i.colSpan ?? 1, 2) as 1|2|3|4|5 })) }
-                        : c.widget,
-                })),
-            })));
-        }
-    }, [om.layerType, om.outputMode]);
-
-    /* ── 위젯 셀 추가 확정 (row/col만 입력 → 빈 셀 생성) ── */
-    const confirmAddWidget = () => {
-        const newItem: PageWidgetItem = {
-            id: uid(),
-            colSpan: Math.max(1, Math.min(12, addColSpan)),
-            rowSpan: Math.max(1, addRowSpan),
-            contents: [],
-        };
-        setWidgetItems(prev => [...prev, newItem]);
-        setEditingItemId(newItem.id);   // 생성 후 바로 펼치기
-        setEditingContentId(null);
-        setShowAddWidget(false);
-        setAddRowSpan(1);
-        setAddColSpan(12);
-    };
-
-    /* ── 위젯 셀 삭제 ── */
-    const removeWidgetItem = (itemId: string) => {
-        setWidgetItems(prev => prev.filter(i => i.id !== itemId));
-        if (editingItemId === itemId) { setEditingItemId(null); setEditingContentId(null); }
-    };
-
-    /* ── 위젯 목록 DnD 센서 (List 빌더와 동일 설정) ── */
-    const widgetSensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    );
-
-    /* ── 위젯 드래그 재정렬 ── */
-    const handleWidgetDragEnd = (event: import('@dnd-kit/core').DragEndEvent) => {
-        const { active, over } = event;
-        if (!over || active.id === over.id) return;
-        setWidgetItems(prev => {
-            const oldIdx = prev.findIndex(i => i.id === active.id);
-            const newIdx = prev.findIndex(i => i.id === over.id);
-            if (oldIdx === -1 || newIdx === -1) return prev;
-            return arrayMove(prev, oldIdx, newIdx);
-        });
-    };
-
-    /* ── 컨텐츠 추가: 타입 선택 → 즉시 생성 (기본 col=부모 전체, row=1) ── */
-    const addContent = (itemId: string, type: PageWidgetType) => {
-        const id = wuid();
-        const newWidget: PageWidget = (() => {
-            switch (type) {
-                case 'search':   return { type: 'search', widgetId: id, contentKey: '', rows: [] } as SearchWidget;
-                case 'table':    return { type: 'table', widgetId: id, contentKey: '', columns: [], connectedSearchIds: [], pageSize: 10, displayMode: 'pagination' } as TableWidget;
-                case 'form':     return { type: 'form', widgetId: id, contentKey: '', fields: [], ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as FormWidget;
-                case 'space':    return { type: 'space', widgetId: id, items: [] } as SpaceWidget;
-                case 'category': return { type: 'category', widgetId: id, contentKey: '', dbSlug: '', depth: 1, allowCreate: true, allowEdit: true, allowDelete: true, showBorder: true } as CategoryWidget;
-                case 'sublist':     return { type: 'sublist',     widgetId: id, contentKey: '', columns: [], showBorder: true, ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as SubListWidget;
-                case 'multiselect': return { type: 'multiselect', widgetId: id, contentKey: '', sourceSlug: '', labelFields: 'name', ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}) } as MultiSelectWidget;
-                case 'tab':         return { type: 'tab', widgetId: id, tabs: [{ id: `tab-${Date.now()}-0`, label: '탭 1', pageSlug: '' }] } as TabWidget;
-            }
-        })();
-        const parent = widgetItems.find(i => i.id === itemId);
-        const newContent: PageContentItem = {
-            id: uid(),
-            colSpan: parent?.colSpan ?? 1,  // 기본값: 부모 위젯 전체 너비
-            rowSpan: 1,
-            widget: newWidget,
-        };
-        setWidgetItems(prev => prev.map(item =>
-            item.id === itemId
-                ? { ...item, contents: [...item.contents, newContent] }
-                : item
-        ));
-        setEditingContentId(newContent.id);
-        setAddingContentToItemId(null);
-    };
-
-    /* ── 위젯 col/row 수정 ── */
-    const updateWidgetSize = (itemId: string, colSpan: number, rowSpan: number) => {
-        const newCol = Math.max(1, Math.min(12, colSpan));
-        setWidgetItems(prev => prev.map(item =>
-            item.id === itemId
+  /* layerType이 'right'로 변경될 때 위젯/컨텐츠/내부필드 colSpan 초과분 자동 클램핑 */
+  useEffect(() => {
+    if (om.outputMode === "layerpopup" && om.layerType === "right") {
+      setWidgetItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          colSpan: Math.min(item.colSpan, 2),
+          contents: item.contents.map((c) => ({
+            ...c,
+            colSpan: Math.min(c.colSpan, 2),
+            widget:
+              c.widget.type === "form"
                 ? {
-                    ...item,
-                    colSpan: newCol,
-                    rowSpan: Math.max(1, rowSpan),
-                    /* 컨텐츠 colSpan이 새 위젯 colSpan 초과 시 클램핑 */
-                    contents: item.contents.map(c => ({
-                        ...c,
-                        colSpan: Math.min(c.colSpan, newCol),
-                    })),
-                }
-                : item
-        ));
-    };
-
-    /* ── 컨텐츠 col/row 수정 ── */
-    const updateContentSize = (itemId: string, contentId: string, colSpan: number, rowSpan: number) => {
-        const parent = widgetItems.find(i => i.id === itemId);
-        const maxCol = parent?.colSpan ?? 12;
-        setWidgetItems(prev => prev.map(item =>
-            item.id === itemId
-                ? {
-                    ...item,
-                    contents: item.contents.map(c =>
-                        c.id === contentId
-                            ? { ...c, colSpan: Math.max(1, Math.min(maxCol, colSpan)), rowSpan: Math.max(1, rowSpan) }
-                            : c
-                    ),
-                }
-                : item
-        ));
-    };
-
-    /* ── 컨텐츠 삭제 ── */
-    const removeContent = (itemId: string, contentId: string) => {
-        setWidgetItems(prev => prev.map(item =>
-            item.id === itemId
-                ? { ...item, contents: item.contents.filter(c => c.id !== contentId) }
-                : item
-        ));
-        if (editingContentId === contentId) setEditingContentId(null);
-    };
-
-    /* ── 컨텐츠 순서 재정렬 (드래그) ── */
-    const reorderContent = (itemId: string, activeId: string, overId: string) => {
-        setWidgetItems(prev => prev.map(item => {
-            if (item.id !== itemId) return item;
-            const oldIdx = item.contents.findIndex(c => c.id === activeId);
-            const newIdx = item.contents.findIndex(c => c.id === overId);
-            if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return item;
-            return { ...item, contents: arrayMove(item.contents, oldIdx, newIdx) };
-        }));
-    };
-
-    /* ── 컨텐츠 내부 위젯 데이터 업데이트 ── */
-    const updateContent = (itemId: string, contentId: string, widget: PageWidget) => {
-        setWidgetItems(prev => prev.map(item =>
-            item.id === itemId
-                ? { ...item, contents: item.contents.map(c => c.id === contentId ? { ...c, widget } : c) }
-                : item
-        ));
-    };
-
-    /* ── 메인 연결 slug 변경 ── */
-    const handleMainConnectedSlugChange = (slug: string) => {
-        om.setMainConnectedSlug(slug);
-    };
-
-    /* ── 연결 Entity(slug) 변경 — entity가 연결된 slug를 그대로 Form connectedSlug에 자동 설정 (역산 없이 직접 사용) ── */
-    const handleConnectedSlugChange = (slug: string) => {
-        om.setMainConnectedSlug(slug);
-    };
-
-    /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 (공통 로직은 entityBuild.ts의 buildFormFromEntity) ── */
-    const handleBuildFromEntity = () => {
-        if (!selectedEntityId || slugEntityFields.length === 0) return;
-
-        const hasFormContent = widgetItems.some(item =>
-            item.contents.some(c => c.widget.type === 'form')
-        );
-
-        if (hasFormContent) {
-            /* ── 케이스 1: form 위젯이 이미 있는 경우 — 페이지 내 모든 form 위젯에 동일하게 빌드 적용 ── */
-            setWidgetItems(prev => prev.map(item => ({
-                ...item,
-                contents: item.contents.map(c =>
-                    c.widget.type !== 'form'
-                        ? c
-                        : { ...c, widget: buildFormFromEntity(c.widget as FormWidget, slugEntityFields) }
-                ),
-            })));
-        } else {
-            /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ──
-               빈 fields로 시작한 Form에 buildFormFromEntity를 적용하면 entity 필드 전체가 그대로 추가된다 */
-            const connectedSlug = om.mainConnectedSlug || undefined;
-            const emptyFormWidget: FormWidget = {
-                type: 'form',
-                widgetId: wuid(),
-                contentKey: '',
-                fields: [],
-                ...(connectedSlug ? { connectedSlug } : {}),
-            };
-            const newFormWidget = buildFormFromEntity(emptyFormWidget, slugEntityFields);
-
-            const newContent: PageContentItem = {
-                id: uid(),
-                colSpan: 12,
-                rowSpan: 1,
-                widget: newFormWidget,
-            };
-
-            const newWidgetItem: PageWidgetItem = {
-                id: wuid(),
-                colSpan: 12,
-                rowSpan: 1,
-                contents: [newContent],
-            };
-
-            setWidgetItems(prev => [...prev, newWidgetItem]);
-        }
-    };
-
-    /**
-     * 저장 전 공통 validation — 저장 버튼(상단)과 모달 확인 버튼 양쪽에서 동일하게 사용
-     * @returns 오류가 없으면 true
-     */
-    const validateBeforeSave = (): boolean => {
-        const errors: string[] = [];
-        const allContents = widgetItems.flatMap(item => item.contents);
-
-        /* 1) contentKey 필수 + 중복 검사 */
-        const allKeys = allContents
-            .map(c => ('contentKey' in c.widget ? (c.widget as { contentKey: string }).contentKey.trim() : null))
-            .filter((k): k is string => k !== null);
-
-        allKeys.forEach((key, idx) => {
-            if (!key) errors.push(`컨텐츠 ${idx + 1}: Key를 입력해주세요`);
-        });
-        const duplicates = allKeys.filter((k, i) => k && allKeys.indexOf(k) !== i);
-        if (duplicates.length > 0)
-            errors.push(`중복 Key: ${[...new Set(duplicates)].join(', ')}`);
-
-        /* 2) Search 필드 라벨/Key 필수 + 내부 중복 검사 */
-        allContents.forEach(c => {
-            if (c.widget.type !== 'search') return;
-            const sw = c.widget as SearchWidget;
-            const label = sw.contentKey || '?';
-            const fieldKeys: string[] = [];
-            sw.rows.forEach(row => {
-                row.fields.forEach(f => {
-                    if (!f.label?.trim() && !f.labelMsgKey?.trim()) errors.push(`[Search:${label}] 필드 라벨 미입력`);
-                    if (!f.fieldKey?.trim()) {
-                        errors.push(`[Search:${label}] 필드 Key 미입력`);
-                    } else {
-                        fieldKeys.push(f.fieldKey.trim());
+                    ...c.widget,
+                    fields: (c.widget as FormWidget).fields.map((f) => ({ ...f, colSpan: Math.min(f.colSpan, 2) })),
+                  }
+                : c.widget.type === "space"
+                  ? {
+                      ...c.widget,
+                      items: (c.widget as SpaceWidget).items.map((i) => ({
+                        ...i,
+                        colSpan: Math.min(i.colSpan ?? 1, 2) as 1 | 2 | 3 | 4 | 5,
+                      })),
                     }
-                });
-            });
-            /* 내부 fieldKey 중복 */
-            const dupFieldKeys = fieldKeys.filter((k, i) => fieldKeys.indexOf(k) !== i);
-            if (dupFieldKeys.length > 0)
-                errors.push(`[Search:${label}] 중복 필드 Key: ${[...new Set(dupFieldKeys)].join(', ')}`);
-        });
+                  : c.widget,
+          })),
+        }))
+      );
+    }
+  }, [om.layerType, om.outputMode]);
 
-        /* 3) Form 필드 라벨/Key 필수 + 내부 중복 검사 */
-        allContents.forEach(c => {
-            if (c.widget.type !== 'form') return;
-            const fw = c.widget as FormWidget;
-            const label = fw.contentKey || '?';
-            const fieldKeys: string[] = [];
-            fw.fields.forEach(f => {
-                /* editor/hidden 타입은 라벨 불필요 — 나머지 타입만 필수 검사 */
-                if (f.type !== 'editor' && f.type !== 'hidden' && !f.label?.trim() && !f.labelMsgKey?.trim()) errors.push(`[Form:${label}] 필드 라벨 미입력`);
-                if (!f.fieldKey?.trim()) {
-                    errors.push(`[Form:${label}] 필드 Key 미입력`);
-                } else {
-                    fieldKeys.push(f.fieldKey.trim());
-                }
-                /* 글자수 표시 ON + 최대 글자 미설정 검사 */
-                if ((f.type === 'input' || f.type === 'textarea') && f.showCharCount && !f.maxLength) {
-                    const fieldLabel = f.label || f.fieldKey || '?';
-                    errors.push(`[Form:${label}] '${fieldLabel}' 필드: 글자수 표시 사용 시 최대 글자를 설정해주세요`);
-                }
-            });
-            /* 내부 fieldKey 중복 */
-            const dupFieldKeys = fieldKeys.filter((k, i) => fieldKeys.indexOf(k) !== i);
-            if (dupFieldKeys.length > 0)
-                errors.push(`[Form:${label}] 중복 필드 Key: ${[...new Set(dupFieldKeys)].join(', ')}`);
-        });
+  /* ── 위젯 셀 추가 확정 (row/col만 입력 → 빈 셀 생성) ── */
+  const confirmAddWidget = () => {
+    const newItem: PageWidgetItem = {
+      id: uid(),
+      colSpan: Math.max(1, Math.min(12, addColSpan)),
+      rowSpan: Math.max(1, addRowSpan),
+      contents: [],
+    };
+    setWidgetItems((prev) => [...prev, newItem]);
+    setEditingItemId(newItem.id); // 생성 후 바로 펼치기
+    setEditingContentId(null);
+    setShowAddWidget(false);
+    setAddRowSpan(1);
+    setAddColSpan(12);
+  };
 
-        /* 4) Tab 위젯 탭별 contentKey 필수 검사 */
-        allContents.forEach(c => {
-            if (c.widget.type !== 'tab') return;
-            const tw = c.widget as import('../_shared/components/renderer/types').TabWidget;
-            tw.tabs.forEach((tab, idx) => {
-                if (!tab.contentKey?.trim())
-                    errors.push(`[Tab] 탭 ${idx + 1}: Key를 입력해주세요`);
-            });
-        });
+  /* ── 위젯 셀 삭제 ── */
+  const removeWidgetItem = (itemId: string) => {
+    setWidgetItems((prev) => prev.filter((i) => i.id !== itemId));
+    if (editingItemId === itemId) {
+      setEditingItemId(null);
+      setEditingContentId(null);
+    }
+  };
 
-        if (errors.length > 0) {
-            toast.error(`저장 오류 (${errors.length}건): ${errors[0]}${errors.length > 1 ? ` 외 ${errors.length - 1}건` : ''}`);
-            return false;
+  /* ── 위젯 목록 DnD 센서 (List 빌더와 동일 설정) ── */
+  const widgetSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  /* ── 위젯 드래그 재정렬 ── */
+  const handleWidgetDragEnd = (event: import("@dnd-kit/core").DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setWidgetItems((prev) => {
+      const oldIdx = prev.findIndex((i) => i.id === active.id);
+      const newIdx = prev.findIndex((i) => i.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      return arrayMove(prev, oldIdx, newIdx);
+    });
+  };
+
+  /* ── 컨텐츠 추가: 타입 선택 → 즉시 생성 (기본 col=부모 전체, row=1) ── */
+  const addContent = (itemId: string, type: PageWidgetType) => {
+    const id = wuid();
+    const newWidget: PageWidget = (() => {
+      switch (type) {
+        case "search":
+          return { type: "search", widgetId: id, contentKey: "", rows: [] } as SearchWidget;
+        case "table":
+          return {
+            type: "table",
+            widgetId: id,
+            contentKey: "",
+            columns: [],
+            connectedSearchIds: [],
+            pageSize: 10,
+            displayMode: "pagination",
+          } as TableWidget;
+        case "form":
+          return {
+            type: "form",
+            widgetId: id,
+            contentKey: "",
+            fields: [],
+            ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}),
+          } as FormWidget;
+        case "space":
+          return { type: "space", widgetId: id, items: [] } as SpaceWidget;
+        case "category":
+          return {
+            type: "category",
+            widgetId: id,
+            contentKey: "",
+            dbSlug: "",
+            depth: 1,
+            allowCreate: true,
+            allowEdit: true,
+            allowDelete: true,
+            showBorder: true,
+          } as CategoryWidget;
+        case "sublist":
+          return {
+            type: "sublist",
+            widgetId: id,
+            contentKey: "",
+            columns: [],
+            showBorder: true,
+            ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}),
+          } as SubListWidget;
+        case "multiselect":
+          return {
+            type: "multiselect",
+            widgetId: id,
+            contentKey: "",
+            sourceSlug: "",
+            labelFields: "name",
+            ...(om.mainConnectedSlug ? { connectedSlug: om.mainConnectedSlug } : {}),
+          } as MultiSelectWidget;
+        case "tab":
+          return {
+            type: "tab",
+            widgetId: id,
+            tabs: [{ id: `tab-${Date.now()}-0`, label: "탭 1", pageSlug: "" }],
+          } as TabWidget;
+      }
+    })();
+    const parent = widgetItems.find((i) => i.id === itemId);
+    const newContent: PageContentItem = {
+      id: uid(),
+      colSpan: parent?.colSpan ?? 1, // 기본값: 부모 위젯 전체 너비
+      rowSpan: 1,
+      widget: newWidget,
+    };
+    setWidgetItems((prev) =>
+      prev.map((item) => (item.id === itemId ? { ...item, contents: [...item.contents, newContent] } : item))
+    );
+    setEditingContentId(newContent.id);
+    setAddingContentToItemId(null);
+  };
+
+  /* ── 위젯 col/row 수정 ── */
+  const updateWidgetSize = (itemId: string, colSpan: number, rowSpan: number) => {
+    const newCol = Math.max(1, Math.min(12, colSpan));
+    setWidgetItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              colSpan: newCol,
+              rowSpan: Math.max(1, rowSpan),
+              /* 컨텐츠 colSpan이 새 위젯 colSpan 초과 시 클램핑 */
+              contents: item.contents.map((c) => ({
+                ...c,
+                colSpan: Math.min(c.colSpan, newCol),
+              })),
+            }
+          : item
+      )
+    );
+  };
+
+  /* ── 컨텐츠 col/row 수정 ── */
+  const updateContentSize = (itemId: string, contentId: string, colSpan: number, rowSpan: number) => {
+    const parent = widgetItems.find((i) => i.id === itemId);
+    const maxCol = parent?.colSpan ?? 12;
+    setWidgetItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              contents: item.contents.map((c) =>
+                c.id === contentId
+                  ? { ...c, colSpan: Math.max(1, Math.min(maxCol, colSpan)), rowSpan: Math.max(1, rowSpan) }
+                  : c
+              ),
+            }
+          : item
+      )
+    );
+  };
+
+  /* ── 컨텐츠 삭제 ── */
+  const removeContent = (itemId: string, contentId: string) => {
+    setWidgetItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, contents: item.contents.filter((c) => c.id !== contentId) } : item
+      )
+    );
+    if (editingContentId === contentId) setEditingContentId(null);
+  };
+
+  /* ── 컨텐츠 순서 재정렬 (드래그) ── */
+  const reorderContent = (itemId: string, activeId: string, overId: string) => {
+    setWidgetItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== itemId) return item;
+        const oldIdx = item.contents.findIndex((c) => c.id === activeId);
+        const newIdx = item.contents.findIndex((c) => c.id === overId);
+        if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return item;
+        return { ...item, contents: arrayMove(item.contents, oldIdx, newIdx) };
+      })
+    );
+  };
+
+  /* ── 컨텐츠 내부 위젯 데이터 업데이트 ── */
+  const updateContent = (itemId: string, contentId: string, widget: PageWidget) => {
+    setWidgetItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId
+          ? { ...item, contents: item.contents.map((c) => (c.id === contentId ? { ...c, widget } : c)) }
+          : item
+      )
+    );
+  };
+
+  /* ── 메인 연결 slug 변경 ── */
+  const handleMainConnectedSlugChange = (slug: string) => {
+    om.setMainConnectedSlug(slug);
+    om.setPageRelations([]);
+  };
+
+  /* ── 연결 Entity(slug) 변경 — entity가 연결된 slug를 그대로 Form connectedSlug에 자동 설정 (역산 없이 직접 사용) ── */
+  const handleConnectedSlugChange = (slug: string) => {
+    om.setMainConnectedSlug(slug);
+    om.setPageRelations([]);
+  };
+
+  /* ── 빌드 버튼 — Slug Entity fields 기반 Form 필드 자동 구성 (공통 로직은 entityBuild.ts의 buildFormFromEntity) ── */
+  const handleBuildFromEntity = () => {
+    if (!selectedEntityId || slugEntityFields.length === 0) return;
+
+    const hasFormContent = widgetItems.some((item) => item.contents.some((c) => c.widget.type === "form"));
+
+    if (hasFormContent) {
+      /* ── 케이스 1: form 위젯이 이미 있는 경우 — 페이지 내 모든 form 위젯에 동일하게 빌드 적용 ── */
+      setWidgetItems((prev) =>
+        prev.map((item) => ({
+          ...item,
+          contents: item.contents.map((c) =>
+            c.widget.type !== "form"
+              ? c
+              : { ...c, widget: buildFormFromEntity(c.widget as FormWidget, slugEntityFields) }
+          ),
+        }))
+      );
+    } else {
+      /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ──
+               빈 fields로 시작한 Form에 buildFormFromEntity를 적용하면 entity 필드 전체가 그대로 추가된다 */
+      const connectedSlug = om.mainConnectedSlug || undefined;
+      const emptyFormWidget: FormWidget = {
+        type: "form",
+        widgetId: wuid(),
+        contentKey: "",
+        fields: [],
+        ...(connectedSlug ? { connectedSlug } : {}),
+      };
+      const newFormWidget = buildFormFromEntity(emptyFormWidget, slugEntityFields);
+
+      const newContent: PageContentItem = {
+        id: uid(),
+        colSpan: 12,
+        rowSpan: 1,
+        widget: newFormWidget,
+      };
+
+      const newWidgetItem: PageWidgetItem = {
+        id: wuid(),
+        colSpan: 12,
+        rowSpan: 1,
+        contents: [newContent],
+      };
+
+      setWidgetItems((prev) => [...prev, newWidgetItem]);
+    }
+  };
+
+  /**
+   * 저장 전 공통 validation — 저장 버튼(상단)과 모달 확인 버튼 양쪽에서 동일하게 사용
+   * @returns 오류가 없으면 true
+   */
+  const validateBeforeSave = (): boolean => {
+    const errors: string[] = [];
+    const allContents = widgetItems.flatMap((item) => item.contents);
+
+    /* 1) contentKey 필수 + 중복 검사 */
+    const allKeys = allContents
+      .map((c) => ("contentKey" in c.widget ? (c.widget as { contentKey: string }).contentKey.trim() : null))
+      .filter((k): k is string => k !== null);
+
+    allKeys.forEach((key, idx) => {
+      if (!key) errors.push(`컨텐츠 ${idx + 1}: Key를 입력해주세요`);
+    });
+    const duplicates = allKeys.filter((k, i) => k && allKeys.indexOf(k) !== i);
+    if (duplicates.length > 0) errors.push(`중복 Key: ${[...new Set(duplicates)].join(", ")}`);
+
+    /* 2) Search 필드 라벨/Key 필수 + 내부 중복 검사 */
+    allContents.forEach((c) => {
+      if (c.widget.type !== "search") return;
+      const sw = c.widget as SearchWidget;
+      const label = sw.contentKey || "?";
+      const fieldKeys: string[] = [];
+      sw.rows.forEach((row) => {
+        row.fields.forEach((f) => {
+          if (!f.label?.trim() && !f.labelMsgKey?.trim()) errors.push(`[Search:${label}] 필드 라벨 미입력`);
+          if (!f.fieldKey?.trim()) {
+            errors.push(`[Search:${label}] 필드 Key 미입력`);
+          } else {
+            fieldKeys.push(f.fieldKey.trim());
+          }
+        });
+      });
+      /* 내부 fieldKey 중복 */
+      const dupFieldKeys = fieldKeys.filter((k, i) => fieldKeys.indexOf(k) !== i);
+      if (dupFieldKeys.length > 0)
+        errors.push(`[Search:${label}] 중복 필드 Key: ${[...new Set(dupFieldKeys)].join(", ")}`);
+    });
+
+    /* 3) Form 필드 라벨/Key 필수 + 내부 중복 검사 */
+    allContents.forEach((c) => {
+      if (c.widget.type !== "form") return;
+      const fw = c.widget as FormWidget;
+      const label = fw.contentKey || "?";
+      const fieldKeys: string[] = [];
+      fw.fields.forEach((f) => {
+        /* editor/hidden 타입은 라벨 불필요 — 나머지 타입만 필수 검사 */
+        if (f.type !== "editor" && f.type !== "hidden" && !f.label?.trim() && !f.labelMsgKey?.trim())
+          errors.push(`[Form:${label}] 필드 라벨 미입력`);
+        if (!f.fieldKey?.trim()) {
+          errors.push(`[Form:${label}] 필드 Key 미입력`);
+        } else {
+          fieldKeys.push(f.fieldKey.trim());
         }
-        return true;
-    };
+        /* 글자수 표시 ON + 최대 글자 미설정 검사 */
+        if ((f.type === "input" || f.type === "textarea") && f.showCharCount && !f.maxLength) {
+          const fieldLabel = f.label || f.fieldKey || "?";
+          errors.push(`[Form:${label}] '${fieldLabel}' 필드: 글자수 표시 사용 시 최대 글자를 설정해주세요`);
+        }
+      });
+      /* 내부 fieldKey 중복 */
+      const dupFieldKeys = fieldKeys.filter((k, i) => fieldKeys.indexOf(k) !== i);
+      if (dupFieldKeys.length > 0)
+        errors.push(`[Form:${label}] 중복 필드 Key: ${[...new Set(dupFieldKeys)].join(", ")}`);
+    });
 
-    /* ── 저장 열기 — validation 통과 시에만 모달 오픈 ── */
-    const handleSaveOpen = () => {
-        if (!validateBeforeSave()) return;
-        tm.openSaveModal();
-    };
+    /* 4) Tab 위젯 탭별 contentKey 필수 검사 */
+    allContents.forEach((c) => {
+      if (c.widget.type !== "tab") return;
+      const tw = c.widget as import("../_shared/components/renderer/types").TabWidget;
+      tw.tabs.forEach((tab, idx) => {
+        if (!tab.contentKey?.trim()) errors.push(`[Tab] 탭 ${idx + 1}: Key를 입력해주세요`);
+      });
+    });
 
-    /* ── 저장 확인 — validation 재실행 후 훅의 handleSaveConfirm 호출 ── */
-    const handleSaveConfirm = async () => {
-        if (!tm.saveModalName.trim() || !tm.saveModalSlug.trim()) return;
-        if (!validateBeforeSave()) return;
+    if (errors.length > 0) {
+      toast.error(
+        `저장 오류 (${errors.length}건): ${errors[0]}${errors.length > 1 ? ` 외 ${errors.length - 1}건` : ""}`
+      );
+      return false;
+    }
+    return true;
+  };
 
-        /* 저장 직전 — Form/Table/SubList/MultiSelect 4종 위젯 중 connectedSlug가 비어있는 위젯만
-         * om.mainConnectedSlug로 채운다(fill-if-empty). 이미 개별 지정된 위젯은 그대로 유지된다. */
-        const itemsToSave = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
+  /* ── 저장 열기 — validation 통과 시에만 모달 오픈 ── */
+  const handleSaveOpen = () => {
+    if (!validateBeforeSave()) return;
+    tm.openSaveModal();
+  };
 
-        await tm.handleSaveConfirm(
-            itemsToSave as unknown as import('../_shared/templateApi').PageWidgetItem[],
-            {
-                outputMode:          om.outputMode,
-                pageTitle:           om.pageTitle,
-                pageTitleMsgKey:     om.pageTitleMsgKey || undefined,
-                layerType:           om.layerType,
-                layerTitle:          om.layerTitle,
-                layerTitleMsgKey:    om.layerTitleMsgKey || undefined,
-                layerWidth:          om.layerWidth,
-                mainConnectedSlug:   om.mainConnectedSlug || undefined,
-                leaveCheck:          om.leaveCheck || undefined,
-                singlePage:          om.singlePage || undefined,
-                connectedType:       om.connectedType,
-            },
-        );
-    };
+  /* ── 저장 확인 — validation 재실행 후 훅의 handleSaveConfirm 호출 ── */
+  const handleSaveConfirm = async () => {
+    if (!tm.saveModalName.trim() || !tm.saveModalSlug.trim()) return;
+    if (!validateBeforeSave()) return;
 
-    /* ═══════════════════════════════════════ */
-    /*  렌더                                    */
-    /* ═══════════════════════════════════════ */
-    return (
-        <div className="space-y-5">
+    /* 저장 직전 — Form/Table/SubList/MultiSelect 4종 위젯 중 connectedSlug가 비어있는 위젯만
+     * om.mainConnectedSlug로 채운다(fill-if-empty). 이미 개별 지정된 위젯은 그대로 유지된다. */
+    const itemsToSave = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
 
-            {/* ── 페이지 헤더 ── */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <Wand2 className="w-5 h-5 text-slate-400" />
-                        페이지 메이커 — Widget
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-1">
-                        위젯 셀을 배치하여 페이지 레이아웃을 구성합니다.
-                        {tm.currentTemplateName && (
-                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                                <Save className="w-3 h-3" />{tm.currentTemplateName}
+    await tm.handleSaveConfirm(itemsToSave as unknown as import("../_shared/templateApi").PageWidgetItem[], {
+      outputMode: om.outputMode,
+      pageTitle: om.pageTitle,
+      pageTitleMsgKey: om.pageTitleMsgKey || undefined,
+      layerType: om.layerType,
+      layerTitle: om.layerTitle,
+      layerTitleMsgKey: om.layerTitleMsgKey || undefined,
+      layerWidth: om.layerWidth,
+      mainConnectedSlug: om.mainConnectedSlug || undefined,
+      leaveCheck: om.leaveCheck || undefined,
+      singlePage: om.singlePage || undefined,
+      connectedType: om.connectedType,
+      pageRelations: om.pageRelations.length > 0 ? om.pageRelations : undefined,
+    });
+  };
+
+  /* ═══════════════════════════════════════ */
+  /*  렌더                                    */
+  /* ═══════════════════════════════════════ */
+  return (
+    <div className="space-y-5">
+      {/* ── 페이지 헤더 ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Wand2 className="w-5 h-5 text-slate-400" />
+            페이지 메이커 — Widget
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            위젯 셀을 배치하여 페이지 레이아웃을 구성합니다.
+            {tm.currentTemplateName && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+                <Save className="w-3 h-3" />
+                {tm.currentTemplateName}
+              </span>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* ── 메인 레이아웃 ── */}
+      <div className="grid grid-cols-[340px_1fr] gap-5 items-start">
+        {/* ════════════════════════════════ */}
+        {/* 좌측: 설정 패널                   */}
+        {/* ════════════════════════════════ */}
+        <div className="bg-white border border-slate-200 rounded-xl sticky top-4">
+          {/* 검증 규칙 생성 — 버튼 클릭 시 RuleCreateModal(자기완결형, BE API 직접 연동)이 열린다. */}
+          <div className="px-3 pt-3 pb-1">
+            <button
+              onClick={() => setShowRuleModal(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-500 bg-white hover:border-slate-400 hover:text-slate-700 transition-all"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              규칙생성
+            </button>
+          </div>
+
+          {/* 불러오기 드롭다운 */}
+          <TemplateLoader
+            {...tm}
+            onToggle={() => {
+              tm.setShowLoadDropdown((v) => !v);
+              if (!tm.showLoadDropdown) tm.loadTemplateList();
+            }}
+            onSearchChange={tm.setLoadSearch}
+            onSelect={handleLoadSelect}
+            onDelete={tm.handleDeleteTemplate}
+            onDuplicate={tm.handleDuplicateTemplate}
+          />
+
+          {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
+          <OutputModePanel
+            outputMode={om.outputMode}
+            pageTitle={om.pageTitle}
+            pageTitleMsgKey={om.pageTitleMsgKey}
+            layerType={om.layerType}
+            layerTitle={om.layerTitle}
+            layerTitleMsgKey={om.layerTitleMsgKey}
+            layerWidth={om.layerWidth}
+            mainConnectedSlug={om.mainConnectedSlug}
+            onMainConnectedSlugChange={handleMainConnectedSlugChange}
+            onConnectedSlugChange={handleConnectedSlugChange}
+            slugOptions={slugOptions}
+            dataEntityOptions={dataEntityOptions}
+            onBuildFromEntity={handleBuildFromEntity}
+            leaveCheck={om.leaveCheck}
+            onLeaveCheckChange={om.setLeaveCheck}
+            singlePage={om.singlePage}
+            onSinglePageChange={om.setSinglePage}
+            connectedType={om.connectedType}
+            onConnectedTypeChange={om.setConnectedType}
+            pageRelations={om.pageRelations}
+            onPageRelationsChange={om.setPageRelations}
+            onOutputModeChange={om.setOutputMode}
+            onPageTitleChange={om.setPageTitle}
+            onPageTitleMsgKeyChange={om.setPageTitleMsgKey}
+            onLayerTypeChange={om.setLayerType}
+            onLayerTitleChange={om.setLayerTitle}
+            onLayerTitleMsgKeyChange={om.setLayerTitleMsgKey}
+            onLayerWidthChange={om.setLayerWidth}
+          />
+
+          {/* 위젯 셀 목록 */}
+          <div className="p-3 space-y-1.5 max-h-[calc(100vh-280px)] overflow-y-auto">
+            {/* 위젯이 없을 때 안내 */}
+            {widgetItems.length === 0 && !showAddWidget && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <AlignLeft className="w-8 h-8 text-slate-200 mb-2" />
+                <p className="text-xs font-medium text-slate-400">위젯이 없습니다</p>
+                <p className="text-[10px] text-slate-300 mt-0.5">아래 버튼으로 위젯을 추가하세요</p>
+              </div>
+            )}
+
+            {/* 위젯 셀 목록 — DnD 드래그 재정렬 (List 빌더 동일 패턴) */}
+            <DndContext sensors={widgetSensors} collisionDetection={closestCenter} onDragEnd={handleWidgetDragEnd}>
+              <SortableContext items={widgetItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                {widgetItems.map((item, idx) => (
+                  <SortableRowWrapper key={item.id} id={item.id}>
+                    {(handleProps) => (
+                      <BuilderI18nModeProvider
+                        defaultMode={item.i18nMode ?? /"labelMsgKey"\s*:\s*"[^"]/.test(JSON.stringify(item.contents))}
+                        onToggle={(newMode) =>
+                          setWidgetItems((prev) =>
+                            prev.map((w) => (w.id === item.id ? { ...w, i18nMode: newMode } : w))
+                          )
+                        }
+                      >
+                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                          {/* ── 위젯 셀 헤더 ── */}
+                          <div
+                            className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer transition-all select-none ${editingItemId === item.id ? "bg-slate-900" : "bg-slate-50 hover:bg-slate-100"}`}
+                            onClick={() => {
+                              setShowAddWidget(false);
+                              setAddingContentToItemId(null);
+                              if (editingItemId === item.id) {
+                                setEditingItemId(null);
+                                setEditingContentId(null);
+                              } else {
+                                setEditingItemId(item.id);
+                                setEditingContentId(null);
+                              }
+                            }}
+                          >
+                            {/* 그립 핸들 — 드래그 활성화 전용 (클릭 이벤트 차단) */}
+                            <span
+                              {...handleProps}
+                              onClick={(e) => e.stopPropagation()}
+                              className={`cursor-grab flex-shrink-0 ${editingItemId === item.id ? "text-slate-500 hover:text-slate-300" : "text-slate-300 hover:text-slate-500"}`}
+                            >
+                              <GripVertical className="w-3 h-3" />
                             </span>
-                        )}
-                    </p>
-                </div>
-            </div>
+                            {/* 순서 번호 */}
+                            <span
+                              className={`text-[10px] font-bold w-4 text-center flex-shrink-0 ${editingItemId === item.id ? "text-slate-400" : "text-slate-400"}`}
+                            >
+                              {idx + 1}
+                            </span>
+                            {/* 위젯 크기 배지 */}
+                            <span
+                              className={`text-[10px] font-semibold flex-1 truncate ${editingItemId === item.id ? "text-slate-300" : "text-slate-600"}`}
+                            >
+                              위젯 {idx + 1}
+                              <span
+                                className={`ml-1 font-normal text-[9px] ${editingItemId === item.id ? "text-slate-500" : "text-slate-400"}`}
+                              >
+                                col {item.colSpan} × row {item.rowSpan}
+                              </span>
+                            </span>
+                            {/* 컨텐츠 수 배지 */}
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${editingItemId === item.id ? "bg-white/10 text-slate-400" : "bg-slate-200 text-slate-500"}`}
+                            >
+                              {item.contents.length}개
+                            </span>
+                            {/* 삭제 */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeWidgetItem(item.id);
+                              }}
+                              className={`p-0.5 rounded flex-shrink-0 transition-all ${editingItemId === item.id ? "text-slate-400 hover:bg-white/10" : "text-slate-400 hover:bg-red-50 hover:text-red-500"}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
 
-            {/* ── 메인 레이아웃 ── */}
-            <div className="grid grid-cols-[340px_1fr] gap-5 items-start">
+                          {/* ── 위젯 셀 편집 영역 ── */}
+                          {editingItemId === item.id && (
+                            <div className="bg-white">
+                              {/* 위젯 크기 설정 — showI18nToggle로 🌐 버튼 표시 */}
+                              <SizeSettingPanel
+                                colSpan={item.colSpan}
+                                rowSpan={item.rowSpan}
+                                maxColSpan={om.isRightDrawer ? 2 : 12}
+                                showI18nToggle
+                                onColSpanChange={(v) => updateWidgetSize(item.id, v, item.rowSpan)}
+                                onRowSpanChange={(v) => updateWidgetSize(item.id, item.colSpan, v)}
+                              />
 
-                {/* ════════════════════════════════ */}
-                {/* 좌측: 설정 패널                   */}
-                {/* ════════════════════════════════ */}
-                <div className="bg-white border border-slate-200 rounded-xl sticky top-4">
+                              {/* 컨텐츠 목록 — DnD 드래그 재정렬 (위젯 목록과 동일 패턴) */}
+                              <DndContext
+                                sensors={widgetSensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(e) => {
+                                  const { active, over } = e;
+                                  if (over && active.id !== over.id)
+                                    reorderContent(item.id, active.id as string, over.id as string);
+                                }}
+                              >
+                                <SortableContext
+                                  items={item.contents.map((c) => c.id)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  {item.contents.map((content) => (
+                                    <SortableRowWrapper key={content.id} id={content.id}>
+                                      {(handleProps) => (
+                                        <div className="border-t border-slate-100">
+                                          {/* 컨텐츠 헤더 */}
+                                          <ContentRowHeader
+                                            widgetType={content.widget.type}
+                                            label={`${WIDGET_META[content.widget.type as PageWidgetType]?.label ?? content.widget.type}${"contentKey" in content.widget && (content.widget as { contentKey: string }).contentKey ? ` — ${(content.widget as { contentKey: string }).contentKey}` : ""}`}
+                                            colSpan={content.colSpan}
+                                            rowSpan={content.rowSpan}
+                                            isEditing={editingContentId === content.id}
+                                            onToggle={() =>
+                                              setEditingContentId(editingContentId === content.id ? null : content.id)
+                                            }
+                                            onRemove={() => removeContent(item.id, content.id)}
+                                            dragHandleProps={handleProps}
+                                          />
 
-                    {/* 검증 규칙 생성 — 버튼 클릭 시 RuleCreateModal(자기완결형, BE API 직접 연동)이 열린다. */}
-                    <div className="px-3 pt-3 pb-1">
-                        <button
-                            onClick={() => setShowRuleModal(true)}
-                            className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-500 bg-white hover:border-slate-400 hover:text-slate-700 transition-all"
-                        >
-                            <ShieldCheck className="w-3.5 h-3.5" />규칙생성
-                        </button>
-                    </div>
-
-                    {/* 불러오기 드롭다운 */}
-                    <TemplateLoader
-                        {...tm}
-                        onToggle={() => { tm.setShowLoadDropdown(v => !v); if (!tm.showLoadDropdown) tm.loadTemplateList(); }}
-                        onSearchChange={tm.setLoadSearch}
-                        onSelect={handleLoadSelect}
-                        onDelete={tm.handleDeleteTemplate}
-                        onDuplicate={tm.handleDuplicateTemplate}
-                    />
-
-                    {/* 출력 모드 탭 + LayerPopup 설정 — 공통 컴포넌트 */}
-                    <OutputModePanel
-                        outputMode={om.outputMode}
-                        pageTitle={om.pageTitle}
-                        pageTitleMsgKey={om.pageTitleMsgKey}
-                        layerType={om.layerType}
-                        layerTitle={om.layerTitle}
-                        layerTitleMsgKey={om.layerTitleMsgKey}
-                        layerWidth={om.layerWidth}
-                        mainConnectedSlug={om.mainConnectedSlug}
-                        onMainConnectedSlugChange={handleMainConnectedSlugChange}
-                        onConnectedSlugChange={handleConnectedSlugChange}
-                        slugOptions={slugOptions}
-                        dataEntityOptions={dataEntityOptions}
-                        onBuildFromEntity={handleBuildFromEntity}
-                        leaveCheck={om.leaveCheck}
-                        onLeaveCheckChange={om.setLeaveCheck}
-                        singlePage={om.singlePage}
-                        onSinglePageChange={om.setSinglePage}
-                        connectedType={om.connectedType}
-                        onConnectedTypeChange={om.setConnectedType}
-                        onOutputModeChange={om.setOutputMode}
-                        onPageTitleChange={om.setPageTitle}
-                        onPageTitleMsgKeyChange={om.setPageTitleMsgKey}
-                        onLayerTypeChange={om.setLayerType}
-                        onLayerTitleChange={om.setLayerTitle}
-                        onLayerTitleMsgKeyChange={om.setLayerTitleMsgKey}
-                        onLayerWidthChange={om.setLayerWidth}
-                    />
-
-                    {/* 위젯 셀 목록 */}
-                    <div className="p-3 space-y-1.5 max-h-[calc(100vh-280px)] overflow-y-auto">
-
-                        {/* 위젯이 없을 때 안내 */}
-                        {widgetItems.length === 0 && !showAddWidget && (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <AlignLeft className="w-8 h-8 text-slate-200 mb-2" />
-                                <p className="text-xs font-medium text-slate-400">위젯이 없습니다</p>
-                                <p className="text-[10px] text-slate-300 mt-0.5">아래 버튼으로 위젯을 추가하세요</p>
-                            </div>
-                        )}
-
-                        {/* 위젯 셀 목록 — DnD 드래그 재정렬 (List 빌더 동일 패턴) */}
-                        <DndContext sensors={widgetSensors} collisionDetection={closestCenter} onDragEnd={handleWidgetDragEnd}>
-                            <SortableContext items={widgetItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                                {widgetItems.map((item, idx) => (
-                                    <SortableRowWrapper key={item.id} id={item.id}>
-                                        {(handleProps) => (
-                                            <BuilderI18nModeProvider
-                                                defaultMode={item.i18nMode ?? /"labelMsgKey"\s*:\s*"[^"]/.test(JSON.stringify(item.contents))}
-                                                onToggle={(newMode) => setWidgetItems(prev => prev.map(w => w.id === item.id ? { ...w, i18nMode: newMode } : w))}
-                                            >
-                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-
-                                                {/* ── 위젯 셀 헤더 ── */}
-                                                <div
-                                                    className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer transition-all select-none ${editingItemId === item.id ? 'bg-slate-900' : 'bg-slate-50 hover:bg-slate-100'}`}
-                                                    onClick={() => {
-                                                        setShowAddWidget(false);
-                                                        setAddingContentToItemId(null);
-                                                        if (editingItemId === item.id) {
-                                                            setEditingItemId(null);
-                                                            setEditingContentId(null);
-                                                        } else {
-                                                            setEditingItemId(item.id);
-                                                            setEditingContentId(null);
-                                                        }
-                                                    }}
-                                                >
-                                                    {/* 그립 핸들 — 드래그 활성화 전용 (클릭 이벤트 차단) */}
-                                                    <span
-                                                        {...handleProps}
-                                                        onClick={e => e.stopPropagation()}
-                                                        className={`cursor-grab flex-shrink-0 ${editingItemId === item.id ? 'text-slate-500 hover:text-slate-300' : 'text-slate-300 hover:text-slate-500'}`}
-                                                    >
-                                                        <GripVertical className="w-3 h-3" />
-                                                    </span>
-                                                    {/* 순서 번호 */}
-                                                    <span className={`text-[10px] font-bold w-4 text-center flex-shrink-0 ${editingItemId === item.id ? 'text-slate-400' : 'text-slate-400'}`}>
-                                                        {idx + 1}
-                                                    </span>
-                                                    {/* 위젯 크기 배지 */}
-                                                    <span className={`text-[10px] font-semibold flex-1 truncate ${editingItemId === item.id ? 'text-slate-300' : 'text-slate-600'}`}>
-                                                        위젯 {idx + 1}
-                                                        <span className={`ml-1 font-normal text-[9px] ${editingItemId === item.id ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                            col {item.colSpan} × row {item.rowSpan}
-                                                        </span>
-                                                    </span>
-                                                    {/* 컨텐츠 수 배지 */}
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${editingItemId === item.id ? 'bg-white/10 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>
-                                                        {item.contents.length}개
-                                                    </span>
-                                                    {/* 삭제 */}
-                                                    <button onClick={e => { e.stopPropagation(); removeWidgetItem(item.id); }}
-                                                        className={`p-0.5 rounded flex-shrink-0 transition-all ${editingItemId === item.id ? 'text-slate-400 hover:bg-white/10' : 'text-slate-400 hover:bg-red-50 hover:text-red-500'}`}>
-                                                        <Trash2 className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-
-                                                {/* ── 위젯 셀 편집 영역 ── */}
-                                                {editingItemId === item.id && (
-                                                    <div className="bg-white">
-
-                                                        {/* 위젯 크기 설정 — showI18nToggle로 🌐 버튼 표시 */}
-                                                        <SizeSettingPanel
-                                                            colSpan={item.colSpan}
-                                                            rowSpan={item.rowSpan}
-                                                            maxColSpan={om.isRightDrawer ? 2 : 12}
-                                                            showI18nToggle
-                                                            onColSpanChange={v => updateWidgetSize(item.id, v, item.rowSpan)}
-                                                            onRowSpanChange={v => updateWidgetSize(item.id, item.colSpan, v)}
-                                                        />
-
-                                                        {/* 컨텐츠 목록 — DnD 드래그 재정렬 (위젯 목록과 동일 패턴) */}
-                                                        <DndContext
-                                                            sensors={widgetSensors}
-                                                            collisionDetection={closestCenter}
-                                                            onDragEnd={e => {
-                                                                const { active, over } = e;
-                                                                if (over && active.id !== over.id)
-                                                                    reorderContent(item.id, active.id as string, over.id as string);
-                                                            }}
-                                                        >
-                                                            <SortableContext items={item.contents.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                                                                {item.contents.map((content) => (
-                                                                    <SortableRowWrapper key={content.id} id={content.id}>
-                                                                        {(handleProps) => (
-                                                                            <div className="border-t border-slate-100">
-
-                                                                                {/* 컨텐츠 헤더 */}
-                                                                                <ContentRowHeader
-                                                                                    widgetType={content.widget.type}
-                                                                                    label={`${WIDGET_META[content.widget.type as PageWidgetType]?.label ?? content.widget.type}${'contentKey' in content.widget && (content.widget as { contentKey: string }).contentKey ? ` — ${(content.widget as { contentKey: string }).contentKey}` : ''}`}
-                                                                                    colSpan={content.colSpan}
-                                                                                    rowSpan={content.rowSpan}
-                                                                                    isEditing={editingContentId === content.id}
-                                                                                    onToggle={() => setEditingContentId(editingContentId === content.id ? null : content.id)}
-                                                                                    onRemove={() => removeContent(item.id, content.id)}
-                                                                                    dragHandleProps={handleProps}
-                                                                                />
-
-                                                                                {/* 컨텐츠 설정 패널 */}
-                                                                                {editingContentId === content.id && (
-                                                                                    <div className="border-t border-slate-100 bg-slate-50/50">
-                                                                                        <SizeSettingPanel
-                                                                                            colSpan={content.colSpan}
-                                                                                            rowSpan={content.rowSpan}
-                                                                                            maxColSpan={item.colSpan}
-                                                                                            onColSpanChange={v => updateContentSize(item.id, content.id, v, content.rowSpan)}
-                                                                                            onRowSpanChange={v => updateContentSize(item.id, content.id, content.colSpan, v)}
-                                                                                            {...(content.widget.type === 'sublist' || content.widget.type === 'multiselect' ? {
-                                                                                                required: (content.widget as SubListWidget | MultiSelectWidget).required ?? false,
-                                                                                                onRequiredChange: (v: boolean) => updateContent(item.id, content.id, { ...content.widget, required: v } as Parameters<typeof updateContent>[2]),
-                                                                                            } : {})}
-                                                                                        />
-                                                                                        {/* 위젯 설정 (통합 디스패처 적용) */}
-                                                                                        <div className="px-3 pb-2 pt-1">
-                                                                                            <CommonBuilderDispatcher
-                                                                                                widget={content.widget}
-                                                                                                onChange={w => updateContent(item.id, content.id, w)}
-                                                                                                context={{
-                                                                                                    slugOptions,
-                                                                                                    dataEntityOptions,
-                                                                                                    apiInfoOptions,
-                                                                                                    pageTemplates: mainLayerTemplates,
-                                                                                                    searchWidgets: (collectWidgets(widgetItems, 'search') as SearchWidget[]).map(w => ({ widgetId: w.widgetId, contentKey: w.contentKey })),
-                                                                                                    contentWidgets: [
-                                                                                                        ...(collectWidgets(widgetItems, 'form') as FormWidget[]).map(w => ({ type: 'form' as const, widgetId: w.widgetId, contentKey: w.contentKey, connectedSlug: w.connectedSlug })),
-                                                                                                        ...(collectWidgets(widgetItems, 'sublist') as SubListWidget[]).map(w => ({ type: 'sublist' as const, widgetId: w.widgetId, contentKey: w.contentKey, title: w.title })),
-                                                                                                        ...(collectWidgets(widgetItems, 'multiselect') as MultiSelectWidget[]).map(w => ({ type: 'multiselect' as const, widgetId: w.widgetId, contentKey: w.contentKey, title: w.title })),
-                                                                                                        /* 엑셀 다운로드 연결용 — table 위젯도 포함 */
-                                                                                                        ...(collectWidgets(widgetItems, 'table') as TableWidget[]).map(w => ({ type: 'table' as const, widgetId: w.widgetId, contentKey: w.contentKey, title: w.contentKey, connectedSlug: w.connectedSlug })),
-                                                                                                    ],
-                                                                                                    categoryWidgets: (collectWidgets(widgetItems, 'category') as CategoryWidget[]).map(w => ({ widgetId: w.widgetId, label: w.label, depth: w.depth })),
-                                                                                                    maxColSpan: om.isRightDrawer ? 2 : 12,
-                                                                                                    slugEntityFields,
-                                                                                                    /* entity/data 연결 모드일 때 "연결 Slug" 라벨을 "연결 Entity"로 표시 + 기본값 자동 설정 */
-                                                                                                    connLabel: (om.connectedType === 'entity' || om.connectedType === 'data') ? '연결 Entity' : undefined,
-                                                                                                    connDefaultSlug: om.mainConnectedSlug,
-                                                                                                    /* entity/data 연결 모드일 때 "연결 Slug" 옵션 소스를 구분 — entity: slugOptions 중 entity 연결분, data: dataEntityOptions */
-                                                                                                    connMode: (om.connectedType === 'entity' || om.connectedType === 'data') ? om.connectedType : undefined,
-                                                                                                }}
-                                                                                            />
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-                                                                    </SortableRowWrapper>
-                                                                ))}
-                                                            </SortableContext>
-                                                        </DndContext>
-
-                                                        {/* 컨텐츠 추가 영역 */}
-                                                        <div className="border-t border-slate-100 p-2">
-                                                            {addingContentToItemId === item.id ? (
-                                                                /* 컨텐츠 타입 선택 → 바로 생성 */
-                                                                <WidgetTypePicker
-                                                                    title="컨텐츠 타입 선택"
-                                                                    onSelect={t => addContent(item.id, t)}
-                                                                    onCancel={() => setAddingContentToItemId(null)}
-                                                                />
-                                                            ) : (
-                                                                <button
-                                                                    onClick={() => setAddingContentToItemId(item.id)}
-                                                                    className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] text-slate-400 hover:border-blue-300 hover:text-blue-500 transition-all"
-                                                                >
-                                                                    <Plus className="w-3 h-3" />컨텐츠 추가
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
+                                          {/* 컨텐츠 설정 패널 */}
+                                          {editingContentId === content.id && (
+                                            <div className="border-t border-slate-100 bg-slate-50/50">
+                                              <SizeSettingPanel
+                                                colSpan={content.colSpan}
+                                                rowSpan={content.rowSpan}
+                                                maxColSpan={item.colSpan}
+                                                onColSpanChange={(v) =>
+                                                  updateContentSize(item.id, content.id, v, content.rowSpan)
+                                                }
+                                                onRowSpanChange={(v) =>
+                                                  updateContentSize(item.id, content.id, content.colSpan, v)
+                                                }
+                                                {...(content.widget.type === "sublist" ||
+                                                content.widget.type === "multiselect"
+                                                  ? {
+                                                      required:
+                                                        (content.widget as SubListWidget | MultiSelectWidget)
+                                                          .required ?? false,
+                                                      onRequiredChange: (v: boolean) =>
+                                                        updateContent(item.id, content.id, {
+                                                          ...content.widget,
+                                                          required: v,
+                                                        } as Parameters<typeof updateContent>[2]),
+                                                    }
+                                                  : {})}
+                                              />
+                                              {/* 위젯 설정 (통합 디스패처 적용) */}
+                                              <div className="px-3 pb-2 pt-1">
+                                                <CommonBuilderDispatcher
+                                                  widget={content.widget}
+                                                  onChange={(w) => updateContent(item.id, content.id, w)}
+                                                  context={{
+                                                    slugOptions,
+                                                    dataEntityOptions,
+                                                    apiInfoOptions,
+                                                    pageTemplates: mainLayerTemplates,
+                                                    searchWidgets: (
+                                                      collectWidgets(widgetItems, "search") as SearchWidget[]
+                                                    ).map((w) => ({ widgetId: w.widgetId, contentKey: w.contentKey })),
+                                                    contentWidgets: [
+                                                      ...(collectWidgets(widgetItems, "form") as FormWidget[]).map(
+                                                        (w) => ({
+                                                          type: "form" as const,
+                                                          widgetId: w.widgetId,
+                                                          contentKey: w.contentKey,
+                                                          connectedSlug: w.connectedSlug,
+                                                        })
+                                                      ),
+                                                      ...(
+                                                        collectWidgets(widgetItems, "sublist") as SubListWidget[]
+                                                      ).map((w) => ({
+                                                        type: "sublist" as const,
+                                                        widgetId: w.widgetId,
+                                                        contentKey: w.contentKey,
+                                                        title: w.title,
+                                                      })),
+                                                      ...(
+                                                        collectWidgets(
+                                                          widgetItems,
+                                                          "multiselect"
+                                                        ) as MultiSelectWidget[]
+                                                      ).map((w) => ({
+                                                        type: "multiselect" as const,
+                                                        widgetId: w.widgetId,
+                                                        contentKey: w.contentKey,
+                                                        title: w.title,
+                                                      })),
+                                                      /* 엑셀 다운로드 연결용 — table 위젯도 포함 */
+                                                      ...(collectWidgets(widgetItems, "table") as TableWidget[]).map(
+                                                        (w) => ({
+                                                          type: "table" as const,
+                                                          widgetId: w.widgetId,
+                                                          contentKey: w.contentKey,
+                                                          title: w.contentKey,
+                                                          connectedSlug: w.connectedSlug,
+                                                        })
+                                                      ),
+                                                    ],
+                                                    categoryWidgets: (
+                                                      collectWidgets(widgetItems, "category") as CategoryWidget[]
+                                                    ).map((w) => ({
+                                                      widgetId: w.widgetId,
+                                                      label: w.label,
+                                                      depth: w.depth,
+                                                    })),
+                                                    maxColSpan: om.isRightDrawer ? 2 : 12,
+                                                    slugEntityFields,
+                                                    /* entity/data 연결 모드일 때 "연결 Slug" 라벨을 "연결 Entity"로 표시 + 기본값 자동 설정 */
+                                                    connLabel:
+                                                      om.connectedType === "entity" || om.connectedType === "data"
+                                                        ? "연결 Entity"
+                                                        : undefined,
+                                                    connDefaultSlug: om.mainConnectedSlug,
+                                                    /* entity/data 연결 모드일 때 "연결 Slug" 옵션 소스를 구분 — entity: slugOptions 중 entity 연결분, data: dataEntityOptions */
+                                                    connMode:
+                                                      om.connectedType === "entity" || om.connectedType === "data"
+                                                        ? om.connectedType
+                                                        : undefined,
+                                                  }}
+                                                />
+                                              </div>
                                             </div>
-                                            </BuilderI18nModeProvider>
-                                        )}
+                                          )}
+                                        </div>
+                                      )}
                                     </SortableRowWrapper>
-                                ))}
-                            </SortableContext>
-                        </DndContext>
+                                  ))}
+                                </SortableContext>
+                              </DndContext>
 
-                        {/* ── 위젯 추가 플로우 (row/col 입력만) ──
+                              {/* 컨텐츠 추가 영역 */}
+                              <div className="border-t border-slate-100 p-2">
+                                {addingContentToItemId === item.id ? (
+                                  /* 컨텐츠 타입 선택 → 바로 생성 */
+                                  <WidgetTypePicker
+                                    title="컨텐츠 타입 선택"
+                                    onSelect={(t) => addContent(item.id, t)}
+                                    onCancel={() => setAddingContentToItemId(null)}
+                                  />
+                                ) : (
+                                  <button
+                                    onClick={() => setAddingContentToItemId(item.id)}
+                                    className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-slate-200 rounded text-[10px] text-slate-400 hover:border-blue-300 hover:text-blue-500 transition-all"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    컨텐츠 추가
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </BuilderI18nModeProvider>
+                    )}
+                  </SortableRowWrapper>
+                ))}
+              </SortableContext>
+            </DndContext>
+
+            {/* ── 위젯 추가 플로우 (row/col 입력만) ──
                              위젯이 하나도 없을 때는 항상 노출, 1개 이상 생긴 후에는
                              레거시 다중위젯 템플릿(불러왔을 때 이미 2개 이상)일 때만 계속 노출 */}
-                        {(widgetItems.length === 0 || isLegacyMultiWidget) && (
-                            showAddWidget ? (
-                                <div className="border border-slate-200 rounded-lg p-3 bg-white space-y-2.5">
-                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">위젯 크기 설정</p>
-                                    <div className="flex items-center gap-2">
-                                        <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Row 수</label>
-                                        <input
-                                            type="number" min={1} max={20} value={addRowSpan}
-                                            onChange={e => setAddRowSpan(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Col 수</label>
-                                        <input
-                                            type="number" min={1} max={12} value={addColSpan}
-                                            onChange={e => setAddColSpan(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
-                                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
-                                        />
-                                    </div>
-                                    <div className="flex gap-1.5">
-                                        <button
-                                            onClick={() => { setShowAddWidget(false); setAddRowSpan(1); setAddColSpan(12); }}
-                                            className="flex-1 py-1.5 text-xs border border-slate-200 rounded text-slate-500 hover:bg-slate-50 transition-all"
-                                        >취소</button>
-                                        <button
-                                            onClick={confirmAddWidget}
-                                            className="flex-1 py-1.5 text-xs bg-slate-900 text-white rounded hover:bg-slate-700 transition-all font-medium"
-                                        >추가</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <button
-                                    onClick={() => { setEditingItemId(null); setEditingContentId(null); setShowAddWidget(true); }}
-                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />위젯 추가
-                                </button>
-                            )
-                        )}
-
-                    </div>
+            {(widgetItems.length === 0 || isLegacyMultiWidget) &&
+              (showAddWidget ? (
+                <div className="border border-slate-200 rounded-lg p-3 bg-white space-y-2.5">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">위젯 크기 설정</p>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Row 수</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={addRowSpan}
+                      onChange={(e) => setAddRowSpan(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                      className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-medium text-slate-500 w-12 flex-shrink-0">Col 수</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={addColSpan}
+                      onChange={(e) => setAddColSpan(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                      className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs text-center focus:outline-none focus:border-slate-900"
+                    />
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => {
+                        setShowAddWidget(false);
+                        setAddRowSpan(1);
+                        setAddColSpan(12);
+                      }}
+                      className="flex-1 py-1.5 text-xs border border-slate-200 rounded text-slate-500 hover:bg-slate-50 transition-all"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={confirmAddWidget}
+                      className="flex-1 py-1.5 text-xs bg-slate-900 text-white rounded hover:bg-slate-700 transition-all font-medium"
+                    >
+                      추가
+                    </button>
+                  </div>
                 </div>
-
-                {/* ════════════════════════════════ */}
-                {/* 우측: 미리보기 패널               */}
-                {/* ════════════════════════════════ */}
-                <div className="space-y-4">
-
-                    {/* 상단 툴바 */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-700">미리보기</span>
-                            <span className="text-xs text-slate-400">{widgetItems.length}개 위젯</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${om.outputMode === 'page' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-600'}`}>
-                                {om.outputMode === 'page' ? '상세페이지' : 'LayerPopup'}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                onClick={handleSaveOpen}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-all"
-                                title={tm.currentTemplateId ? '템플릿 수정 저장' : '새 템플릿 저장'}
-                            >
-                                <Save className="w-3.5 h-3.5" />
-                                {tm.currentTemplateId ? '수정' : '저장'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 미리보기 영역 — PreviewWrapper가 outputMode에 따라 팝업 레이아웃 적용 */}
-                    <div className={`bg-slate-100 rounded-xl min-h-[500px] overflow-hidden ${om.outputMode !== 'layerpopup' ? 'p-6 overflow-y-auto' : 'flex flex-col'}`}>
-                        <PreviewWrapper
-                            outputMode={om.outputMode}
-                            layerType={om.layerType}
-                            layerTitle={om.layerTitle}
-                            layerTitleMsgKey={om.layerTitleMsgKey}
-                            layerWidth={om.layerWidth}
-                        >
-                            {widgetItems.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-64 text-center">
-                                    <AlignLeft className="w-12 h-12 text-slate-200 mb-3" />
-                                    <p className="text-sm font-medium text-slate-400">페이지 구성을 시작하세요</p>
-                                    <p className="text-xs text-slate-300 mt-1">좌측 패널에서 위젯을 추가하세요</p>
-                                </div>
-                            ) : (
-                                /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
-                                <PageLayout mode="preview">
-                                    <PageGridRenderer
-                                        mode="preview"
-                                        widgetItems={widgetItems}
-                                        onItemClick={(itemId) => {
-                                            setShowAddWidget(false);
-                                            setAddingContentToItemId(null);
-                                            setEditingItemId(editingItemId === itemId ? null : itemId);
-                                            setEditingContentId(null);
-                                        }}
-                                        selectedItemId={editingItemId}
-                                    />
-                                </PageLayout>
-                            )}
-                        </PreviewWrapper>
-                    </div>
-                </div>
-            </div>{/* 메인 레이아웃 끝 */}
-
-            {/* ── 저장 모달 ── */}
-            <SaveModal
-                show={tm.showSaveModal}
-                onClose={() => tm.setShowSaveModal(false)}
-                isEdit={!!tm.currentTemplateId}
-                name={tm.saveModalName}
-                slug={tm.saveModalSlug}
-                desc={tm.saveModalDesc}
-                isSaving={tm.isSaving}
-                onNameChange={tm.setSaveModalName}
-                onSlugChange={tm.setSaveModalSlug}
-                onDescChange={tm.setSaveModalDesc}
-                onConfirm={handleSaveConfirm}
-                toSlug={toSlug}
-            />
-
-            {/* ── 검증 규칙 생성 모달 ── */}
-            <RuleCreateModal
-                show={showRuleModal}
-                onClose={() => setShowRuleModal(false)}
-                slugOptions={slugOptions}
-            />
+              ) : (
+                <button
+                  onClick={() => {
+                    setEditingItemId(null);
+                    setEditingContentId(null);
+                    setShowAddWidget(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  위젯 추가
+                </button>
+              ))}
+          </div>
         </div>
-    );
+
+        {/* ════════════════════════════════ */}
+        {/* 우측: 미리보기 패널               */}
+        {/* ════════════════════════════════ */}
+        <div className="space-y-4">
+          {/* 상단 툴바 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-slate-700">미리보기</span>
+              <span className="text-xs text-slate-400">{widgetItems.length}개 위젯</span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${om.outputMode === "page" ? "bg-slate-100 text-slate-500" : "bg-blue-50 text-blue-600"}`}
+              >
+                {om.outputMode === "page" ? "상세페이지" : "LayerPopup"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleSaveOpen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600 transition-all"
+                title={tm.currentTemplateId ? "템플릿 수정 저장" : "새 템플릿 저장"}
+              >
+                <Save className="w-3.5 h-3.5" />
+                {tm.currentTemplateId ? "수정" : "저장"}
+              </button>
+            </div>
+          </div>
+
+          {/* 미리보기 영역 — PreviewWrapper가 outputMode에 따라 팝업 레이아웃 적용 */}
+          <div
+            className={`bg-slate-100 rounded-xl min-h-[500px] overflow-hidden ${om.outputMode !== "layerpopup" ? "p-6 overflow-y-auto" : "flex flex-col"}`}
+          >
+            <PreviewWrapper
+              outputMode={om.outputMode}
+              layerType={om.layerType}
+              layerTitle={om.layerTitle}
+              layerTitleMsgKey={om.layerTitleMsgKey}
+              layerWidth={om.layerWidth}
+            >
+              {widgetItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <AlignLeft className="w-12 h-12 text-slate-200 mb-3" />
+                  <p className="text-sm font-medium text-slate-400">페이지 구성을 시작하세요</p>
+                  <p className="text-xs text-slate-300 mt-1">좌측 패널에서 위젯을 추가하세요</p>
+                </div>
+              ) : (
+                /* PageLayout — 12칸 그리드 + ctrl+g 격자 토글 공통 처리 */
+                <PageLayout mode="preview">
+                  <PageGridRenderer
+                    mode="preview"
+                    widgetItems={widgetItems}
+                    onItemClick={(itemId) => {
+                      setShowAddWidget(false);
+                      setAddingContentToItemId(null);
+                      setEditingItemId(editingItemId === itemId ? null : itemId);
+                      setEditingContentId(null);
+                    }}
+                    selectedItemId={editingItemId}
+                  />
+                </PageLayout>
+              )}
+            </PreviewWrapper>
+          </div>
+        </div>
+      </div>
+      {/* 메인 레이아웃 끝 */}
+
+      {/* ── 저장 모달 ── */}
+      <SaveModal
+        show={tm.showSaveModal}
+        onClose={() => tm.setShowSaveModal(false)}
+        isEdit={!!tm.currentTemplateId}
+        name={tm.saveModalName}
+        slug={tm.saveModalSlug}
+        desc={tm.saveModalDesc}
+        isSaving={tm.isSaving}
+        onNameChange={tm.setSaveModalName}
+        onSlugChange={tm.setSaveModalSlug}
+        onDescChange={tm.setSaveModalDesc}
+        onConfirm={handleSaveConfirm}
+        toSlug={toSlug}
+      />
+
+      {/* ── 검증 규칙 생성 모달 ── */}
+      <RuleCreateModal show={showRuleModal} onClose={() => setShowRuleModal(false)} slugOptions={slugOptions} />
+    </div>
+  );
 }
