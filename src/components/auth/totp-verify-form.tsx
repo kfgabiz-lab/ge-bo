@@ -5,63 +5,66 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
+import { useI18n } from "@/hooks/use-i18n";
 import OtpInput from "./otp-input";
 
 interface TotpVerifyFormProps {
-    tempToken: string;
+  tempToken: string;
 }
 
 /** TOTP 로그인 검증 화면 (OTP 6자리 입력) */
 export default function TotpVerifyForm({ tempToken }: TotpVerifyFormProps) {
-    const [totpCode, setTotpCode] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const router = useRouter();
-    const login = useAuthStore((state) => state.login);
+  const [totpCode, setTotpCode] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const login = useAuthStore((state) => state.login);
+  const { t } = useI18n();
 
-    const handleVerify = async () => {
-        if (totpCode.length < 6) {
-            toast.error("6자리 코드를 모두 입력해주세요.");
-            return;
-        }
+  const handleVerify = async () => {
+    if (totpCode.length < 6) {
+      toast.error(t("login.totp.code.incomplete"));
+      return;
+    }
 
-        setIsLoading(true);
-        try {
-            const res = await api.post("/auth/totp/sessions", { tempToken, totpCode });
-            login(res.data.accessToken, res.data.adminInfo);
-            toast.success(`${res.data.adminInfo.name}님, 환영합니다.`);
-            router.push("/admin/dashboard");
-        } catch (error: any) {
-            setTotpCode("");
-            toast.error(getApiErrorMessage(error, "인증에 실패했습니다. 다시 시도해주세요."));
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    setIsLoading(true);
+    try {
+      const res = await api.post("/auth/totp/sessions", { tempToken, totpCode });
+      login(res.data.accessToken, res.data.adminInfo);
+      toast.success(t("login.totp.verify.success", { name: res.data.adminInfo.name }));
+      router.push("/admin/dashboard");
+    } catch (error: unknown) {
+      setTotpCode("");
+      toast.error(getApiErrorMessage(error, t("login.totp.verify.error")));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return (
-        <div className="w-full max-w-[380px] mx-auto">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-[#111827] mb-1">2단계 인증</h1>
-                <p className="text-sm text-[#6b7280]">Authenticator 앱에 표시된 6자리 코드를 입력하세요.</p>
-            </div>
+  return (
+    <div className="w-full max-w-[380px] mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#111827] mb-1">{t("login.totp.verify.title")}</h1>
+        <p className="text-sm text-[#6b7280]">{t("login.totp.verify.subtitle")}</p>
+      </div>
 
-            <div className="bg-white rounded-xl border border-[#e2e4e9] shadow-sm p-6 space-y-5">
-                <OtpInput length={6} value={totpCode} onChange={setTotpCode} onEnter={handleVerify} />
+      <div className="bg-white rounded-xl border border-[#e2e4e9] shadow-sm p-6 space-y-5">
+        <OtpInput length={6} value={totpCode} onChange={setTotpCode} onEnter={handleVerify} />
 
-                <button
-                    type="button"
-                    onClick={handleVerify}
-                    disabled={isLoading || totpCode.length < 6}
-                    className="w-full py-2.5 bg-[#4361ee] hover:bg-[#3451d1] text-white text-sm font-semibold rounded-lg
+        <button
+          type="button"
+          onClick={handleVerify}
+          disabled={isLoading || totpCode.length < 6}
+          className="w-full py-2.5 bg-[#4361ee] hover:bg-[#3451d1] text-white text-sm font-semibold rounded-lg
                                transition-all flex items-center justify-center gap-2
                                disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[#4361ee]/20"
-                >
-                    {isLoading
-                        ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        : "로그인"
-                    }
-                </button>
-            </div>
-        </div>
-    );
+        >
+          {isLoading ? (
+            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            t("login.submit")
+          )}
+        </button>
+      </div>
+    </div>
+  );
 }

@@ -50,6 +50,7 @@ import {
   parseOpt,
   flattenPageDataItem,
   evalColumnDataExpr,
+  resolveEvalExprI18n,
   evalConditionExpr,
   formatFetchedRelValue,
   formatNowBySubType,
@@ -1006,7 +1007,7 @@ export function FieldRenderer({
         let displayVal: string;
         if (field.data && !isPreview) {
           /* data 표현식 있으면 공통함수로 계산 — TABLE과 동일한 evalColumnDataExpr 사용 */
-          displayVal = evalColumnDataExpr(field.data, rowData ?? {});
+          displayVal = resolveEvalExprI18n(evalColumnDataExpr(field.data, rowData ?? {}), t);
         } else {
           /* data 없으면 rowData[fieldKey] 직접 참조 (FormRenderer에서 fetchRelData 주입된 값) */
           const fetched = rowData ? rowData[field.fieldKey ?? ""] : undefined;
@@ -1032,7 +1033,7 @@ export function FieldRenderer({
       }
       /* data 표현식 있으면 evalColumnDataExpr로 계산 후 읽기전용 표시 */
       if (field.data) {
-        const displayVal = isPreview ? "" : evalColumnDataExpr(field.data, rowData ?? {});
+        const displayVal = isPreview ? "" : resolveEvalExprI18n(evalColumnDataExpr(field.data, rowData ?? {}), t);
         return (
           <input
             type="text"
@@ -1116,7 +1117,7 @@ export function FieldRenderer({
       /* 단건 매칭(EQ) — input case와 동일한 방식: data 표현식 or rowData 직접 참조 */
       let displayVal: string;
       if (field.data && !isPreview) {
-        displayVal = evalColumnDataExpr(field.data, rowData ?? {});
+        displayVal = resolveEvalExprI18n(evalColumnDataExpr(field.data, rowData ?? {}), t);
       } else {
         displayVal = isPreview ? "" : String(fetched ?? value ?? "");
       }
