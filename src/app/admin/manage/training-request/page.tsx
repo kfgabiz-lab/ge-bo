@@ -336,7 +336,7 @@ export default function TrainingRequestListPage() {
         },
         {
           id: "r3",
-          cols: 4,
+          cols: 5,
           fields: [
             {
               id: "curriculumTitle",
