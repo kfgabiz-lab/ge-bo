@@ -235,7 +235,7 @@ export default function TrainingRequestListPage() {
       rows: [
         {
           id: "r1",
-          cols: 5,
+          cols: 4,
           fields: [
             {
               id: "periodType",
@@ -294,7 +294,7 @@ export default function TrainingRequestListPage() {
         },
         {
           id: "r2",
-          cols: 5,
+          cols: 4,
           fields: [
             {
               id: "trainingScheduleType",
@@ -336,7 +336,7 @@ export default function TrainingRequestListPage() {
         },
         {
           id: "r3",
-          cols: 5,
+          cols: 4,
           fields: [
             {
               id: "curriculumTitle",
@@ -621,7 +621,7 @@ export default function TrainingRequestListPage() {
 
   return (
     <PageLayout mode="live">
-      <GridCell colSpan={12} rowSpan={5}>
+      <GridCell colSpan={12} rowSpan={4}>
         <WidgetRenderer
           mode="live"
           widget={SEARCH_WIDGET}
