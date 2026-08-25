@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Globe } from "lucide-react";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
 import PageLayout from "@/components/layout/page-layout";
@@ -18,7 +19,9 @@ interface Role {
   id: number;
   code: string;
   displayName: string;
+  displayNameMsgKey: string | null;
   description: string;
+  descriptionMsgKey: string | null;
   color: string;
   isSystem: boolean;
   memberCount: number;
@@ -40,6 +43,8 @@ export default function RolesDetailPage() {
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  /* 다국어 모드 — ON: 표시명/설명을 등록된 다국어 키에서 선택, OFF: 직접 입력 */
+  const [i18nMode, setI18nMode] = useState(true);
 
   /* 브레드크럼/영역명이 이전 화면 제목을 그대로 재사용하지 않도록 진입 시 명시적으로 설정, 이탈 시 초기화 */
   useEffect(() => {
@@ -51,7 +56,9 @@ export default function RolesDetailPage() {
   const [formValues, setFormValues] = useState<Record<string, string>>({
     code: "",
     displayName: "",
+    displayNameMsgKey: "",
     description: "",
+    descriptionMsgKey: "",
     color: COLOR_PRESETS[0],
   });
 
@@ -108,25 +115,44 @@ export default function RolesDetailPage() {
           description: t("validation.code.code.format"),
           readonly: !isNew,
         },
-        {
-          id: "displayName",
-          type: "input",
-          label: t("common.label.displayName"),
-          colSpan: 6,
-          rowSpan: 1,
-          required: true,
-          fieldKey: "displayName",
-          placeholder: t("role.placeholder.displayName"),
-        },
-        {
-          id: "description",
-          type: "input",
-          label: t("common.label.description"),
-          colSpan: 12,
-          rowSpan: 1,
-          fieldKey: "description",
-          placeholder: t("role.placeholder.description"),
-        },
+        i18nMode
+          ? {
+              id: "displayNameMsgKey",
+              type: "message-key-select",
+              label: t("common.label.displayName"),
+              colSpan: 6,
+              rowSpan: 1,
+              required: true,
+              fieldKey: "displayNameMsgKey",
+            }
+          : {
+              id: "displayName",
+              type: "input",
+              label: t("common.label.displayName"),
+              colSpan: 6,
+              rowSpan: 1,
+              required: true,
+              fieldKey: "displayName",
+              placeholder: t("role.placeholder.displayName"),
+            },
+        i18nMode
+          ? {
+              id: "descriptionMsgKey",
+              type: "message-key-select",
+              label: t("common.label.description"),
+              colSpan: 12,
+              rowSpan: 1,
+              fieldKey: "descriptionMsgKey",
+            }
+          : {
+              id: "description",
+              type: "input",
+              label: t("common.label.description"),
+              colSpan: 12,
+              rowSpan: 1,
+              fieldKey: "description",
+              placeholder: t("role.placeholder.description"),
+            },
         {
           id: "color",
           type: "color",
@@ -139,7 +165,7 @@ export default function RolesDetailPage() {
         },
       ],
     }),
-    [isNew, t]
+    [isNew, t, i18nMode]
   );
 
   /* 수정 모드: 기존 데이터 로드 */
@@ -150,10 +176,13 @@ export default function RolesDetailPage() {
       try {
         const res = await api.get<Role>(`/roles/${id}`);
         const role = res.data;
+        setI18nMode(!!role.displayNameMsgKey);
         setFormValues({
           code: role.code,
-          displayName: role.displayName,
-          description: role.description ?? "",
+          displayName: role.displayNameMsgKey ? "" : role.displayName,
+          displayNameMsgKey: role.displayNameMsgKey ?? "",
+          description: role.descriptionMsgKey ? "" : (role.description ?? ""),
+          descriptionMsgKey: role.descriptionMsgKey ?? "",
           color: role.color ?? COLOR_PRESETS[0],
         });
       } catch {
@@ -181,7 +210,8 @@ export default function RolesDetailPage() {
         toast.error(t("validation.role.code.required"));
         return;
       }
-      if (!formValues.displayName?.trim()) {
+      const displayNameValue = i18nMode ? formValues.displayNameMsgKey : formValues.displayName;
+      if (!displayNameValue?.trim()) {
         toast.error(t("validation.role.displayName.required"));
         return;
       }
@@ -192,20 +222,18 @@ export default function RolesDetailPage() {
 
       setSaving(true);
       try {
+        const payload = {
+          displayName: i18nMode ? "" : formValues.displayName,
+          displayNameMsgKey: i18nMode ? formValues.displayNameMsgKey : "",
+          description: i18nMode ? "" : formValues.description || null,
+          descriptionMsgKey: i18nMode ? formValues.descriptionMsgKey || undefined : undefined,
+          color: formValues.color,
+        };
         if (isNew) {
-          await api.post("/roles", {
-            code: formValues.code.toUpperCase(),
-            displayName: formValues.displayName,
-            description: formValues.description || null,
-            color: formValues.color,
-          });
+          await api.post("/roles", { code: formValues.code.toUpperCase(), ...payload });
           toast.success(t("role.created"));
         } else {
-          await api.patch(`/roles/${id}`, {
-            displayName: formValues.displayName,
-            description: formValues.description || null,
-            color: formValues.color,
-          });
+          await api.patch(`/roles/${id}`, payload);
           toast.success(t("role.updated"));
         }
         router.push("/admin/settings/roles");
@@ -215,7 +243,7 @@ export default function RolesDetailPage() {
         setSaving(false);
       }
     },
-    [formValues, id, isNew, router, saving, t]
+    [formValues, i18nMode, id, isNew, router, saving, t]
   );
 
   if (loading) {
@@ -230,13 +258,28 @@ export default function RolesDetailPage() {
     <PageLayout mode="live" title={isNew ? t("role.title.new") : t("role.title.edit")}>
       {/* 폼 위젯 */}
       <GridCell colSpan={12} rowSpan={5}>
-        <WidgetRenderer
-          mode="live"
-          widget={FORM_WIDGET}
-          contentColSpan={12}
-          formValues={formValues}
-          onFormValuesChange={handleFormChange}
-        />
+        <div className="relative h-full">
+          <button
+            type="button"
+            title={i18nMode ? t("menu.title.switchToManualInput") : t("menu.title.switchToI18nMode")}
+            onClick={() => setI18nMode((v) => !v)}
+            className={`absolute top-3 right-3 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ${
+              i18nMode
+                ? "text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100"
+                : "text-slate-400 bg-slate-50 border border-slate-200 hover:bg-slate-100"
+            }`}
+          >
+            <Globe className="w-3 h-3" />
+            {i18nMode ? t("menu.btn.i18nMode") : t("search.btn.manualInput")}
+          </button>
+          <WidgetRenderer
+            mode="live"
+            widget={FORM_WIDGET}
+            contentColSpan={12}
+            formValues={formValues}
+            onFormValuesChange={handleFormChange}
+          />
+        </div>
       </GridCell>
 
       {/* 공간영역 — 취소/저장 버튼 */}

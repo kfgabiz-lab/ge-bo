@@ -18,6 +18,7 @@ import {
 import { useMenuStore, MenuItem } from "@/store/use-menu-store";
 import { useQueryClient } from "@tanstack/react-query";
 import { MenuRoleMatrix } from "./menu-role-matrix";
+import { MenuApiRegisterButton } from "./menu-api-register-modal";
 import { toast } from "sonner";
 import { URL_REGEX, EXTERNAL_URL_REGEX, XSS_CHARS } from "./constants";
 import { IconPicker } from "./icon-picker";
@@ -1085,6 +1086,7 @@ export function MenuDetail() {
             <Trash2 className="w-3.5 h-3.5" />
             {t("common.btn.delete")}
           </button>
+          <MenuApiRegisterButton />
           <button
             onClick={handleSave}
             disabled={isSubmitting}

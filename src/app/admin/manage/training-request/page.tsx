@@ -235,7 +235,7 @@ export default function TrainingRequestListPage() {
       rows: [
         {
           id: "r1",
-          cols: 5,
+          cols: 4,
           fields: [
             {
               id: "periodType",
@@ -294,7 +294,7 @@ export default function TrainingRequestListPage() {
         },
         {
           id: "r2",
-          cols: 5,
+          cols: 4,
           fields: [
             {
               id: "trainingScheduleType",
@@ -303,8 +303,8 @@ export default function TrainingRequestListPage() {
               labelMsgKey: "",
               fieldKey: "trainingScheduleType",
               colSpan: 1,
-              placeholder: "전체",
-              placeholderMsgKey: "common.label.all",
+              placeholder: "",
+              placeholderMsgKey: "training.label.category",
               options: ["정기 Training:01", "비정기 Training:02"],
               codeGroupCode: "TRAININGSCHEDULETYPE",
             },
@@ -315,8 +315,8 @@ export default function TrainingRequestListPage() {
               labelMsgKey: "",
               fieldKey: "trainingFormat",
               colSpan: 1,
-              placeholder: "전체",
-              placeholderMsgKey: "common.label.all",
+              placeholder: "",
+              placeholderMsgKey: "common.label.trainingType",
               options: ["In-Person:001", "Virtual:002"],
               codeGroupCode: "TRAININGTYPE",
             },
@@ -327,8 +327,8 @@ export default function TrainingRequestListPage() {
               labelMsgKey: "",
               fieldKey: "trainingCourse",
               colSpan: 1,
-              placeholder: "전체",
-              placeholderMsgKey: "common.label.all",
+              placeholder: "",
+              placeholderMsgKey: "common.label.training",
               options: ["Engineering Training:01", "Service Training:02", "Sales Training:03"],
               codeGroupCode: "TRAININGCOURSE",
             },
@@ -345,7 +345,8 @@ export default function TrainingRequestListPage() {
               labelMsgKey: "",
               fieldKey: "curriculumTitle",
               colSpan: 2,
-              placeholder: "Course명을 입력하세요.",
+              placeholder: "",
+              placeholderMsgKey: "course.placeholder.search",
             },
             {
               id: "sessionTitle",
@@ -354,7 +355,8 @@ export default function TrainingRequestListPage() {
               labelMsgKey: "",
               fieldKey: "sessionTitle",
               colSpan: 2,
-              placeholder: "제목을 입력하세요.",
+              placeholder: "",
+              placeholderMsgKey: "common.placeholder.title",
             },
           ],
         },
@@ -485,6 +487,7 @@ export default function TrainingRequestListPage() {
         {
           id: "c11",
           header: "액션",
+          headerMsgKey: "common.label.action",
           accessor: "_actions",
           cellType: "actions",
           align: "center",
@@ -618,7 +621,7 @@ export default function TrainingRequestListPage() {
 
   return (
     <PageLayout mode="live">
-      <GridCell colSpan={12} rowSpan={5}>
+      <GridCell colSpan={12} rowSpan={4}>
         <WidgetRenderer
           mode="live"
           widget={SEARCH_WIDGET}

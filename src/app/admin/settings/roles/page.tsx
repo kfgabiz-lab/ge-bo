@@ -18,7 +18,9 @@ interface Role {
   id: number;
   code: string;
   displayName: string;
+  displayNameMsgKey: string | null;
   description: string;
+  descriptionMsgKey: string | null;
   color: string;
   isSystem: boolean;
   memberCount: number;
@@ -271,7 +273,14 @@ export default function RolesSystemPage() {
           mode="live"
           widget={TABLE_WIDGET}
           contentColSpan={12}
-          tableData={pagedRoles.map((r) => ({ _id: r.id, ...r })) as unknown as Record<string, unknown>[]}
+          tableData={
+            pagedRoles.map((r) => ({
+              _id: r.id,
+              ...r,
+              displayName: r.displayNameMsgKey ? t(r.displayNameMsgKey) : r.displayName,
+              description: r.descriptionMsgKey ? t(r.descriptionMsgKey) : r.description,
+            })) as unknown as Record<string, unknown>[]
+          }
           tableLoading={loading}
           totalElements={totalElements}
           totalPages={totalPages}

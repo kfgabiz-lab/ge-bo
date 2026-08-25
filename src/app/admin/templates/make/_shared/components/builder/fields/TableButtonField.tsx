@@ -18,6 +18,8 @@ import { TemplateItem } from "../../../types";
 import { ColEditProps, CUSTOM_ACTION_COLORS } from "./col-types";
 import { INPUT_CLS, LABEL_CLS } from "./_FieldBase";
 import { SlugSelectField } from "./SlugSelectField";
+import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { useBuilderI18nMode } from "../../../contexts/BuilderI18nModeContext";
 
 interface TableButtonFieldProps extends ColEditProps {
   /** 페이지/팝업 템플릿 목록 — targetSlug 선택용 (ActionsField의 layerTemplates와 동일 구조) */
@@ -34,6 +36,7 @@ const CONN_TYPE_OPTIONS: { value: "page" | "popup" | "windowPopup"; label: strin
 ];
 
 export function TableButtonField({ values, onChange, layerTemplates, onRequestLayerTemplates }: TableButtonFieldProps) {
+  const { i18nMode } = useBuilderI18nMode();
   const connType = values.connType ?? "page";
   /** 연결대상 방식 — page/windowPopup에서만 의미 있음. popup은 항상 slug 고정 */
   const targetType = values.targetType ?? "slug";
@@ -48,13 +51,22 @@ export function TableButtonField({ values, onChange, layerTemplates, onRequestLa
           <label className={LABEL_CLS}>
             버튼 라벨 <span className="text-red-400">*</span>
           </label>
-          <input
-            type="text"
-            value={values.buttonLabel ?? ""}
-            onChange={(e) => onChange({ buttonLabel: e.target.value })}
-            placeholder="예: 상세보기"
-            className={INPUT_CLS}
-          />
+          {i18nMode ? (
+            <MessageKeySelector
+              value={values.buttonLabelMsgKey ?? ""}
+              onChange={(key) => onChange({ buttonLabelMsgKey: key })}
+              resourceType="WORD"
+              size="sm"
+            />
+          ) : (
+            <input
+              type="text"
+              value={values.buttonLabel ?? ""}
+              onChange={(e) => onChange({ buttonLabel: e.target.value })}
+              placeholder="예: 상세보기"
+              className={INPUT_CLS}
+            />
+          )}
         </div>
 
         {/* 색상 — CUSTOM_ACTION_COLORS 공통 팔레트 재사용 */}

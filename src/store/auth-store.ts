@@ -7,6 +7,7 @@ interface AdminInfo {
   email: string;
   role: string;
   roleDisplayName: string;
+  roleDisplayNameMsgKey: string | null;
   isSystem: boolean;
 }
 

@@ -437,6 +437,8 @@ export interface TableColumnConfig {
   /* ── button 전용 (cellType: 'button') — 클릭 시 페이지이동/레이어팝업/윈도우팝업 실행 ── */
   /** 버튼에 표시할 라벨 (예: '상세보기') */
   buttonLabel?: string;
+  /** 버튼 라벨 다국어 키 — 있으면 buttonLabel보다 우선 */
+  buttonLabelMsgKey?: string;
   /** 버튼 색상 (col-types.ts CUSTOM_ACTION_COLORS 팔레트 값, 예: 'blue', 'green') */
   buttonColor?: string;
   /** 클릭 시 연결 방식 — page: 페이지 이동, popup: 레이어팝업(EditPageRule 패턴 재사용), windowPopup: 별도 창으로 열기(신규) */

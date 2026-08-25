@@ -296,6 +296,14 @@ function stripQuotedLiteral(token: string): string | null {
   return token.startsWith("'") && token.endsWith("'") ? token.slice(1, -1) : null;
 }
 
+/** 다국어 메시지 키를 나타내는 브라켓 토큰 패턴 — {common.status.published} 형태 */
+const MSG_KEY_BRACKET_RE = /^\{[^{}]+\}$/;
+
+/** 리터럴 텍스트가 아닌 다국어 메시지 키 마커인지 판별 */
+function isMsgKeyBracketToken(token: string): boolean {
+  return MSG_KEY_BRACKET_RE.test(token);
+}
+
 /** 함수토큰 아닌 피연산자의 원시값 — 함수토큰의 sibling 포맷 추론용 (함수토큰이면 '' 반환해 재귀 차단) */
 function rawOperandValue(token: string, resolveField: (k: string) => string | undefined): string {
   if (token in FUNCTION_TOKENS) return "";
@@ -1054,12 +1062,14 @@ function addDotNotationKeys(target: Record<string, unknown>, obj: Record<string,
  * 지원 패턴:
  *   - 조건식: condition?trueExpr:falseExpr (중첩 가능, 재귀 평가)
  *   - 연결식: token1+token2+... (따옴표 없는 토큰은 row 필드, 따옴표 있는 토큰은 리터럴)
+ *   - 다국어 토큰: {msgKey} — 리터럴로 취급하지 않고 그대로 반환, 호출부에서 resolveEvalExprI18n(value, t)로 변환
  *   - 조건 연산자: = (같음), != (다름) — 문자열 비교 / < > <= >= — 숫자 비교
  *
  * @example
  * evalColumnDataExpr("code=1?title:title2", { code: '1', title: '타이틀' }) // → '타이틀'
  * evalColumnDataExpr("title+'-'+code", { title: '타이틀', code: '1' }) // → '타이틀-1'
  * evalColumnDataExpr("code=1?title+'-'+code:title2", { code: '1', title: '타이틀', ... }) // → '타이틀-1'
+ * evalColumnDataExpr("is_visible=001?{common.status.published}:{common.status.unpublished}", { is_visible: '001' }) // → '{common.status.published}'
  */
 export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): string {
   const trimmed = expr.trim();
@@ -1080,6 +1090,18 @@ export function evalColumnDataExpr(expr: string, row: Record<string, unknown>): 
 
   /* 연결식: token1+token2+... */
   return parseConcatTokens(trimmed, row);
+}
+
+/**
+ * evalColumnDataExpr 결과가 다국어 브라켓 토큰({msgKey})이면 t()로 변환, 아니면 원본 그대로 반환
+ * - evalColumnDataExpr은 순수 함수라 useI18n에 접근할 수 없어 브라켓 토큰을 마커 그대로 반환한다
+ * - TableCellRenderer·FieldRenderer가 evalColumnDataExpr 호출 직후 이 함수로 감싸 실제 번역을 적용한다
+ *
+ * @example resolveEvalExprI18n("{common.status.published}", t) // → "게시" (t 반환값)
+ * @example resolveEvalExprI18n("게시", t) // → "게시" (브라켓 아니므로 그대로)
+ */
+export function resolveEvalExprI18n(value: string, t: (key: string) => string): string {
+  return MSG_KEY_BRACKET_RE.test(value) ? t(value.slice(1, -1)) : value;
 }
 
 /** 최상위(depth=0)의 : 위치 반환 — 중첩 조건식 내 : 건너뜀 */
@@ -1126,6 +1148,7 @@ function parseConcatTokens(expr: string, row: Record<string, unknown>): string {
     .map((token) => {
       const literal = stripQuotedLiteral(token);
       if (literal !== null) return literal;
+      if (isMsgKeyBracketToken(token)) return token;
       return String(row[token] ?? "");
     })
     .join("");

@@ -23,6 +23,7 @@ import { TableColumnConfig, CodeGroupDef } from "../../types";
 import type { RendererMode, TableActionHandlers } from "./types";
 import {
   evalColumnDataExpr,
+  resolveEvalExprI18n,
   formatFetchedRelValue,
   formatFetchedRelMulti,
   formatNowBySubType,
@@ -85,7 +86,10 @@ export function TableCellRenderer({
        단, row[accessor]가 배열(ARRAY_CONTAINS 다건 매칭)이면 evalColumnDataExpr을 거치지 않고 그대로 둔다 —
        default 케이스에서 formatFetchedRelValue(→formatFetchedRelArray)로 레코드별 data 표현식을 반복 평가하기 위함 */
   const rawValue = row[col.accessor];
-  const value = col.data && !isPreview && !Array.isArray(rawValue) ? evalColumnDataExpr(col.data, row) : rawValue;
+  const value =
+    col.data && !isPreview && !Array.isArray(rawValue)
+      ? resolveEvalExprI18n(evalColumnDataExpr(col.data, row), t)
+      : rawValue;
 
   switch (col.cellType) {
     /* ── badge ── */
@@ -203,7 +207,7 @@ export function TableCellRenderer({
             onClick={!isPreview ? () => handlers?.onButtonClick?.(col, row) : undefined}
             className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${colorDef.cls}`}
           >
-            {col.buttonLabel || t("common.btn.default")}
+            {col.buttonLabelMsgKey ? t(col.buttonLabelMsgKey) : col.buttonLabel || t("common.btn.default")}
           </button>
         </div>
       );

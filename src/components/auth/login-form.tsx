@@ -1,15 +1,14 @@
 ﻿"use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import ReCAPTCHA from "react-google-recaptcha";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
-import { User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Users } from "lucide-react";
+import { User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Users, RefreshCw } from "lucide-react";
 import { LanguageSelector } from "@/components/layout/language-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import TotpSetupForm from "./totp-setup-form";
@@ -19,20 +18,42 @@ import TotpVerifyForm from "./totp-verify-form";
 type LoginFormValues = {
   email: string;
   password: string;
+  captchaCode: string;
 };
 
 type LoginStep = "credentials" | "totp-setup" | "totp-verify";
 
+/* GET /api/v1/public/captcha-image 응답 — 서버 상태 없이 정답+발급시각을 암호화 토큰에 담아 왕복시킨다 */
+type Captcha = { captchaImage: string; captchaToken: string };
+
 export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState<Captcha | null>(null);
+  const [captchaLoadFailed, setCaptchaLoadFailed] = useState(false);
   const [step, setStep] = useState<LoginStep>("credentials");
   const [tempToken, setTempToken] = useState("");
-  const recaptchaRef = useRef<ReCAPTCHA>(null);
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
   const { t } = useI18n();
+
+  /* t()는 언어 변경 시 참조가 바뀌므로 deps에 넣지 않는다(넣으면 언어 전환마다 캡차가 재발급됨) —
+     실패 메시지는 captchaLoadFailed 플래그로 렌더 시점에 t()를 읽어 항상 최신 언어로 표시한다 */
+  const refreshCaptcha = useCallback(async () => {
+    try {
+      const response = await api.get<Captcha>("/public/captcha-image");
+      setCaptcha(response.data);
+      setCaptchaLoadFailed(false);
+    } catch {
+      setCaptcha(null);
+      setCaptchaLoadFailed(true);
+    }
+  }, []);
+
+  /* 최초 진입 시 캡차 1회 발급 */
+  useEffect(() => {
+    refreshCaptcha();
+  }, [refreshCaptcha]);
 
   /* 언어 변경 시 유효성 메시지도 함께 갱신되도록 useMemo로 스키마 생성 */
   const loginSchema = useMemo(
@@ -44,6 +65,7 @@ export default function LoginForm() {
           .max(30, t("validation.id.max"))
           .regex(/^[a-zA-Z0-9.]+$/, t("validation.id.pattern")),
         password: z.string().min(4, t("validation.password.min")),
+        captchaCode: z.string().regex(/^\d{4}$/, t("validation.captcha.required")),
       }),
     [t]
   );
@@ -51,22 +73,24 @@ export default function LoginForm() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "", password: "", captchaCode: "" },
   });
 
+  const { onChange: onCaptchaChange, ...captchaField } = register("captchaCode");
+
   const onSubmit = async (data: LoginFormValues) => {
-    /* reCAPTCHA 미완료 시 차단 */
-    if (!recaptchaToken) {
-      toast.error("reCAPTCHA 인증을 완료해주세요.");
+    if (!captcha) {
+      toast.error(t("login.captcha.loading"));
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await api.post("/auth/login", { ...data, recaptchaToken });
+      const response = await api.post("/auth/login", { ...data, captchaToken: captcha.captchaToken });
       const { tempToken: token, requireTotpSetup, requireTotpVerify, accessToken, adminInfo } = response.data;
 
       /* 2FA 비활성화 — 바로 로그인 처리 */
@@ -84,20 +108,26 @@ export default function LoginForm() {
         setStep("totp-verify");
       }
     } catch (error) {
-      recaptchaRef.current?.reset();
-      setRecaptchaToken(null);
+      /* 로그인 실패 시 캡차는 항상 새로 발급받고 입력값은 비운다 */
+      refreshCaptcha();
+      setValue("captchaCode", "");
 
-      const err = error as { response?: { status: number; data?: { message?: string; code?: string } } };
+      const err = error as { response?: { status: number; data?: { message?: string; error?: string } } };
 
       if (!err.response) {
         toast.error(t("login.error.no_server"));
         return;
       }
       const status = err.response.status;
+      /* GlobalExceptionHandler가 에러코드를 "error" 필드로 내려준다("code" 아님) */
+      const code = err.response.data?.error;
       if (status === 401) {
         toast.error(err.response.data?.message || t("login.error.invalid"));
-      } else if (status === 400 && err.response.data?.code?.startsWith("RECAPTCHA")) {
-        toast.error(err.response.data.message || "reCAPTCHA 인증에 실패했습니다.");
+      } else if (status === 400 && code === "CAPTCHA_FAILED") {
+        /* 서버 메시지는 항상 한국어라 여기서는 쓰지 않고 FE 번역 키를 우선한다 */
+        toast.error(t("login.error.captcha"));
+      } else if (status === 400 && code === "CAPTCHA_EXPIRED") {
+        toast.error(t("login.error.captcha_expired"));
       } else if (status === 403) {
         toast.error(err.response.data?.message || t("login.error.forbidden"));
       } else if (status >= 500) {
@@ -243,23 +273,49 @@ export default function LoginForm() {
               {errors.password && <p className="mt-1.5 text-xs text-red-500">{errors.password.message}</p>}
             </div>
 
-            {/* reCAPTCHA v2 체크박스 */}
-            <div className="flex justify-center">
-              <ReCAPTCHA
-                ref={recaptchaRef}
-                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-                hl="en"
-                onChange={(token) => setRecaptchaToken(token)}
-                onExpired={() => {
-                  setRecaptchaToken(null);
-                  toast.error("reCAPTCHA 인증이 만료되었습니다. 다시 인증해 주세요.");
-                }}
-              />
+            {/* 자체 캡차 — 이미지 + 새로고침 + 4자리 숫자 입력 */}
+            <div>
+              <label className="block text-sm font-medium text-[#374151] mb-1.5">CAPTCHA</label>
+              <div className="flex items-center gap-2">
+                {captcha ? (
+                  <img
+                    src={captcha.captchaImage}
+                    alt="CAPTCHA"
+                    className="h-10 w-[150px] rounded-md border border-[#e2e4e9]"
+                  />
+                ) : (
+                  <div className="h-10 w-[150px] rounded-md border border-[#e2e4e9] bg-[#f4f5f7] animate-pulse" />
+                )}
+                <button
+                  type="button"
+                  onClick={refreshCaptcha}
+                  className="p-2 text-[#9ca3af] hover:text-[#6b7280] transition-colors"
+                  aria-label="Refresh CAPTCHA"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <input
+                  {...captchaField}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="CAPTCHA"
+                  onChange={(e) => {
+                    e.target.value = e.target.value.replace(/[^0-9]/g, "");
+                    onCaptchaChange(e);
+                  }}
+                  className={`flex-1 min-w-0 px-4 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4361ee]/15 focus:border-[#4361ee] transition-all ${errors.captchaCode ? "border-red-400 bg-red-50" : "border-[#e2e4e9]"}`}
+                />
+              </div>
+              {errors.captchaCode && <p className="mt-1.5 text-xs text-red-500">{errors.captchaCode.message}</p>}
+              {!errors.captchaCode && captchaLoadFailed && (
+                <p className="mt-1.5 text-xs text-red-500">{t("login.captcha.load_failed")}</p>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={isLoading || !recaptchaToken}
+              disabled={isLoading}
               className="w-full py-2.5 bg-[#4361ee] hover:bg-[#3451d1] text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed mt-1 shadow-md shadow-[#4361ee]/20"
             >
               {isLoading ? (
