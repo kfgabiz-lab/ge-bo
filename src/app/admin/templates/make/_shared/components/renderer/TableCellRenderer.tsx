@@ -207,7 +207,7 @@ export function TableCellRenderer({
             onClick={!isPreview ? () => handlers?.onButtonClick?.(col, row) : undefined}
             className={`px-2.5 py-1 rounded text-[11px] font-medium transition-all ${colorDef.cls}`}
           >
-            {col.buttonLabel || t("common.btn.default")}
+            {col.buttonLabelMsgKey ? t(col.buttonLabelMsgKey) : col.buttonLabel || t("common.btn.default")}
           </button>
         </div>
       );
