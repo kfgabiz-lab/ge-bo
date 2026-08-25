@@ -315,6 +315,8 @@ export function useWidgetPageState(
 
   const [formFetchRelMap, setFormFetchRelMap] = useState<Record<string, Record<string, unknown>>>({});
 
+  const [recordLoaded, setRecordLoaded] = useState(false);
+
   const [apiInfoOptions, setApiInfoOptions] = useState<ApiInfoOption[]>([]);
   useEffect(() => {
     api
@@ -500,6 +502,7 @@ export function useWidgetPageState(
 
   useEffect(() => {
     if (!options?.enableUrlEditMode || !widgetItems.length) return;
+    setRecordLoaded(false);
 
     const allWidgets = flatWidgets(widgetItems);
     const formWidgets = allWidgets.filter((w) => w.type === "form") as FormWidget[];
@@ -564,7 +567,7 @@ export function useWidgetPageState(
           ...multiSelWidgets.map((mw) => mw.connectedSlug),
         ].filter((s): s is string => !!s)
       );
-      slugSet.forEach((s) => {
+      const loadPromises = Array.from(slugSet).map((s) => {
         const fetchPromise = pageIsEntity
           ? api.get(entityItemPath(s, queryGroupId)).then((r) => {
               const dateFieldMeta = buildEntityDateFieldMeta(
@@ -575,7 +578,7 @@ export function useWidgetPageState(
           : api
               .get(`/page-data/${s}/group/${queryGroupId}`)
               .then((r) => (r.data.dataJson || {}) as Record<string, unknown>);
-        fetchPromise
+        return fetchPromise
           .then(async (dataJson) => {
             await restoreFormDataFromJson(
               dataJson,
@@ -595,6 +598,7 @@ export function useWidgetPageState(
           })
           .catch(() => {});
       });
+      Promise.all(loadPromises).then(() => setRecordLoaded(true));
     } else if (queryId) {
       const connectedSlug =
         formWidgets[0]?.connectedSlug ?? multiSelWidgets[0]?.connectedSlug ?? sublistWidgets[0]?.connectedSlug;
@@ -630,6 +634,7 @@ export function useWidgetPageState(
               });
             }
             applyUrlParams();
+            setRecordLoaded(true);
           })
           .catch(() => toast.error(t("common.error.load_existing_data")));
       }
@@ -638,6 +643,7 @@ export function useWidgetPageState(
       setMultiSelectValuesMap({});
       if (sitesLoaded && clockReady) {
         setFormValuesMap(initFormDefaultValues(formWidgets, t));
+        setRecordLoaded(true);
       }
       applyUrlParams();
     }
@@ -646,6 +652,7 @@ export function useWidgetPageState(
 
   useEffect(() => {
     if (!widgetItems.length) return;
+    setRecordLoaded(false);
     const id = options?.sharedDataId ?? null;
     if (!id) return;
 
@@ -687,6 +694,7 @@ export function useWidgetPageState(
             setFormFetchRelMap((prev) => ({ ...prev, [fw.widgetId]: fetchRelData }));
           });
         }
+        setRecordLoaded(true);
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1866,6 +1874,7 @@ export function useWidgetPageState(
     onMultiSelectExtraFieldChange: handleMultiSelectExtraFieldChange,
     formFetchRelMap,
     pageIsEntity,
+    recordLoaded,
   };
 
   return { gridProps, setSubListRowsMap, confirmLeave };

@@ -80,11 +80,16 @@ export function fieldChromeHeight(hasLabel: boolean, hasDesc: boolean): number {
  * GridCell 실제 트랙 높이 공식(rowSpan × ROW_HEIGHT - GAP_SIZE)에서
  * 라벨/설명 영역(chromeHeight)과 여유분을 뺀 나머지를 콘텐츠 높이로 사용한다.
  */
-function fieldContentHeight(field: SearchFieldConfig, rowSpan: number, chromeHeight?: number): number {
+function fieldContentHeight(
+  field: SearchFieldConfig,
+  rowSpan: number,
+  chromeHeight?: number,
+  rowPitch: number = ROW_HEIGHT
+): number {
   const chrome =
     chromeHeight ??
     fieldChromeHeight(!!(field.label || field.labelMsgKey), !!(field.description || field.descriptionMsgKey));
-  return rowSpan * ROW_HEIGHT - GAP_SIZE - chrome - FIELD_CELL_SLACK_PX;
+  return rowSpan * rowPitch - GAP_SIZE - chrome - FIELD_CELL_SLACK_PX;
 }
 
 /**
@@ -214,6 +219,8 @@ interface FieldRendererProps {
   isEntity?: boolean;
   /** 필드 위쪽 라벨/설명 영역 높이(px) — 미지정 시 field의 label/description 유무로 추정 */
   contentChromeHeight?: number;
+  /** file/image/video/media/editor 콘텐츠 높이 계산에 쓰는 행 간격(px) — 미지정 시 ROW_HEIGHT 사용 */
+  contentRowPitch?: number;
 }
 
 /**
@@ -432,9 +439,18 @@ interface AutocompleteInputProps {
   placeholder?: string;
   isDisabled?: boolean;
   isReadOnly?: boolean;
+  fallbackDisplayText?: string;
 }
 
-function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isReadOnly }: AutocompleteInputProps) {
+function AutocompleteInput({
+  value,
+  onChange,
+  opts,
+  placeholder,
+  isDisabled,
+  isReadOnly,
+  fallbackDisplayText,
+}: AutocompleteInputProps) {
   const { t } = useI18n();
 
   /* 옵션 배열을 { text, value } 객체로 변환 */
@@ -443,7 +459,7 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
   /* value(키값)로 displayText 실시간 계산 — <select value={value}>와 동일 패턴
        value가 외부에서 바뀌어도 state 동기화 없이 즉시 반영됨 */
   const matched = parsedOpts.find((o) => o.value === value);
-  const displayText = matched ? t(matched.text) : "";
+  const displayText = matched ? t(matched.text) : fallbackDisplayText ? t(fallbackDisplayText) : "";
 
   /* 사용자 입력 중일 때만 사용하는 필터 텍스트 */
   const [filterText, setFilterText] = useState("");
@@ -491,7 +507,7 @@ function AutocompleteInput({ value, onChange, opts, placeholder, isDisabled, isR
         /* 포커스 시 드롭다운 열기 + 기존 displayText를 필터 초기값으로 설정 */
         onFocus={() => {
           if (!isReadOnly) {
-            setFilterText(displayText);
+            setFilterText(matched ? displayText : "");
             setIsOpen(true);
           }
         }}
@@ -733,6 +749,17 @@ function buildSlugOptRows(
   return opts.map(({ value, text }) => ({ value, text }));
 }
 
+function findSlugFallbackDisplayText(
+  rawRows: Record<string, unknown>[],
+  field: SearchFieldConfig,
+  value: string
+): string | undefined {
+  if (!value || rawRows.length === 0) return undefined;
+  const row = rawRows.find((r) => String(r[field.optionValueKey ?? ""] ?? "") === value);
+  if (!row) return undefined;
+  return String(row[field.optionTextKey ?? ""] ?? "");
+}
+
 /**
  * useOptionDerivedValues — SLUG 옵션에서 선택된 row의 파생값을 emit하는 공용 훅
  * SlugOptionSelect / SlugAutocompleteInput이 공용으로 사용한다.
@@ -856,6 +883,9 @@ function SlugOptionSelect({
 
   useOptionDerivedValues(rawRows, value, field, onDerivedChange);
 
+  const hasMatchedOpt = slugOpts.some((opt) => opt.value === value);
+  const fallbackText = !hasMatchedOpt ? findSlugFallbackDisplayText(rawRows, field, value) : undefined;
+
   return (
     <div className="relative">
       <select
@@ -865,6 +895,11 @@ function SlugOptionSelect({
         onChange={isReadOnly ? undefined : (e) => onChange?.(e.target.value)}
       >
         <option value="">{placeholder}</option>
+        {fallbackText !== undefined && (
+          <option value={value} disabled>
+            {fallbackText}
+          </option>
+        )}
         {slugOpts.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.text}
@@ -930,9 +965,9 @@ function SlugAutocompleteInput({
   }, [field.optionSlug]);
 
   /* optionFilter 평가(rowData의 $fieldKey 참조 포함) + Value/Text 추출 + 정렬 — 참조 필드 값이 바뀔 때마다 재계산 */
-  const slugOpts = useMemo(
+  const slugOptRows = useMemo(
     // eslint-disable-next-line react-hooks/preserve-manual-memoization -- 기존 코드, 이번 작업과 무관, 추후 기술부채로 별도 정리 예정
-    () => buildSlugOptRows(rawRows, field, rowData).map(({ value, text }) => `${text}:${value}`),
+    () => buildSlugOptRows(rawRows, field, rowData),
     [
       rawRows,
       field.optionValueKey,
@@ -943,8 +978,12 @@ function SlugAutocompleteInput({
       rowData,
     ]
   );
+  const slugOpts = slugOptRows.map(({ value: optValue, text }) => `${text}:${optValue}`);
 
   useOptionDerivedValues(rawRows, value, field, onDerivedChange);
+
+  const hasMatchedOpt = slugOptRows.some((opt) => opt.value === value);
+  const fallbackDisplayText = !hasMatchedOpt ? findSlugFallbackDisplayText(rawRows, field, value) : undefined;
 
   return (
     <AutocompleteInput
@@ -954,6 +993,7 @@ function SlugAutocompleteInput({
       placeholder={placeholder}
       isDisabled={isDisabled}
       isReadOnly={isReadOnly}
+      fallbackDisplayText={fallbackDisplayText}
     />
   );
 }
@@ -980,8 +1020,9 @@ export function FieldRenderer({
   rowData,
   isEntity,
   contentChromeHeight,
+  contentRowPitch,
 }: FieldRendererProps) {
-  const contentHeight = (rowSpan: number) => fieldContentHeight(field, rowSpan, contentChromeHeight);
+  const contentHeight = (rowSpan: number) => fieldContentHeight(field, rowSpan, contentChromeHeight, contentRowPitch);
   const isPreview = mode === "preview";
   const { t } = useI18n();
   /* 탭 keep-alive 환경에서 radio name 충돌 방지 — 인스턴스별 고유 prefix */

@@ -3,6 +3,8 @@
  * - list/page.tsx, layer/page.tsx에서 공유
  */
 
+import { ROW_HEIGHT } from "@/components/layout/grid-cell";
+
 /** 기본 input 스타일 */
 export const inputCls =
   "w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200";
@@ -28,11 +30,8 @@ export const fieldDescCls = "text-sm text-slate-400 mb-0.5 flex-shrink-0 leading
 /** Form 필드 본체 영역 스타일 — 여유가 있으면 세로 중앙, 넘치면 상단 정렬로 자동 폴백 */
 export const fieldBodyCls = "flex-1 min-h-0 flex flex-col justify-center-safe";
 
-/**
- * radio/checkbox/dateRangeStatus 옵션 그룹 래퍼 — 옵션 줄 20px + pb 18px = input과 같은 38px 박스.
- * py-* 대칭 padding으로 바꾸면 fieldBodyCls의 중앙정렬과 상쇄되어 라벨 간격이 전혀 안 바뀐다.
- */
-export const fieldOptionGroupCls = "flex items-center gap-4 pb-[18px]";
+/** radio/checkbox/dateRangeStatus 옵션 그룹 래퍼 — 옵션 줄바꿈 없는 전제 */
+export const fieldOptionGroupCls = "flex items-center gap-4";
 
 /** 글자수 카운터를 입력창 내부 우측에 겹쳐 배치 — 세로 흐름을 차지하지 않아 셀 높이에 영향 없음 */
 export const fieldCharCountCls =
@@ -49,3 +48,18 @@ export const FIELD_DESC_HEIGHT_PX = 20;
 
 /** 필드 셀 하단 여유분(px) — 테두리·반올림 오차 흡수용 */
 export const FIELD_CELL_SLACK_PX = 4;
+
+export const FORM_CONTENT_PADDING_TOP = 10;
+
+export const FORM_FIELD_ROW_HEIGHT = 90;
+
+export const FORM_FIELD_GAP = 12;
+
+export const FIELD_CONTROL_HEIGHT_PX = 38;
+
+/** FieldRenderer의 MULTI_LINE(text) 렌더링(whitespace-pre-wrap div, text-sm)이 한 줄당 실제로 차지하는 높이(px) — Tailwind text-sm: font-size 14 / line-height 20 */
+export const FIELD_TEXT_LINE_HEIGHT_PX = 20;
+
+export const TAB_CHROME_HEIGHT_PX = 50;
+
+export const TAB_CHROME_ROWS = Math.ceil(TAB_CHROME_HEIGHT_PX / ROW_HEIGHT);

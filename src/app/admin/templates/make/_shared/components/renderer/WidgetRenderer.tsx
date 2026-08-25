@@ -192,6 +192,7 @@ interface WidgetRendererProps {
   widget: AnyWidget | null;
   /** Form 위젯 그리드 열 수 (부모 위젯의 colSpan, 기본 12) */
   contentColSpan?: number;
+  spaceFillHeight?: boolean;
 
   /* ── live 모드 전용 — search ── */
   /** 검색폼 접기/펼치기 여부 */
@@ -336,6 +337,8 @@ interface WidgetRendererProps {
   mainConnectedSlug?: string;
   /** 이탈체크 활성 여부 — TabRenderer에 전달하여 탭 내부 폼 변경 감지 */
   leaveCheck?: boolean;
+  onTabContentRowsChange?: (rows: number) => void;
+  onTabActiveIndexChange?: (idx: number) => void;
   /** _fetchedRel{id} 원본 데이터 — FormRenderer rowData dot-notation 확장용 */
   fetchRelData?: Record<string, unknown>;
   /** entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
@@ -372,6 +375,7 @@ export function WidgetRenderer({
   mode,
   widget,
   contentColSpan = 12,
+  spaceFillHeight,
   /* search */
   collapsible,
   codeGroups = [],
@@ -438,6 +442,8 @@ export function WidgetRenderer({
   pageSlug,
   mainConnectedSlug,
   leaveCheck,
+  onTabContentRowsChange,
+  onTabActiveIndexChange,
   externalPopupTrigger,
   fetchRelData,
   isEntity,
@@ -2187,6 +2193,7 @@ export function WidgetRenderer({
           contentColSpan={contentColSpan}
           showBorder={widget.showBorder}
           bgColor={widget.bgColor}
+          fillHeight={spaceFillHeight}
           onContentAction={onContentAction}
           onDataSave={mode === "live" ? onDataSave : undefined}
           onApiCall={mode === "live" ? onApiCall : undefined}
@@ -2278,6 +2285,8 @@ export function WidgetRenderer({
         pageSlug={pageSlug}
         parentMainConnectedSlug={mainConnectedSlug}
         leaveCheck={leaveCheck}
+        onContentRowsChange={onTabContentRowsChange}
+        onActiveTabIndexChange={onTabActiveIndexChange}
       />
     );
   }
