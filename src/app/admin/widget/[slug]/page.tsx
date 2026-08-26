@@ -1,13 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import PageLayout, { findMenuByUrl } from "@/components/layout/page-layout";
 import { Loader2, AlertCircle } from "lucide-react";
 import api from "@/lib/api";
 import { useCodeStore } from "@/store/use-code-store";
 import { usePageTitleStore } from "@/store/use-page-title-store";
-import { useAuthStore } from "@/store/auth-store";
 import { useNavMenusQuery } from "@/hooks/use-menu-queries";
 import { PageGridRenderer } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { PageWidgetItem } from "@/app/admin/templates/make/_shared/components/renderer";
@@ -29,10 +28,8 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
   const { t } = useI18n();
 
   const pathname = usePathname();
-  const router = useRouter();
-  const { data: navMenusData, isLoading: navMenusLoading, isError: navMenusError } = useNavMenusQuery();
+  const { data: navMenusData, isLoading: navMenusLoading } = useNavMenusQuery();
   const menuId = useMemo(() => findMenuByUrl(navMenusData || [], pathname || "")?.id ?? null, [navMenusData, pathname]);
-  const isSystemAdmin = useAuthStore((s) => s.adminInfo?.isSystem ?? false);
 
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -48,15 +45,6 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
 
   useEffect(() => {
     if (navMenusLoading) return;
-    if (navMenusError) return;
-    if (menuId == null && !isSystemAdmin) {
-      router.replace("/admin/no-permission");
-    }
-  }, [navMenusLoading, navMenusError, menuId, isSystemAdmin, router]);
-
-  useEffect(() => {
-    if (navMenusLoading) return;
-    if (!navMenusError && menuId == null && !isSystemAdmin) return;
 
     fetchGroups();
     api
@@ -74,7 +62,7 @@ export default function WidgetRendererPage({ params }: { params: Promise<{ slug:
       })
       .catch(() => setHasError(true))
       .finally(() => setLoading(false));
-  }, [slug, fetchGroups, setPageTitle, navMenusLoading, navMenusError, menuId, isSystemAdmin]);
+  }, [slug, fetchGroups, setPageTitle, navMenusLoading, menuId]);
 
   if (loading) {
     return (

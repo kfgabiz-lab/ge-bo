@@ -1,51 +1,72 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Link2, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link2, Search, ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import CenterPopupLayout from "@/components/layout/popup/center-popup-layout";
+import api, { getApiErrorMessage } from "@/lib/api";
 
-/* 퍼블 단계 — 실제 api_info 연동 전 샘플 데이터 */
 interface ApiInfoRow {
   id: number;
   method: string;
   urlPattern: string;
-  category: string;
+  category: string | null;
+  accessType: string;
 }
 
-const SAMPLE_API_LIST: ApiInfoRow[] = [
-  { id: 1, method: "GET", urlPattern: "/api/v1/menus", category: "시스템" },
-  { id: 2, method: "POST", urlPattern: "/api/v1/menus", category: "시스템" },
-  { id: 3, method: "PATCH", urlPattern: "/api/v1/menus/{id}", category: "시스템" },
-  { id: 4, method: "DELETE", urlPattern: "/api/v1/menus/{id}", category: "시스템" },
-  { id: 5, method: "GET", urlPattern: "/api/v1/admins", category: "사용자관리" },
-  { id: 6, method: "PATCH", urlPattern: "/api/v1/admins/{id}", category: "사용자관리" },
-  { id: 7, method: "GET", urlPattern: "/api/v1/roles", category: "권한관리" },
-  { id: 8, method: "GET", urlPattern: "/api/v1/codes", category: "공통코드" },
-  { id: 9, method: "GET", urlPattern: "/api/v1/sites", category: "사이트관리" },
-];
+const METHOD_ORDER = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
 const METHOD_BADGE_CLS: Record<string, string> = {
   GET: "bg-blue-50 text-blue-600 border border-blue-200",
   POST: "bg-emerald-50 text-emerald-600 border border-emerald-200",
+  PUT: "bg-violet-50 text-violet-600 border border-violet-200",
   PATCH: "bg-amber-50 text-amber-600 border border-amber-200",
   DELETE: "bg-red-50 text-red-600 border border-red-200",
 };
+const METHOD_BADGE_FALLBACK_CLS = "bg-slate-50 text-slate-600 border border-slate-200";
+const METHOD_BADGE_INACTIVE_CLS = "bg-white text-slate-400 border border-slate-200 hover:border-slate-300";
 
-type SortKey = "method" | "urlPattern" | "category";
+interface UrlGroup {
+  urlPattern: string;
+  category: string | null;
+  methods: { id: number; method: string }[];
+}
+
+type SortKey = "urlPattern" | "category";
 type SortDir = "asc" | "desc";
 
-const COLUMNS: { key: SortKey; label: string; cls: string }[] = [
-  { key: "method", label: "메소드", cls: "w-20" },
-  { key: "urlPattern", label: "URL 패턴", cls: "flex-1" },
-  { key: "category", label: "카테고리", cls: "w-24 text-right" },
-];
-
-export function MenuApiRegisterButton() {
+export function MenuApiRegisterButton({ menuId }: { menuId: number }) {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [apiList, setApiList] = useState<ApiInfoRow[]>([]);
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [keyword, setKeyword] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [listRes, mappedRes] = await Promise.all([
+        api.get<ApiInfoRow[]>("/api-infos/active"),
+        api.get<number[]>(`/menus/${menuId}/apis`),
+      ]);
+      /* accessType=ALL API는 menu_api 등록과 무관하게 항상 허용되므로 등록 대상 목록에서 제외 */
+      setApiList(listRes.data.filter((api) => api.accessType !== "ALL"));
+      setChecked(new Set(mappedRes.data));
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "API 목록을 불러오는 중 오류가 발생했습니다."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpen = () => {
+    setOpen(true);
+    setKeyword("");
+    loadData();
+  };
 
   const toggle = (id: number) => {
     setChecked((prev) => {
@@ -70,28 +91,67 @@ export function MenuApiRegisterButton() {
 
   const rows = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
-    let result = SAMPLE_API_LIST;
+    let filtered = apiList;
     if (kw) {
-      result = result.filter(
+      filtered = filtered.filter(
         (api) =>
           api.urlPattern.toLowerCase().includes(kw) ||
           api.method.toLowerCase().includes(kw) ||
-          api.category.toLowerCase().includes(kw)
+          (api.category ?? "").toLowerCase().includes(kw)
       );
     }
+
+    const groupMap = new Map<string, UrlGroup>();
+    for (const api of filtered) {
+      const group = groupMap.get(api.urlPattern);
+      if (group) {
+        group.methods.push({ id: api.id, method: api.method });
+      } else {
+        groupMap.set(api.urlPattern, {
+          urlPattern: api.urlPattern,
+          category: api.category,
+          methods: [{ id: api.id, method: api.method }],
+        });
+      }
+    }
+
+    let result = Array.from(groupMap.values());
+    result.forEach((group) => {
+      group.methods.sort(
+        (a, b) =>
+          METHOD_ORDER.indexOf(a.method as (typeof METHOD_ORDER)[number]) -
+          METHOD_ORDER.indexOf(b.method as (typeof METHOD_ORDER)[number])
+      );
+    });
+
     if (sortKey) {
       result = [...result].sort((a, b) => {
-        const cmp = a[sortKey].localeCompare(b[sortKey]);
+        const av = (a[sortKey] ?? "").toString();
+        const bv = (b[sortKey] ?? "").toString();
+        const cmp = av.localeCompare(bv);
         return sortDir === "asc" ? cmp : -cmp;
       });
     }
     return result;
-  }, [keyword, sortKey, sortDir]);
+  }, [apiList, keyword, sortKey, sortDir]);
+
+  const handleSave = async () => {
+    setSubmitting(true);
+    try {
+      await api.put(`/menus/${menuId}/apis`, { apiInfoIds: [...checked] });
+      toast.success("저장되었습니다.");
+      setOpen(false);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "저장 중 오류가 발생했습니다."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 transition-all"
       >
         <Link2 className="w-3.5 h-3.5" />
@@ -117,55 +177,74 @@ export function MenuApiRegisterButton() {
           </div>
 
           <div className="border border-slate-200 rounded-lg overflow-hidden">
-            {/* 헤더 — 클릭 시 정렬 */}
+            {/* 헤더 — URL/카테고리 클릭 시 정렬 */}
             <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200">
-              <span className="w-4" />
-              {COLUMNS.map((col) => {
-                const active = sortKey === col.key;
-                return (
-                  <button
-                    key={col.key}
-                    onClick={() => handleSort(col.key)}
-                    className={`flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-all ${col.cls} ${col.key === "category" ? "justify-end" : ""}`}
-                  >
-                    {col.label}
-                    {active ? (
-                      sortDir === "asc" ? (
-                        <ChevronUp className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )
-                    ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-300" />
-                    )}
-                  </button>
-                );
-              })}
+              <button
+                onClick={() => handleSort("urlPattern")}
+                className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-all flex-1"
+              >
+                URL 패턴
+                {sortKey === "urlPattern" ? (
+                  sortDir === "asc" ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )
+                ) : (
+                  <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                )}
+              </button>
+              <span className="w-52 text-[11px] font-semibold text-slate-500 text-center">METHOD</span>
+              <button
+                onClick={() => handleSort("category")}
+                className="flex items-center gap-1 justify-end text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-all w-24"
+              >
+                카테고리
+                {sortKey === "category" ? (
+                  sortDir === "asc" ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )
+                ) : (
+                  <ChevronsUpDown className="w-3 h-3 text-slate-300" />
+                )}
+              </button>
             </div>
 
             {/* 목록 */}
             <div className="divide-y divide-slate-100 max-h-[320px] overflow-y-auto">
-              {rows.length === 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                </div>
+              ) : rows.length === 0 ? (
                 <p className="px-4 py-6 text-center text-xs text-slate-400">검색 결과가 없습니다.</p>
               ) : (
-                rows.map((api) => (
-                  <label key={api.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50">
-                    <input
-                      type="checkbox"
-                      checked={checked.has(api.id)}
-                      onChange={() => toggle(api.id)}
-                      className="w-4 h-4 rounded border-slate-300"
-                    />
-                    <span className="w-20">
-                      <span
-                        className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${METHOD_BADGE_CLS[api.method]}`}
-                      >
-                        {api.method}
-                      </span>
+                rows.map((group) => (
+                  <div key={group.urlPattern} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
+                    <span className="text-xs font-mono text-slate-700 flex-1">{group.urlPattern}</span>
+                    <span className="w-52 flex flex-wrap items-center justify-center gap-1">
+                      {group.methods.map(({ id, method }) => {
+                        const active = checked.has(id);
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggle(id)}
+                            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded transition-all ${
+                              active
+                                ? (METHOD_BADGE_CLS[method] ?? METHOD_BADGE_FALLBACK_CLS)
+                                : METHOD_BADGE_INACTIVE_CLS
+                            }`}
+                          >
+                            {method}
+                          </button>
+                        );
+                      })}
                     </span>
-                    <span className="text-xs font-mono text-slate-700 flex-1">{api.urlPattern}</span>
-                    <span className="w-24 text-[10px] text-slate-400 text-right">{api.category}</span>
-                  </label>
+                    <span className="w-24 text-[10px] text-slate-400 text-right">{group.category ?? "-"}</span>
+                  </div>
                 ))
               )}
             </div>
@@ -174,15 +253,17 @@ export function MenuApiRegisterButton() {
           <div className="flex justify-end gap-2 mt-5">
             <button
               onClick={() => setOpen(false)}
-              className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 transition-all"
+              disabled={submitting}
+              className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 transition-all disabled:opacity-40"
             >
               취소
             </button>
             <button
-              onClick={() => setOpen(false)}
-              className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-all"
+              onClick={handleSave}
+              disabled={submitting || loading}
+              className="px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-all disabled:opacity-40"
             >
-              저장
+              {submitting ? "저장 중..." : "저장"}
             </button>
           </div>
         </div>

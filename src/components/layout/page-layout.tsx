@@ -1,13 +1,11 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ROW_HEIGHT } from "./grid-cell";
 import { PageGridContainer } from "./page-grid-container";
 import { useMenuStore, MenuItem } from "@/store/use-menu-store";
 import { usePageTitleStore } from "@/store/use-page-title-store";
-import { useAuthStore } from "@/store/auth-store";
-import { useNavMenusQuery } from "@/hooks/use-menu-queries";
 import { useI18n } from "@/hooks/use-i18n";
 
 export function findMenuByUrl(menus: MenuItem[], pathname: string): MenuItem | null {
@@ -32,11 +30,6 @@ export function findMenuById(menus: MenuItem[], id: number): MenuItem | undefine
   return undefined;
 }
 
-function isRecordDetailRoute(pathname: string): boolean {
-  const last = pathname.split("/").pop();
-  return !!last && /^\d+$/.test(last);
-}
-
 interface PageLayoutProps {
   title?: string;
   description?: string;
@@ -47,24 +40,8 @@ interface PageLayoutProps {
 
 export default function PageLayout({ title, description, mode = "live", noGrid = false, children }: PageLayoutProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const navMenus = useMenuStore((state) => state.navMenus);
   const { t } = useI18n();
-
-  const isSystemAdmin = useAuthStore((s) => s.adminInfo?.isSystem ?? false);
-  const { data: navMenusData, isLoading: navMenusLoading, isError: navMenusError } = useNavMenusQuery();
-
-  useEffect(() => {
-    if (mode !== "live") return;
-    if (navMenusLoading || navMenusError) return;
-    if (isSystemAdmin) return;
-    if (pathname === "/admin/dashboard") return;
-    if (!pathname) return;
-    if (isRecordDetailRoute(pathname)) return;
-    if (!findMenuByUrl(navMenusData || [], pathname)) {
-      // router.replace("/admin/no-permission");
-    }
-  }, [mode, pathname, isSystemAdmin, navMenusData, navMenusLoading, navMenusError, router]);
 
   const pageTitle = usePageTitleStore((s) => s.pageTitle);
 

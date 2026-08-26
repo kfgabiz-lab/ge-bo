@@ -1086,7 +1086,7 @@ export function MenuDetail() {
             <Trash2 className="w-3.5 h-3.5" />
             {t("common.btn.delete")}
           </button>
-          <MenuApiRegisterButton />
+          {activeTab === "BO" && <MenuApiRegisterButton menuId={selectedMenu.id} />}
           <button
             onClick={handleSave}
             disabled={isSubmitting}

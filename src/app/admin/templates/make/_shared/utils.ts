@@ -1671,10 +1671,14 @@ export function buildDataJson(
   };
 
   const pageKeyToId: Record<string, string> = {};
+  const generationTargetKeyToId: Record<string, string> = {};
   widgets.forEach((w) => {
     if (w.type !== "form") return;
     (w.fields ?? []).forEach((f) => {
-      if (f.fieldKey) pageKeyToId[f.fieldKey] = f.id;
+      if (!f.fieldKey) return;
+      pageKeyToId[f.fieldKey] = f.id;
+      generationTargetKeyToId[f.fieldKey] = f.id;
+      if (w.contentKey) generationTargetKeyToId[`${w.contentKey}.${f.fieldKey}`] = f.id;
     });
   });
 
@@ -1756,14 +1760,7 @@ export function buildDataJson(
           if (!dg.generationKey) return;
           /* cross-tab 참조는 저장 단계에서 skip — UI(crossTabFormValues 경로)에서 이미 반영됨 */
           if (isCrossTabKey(dg.generationKey)) return;
-          /* onlyIfEmpty=true이고 같은 폼 내 대상 필드가 이미 값 있으면 저장도 건너뜀 */
-          if (dg.onlyIfEmpty) {
-            const targetField = (w.fields ?? []).find((f2) => f2.fieldKey === dg.generationKey);
-            if (targetField) {
-              const currentVal = rawValues[targetField.id] ?? "";
-              if (currentVal !== "") return;
-            }
-          }
+          if (dg.onlyIfEmpty && generationTargetKeyToId[dg.generationKey]) return;
           const transformed = applyDataGeneration(
             sourceValue,
             dg.dataReplacement,

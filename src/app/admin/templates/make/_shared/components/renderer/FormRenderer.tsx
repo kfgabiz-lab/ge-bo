@@ -163,11 +163,7 @@ export function FormRenderer({
   const shouldDisable = (f: FormFieldItem): boolean =>
     !isPreview && !!f.disableCondition && evalCondition(f.disableCondition);
 
-  /* 페이지 최초 로드 시 값을 저장 — onlyIfEmpty 체크 기준
-   * 신규 등록: 초기값 모두 "" → 항상 반영 (연속 타이핑 가능)
-   * 편집 모드: 초기값이 있는 필드 → 소스 변경해도 skip (기존값 보호) */
-  const initialValuesRef = useRef<Record<string, string>>(values);
-  const initialAllFormValuesRef = useRef<Record<string, string> | undefined>(allFormValues);
+  const lastGeneratedRef = useRef<Record<string, string>>({});
 
   /**
    * 필드값 변경 핸들러 — generationKey 설정 시 대상 필드에 변환값 자동 입력
@@ -245,26 +241,43 @@ export function FormRenderer({
           dg.truncateLength,
           dg.stripHtml
         );
+
+        const sourceIsBlank =
+          !!dg.onlyIfEmpty &&
+          applyDataGeneration(value, dg.dataReplacement, dg.caseChange, undefined, undefined, dg.stripHtml).trim() ===
+            "";
+
+        const nextValue = sourceIsBlank ? "" : transformed;
+
         if (targetFieldId && targetFieldId !== fieldId) {
-          /* onlyIfEmpty=true: 초기값 기준 체크 — 신규 등록은 연속 반영, 편집 모드는 기존값 보호 */
-          if (dg.onlyIfEmpty) {
-            const initialVal =
-              initialValuesRef.current[targetFieldId] ?? initialAllFormValuesRef.current?.[targetFieldId] ?? "";
-            if (initialVal !== "") return;
+          if (dg.onlyIfEmpty && !sourceIsBlank) {
+            const currentTargetValue = values[targetFieldId] ?? allFormValues?.[targetFieldId] ?? "";
+            if (currentTargetValue !== "" && currentTargetValue !== lastGeneratedRef.current[targetFieldId]) return;
           }
-          dispatchValue(targetFieldId, transformed);
+          dispatchValue(targetFieldId, nextValue);
+          if (dg.onlyIfEmpty) lastGeneratedRef.current[targetFieldId] = nextValue;
         } else if (!targetFieldId) {
           /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
-          if (dg.onlyIfEmpty) {
-            const crossFieldId = allFieldKeyToId?.[dg.generationKey];
-            const initialCrossVal = (crossFieldId ? initialAllFormValuesRef.current?.[crossFieldId] : undefined) ?? "";
-            if (initialCrossVal !== "") return;
+          if (dg.onlyIfEmpty && !sourceIsBlank) {
+            const currentTargetValue = crossTabFormValues?.[dg.generationKey] ?? "";
+            if (currentTargetValue !== "" && currentTargetValue !== lastGeneratedRef.current[dg.generationKey]) return;
           }
-          onChangeAllFormValues?.(dg.generationKey, transformed);
+          onChangeAllFormValues?.(dg.generationKey, nextValue);
+          if (dg.onlyIfEmpty) lastGeneratedRef.current[dg.generationKey] = nextValue;
         }
       });
     },
-    [fields, keyToId, allFieldKeyToId, onChangeValues, onChangeAllFormValues, contentKey]
+    [
+      fields,
+      keyToId,
+      allFieldKeyToId,
+      onChangeValues,
+      onChangeAllFormValues,
+      contentKey,
+      values,
+      allFormValues,
+      crossTabFormValues,
+    ]
   );
 
   if (!fields.length) {

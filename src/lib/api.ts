@@ -38,7 +38,8 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config as RetryableConfig;
 
-    if (error.response?.status === 403) {
+    const ACCESS_DENIED_CODES = ["SITE_ACCESS_DENIED", "MENU_ACCESS_DENIED", "FORBIDDEN"];
+    if (error.response?.status === 403 && ACCESS_DENIED_CODES.includes(error.response?.data?.error)) {
       if (typeof window !== "undefined" && window.location.pathname !== "/bo/admin/no-permission") {
         const navigate = useNavigationStore.getState().navigate;
         if (navigate) {
