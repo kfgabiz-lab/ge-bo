@@ -24,6 +24,7 @@ import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@/hooks/use-i18n";
+import { PageGridContainer } from "@/components/layout/page-grid-container";
 import { fetchTemplateConfig } from "../../templateApi";
 import { PageGridRenderer } from "./PageGridRenderer";
 import type { PageWidgetItem } from "./PageGridRenderer";
@@ -32,6 +33,7 @@ import type { TableWidget } from "../builder/TableBuilder";
 import { useWidgetPageState, flatWidgets } from "../../hooks/useWidgetPageState";
 import type { ConnectedType } from "../../hooks/useOutputMode";
 import { useCodeStore } from "@/store/use-code-store";
+import { TAB_CHROME_ROWS } from "../../styles";
 
 interface TabRendererProps {
   mode: RendererMode;
@@ -42,15 +44,51 @@ interface TabRendererProps {
   parentMainConnectedSlug?: string;
   /** 이탈체크 활성 여부 — 탭 내부 폼 변경 시 이탈 감지 */
   leaveCheck?: boolean;
+  onContentRowsChange?: (rows: number) => void;
+  onActiveTabIndexChange?: (idx: number) => void;
 }
 
-export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, leaveCheck }: TabRendererProps) {
+export function TabRenderer({
+  mode,
+  widget,
+  pageSlug,
+  parentMainConnectedSlug,
+  leaveCheck,
+  onContentRowsChange,
+  onActiveTabIndexChange,
+}: TabRendererProps) {
   const { tabs } = widget;
   const [activeIdx, setActiveIdx] = useState(0);
   /* 한 번이라도 활성화된 탭 인덱스 집합 — lazy mount용 */
   const [mountedTabs, setMountedTabs] = useState<Set<number>>(new Set([0]));
   const { t } = useI18n();
   const searchParams = useSearchParams();
+
+  const [tabContentRows, setTabContentRows] = useState<Record<number, number>>({});
+
+  const handleTabRowsChange = useCallback((tabIdx: number, rows: number) => {
+    setTabContentRows((prev) => {
+      if (rows <= 0) {
+        if (!(tabIdx in prev)) return prev;
+        const next = { ...prev };
+        delete next[tabIdx];
+        return next;
+      }
+      if (prev[tabIdx] === rows) return prev;
+      return { ...prev, [tabIdx]: rows };
+    });
+  }, []);
+
+  const activeTabRows = tabContentRows[activeIdx];
+
+  useEffect(() => {
+    if (!onContentRowsChange || !activeTabRows) return;
+    onContentRowsChange(activeTabRows + TAB_CHROME_ROWS);
+  }, [activeTabRows, onContentRowsChange]);
+
+  useEffect(() => {
+    onActiveTabIndexChange?.(activeIdx);
+  }, [activeIdx, onActiveTabIndexChange]);
 
   /**
    * 탭들이 같은 connectedSlug를 사용할 때 공유하는 row id
@@ -177,9 +215,10 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
                     confirmLeaveMap.current[tabIdx] = fn;
                   }}
                   urlParams={urlParams}
+                  onTabRowsChange={handleTabRowsChange}
                 />
               ) : (
-                <PreviewTabPanel tab={tab} activeIdx={idx} />
+                <PreviewTabPanel tab={tab} activeIdx={idx} onTabRowsChange={handleTabRowsChange} />
               ))}
           </div>
         ))}
@@ -193,30 +232,43 @@ export function TabRenderer({ mode, widget, pageSlug, parentMainConnectedSlug, l
 interface PreviewTabPanelProps {
   tab: TabItem;
   activeIdx: number;
+  onTabRowsChange: (tabIdx: number, rows: number) => void;
 }
 
-function PreviewTabPanel({ tab, activeIdx }: PreviewTabPanelProps) {
+function PreviewTabPanel({ tab, activeIdx, onTabRowsChange }: PreviewTabPanelProps) {
+  const handleContentRowsChange = useCallback(
+    (rows: number) => onTabRowsChange(activeIdx, rows),
+    [activeIdx, onTabRowsChange]
+  );
+
+  useEffect(() => {
+    return () => onTabRowsChange(activeIdx, 0);
+  }, [activeIdx, onTabRowsChange]);
+
   /* items가 있으면 PageGridRenderer로 직접 렌더링 */
   if (tab.items && tab.items.length > 0) {
     return (
-      <PageGridRenderer
-        mode="preview"
-        widgetItems={tab.items.map(
-          (item, idx): PageWidgetItem => ({
-            id: `tab-preview-${activeIdx}-${idx}`,
-            colSpan: item.colSpan,
-            rowSpan: item.rowSpan,
-            contents: [
-              {
-                id: `tab-content-${activeIdx}-${idx}`,
-                colSpan: item.colSpan,
-                rowSpan: item.rowSpan,
-                widget: item.widget,
-              },
-            ],
-          })
-        )}
-      />
+      <PageGridContainer>
+        <PageGridRenderer
+          mode="preview"
+          widgetItems={tab.items.map(
+            (item, idx): PageWidgetItem => ({
+              id: `tab-preview-${activeIdx}-${idx}`,
+              colSpan: item.colSpan,
+              rowSpan: item.rowSpan,
+              contents: [
+                {
+                  id: `tab-content-${activeIdx}-${idx}`,
+                  colSpan: item.colSpan,
+                  rowSpan: item.rowSpan,
+                  widget: item.widget,
+                },
+              ],
+            })
+          )}
+          onContentRowsChange={handleContentRowsChange}
+        />
+      </PageGridContainer>
     );
   }
 
@@ -255,6 +307,7 @@ interface LiveTabPanelProps {
   onRegisterConfirmLeave?: (tabIdx: number, fn: () => boolean) => void;
   /** URL 쿼리 파라미터 — hideCondition/disableCondition 평가용 */
   urlParams?: Record<string, string>;
+  onTabRowsChange: (tabIdx: number, rows: number) => void;
 }
 
 /**
@@ -276,10 +329,21 @@ function LiveTabPanel({
   leaveCheck,
   onRegisterConfirmLeave,
   urlParams,
+  onTabRowsChange,
 }: LiveTabPanelProps) {
   const { groups: codeGroups } = useCodeStore();
   const { t } = useI18n();
   const [widgetItems, setWidgetItems] = useState<PageWidgetItem[]>([]);
+
+  const handleContentRowsChange = useCallback(
+    (rows: number) => onTabRowsChange(tabIdx, rows),
+    [tabIdx, onTabRowsChange]
+  );
+
+  useEffect(() => {
+    return () => onTabRowsChange(tabIdx, 0);
+  }, [tabIdx, onTabRowsChange]);
+
   const [subPageMainConnectedSlug, setSubPageMainConnectedSlug] = useState<string | undefined>(undefined);
   /* 탭 서브페이지 자체의 connectedType — 이 탭 안의 Table 위젯이 entity API를 조회해야 하는지 판단 기준 */
   const [subPageConnectedType, setSubPageConnectedType] = useState<ConnectedType | undefined>(undefined);
@@ -373,15 +437,18 @@ function LiveTabPanel({
   if (!widgetItems.length) return null;
 
   return (
-    <PageGridRenderer
-      mode="live"
-      widgetItems={widgetItems}
-      codeGroups={codeGroups}
-      dataSlug={dataSlug}
-      urlParams={urlParams}
-      crossTabFormValues={crossTabFormValues}
-      onCrossTabFormChange={onCrossTabFormChange}
-      {...gridProps}
-    />
+    <PageGridContainer>
+      <PageGridRenderer
+        mode="live"
+        widgetItems={widgetItems}
+        codeGroups={codeGroups}
+        dataSlug={dataSlug}
+        urlParams={urlParams}
+        crossTabFormValues={crossTabFormValues}
+        onCrossTabFormChange={onCrossTabFormChange}
+        onContentRowsChange={handleContentRowsChange}
+        {...gridProps}
+      />
+    </PageGridContainer>
   );
 }

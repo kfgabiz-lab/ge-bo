@@ -1,5 +1,5 @@
-import React from 'react';
-import { ROW_HEIGHT, GAP_SIZE } from './grid-cell';
+import React from "react";
+import { GAP_SIZE } from "./grid-cell";
 
 /**
  * PageGridContainer — 12col CSS 그리드 공통 컨테이너
@@ -12,17 +12,17 @@ import { ROW_HEIGHT, GAP_SIZE } from './grid-cell';
  *   - WidgetRenderer: LayerPopup 내부 그리드
  */
 export function PageGridContainer({ children }: { children: React.ReactNode }) {
-    return (
-        <div
-            style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(12, 1fr)',
-                gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                rowGap: `${GAP_SIZE}px`,
-                columnGap: 0,
-            }}
-        >
-            {children}
-        </div>
-    );
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(12, 1fr)",
+        gridAutoRows: "auto",
+        rowGap: `${GAP_SIZE}px`,
+        columnGap: 0,
+      }}
+    >
+      {children}
+    </div>
+  );
 }

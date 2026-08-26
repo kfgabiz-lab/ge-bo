@@ -388,6 +388,21 @@ export const evalWidgetHideCondition = (
     return allFormValues[key];
   });
 
+export const buildFieldConditionResolver = (
+  keyToId: Record<string, string>,
+  values: Record<string, string>,
+  urlParams?: Record<string, string>,
+  crossTabFormValues?: Record<string, string>
+) => {
+  return (key: string): string | undefined => {
+    const fieldId = keyToId[key];
+    if (fieldId) return values[fieldId] ?? "";
+    if (urlParams && key in urlParams) return urlParams[key] ?? "";
+    if (crossTabFormValues && key in crossTabFormValues) return crossTabFormValues[key] ?? "";
+    return undefined;
+  };
+};
+
 /**
  * fieldKey → fieldId(id) 역매핑 테이블 생성 — hideCondition/disableCondition 평가 등에서 공용으로 사용
  * FormRenderer·SearchRenderer가 각자 인라인으로 만들던 동일한 로직을 공통함수로 분리
@@ -401,6 +416,30 @@ export const buildKeyToId = (fields: { id: string; fieldKey?: string }[]): Recor
   });
   return map;
 };
+
+const extractOptionFilterParentKeys = (optionFilter: string): string[] => {
+  const keys: string[] = [];
+  splitTopLevelComma(optionFilter).forEach((cond) => {
+    for (const op of CONDITION_OPS) {
+      const idx = cond.indexOf(op);
+      if (idx === -1) continue;
+      const lhsToken = cond.slice(0, idx).trim();
+      const rhsToken = cond.slice(idx + op.length).trim();
+      if (lhsToken.startsWith("$")) keys.push(lhsToken.slice(1));
+      if (rhsToken.startsWith("$")) keys.push(rhsToken.slice(1));
+      break;
+    }
+  });
+  return keys;
+};
+
+export const findOptionFilterResetTargetIds = (
+  fields: { id: string; fieldKey?: string; optionFilter?: string }[],
+  changedFieldKey: string
+): string[] =>
+  fields
+    .filter((f) => f.optionFilter && extractOptionFilterParentKeys(f.optionFilter).includes(changedFieldKey))
+    .map((f) => f.id);
 
 /** 비교 연산자 심볼(< <= > >=) → 검증 실패 안내 메시지의 i18n 키 (docs/db/i18n/lang.sql에 등록됨) */
 const COMPARE_OP_MSG_KEY: Record<string, string> = {
@@ -1566,6 +1605,16 @@ export const findDuplicateKeys = (keys: string[]): string[] => {
   return [...new Set(duplicated)];
 };
 
+export const getSpaceGridColumnStart = (
+  align: "left" | "center" | "right" | undefined,
+  colSpan: number,
+  maxCols: number = 12
+): number | undefined => {
+  if (!align || align === "left") return undefined;
+  if (align === "right") return maxCols - colSpan + 1;
+  return Math.floor((maxCols - colSpan) / 2) + 1;
+};
+
 /**
  * SpaceWidget의 align 설정에 따라 외부 그리드 컬럼 위치(gridColumn) 계산
  * - left  : span N (자동 배치, 기본)
@@ -1582,14 +1631,8 @@ export const getSpaceGridColumn = (
   colSpan: number,
   maxCols: number = 12
 ): string => {
-  if (!align || align === "left") return `span ${colSpan}`;
-  if (align === "right") {
-    const start = maxCols - colSpan + 1;
-    return `${start} / span ${colSpan}`;
-  }
-  /* center */
-  const start = Math.floor((maxCols - colSpan) / 2) + 1;
-  return `${start} / span ${colSpan}`;
+  const start = getSpaceGridColumnStart(align, colSpan, maxCols);
+  return start === undefined ? `span ${colSpan}` : `${start} / span ${colSpan}`;
 };
 
 /**

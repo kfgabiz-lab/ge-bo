@@ -175,24 +175,30 @@ export function Header() {
       {/* 브레드크럼 */}
       <nav className="flex items-center gap-1.5 text-sm">
         <Home className="w-3.5 h-3.5 text-gray-400" />
-        {crumbs.map((crumb, i) => (
-          <span key={`${crumb.href}-${i}`} className="flex items-center gap-1.5">
-            <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
-            {crumb.isLast ? (
-              <span className="font-semibold text-slate-900 tracking-tight">{crumb.label}</span>
-            ) : (
-              <span
-                className="text-gray-500 hover:text-slate-900 cursor-pointer transition-colors font-medium"
-                onClick={() => {
-                  if (confirmLeave && !confirmLeave()) return;
-                  router.push(crumb.href);
-                }}
-              >
-                {crumb.label}
-              </span>
-            )}
-          </span>
-        ))}
+        {crumbs.map((crumb, i) => {
+          const isClickable = !!crumb.href && crumb.href !== "#" && !crumb.isLast;
+
+          return (
+            <span key={`${crumb.href}-${i}`} className="flex items-center gap-1.5">
+              <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+              {crumb.isLast ? (
+                <span className="font-semibold text-slate-900 tracking-tight">{crumb.label}</span>
+              ) : isClickable ? (
+                <span
+                  className="text-gray-500 hover:text-slate-900 cursor-pointer transition-colors font-medium"
+                  onClick={() => {
+                    if (confirmLeave && !confirmLeave()) return;
+                    router.push(crumb.href);
+                  }}
+                >
+                  {crumb.label}
+                </span>
+              ) : (
+                <span className="text-gray-500 transition-colors font-medium">{crumb.label}</span>
+              )}
+            </span>
+          );
+        })}
       </nav>
 
       {/* 우측 액션 */}

@@ -54,6 +54,7 @@ import type { TableWidget } from "../_shared/components/builder/TableBuilder";
 import type { FormWidget } from "../_shared/components/builder/FormBuilder";
 import { createIdGenerator, toSlug } from "../_shared/utils";
 import { buildFormFromEntity } from "../_shared/utils/entityBuild";
+import { normalizeFormItemRowSpans } from "../_shared/utils/formGridLayout";
 import { stampConnectedSlug } from "../_shared/hooks/useWidgetPageState";
 import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
 import type { SlugOption } from "../_shared/components/builder/fields/SlugSelectField";
@@ -598,11 +599,12 @@ export default function PageBuilderPage() {
   /* ── 컨텐츠 내부 위젯 데이터 업데이트 ── */
   const updateContent = (itemId: string, contentId: string, widget: PageWidget) => {
     setWidgetItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, contents: item.contents.map((c) => (c.id === contentId ? { ...c, widget } : c)) }
-          : item
-      )
+      prev.map((item) => {
+        if (item.id !== itemId) return item;
+        const updatedContents = item.contents.map((c) => (c.id === contentId ? { ...c, widget } : c));
+        const normalized = normalizeFormItemRowSpans(item.colSpan, item.rowSpan, updatedContents);
+        return { ...item, contents: normalized.contents, rowSpan: normalized.rowSpan };
+      })
     );
   };
 
@@ -627,14 +629,15 @@ export default function PageBuilderPage() {
     if (hasFormContent) {
       /* ── 케이스 1: form 위젯이 이미 있는 경우 — 페이지 내 모든 form 위젯에 동일하게 빌드 적용 ── */
       setWidgetItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          contents: item.contents.map((c) =>
+        prev.map((item) => {
+          const updatedContents = item.contents.map((c) =>
             c.widget.type !== "form"
               ? c
               : { ...c, widget: buildFormFromEntity(c.widget as FormWidget, slugEntityFields) }
-          ),
-        }))
+          );
+          const normalized = normalizeFormItemRowSpans(item.colSpan, item.rowSpan, updatedContents);
+          return { ...item, contents: normalized.contents, rowSpan: normalized.rowSpan };
+        })
       );
     } else {
       /* ── 케이스 2: form 위젯이 없는 경우 — 위젯 + 컨텐츠 + 필드 모두 신규 생성 ──
@@ -656,11 +659,13 @@ export default function PageBuilderPage() {
         widget: newFormWidget,
       };
 
+      const normalized = normalizeFormItemRowSpans(12, 1, [newContent]);
+
       const newWidgetItem: PageWidgetItem = {
         id: wuid(),
         colSpan: 12,
-        rowSpan: 1,
-        contents: [newContent],
+        rowSpan: normalized.rowSpan,
+        contents: normalized.contents,
       };
 
       setWidgetItems((prev) => [...prev, newWidgetItem]);
@@ -762,7 +767,11 @@ export default function PageBuilderPage() {
 
     /* 저장 직전 — Form/Table/SubList/MultiSelect 4종 위젯 중 connectedSlug가 비어있는 위젯만
      * om.mainConnectedSlug로 채운다(fill-if-empty). 이미 개별 지정된 위젯은 그대로 유지된다. */
-    const itemsToSave = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
+    const slugStamped = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
+    const itemsToSave = slugStamped.map((item) => {
+      const normalized = normalizeFormItemRowSpans(item.colSpan, item.rowSpan, item.contents);
+      return { ...item, contents: normalized.contents, rowSpan: normalized.rowSpan };
+    });
 
     await tm.handleSaveConfirm(itemsToSave as unknown as import("../_shared/templateApi").PageWidgetItem[], {
       outputMode: om.outputMode,

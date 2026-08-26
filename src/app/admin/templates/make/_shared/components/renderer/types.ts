@@ -362,6 +362,8 @@ export interface TabItem {
     rowSpan: number;
     widget: AnyWidget;
   }[];
+  /** 연결 페이지가 실제로 필요로 하는 콘텐츠 행수 — pageSlug 연결/변경 시 TabBuilder가 계산해 저장 (탭바 높이 제외, 순수 콘텐츠 영역) */
+  contentRowSpan?: number;
 }
 
 /** 탭 컨텐츠 위젯 */

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * GridCell — 그리드 셀 공통 컴포넌트
@@ -27,15 +27,16 @@ export const ROW_HEIGHT = 80;
 export const GAP_SIZE = 8;
 
 interface GridCellProps {
-    /** 12칸 그리드 기준 가로 열 점유 수 (1~12) */
-    colSpan: number;
-    /** 행 점유 수 — height = rowSpan × ROW_HEIGHT */
-    rowSpan: number;
-    children: React.ReactNode;
-    className?: string;
-    onClick?: () => void;
-    /** 시작 열 위치 (1~12) — 지정 시 절대 위치 배치, 미지정 시 자동 배치 */
-    colStart?: number;
+  /** 12칸 그리드 기준 가로 열 점유 수 (1~12) */
+  colSpan: number;
+  /** 행 점유 수 — height = rowSpan × ROW_HEIGHT */
+  rowSpan: number;
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
+  /** 시작 열 위치 (1~12) — 지정 시 절대 위치 배치, 미지정 시 자동 배치 */
+  colStart?: number;
+  autoHeight?: boolean;
 }
 
 /**
@@ -45,23 +46,23 @@ interface GridCellProps {
  * - overflow             : hidden (내부 컴포넌트가 자체 스크롤 처리)
  * - minWidth             : 0 (flex/grid 내부 축소 허용)
  */
-export function GridCell({ colSpan, rowSpan, children, className, onClick, colStart }: GridCellProps) {
-    return (
-        <div
-            style={{
-                gridColumn: colStart ? `${colStart} / span ${colSpan}` : `span ${colSpan}`,
-                gridRow: `span ${rowSpan}`,
-                /* rowGap이 GAP_SIZE이므로 height에서 GAP_SIZE만큼 빼야 track 크기와 일치 */
-                height: `${rowSpan * ROW_HEIGHT - GAP_SIZE}px`,
-                /* overflow:clip — 시각 클리핑은 유지하되 GPU 합성 레이어(video 등)는 clip 안 함
+export function GridCell({ colSpan, rowSpan, children, className, onClick, colStart, autoHeight }: GridCellProps) {
+  return (
+    <div
+      style={{
+        gridColumn: colStart ? `${colStart} / span ${colSpan}` : `span ${colSpan}`,
+        gridRow: `span ${rowSpan}`,
+        /* rowGap이 GAP_SIZE이므로 height에서 GAP_SIZE만큼 빼야 track 크기와 일치 */
+        ...(autoHeight ? {} : { height: `${rowSpan * ROW_HEIGHT - GAP_SIZE}px` }),
+        /* overflow:clip — 시각 클리핑은 유지하되 GPU 합성 레이어(video 등)는 clip 안 함
                    overflow:hidden은 GPU compositing layer도 clip해 Edge에서 video가 안 보이는 버그 유발 */
-                overflow: 'clip',
-                minWidth: 0,
-            }}
-            className={className}
-            onClick={onClick}
-        >
-            {children}
-        </div>
-    );
+        overflow: autoHeight ? "visible" : "clip",
+        minWidth: 0,
+      }}
+      className={className}
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  );
 }

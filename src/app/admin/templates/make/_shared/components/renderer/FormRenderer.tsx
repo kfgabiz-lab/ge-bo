@@ -30,8 +30,23 @@ import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import type { CodeGroupDef, SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { applyDataGeneration, flattenPageDataItem, evalConditionExpr, buildKeyToId } from "../../utils";
-import { fieldLabelCls, fieldDescCls, fieldBodyCls } from "../../styles";
+import {
+  applyDataGeneration,
+  flattenPageDataItem,
+  evalConditionExpr,
+  buildKeyToId,
+  buildFieldConditionResolver,
+  findOptionFilterResetTargetIds,
+} from "../../utils";
+import {
+  fieldLabelCls,
+  fieldDescCls,
+  fieldBodyCls,
+  FORM_CONTENT_PADDING_TOP,
+  FORM_FIELD_ROW_HEIGHT,
+  FORM_FIELD_GAP,
+} from "../../styles";
+import { calculateFormFieldRowTracks } from "../../utils/formGridLayout";
 
 /** flattenPageDataItem이 항상 붙이는 부가 키 — rowData 병합 시 제외 */
 const FLATTEN_META_KEYS = new Set(["_id", "_groupId", "_pathMap", "createdAt", "createdBy", "updatedAt", "updatedBy"]);
@@ -147,13 +162,10 @@ export function FormRenderer({
   const evalCondition = (condition: string): boolean => {
     const resolvedKeyToId = { ...(allFieldKeyToId ?? {}), ...keyToId };
     const resolvedValues = { ...(allFormValues ?? {}), ...values };
-    return evalConditionExpr(condition, (key) => {
-      const fieldId = resolvedKeyToId[key];
-      if (fieldId) return resolvedValues[fieldId] ?? "";
-      if (urlParams && key in urlParams) return urlParams[key] ?? "";
-      if (crossTabFormValues && key in crossTabFormValues) return crossTabFormValues[key] ?? "";
-      return undefined;
-    });
+    return evalConditionExpr(
+      condition,
+      buildFieldConditionResolver(resolvedKeyToId, resolvedValues, urlParams, crossTabFormValues)
+    );
   };
 
   /** hideCondition 평가 — "key=v1,key2=v2" AND 복수 조건 지원
@@ -183,6 +195,15 @@ export function FormRenderer({
         onChangeAllFormValues?.(sourceField.fieldKey, value);
         if (contentKey) {
           onChangeAllFormValues?.(`${contentKey}.${sourceField.fieldKey}`, value);
+        }
+
+        if ((values?.[fieldId] ?? "") !== value) {
+          findOptionFilterResetTargetIds(fields, sourceField.fieldKey).forEach((targetFieldId) => {
+            if (targetFieldId === fieldId) return;
+            if ((values?.[targetFieldId] ?? "") !== "") {
+              onChangeValues?.(targetFieldId, "");
+            }
+          });
         }
       }
 
@@ -280,6 +301,10 @@ export function FormRenderer({
     ]
   );
 
+  const hasTitleBlock = !!(titleMsgKey || title);
+  const visibleFields = fields.filter((f) => !shouldHide(f));
+  const fieldRowIsAuto = calculateFormFieldRowTracks(visibleFields, contentColSpan, hasTitleBlock);
+
   if (!fields.length) {
     return (
       <RendererContainer showBorder={showBorder} bgColor={bgColor} className="flex items-center justify-center">
@@ -290,9 +315,18 @@ export function FormRenderer({
 
   return (
     /* RendererContainer — grid 배치 공통 처리 (contentColSpan 전달 시 CSS Grid 활성화) */
-    <RendererContainer showBorder={showBorder} bgColor={bgColor} contentColSpan={contentColSpan}>
+    <RendererContainer
+      showBorder={showBorder}
+      bgColor={bgColor}
+      contentColSpan={contentColSpan}
+      contentPaddingTop={FORM_CONTENT_PADDING_TOP}
+      fillHeight={false}
+      rowPitch={FORM_FIELD_ROW_HEIGHT}
+      gapSize={FORM_FIELD_GAP}
+      rowIsAuto={fieldRowIsAuto}
+    >
       {/* 타이틀 — grid item으로 전체 너비 차지 (1행 고정) */}
-      {(titleMsgKey || title) && (
+      {hasTitleBlock && (
         <div
           className="flex flex-col justify-center px-3"
           style={{ gridColumn: `span ${contentColSpan}`, gridRow: "span 1" }}
@@ -388,6 +422,7 @@ export function FormRenderer({
                 forceDisabled={shouldDisable(f)}
                 rowData={rowData}
                 isEntity={isEntity}
+                contentRowPitch={FORM_FIELD_ROW_HEIGHT}
               />
             </div>
           </div>

@@ -23,6 +23,7 @@
 import { useRouter } from "next/navigation";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
+import { calculateSpaceItemRowTracks } from "../../utils/formGridLayout";
 import type { SearchFieldConfig } from "../../types";
 import type { RendererMode } from "./types";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
@@ -38,6 +39,7 @@ interface SpaceRendererProps {
   showBorder?: boolean;
   /** 영역 바탕색 (기본 white) */
   bgColor?: string;
+  fillHeight?: boolean;
   /** 컨텐츠 버튼 클릭 시 호출 — connectedContentWidgetIds + contentAction + goBackAfterAction + 위젯별 검증 규칙 ID 전달 */
   onContentAction?: (
     connectedContentWidgetIds: string[],
@@ -80,6 +82,7 @@ export function SpaceRenderer({
   contentColSpan = 5,
   showBorder = true,
   bgColor,
+  fillHeight,
   onContentAction,
   onClose,
   onPopupOpen,
@@ -170,9 +173,17 @@ export function SpaceRenderer({
     }
   };
 
+  const itemRowIsAuto = calculateSpaceItemRowTracks(items, contentColSpan);
+
   return (
     /* RendererContainer — grid 배치 공통 처리 (FormRenderer와 동일한 방식) */
-    <RendererContainer showBorder={showBorder} bgColor={bgColor} contentColSpan={contentColSpan}>
+    <RendererContainer
+      showBorder={showBorder}
+      bgColor={bgColor}
+      contentColSpan={contentColSpan}
+      fillHeight={fillHeight}
+      rowIsAuto={itemRowIsAuto}
+    >
       {/* 각 아이템 — gridColumn/gridRow로 자리만 지정 */}
       {items.map((field) => (
         <div

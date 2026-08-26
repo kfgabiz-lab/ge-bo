@@ -18,7 +18,7 @@
  *   </PageLayout>
  */
 
-import { useMemo, useCallback, useEffect, useRef } from "react";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { getSpaceGridColumn, evalWidgetHideCondition } from "../../utils";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "./WidgetRenderer";
@@ -26,6 +26,8 @@ import type { AnyWidget, RendererMode, MultiSelectWidget } from "./types";
 import type { TableWidget } from "../builder/TableBuilder";
 import type { CodeGroupDef } from "../../types";
 import type { FormWidget } from "../builder/FormBuilder";
+import { useNormalizedWidgetItems } from "../../hooks/useNormalizedWidgetItems";
+import { packedRowLayout } from "../../utils/formGridLayout";
 
 /* ── 공유 타입 (generated/[slug], widget/[slug], 빌더 미리보기 모두 사용) ── */
 
@@ -43,6 +45,8 @@ export interface PageWidgetItem {
   colSpan: number;
   rowSpan: number;
   contents: PageContentItem[];
+  rowIsAuto?: boolean[];
+  contentAutoTrailing?: boolean[];
 }
 
 /** 테이블 위젯별 데이터 상태 */
@@ -184,6 +188,8 @@ interface PageGridRendererProps {
   /** entity 연결 페이지 여부 — useWidgetPageState의 gridProps가 그대로 노출하는 값.
    * WidgetRenderer 이하로는 isEntity 이름으로 전달(파일 다운로드 경로 분기용, FieldRenderer까지) */
   pageIsEntity?: boolean;
+  recordLoaded?: boolean;
+  onContentRowsChange?: (rows: number) => void;
 }
 
 /**
@@ -240,20 +246,9 @@ export function PageGridRenderer({
   leaveCheck,
   formFetchRelMap,
   pageIsEntity,
+  recordLoaded,
+  onContentRowsChange,
 }: PageGridRendererProps) {
-  /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
-   * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
-  const tableWidgetsMap = useMemo<Record<string, TableWidget>>(() => {
-    const map: Record<string, TableWidget> = {};
-    widgetItems
-      .flatMap((item) => item.contents.map((c) => c.widget))
-      .filter((w): w is TableWidget => w.type === "table")
-      .forEach((w) => {
-        map[w.widgetId] = w;
-      });
-    return map;
-  }, [widgetItems]);
-
   /* ── cross-form hideCondition 평가용 통합 맵 ──
    * 페이지 내 모든 Form 위젯의 fieldKey → fieldId, values를 하나로 합산 */
   const allFieldKeyToId = useMemo(() => {
@@ -325,11 +320,140 @@ export function PageGridRenderer({
     return Object.assign({}, ...Object.values(mergedFormValuesMap ?? {})) as Record<string, string>;
   }, [mergedFormValuesMap]);
 
+  const filterVisibleContents = useCallback(
+    (contents: PageContentItem[]): PageContentItem[] => {
+      if (mode === "preview") return contents;
+      return contents.filter((c) => {
+        if (c.widget.type !== "multiselect") return true;
+        const msWidget = c.widget as MultiSelectWidget;
+        if (!msWidget.hideCondition) return true;
+        return !evalWidgetHideCondition(msWidget.hideCondition, allFieldKeyToId, allFormValues);
+      });
+    },
+    [mode, allFieldKeyToId, allFormValues]
+  );
+
+  const [tabContentRowsMap, setTabContentRowsMap] = useState<Record<string, number>>({});
+  const [tabActiveIndexMap, setTabActiveIndexMap] = useState<Record<string, number>>({});
+
+  const handleTabContentRowsChange = useCallback((contentId: string, rows: number) => {
+    setTabContentRowsMap((prev) => {
+      if (rows <= 0) {
+        if (!(contentId in prev)) return prev;
+        const next = { ...prev };
+        delete next[contentId];
+        return next;
+      }
+      if (prev[contentId] === rows) return prev;
+      return { ...prev, [contentId]: rows };
+    });
+  }, []);
+
+  const handleTabActiveIndexChange = useCallback((contentId: string, idx: number) => {
+    setTabActiveIndexMap((prev) => {
+      if (prev[contentId] === idx) return prev;
+      return { ...prev, [contentId]: idx };
+    });
+  }, []);
+
+  const tabContentIdsKey = useMemo(() => {
+    const ids: string[] = [];
+    widgetItems.forEach((item) =>
+      item.contents.forEach((c) => {
+        if (c.widget.type === "tab") ids.push(c.id);
+      })
+    );
+    return ids.join("|");
+  }, [widgetItems]);
+
+  const tabContentRowsHandlers = useMemo(() => {
+    const map: Record<string, (rows: number) => void> = {};
+    tabContentIdsKey
+      .split("|")
+      .filter(Boolean)
+      .forEach((contentId) => {
+        map[contentId] = (rows: number) => handleTabContentRowsChange(contentId, rows);
+      });
+    return map;
+  }, [tabContentIdsKey, handleTabContentRowsChange]);
+
+  const tabActiveIndexHandlers = useMemo(() => {
+    const map: Record<string, (idx: number) => void> = {};
+    tabContentIdsKey
+      .split("|")
+      .filter(Boolean)
+      .forEach((contentId) => {
+        map[contentId] = (idx: number) => handleTabActiveIndexChange(contentId, idx);
+      });
+    return map;
+  }, [tabContentIdsKey, handleTabActiveIndexChange]);
+
+  const tabContentRowsByContentId = useMemo(() => new Map(Object.entries(tabContentRowsMap)), [tabContentRowsMap]);
+  const activeTabIndexByContentId = useMemo(() => new Map(Object.entries(tabActiveIndexMap)), [tabActiveIndexMap]);
+
+  const { normalizedWidgetItems, totalRows } = useNormalizedWidgetItems({
+    widgetItems,
+    mode,
+    recordLoaded,
+    allFieldKeyToId,
+    allFormValues,
+    urlParams,
+    crossTabFormValues,
+    filterVisibleContents,
+    tabContentRowsByContentId,
+    activeTabIndexByContentId,
+  });
+
+  useEffect(() => {
+    onContentRowsChange?.(totalRows);
+  }, [totalRows, onContentRowsChange]);
+
+  const pageLevelPackedLayout = useMemo(
+    () =>
+      packedRowLayout(
+        normalizedWidgetItems.map(({ colSpan, rowSpan }) => ({ colSpan, rowSpan })),
+        12,
+        false
+      ),
+    [normalizedWidgetItems]
+  );
+
+  const itemAutoHeightFlags = useMemo(
+    () =>
+      normalizedWidgetItems.map((item, idx) => {
+        const rowIsAuto = item.rowIsAuto;
+        if (!rowIsAuto || rowIsAuto.length === 0) return false;
+        if (!rowIsAuto[rowIsAuto.length - 1]) return false;
+
+        const lastRow = pageLevelPackedLayout.lastRow[idx];
+        const startRow = lastRow - item.rowSpan + 1;
+        for (let r = startRow; r <= lastRow; r++) {
+          const owners = pageLevelPackedLayout.owners[r] ?? [];
+          if (owners.length !== 1 || owners[0] !== idx) return false;
+        }
+        return true;
+      }),
+    [normalizedWidgetItems, pageLevelPackedLayout]
+  );
+
+  /* ── 엑셀 다운로드용 테이블 위젯 맵 — widgetId → TableWidget ──
+   * widgetItems에서 table 타입 위젯을 수집하여 WidgetRenderer에 전달 */
+  const tableWidgetsMap = useMemo<Record<string, TableWidget>>(() => {
+    const map: Record<string, TableWidget> = {};
+    normalizedWidgetItems
+      .flatMap((item) => item.contents.map((c) => c.widget))
+      .filter((w): w is TableWidget => w.type === "table")
+      .forEach((w) => {
+        map[w.widgetId] = w;
+      });
+    return map;
+  }, [normalizedWidgetItems]);
+
   const multiSelectHideCondWidgets = useMemo(() => {
-    return widgetItems
+    return normalizedWidgetItems
       .flatMap((item) => item.contents.map((c) => c.widget))
       .filter((w): w is MultiSelectWidget => w.type === "multiselect" && !!w.hideCondition);
-  }, [widgetItems]);
+  }, [normalizedWidgetItems]);
 
   const prevMultiSelectHiddenRef = useRef<Record<string, boolean>>({});
 
@@ -392,7 +516,7 @@ export function PageGridRenderer({
    * depth 2+ 위젯은 dbSlug가 없으므로 parentWidgetId 체인을 타고 올라가 상위 dbSlug 상속.
    * widgetId → resolvedDbSlug */
   const categoryDbSlugMap = (() => {
-    const allWidgets = widgetItems.flatMap((item) => item.contents.map((c) => c.widget));
+    const allWidgets = normalizedWidgetItems.flatMap((item) => item.contents.map((c) => c.widget));
     const catWidgets = allWidgets.filter((w) => w.type === "category") as {
       widgetId: string;
       dbSlug?: string;
@@ -427,12 +551,13 @@ export function PageGridRenderer({
 
   return (
     <>
-      {widgetItems.map((item) => (
+      {normalizedWidgetItems.map((item, itemIdx) => (
         /* outer 셀 — GridCell 로 colSpan/rowSpan/height 일괄 관리 */
         <GridCell
           key={item.id}
           colSpan={item.colSpan}
           rowSpan={item.rowSpan}
+          autoHeight={itemAutoHeightFlags[itemIdx]}
           onClick={onItemClick ? () => onItemClick(item.id) : undefined}
           className={
             onItemClick
@@ -446,126 +571,125 @@ export function PageGridRenderer({
             style={{
               display: "grid",
               gridTemplateColumns: `repeat(${item.colSpan}, 1fr)`,
+              ...(item.rowIsAuto && item.rowIsAuto.length > 0
+                ? {
+                    gridTemplateRows: item.rowIsAuto
+                      .map((auto) => (auto ? "auto" : `${ROW_HEIGHT - GAP_SIZE}px`))
+                      .join(" "),
+                  }
+                : {}),
               gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
               gridAutoFlow: "row dense",
               rowGap: `${GAP_SIZE}px`,
               columnGap: 0,
             }}
           >
-            {item.contents
-              .filter((c) => {
-                if (mode === "preview" || c.widget.type !== "multiselect") return true;
-                const msWidget = c.widget as MultiSelectWidget;
-                if (!msWidget.hideCondition) return true;
-                return !evalWidgetHideCondition(msWidget.hideCondition, allFieldKeyToId, allFormValues);
-              })
-              .map((c) => {
-                const wid = (c.widget as { widgetId?: string }).widgetId ?? "";
-                const td = tableDataMap?.[wid];
-                /* category 위젯 dbSlug 상속 — depth 2+ 위젯에 상위 slug 주입 */
-                const resolvedWidget =
-                  c.widget.type === "category" &&
-                  wid &&
-                  categoryDbSlugMap[wid] &&
-                  !(c.widget as { dbSlug?: string }).dbSlug
-                    ? { ...c.widget, dbSlug: categoryDbSlugMap[wid] }
-                    : c.widget;
-                return (
-                  <div
-                    key={c.id}
-                    style={{
-                      /* space 위젯: align 기반 그리드 열 위치 계산 (정렬 보장) */
-                      gridColumn:
-                        c.widget.type === "space"
-                          ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, item.colSpan), item.colSpan)
-                          : `span ${Math.min(c.colSpan, item.colSpan)}`,
-                      gridRow: `span ${c.rowSpan}`,
-                      /* height = rowSpan × ROW_HEIGHT - GAP_SIZE (track + gap 합계 맞춤) */
-                      height: `${c.rowSpan * ROW_HEIGHT - GAP_SIZE}px`,
-                    }}
-                  >
-                    <WidgetRenderer
-                      mode={mode}
-                      widget={resolvedWidget}
-                      contentColSpan={c.colSpan}
-                      /* 검색 */
-                      searchValues={searchValues}
-                      onSearchChange={onSearchChange}
-                      onSearch={wid ? () => onSearch?.(wid) : undefined}
-                      onReset={wid ? () => onReset?.(wid) : undefined}
-                      codeGroups={codeGroups}
-                      /* 폼 */
-                      formValues={mergedFormValuesMap?.[wid] ?? {}}
-                      onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
-                      onDerivedValueChange={(fieldId, value) => onDerivedValueChange?.(wid, fieldId, value)}
-                      onChangeAllFormValues={handleChangeAllFormValues}
-                      allFormValues={allFormValues}
-                      allFieldKeyToId={allFieldKeyToId}
-                      urlParams={urlParams}
-                      crossTabFormValues={crossTabFormValues}
-                      onContentAction={(
-                        widgetIds,
-                        action,
-                        goBack,
-                        contentValidationRuleIds?: Record<string, number[]>
-                      ) => onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap, contentValidationRuleIds)}
-                      onDataSave={onDataSave}
-                      onApiCall={onApiCall}
-                      onClose={onClose}
-                      /* SubList */
-                      subListRowsMap={subListRowsMap}
-                      onSubListRowsChange={onSubListRowsChange}
-                      /* 파일 업로드 — SubList 파일 변경 시 rowId도 함께 전달 */
-                      fileValues={fileValuesMap?.[wid]}
-                      existingFileMeta={existingFileMetaMap?.[wid]}
-                      imgBlobUrls={imgBlobUrls}
-                      onFileChange={
-                        onFileChange ? (fieldId, files, rowId?) => onFileChange(wid, fieldId, files, rowId) : undefined
-                      }
-                      onRemoveExisting={
-                        onRemoveExisting ? (fieldId, fileId) => onRemoveExisting(wid, fieldId, fileId) : undefined
-                      }
-                      /* 테이블 */
-                      tableData={td?.rows}
-                      tableLoading={td?.loading}
-                      sortKey={sortKeyMap?.[wid] ?? null}
-                      sortDir={sortDirMap?.[wid] ?? "asc"}
-                      onSort={(accessor, dir, dataExpr) => onSort?.(wid, accessor, dir, dataExpr)}
-                      totalElements={td?.totalElements}
-                      totalPages={td?.totalPages}
-                      currentPage={td?.currentPage}
-                      onPageChange={(page) => onPageChange?.(wid, page)}
-                      onLoadMore={() => onLoadMore?.(wid)}
-                      appendLoading={td?.appendLoading}
-                      hasMore={td?.hasMore ?? true}
-                      selectedRowIds={tableSelectedRowsMap?.[wid] ?? []}
-                      onRowsSelect={(ids) => onTableRowsSelect?.(wid, ids)}
-                      /* 카테고리 */
-                      categorySelections={categorySelections}
-                      onCategorySelect={onCategorySelect}
-                      /* multiselect */
-                      multiSelectValuesMap={multiSelectValuesMap}
-                      onMultiSelectChange={onMultiSelectChange}
-                      multiSelectExtraFieldValuesMap={multiSelectExtraFieldValuesMap}
-                      onMultiSelectExtraFieldChange={onMultiSelectExtraFieldChange}
-                      /* 팝업 */
-                      dataSlug={dataSlug}
-                      onRefresh={onRefresh}
-                      pageSlug={pageSlug}
-                      mainConnectedSlug={mainConnectedSlug}
-                      leaveCheck={leaveCheck}
-                      /* 엑셀 다운로드 */
-                      tableWidgetsMap={tableWidgetsMap}
-                      currentSearchParams={currentSearchParams}
-                      tableSortParams={tableSortParams}
-                      /* _fetchedRel{id} 데이터 — Form 위젯 relationSlugId 연결 데이터 표시용 */
-                      fetchRelData={formFetchRelMap?.[wid]}
-                      /* entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
-                      isEntity={pageIsEntity}
-                    />
-                  </div>
-                );
-              })}
+            {item.contents.map((c, originalIndex) => {
+              const wid = (c.widget as { widgetId?: string }).widgetId ?? "";
+              const td = tableDataMap?.[wid];
+              /* category 위젯 dbSlug 상속 — depth 2+ 위젯에 상위 slug 주입 */
+              const resolvedWidget =
+                c.widget.type === "category" &&
+                wid &&
+                categoryDbSlugMap[wid] &&
+                !(c.widget as { dbSlug?: string }).dbSlug
+                  ? { ...c.widget, dbSlug: categoryDbSlugMap[wid] }
+                  : c.widget;
+              const isAutoTrailing = item.contentAutoTrailing?.[originalIndex] ?? false;
+              return (
+                <div
+                  key={c.id}
+                  style={{
+                    gridColumn:
+                      c.widget.type === "space"
+                        ? getSpaceGridColumn(c.widget.align, Math.min(c.colSpan, item.colSpan), item.colSpan)
+                        : `span ${Math.min(c.colSpan, item.colSpan)}`,
+                    gridRow: `span ${c.rowSpan}`,
+                    ...(isAutoTrailing ? {} : { height: `${c.rowSpan * ROW_HEIGHT - GAP_SIZE}px` }),
+                  }}
+                >
+                  <WidgetRenderer
+                    mode={mode}
+                    widget={resolvedWidget}
+                    contentColSpan={c.colSpan}
+                    spaceFillHeight={!isAutoTrailing}
+                    /* 검색 */
+                    searchValues={searchValues}
+                    onSearchChange={onSearchChange}
+                    onSearch={wid ? () => onSearch?.(wid) : undefined}
+                    onReset={wid ? () => onReset?.(wid) : undefined}
+                    codeGroups={codeGroups}
+                    /* 폼 */
+                    formValues={mergedFormValuesMap?.[wid] ?? {}}
+                    onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
+                    onDerivedValueChange={(fieldId, value) => onDerivedValueChange?.(wid, fieldId, value)}
+                    onChangeAllFormValues={handleChangeAllFormValues}
+                    allFormValues={allFormValues}
+                    allFieldKeyToId={allFieldKeyToId}
+                    urlParams={urlParams}
+                    crossTabFormValues={crossTabFormValues}
+                    onContentAction={(widgetIds, action, goBack, contentValidationRuleIds?: Record<string, number[]>) =>
+                      onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap, contentValidationRuleIds)
+                    }
+                    onDataSave={onDataSave}
+                    onApiCall={onApiCall}
+                    onClose={onClose}
+                    /* SubList */
+                    subListRowsMap={subListRowsMap}
+                    onSubListRowsChange={onSubListRowsChange}
+                    /* 파일 업로드 — SubList 파일 변경 시 rowId도 함께 전달 */
+                    fileValues={fileValuesMap?.[wid]}
+                    existingFileMeta={existingFileMetaMap?.[wid]}
+                    imgBlobUrls={imgBlobUrls}
+                    onFileChange={
+                      onFileChange ? (fieldId, files, rowId?) => onFileChange(wid, fieldId, files, rowId) : undefined
+                    }
+                    onRemoveExisting={
+                      onRemoveExisting ? (fieldId, fileId) => onRemoveExisting(wid, fieldId, fileId) : undefined
+                    }
+                    /* 테이블 */
+                    tableData={td?.rows}
+                    tableLoading={td?.loading}
+                    sortKey={sortKeyMap?.[wid] ?? null}
+                    sortDir={sortDirMap?.[wid] ?? "asc"}
+                    onSort={(accessor, dir, dataExpr) => onSort?.(wid, accessor, dir, dataExpr)}
+                    totalElements={td?.totalElements}
+                    totalPages={td?.totalPages}
+                    currentPage={td?.currentPage}
+                    onPageChange={(page) => onPageChange?.(wid, page)}
+                    onLoadMore={() => onLoadMore?.(wid)}
+                    appendLoading={td?.appendLoading}
+                    hasMore={td?.hasMore ?? true}
+                    selectedRowIds={tableSelectedRowsMap?.[wid] ?? []}
+                    onRowsSelect={(ids) => onTableRowsSelect?.(wid, ids)}
+                    /* 카테고리 */
+                    categorySelections={categorySelections}
+                    onCategorySelect={onCategorySelect}
+                    /* multiselect */
+                    multiSelectValuesMap={multiSelectValuesMap}
+                    onMultiSelectChange={onMultiSelectChange}
+                    multiSelectExtraFieldValuesMap={multiSelectExtraFieldValuesMap}
+                    onMultiSelectExtraFieldChange={onMultiSelectExtraFieldChange}
+                    /* 팝업 */
+                    dataSlug={dataSlug}
+                    onRefresh={onRefresh}
+                    pageSlug={pageSlug}
+                    mainConnectedSlug={mainConnectedSlug}
+                    leaveCheck={leaveCheck}
+                    /* 엑셀 다운로드 */
+                    tableWidgetsMap={tableWidgetsMap}
+                    currentSearchParams={currentSearchParams}
+                    tableSortParams={tableSortParams}
+                    /* _fetchedRel{id} 데이터 — Form 위젯 relationSlugId 연결 데이터 표시용 */
+                    fetchRelData={formFetchRelMap?.[wid]}
+                    /* entity 연결 페이지 여부 — 파일 다운로드 경로 분기용 (FieldRenderer까지 전달) */
+                    isEntity={pageIsEntity}
+                    onTabContentRowsChange={tabContentRowsHandlers[c.id]}
+                    onTabActiveIndexChange={tabActiveIndexHandlers[c.id]}
+                  />
+                </div>
+              );
+            })}
           </div>
         </GridCell>
       ))}

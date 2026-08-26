@@ -12,15 +12,51 @@
  *   <TabBuilder widget={widget} onChange={setWidget} pageTemplates={pageTemplates} />
  */
 
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { LABEL_CLS, INPUT_CLS } from "./fields/_FieldBase";
 import { SlugSelectField } from "./fields";
 import { MessageKeySelector } from "@/components/i18n/message-key-selector";
 import { useBuilderI18nMode } from "../../contexts/BuilderI18nModeContext";
+import { fetchTemplateConfig } from "../../templateApi";
+import { normalizeFormItemRowSpans, packedRowCount } from "../../utils/formGridLayout";
 import type { TabWidget, TabItem } from "../renderer/types";
+import type { PageWidgetItem } from "../renderer/PageGridRenderer";
 import type { TemplateItem } from "../../types";
 
 /** 탭 최대 개수 */
 const MAX_TABS = 5;
+
+const MAX_TAB_CONTENT_RECURSION_DEPTH = 5;
+
+async function computeConnectedPageContentRows(slug: string, visited: Set<string>, depth: number): Promise<number> {
+  const cfg = await fetchTemplateConfig(slug);
+  const widgetItems = cfg.widgetItems as unknown as PageWidgetItem[];
+
+  const normalizedItems: { colSpan: number; rowSpan: number }[] = [];
+  for (const item of widgetItems) {
+    const contents = await Promise.all(
+      item.contents.map(async (content) => {
+        if (content.widget.type !== "tab") return content;
+        const nextTabs = await Promise.all(
+          content.widget.tabs.map(async (t) => {
+            if (!t.pageSlug || depth >= MAX_TAB_CONTENT_RECURSION_DEPTH || visited.has(t.pageSlug)) {
+              return t;
+            }
+            const nextVisited = new Set(visited);
+            nextVisited.add(t.pageSlug);
+            const rows = await computeConnectedPageContentRows(t.pageSlug, nextVisited, depth + 1);
+            return { ...t, contentRowSpan: rows };
+          })
+        );
+        return { ...content, widget: { ...content.widget, tabs: nextTabs } };
+      })
+    );
+    const normalized = normalizeFormItemRowSpans(item.colSpan, item.rowSpan, contents);
+    normalizedItems.push({ colSpan: item.colSpan, rowSpan: normalized.rowSpan });
+  }
+  return packedRowCount(normalizedItems, 12, false);
+}
 
 interface TabBuilderProps {
   widget: TabWidget;
@@ -37,6 +73,7 @@ function createTabItem(idx: number): TabItem {
 export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps) {
   const tabs = widget.tabs;
   const { i18nMode } = useBuilderI18nMode();
+  const [computingTabIdx, setComputingTabIdx] = useState<number | null>(null);
 
   /** 탭 개수 변경 — 늘리면 추가, 줄이면 뒤에서 제거 */
   function handleCountChange(count: number) {
@@ -59,6 +96,22 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
   function handleTabChange(idx: number, patch: Partial<TabItem>) {
     const next = tabs.map((t, i) => (i === idx ? { ...t, ...patch } : t));
     onChange({ ...widget, tabs: next });
+  }
+
+  async function handlePageSlugChange(idx: number, slug: string) {
+    if (!slug) {
+      handleTabChange(idx, { pageSlug: slug, contentRowSpan: undefined });
+      return;
+    }
+    setComputingTabIdx(idx);
+    try {
+      const rows = await computeConnectedPageContentRows(slug, new Set([slug]), 0);
+      handleTabChange(idx, { pageSlug: slug, contentRowSpan: rows });
+    } catch {
+      handleTabChange(idx, { pageSlug: slug });
+    } finally {
+      setComputingTabIdx((cur) => (cur === idx ? null : cur));
+    }
   }
 
   return (
@@ -132,13 +185,18 @@ export function TabBuilder({ widget, onChange, pageTemplates }: TabBuilderProps)
             {/* 연결 페이지 + 필수여부 — 한 줄 배치 */}
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <SlugSelectField
-                  label="연결 페이지"
-                  value={tab.pageSlug ?? ""}
-                  onChange={(slug) => handleTabChange(idx, { pageSlug: slug })}
-                  slugOptions={pageTemplates}
-                  emptyLabel="-- 연결 없음 --"
-                />
+                <div className="flex items-center gap-1.5">
+                  <div className="flex-1">
+                    <SlugSelectField
+                      label="연결 페이지"
+                      value={tab.pageSlug ?? ""}
+                      onChange={(slug) => handlePageSlugChange(idx, slug)}
+                      slugOptions={pageTemplates}
+                      emptyLabel="-- 연결 없음 --"
+                    />
+                  </div>
+                  {computingTabIdx === idx && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+                </div>
               </div>
 
               {/* 필수여부 — 첫 번째 탭에만 표시 */}

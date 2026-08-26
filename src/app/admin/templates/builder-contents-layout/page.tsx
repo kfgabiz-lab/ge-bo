@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 /**
  * Builder 컨텐츠 레이아웃 가이드 페이지
@@ -8,39 +8,44 @@
  * - 렌더링은 PageLayout / WidgetRenderer 공통 컴포넌트에 위임
  */
 
-import { useState } from 'react';
-import PageLayout from '@/components/layout/page-layout';
-import { GridCell } from '@/components/layout/grid-cell';
-import { WidgetRenderer } from '../make/_shared/components/renderer';
-import { PrivacyReasonModal } from '@/components/ui/privacy-reason-modal';
+import { useState } from "react";
+import PageLayout from "@/components/layout/page-layout";
+import { GridCell } from "@/components/layout/grid-cell";
+import { WidgetRenderer } from "../make/_shared/components/renderer";
+import { PrivacyReasonModal } from "@/components/ui/privacy-reason-modal";
 import type {
-    SearchWidget,
-    SpaceWidget,
-    CategoryWidget,
-    SubListWidget,
-    MultiSelectWidget,
-    TabWidget,
-    AnyWidget,
-} from '../make/_shared/components/renderer';
-import type { TableWidget } from '../make/_shared/components/builder/TableBuilder';
-import type { FormWidget } from '../make/_shared/components/builder/FormBuilder';
+  SearchWidget,
+  SpaceWidget,
+  CategoryWidget,
+  SubListWidget,
+  MultiSelectWidget,
+  TabWidget,
+  AnyWidget,
+} from "../make/_shared/components/renderer";
+import type { TableWidget } from "../make/_shared/components/builder/TableBuilder";
+import type { FormWidget } from "../make/_shared/components/builder/FormBuilder";
+import {
+  calculateFormContentRowSpan,
+  calculateWidgetItemRowSpan,
+  isWidgetAutoEligible,
+} from "../make/_shared/utils/formGridLayout";
 
 /* ══════════════════════════════════════════ */
 /*  탭 정의                                    */
 /* ══════════════════════════════════════════ */
 
 const TABS = [
-    { key: 'search',      label: '검색폼' },
-    { key: 'table',       label: '데이터테이블' },
-    { key: 'form',        label: '폼' },
-    { key: 'space',       label: '공간영역' },
-    { key: 'category',    label: '카테고리' },
-    { key: 'sublist',     label: '서브리스트' },
-    { key: 'multiselect', label: '다중선택' },
-    { key: 'tab',         label: '탭' },
+  { key: "search", label: "검색폼" },
+  { key: "table", label: "데이터테이블" },
+  { key: "form", label: "폼" },
+  { key: "space", label: "공간영역" },
+  { key: "category", label: "카테고리" },
+  { key: "sublist", label: "서브리스트" },
+  { key: "multiselect", label: "다중선택" },
+  { key: "tab", label: "탭" },
 ] as const;
 
-type TabKey = typeof TABS[number]['key'];
+type TabKey = (typeof TABS)[number]["key"];
 
 /* ══════════════════════════════════════════ */
 /*  샘플 위젯 데이터                           */
@@ -48,447 +53,694 @@ type TabKey = typeof TABS[number]['key'];
 
 /** 검색폼 — input / select / date / dateRange / yearMonth / yearMonthRange / checkbox / radio / button / dateRangeStatus 필드 포함 */
 const SAMPLE_SEARCH: SearchWidget = {
-    type: 'search',
-    widgetId: 'guide-search',
-    contentKey: '',
-    rows: [
+  type: "search",
+  widgetId: "guide-search",
+  contentKey: "",
+  rows: [
+    {
+      id: "r1",
+      cols: 3,
+      fields: [
+        { id: "f1", type: "input", label: "검색어", colSpan: 1, placeholder: "검색어를 입력하세요" },
+        { id: "f2", type: "select", label: "상태", colSpan: 1, options: ["전체", "진행중", "완료", "취소"] },
+        { id: "f3", type: "date", label: "등록일", colSpan: 1 },
+      ],
+    },
+    {
+      id: "r2",
+      cols: 3,
+      fields: [
+        { id: "f4", type: "dateRange", label: "기간", colSpan: 2 },
+        { id: "f5", type: "checkbox", label: "카테고리", colSpan: 1, options: ["경영", "기획", "계약", "인사"] },
+      ],
+    },
+    {
+      id: "r3",
+      cols: 3,
+      fields: [
+        { id: "f6", type: "radio", label: "우선순위", colSpan: 1, options: ["높음", "중간", "낮음"] },
+        { id: "f7", type: "button", label: "유형", colSpan: 1, options: ["전체", "공지", "일반", "긴급"] },
+      ],
+    },
+    {
+      id: "r4",
+      cols: 3,
+      fields: [
+        { id: "f8", type: "yearMonth", label: "년월", colSpan: 1 },
+        { id: "f9", type: "yearMonthRange", label: "기간(년월)", colSpan: 2 },
+      ],
+    },
+    {
+      id: "r5",
+      cols: 3,
+      fields: [
         {
-            id: 'r1', cols: 3,
-            fields: [
-                { id: 'f1', type: 'input',  label: '검색어',   colSpan: 1, placeholder: '검색어를 입력하세요' },
-                { id: 'f2', type: 'select', label: '상태',     colSpan: 1, options: ['전체', '진행중', '완료', '취소'] },
-                { id: 'f3', type: 'date',   label: '등록일',   colSpan: 1 },
-            ],
+          id: "f10",
+          type: "dateRangeStatus",
+          label: "진행상태(select)",
+          colSpan: 1,
+          linkedDateRangeKey: "period",
+          beforeText: "예정",
+          inRangeText: "진행중",
+          afterText: "종료",
+          statusDisplayStyle: "select",
         },
         {
-            id: 'r2', cols: 3,
-            fields: [
-                { id: 'f4', type: 'dateRange', label: '기간',    colSpan: 2 },
-                { id: 'f5', type: 'checkbox',  label: '카테고리', colSpan: 1, options: ['경영', '기획', '계약', '인사'] },
-            ],
+          id: "f11",
+          type: "dateRangeStatus",
+          label: "진행상태(radio)",
+          colSpan: 2,
+          linkedDateRangeKey: "period",
+          beforeText: "예정",
+          inRangeText: "진행중",
+          afterText: "종료",
+          statusDisplayStyle: "radio",
+        },
+      ],
+    },
+    {
+      id: "r_auto",
+      cols: 3,
+      fields: [
+        {
+          id: "f_auto1",
+          type: "select",
+          label: "selectbox 예시",
+          colSpan: 1,
+          options: ["전체:", "김철수:kim", "이영희:lee", "박민수:park"],
         },
         {
-            id: 'r3', cols: 3,
-            fields: [
-                { id: 'f6', type: 'radio',  label: '우선순위', colSpan: 1, options: ['높음', '중간', '낮음'] },
-                { id: 'f7', type: 'button', label: '유형',     colSpan: 1, options: ['전체', '공지', '일반', '긴급'] },
-            ],
+          id: "f_auto2",
+          type: "select",
+          label: "autocomplete 예시",
+          colSpan: 1,
+          selectType: "autocomplete" as const,
+          options: ["전체:", "김철수:kim", "이영희:lee", "박민수:park"],
+          placeholder: "이름 입력",
         },
-        {
-            id: 'r4', cols: 3,
-            fields: [
-                { id: 'f8', type: 'yearMonth',      label: '년월',        colSpan: 1 },
-                { id: 'f9', type: 'yearMonthRange', label: '기간(년월)', colSpan: 2 },
-            ],
-        },
-        {
-            id: 'r5', cols: 3,
-            fields: [
-                {
-                    id: 'f10', type: 'dateRangeStatus', label: '진행상태(select)', colSpan: 1,
-                    linkedDateRangeKey: 'period',
-                    beforeText: '예정', inRangeText: '진행중', afterText: '종료',
-                    statusDisplayStyle: 'select',
-                },
-                {
-                    id: 'f11', type: 'dateRangeStatus', label: '진행상태(radio)', colSpan: 2,
-                    linkedDateRangeKey: 'period',
-                    beforeText: '예정', inRangeText: '진행중', afterText: '종료',
-                    statusDisplayStyle: 'radio',
-                },
-            ],
-        },
-        {
-            id: 'r_auto', cols: 3,
-            fields: [
-                {
-                    id: 'f_auto1', type: 'select', label: 'selectbox 예시', colSpan: 1,
-                    options: ['전체:','김철수:kim','이영희:lee','박민수:park'],
-                },
-                {
-                    id: 'f_auto2', type: 'select', label: 'autocomplete 예시', colSpan: 1,
-                    selectType: 'autocomplete' as const,
-                    options: ['전체:','김철수:kim','이영희:lee','박민수:park'],
-                    placeholder: '이름 입력',
-                },
-            ],
-        },
-    ],
+      ],
+    },
+  ],
 };
 
 /** 검색폼 카테고리 버전 — category 타입 selectbox (maxDepth 3, 대분류/중분류/소분류) */
 const SAMPLE_SEARCH_CATEGORY: SearchWidget = {
-    type: 'search',
-    widgetId: 'guide-search-category',
-    contentKey: '',
-    rows: [
+  type: "search",
+  widgetId: "guide-search-category",
+  contentKey: "",
+  rows: [
+    {
+      id: "cr1",
+      cols: 2,
+      fields: [
         {
-            id: 'cr1', cols: 2,
-            fields: [
-                {
-                    id: 'cf1', type: 'category', label: '분류', colSpan: 1,
-                    maxDepth: 3,
-                    depthLabels: ['대분류', '중분류', '소분류'],
-                    dbSlug: '',
-                    depthValueFields: ['id', 'id', 'id'],
-                    depthTextFields: ['name', 'name', 'name'],
-                },
-                { id: 'cf2', type: 'input', label: '검색어', colSpan: 1, placeholder: '검색어를 입력하세요' },
-            ],
+          id: "cf1",
+          type: "category",
+          label: "분류",
+          colSpan: 1,
+          maxDepth: 3,
+          depthLabels: ["대분류", "중분류", "소분류"],
+          dbSlug: "",
+          depthValueFields: ["id", "id", "id"],
+          depthTextFields: ["name", "name", "name"],
+        },
+        { id: "cf2", type: "input", label: "검색어", colSpan: 1, placeholder: "검색어를 입력하세요" },
+      ],
+    },
+    {
+      id: "cr2",
+      cols: 2,
+      fields: [
+        {
+          id: "cf3",
+          type: "category",
+          label: "유형",
+          colSpan: 1,
+          maxDepth: 2,
+          depthLabels: ["대분류", "소분류"],
+          dbSlug: "",
+          depthValueFields: ["id", "id"],
+          depthTextFields: ["name", "name"],
         },
         {
-            id: 'cr2', cols: 2,
-            fields: [
-                {
-                    id: 'cf3', type: 'category', label: '유형', colSpan: 1,
-                    maxDepth: 2,
-                    depthLabels: ['대분류', '소분류'],
-                    dbSlug: '',
-                    depthValueFields: ['id', 'id'],
-                    depthTextFields: ['name', 'name'],
-                },
-                {
-                    id: 'cf4', type: 'category', label: '단일 depth', colSpan: 1,
-                    maxDepth: 1,
-                    depthLabels: ['구분'],
-                    dbSlug: '',
-                    depthValueFields: ['id'],
-                    depthTextFields: ['name'],
-                },
-            ],
+          id: "cf4",
+          type: "category",
+          label: "단일 depth",
+          colSpan: 1,
+          maxDepth: 1,
+          depthLabels: ["구분"],
+          dbSlug: "",
+          depthValueFields: ["id"],
+          depthTextFields: ["name"],
         },
-    ],
+      ],
+    },
+  ],
 };
 
 /** 검색폼 심플 버전 — displayStyle: 'simple' (한 줄 인라인) */
 const SAMPLE_SEARCH_SIMPLE: SearchWidget = {
-    type: 'search',
-    widgetId: 'guide-search-simple',
-    contentKey: '',
-    displayStyle: 'simple',
-    rows: [
-        {
-            id: 'sr1', cols: 3,
-            fields: [
-                { id: 'sf1', type: 'input',  label: '검색어', colSpan: 1, placeholder: '검색어를 입력하세요' },
-                { id: 'sf2', type: 'select', label: '상태',   colSpan: 1, options: ['전체', '진행중', '완료', '취소'] },
-                { id: 'sf3', type: 'date',   label: '등록일', colSpan: 1 },
-            ],
-        },
-    ],
+  type: "search",
+  widgetId: "guide-search-simple",
+  contentKey: "",
+  displayStyle: "simple",
+  rows: [
+    {
+      id: "sr1",
+      cols: 3,
+      fields: [
+        { id: "sf1", type: "input", label: "검색어", colSpan: 1, placeholder: "검색어를 입력하세요" },
+        { id: "sf2", type: "select", label: "상태", colSpan: 1, options: ["전체", "진행중", "완료", "취소"] },
+        { id: "sf3", type: "date", label: "등록일", colSpan: 1 },
+      ],
+    },
+  ],
 };
 
 /** 데이터테이블 — text / badge / boolean / actions / dateRangeStatus 컬럼 포함 */
 const SAMPLE_TABLE: TableWidget = {
-    type: 'table',
-    widgetId: 'guide-table',
-    contentKey: '',
-    connectedSearchIds: [],
-    pageSize: 10,
-    displayMode: 'pagination',
-    columns: [
-        {
-            id: 'c1', header: 'ID',     accessor: 'id',
-            align: 'center', sortable: true,  cellType: 'text', width: 60,
-        },
-        {
-            id: 'c2', header: '제목',   accessor: 'title',
-            align: 'left',   sortable: true,  cellType: 'text',
-        },
-        {
-            id: 'c3', header: '상태',   accessor: 'status',
-            align: 'center', sortable: false, cellType: 'badge',
-            showIcon: true,  badgeShape: 'round',
-            cellOptions: [
-                { text: '진행중', value: '진행중', color: 'blue' },
-                { text: '완료',   value: '완료',   color: 'green' },
-                { text: '취소',   value: '취소',   color: 'red' },
-            ],
-        },
-        {
-            id: 'c4', header: '공개여부', accessor: 'active',
-            align: 'center', sortable: false, cellType: 'boolean',
-            trueText: '공개', falseText: '비공개',
-        },
-        {
-            id: 'c5', header: '기간', accessor: 'period',
-            align: 'center', sortable: false, cellType: 'text',
-        },
-        {
-            id: 'c7', header: '진행상태', accessor: '_status',
-            align: 'center', sortable: false, cellType: 'dateRangeStatus',
-            linkedDateRangeKey: 'period',
-            beforeText: '예정', inRangeText: '진행중', afterText: '종료',
-        },
-        {
-            id: 'c8', header: '사용여부', accessor: 'active',
-            align: 'center', sortable: false, cellType: 'inlineEdit',
-            inlineEditType: 'toggle', inlineEditFieldKey: 'active',
-        },
-        {
-            id: 'c9', header: '상태', accessor: 'status',
-            align: 'center', sortable: false, cellType: 'inlineEdit',
-            inlineEditType: 'radio', inlineEditFieldKey: 'status',
-            options: ['진행중|ing', '완료|done', '취소|cancel'],
-        },
-        {
-            id: 'c10', header: '이메일', accessor: 'email',
-            align: 'left', sortable: false, cellType: 'text',
-            maskType: 'email', maskPattern: 'idMid',
-        },
-        {
-            id: 'c11', header: '전화번호', accessor: 'phone',
-            align: 'center', sortable: false, cellType: 'text',
-            maskType: 'phone', maskPattern: 'mid4',
-        },
-        {
-            id: 'c12', header: '이름', accessor: 'name',
-            align: 'center', sortable: false, cellType: 'text',
-            maskType: 'name', maskPattern: 'mid',
-        },
-        {
-            id: 'c13', header: '커스텀마스킹', accessor: 'customField',
-            align: 'left', sortable: false, cellType: 'text',
-            maskType: 'custom', maskCustomRegex: '\\d{4}$', maskCustomReplacement: '****',
-        },
-        {
-            // 버튼 컬럼 — 퍼블리싱 샘플 (실제 설정 편집 UI·클릭 동작은 이후 개발 단계에서 구현 예정)
-            id: 'c14', header: '상세',   accessor: '_detailButton',
-            align: 'center', sortable: false, cellType: 'button',
-            buttonLabel: '상세보기', buttonColor: 'blue',
-            connType: 'page', targetSlug: '', conditionParam: '', passParam: 'id',
-        },
-        {
-            id: 'c6', header: '관리',   accessor: '_actions',
-            align: 'center', sortable: false, cellType: 'actions',
-            actions: ['edit', 'delete', 'copy'],
-        },
-    ],
+  type: "table",
+  widgetId: "guide-table",
+  contentKey: "",
+  connectedSearchIds: [],
+  pageSize: 10,
+  displayMode: "pagination",
+  columns: [
+    {
+      id: "c1",
+      header: "ID",
+      accessor: "id",
+      align: "center",
+      sortable: true,
+      cellType: "text",
+      width: 60,
+    },
+    {
+      id: "c2",
+      header: "제목",
+      accessor: "title",
+      align: "left",
+      sortable: true,
+      cellType: "text",
+    },
+    {
+      id: "c3",
+      header: "상태",
+      accessor: "status",
+      align: "center",
+      sortable: false,
+      cellType: "badge",
+      showIcon: true,
+      badgeShape: "round",
+      cellOptions: [
+        { text: "진행중", value: "진행중", color: "blue" },
+        { text: "완료", value: "완료", color: "green" },
+        { text: "취소", value: "취소", color: "red" },
+      ],
+    },
+    {
+      id: "c4",
+      header: "공개여부",
+      accessor: "active",
+      align: "center",
+      sortable: false,
+      cellType: "boolean",
+      trueText: "공개",
+      falseText: "비공개",
+    },
+    {
+      id: "c5",
+      header: "기간",
+      accessor: "period",
+      align: "center",
+      sortable: false,
+      cellType: "text",
+    },
+    {
+      id: "c7",
+      header: "진행상태",
+      accessor: "_status",
+      align: "center",
+      sortable: false,
+      cellType: "dateRangeStatus",
+      linkedDateRangeKey: "period",
+      beforeText: "예정",
+      inRangeText: "진행중",
+      afterText: "종료",
+    },
+    {
+      id: "c8",
+      header: "사용여부",
+      accessor: "active",
+      align: "center",
+      sortable: false,
+      cellType: "inlineEdit",
+      inlineEditType: "toggle",
+      inlineEditFieldKey: "active",
+    },
+    {
+      id: "c9",
+      header: "상태",
+      accessor: "status",
+      align: "center",
+      sortable: false,
+      cellType: "inlineEdit",
+      inlineEditType: "radio",
+      inlineEditFieldKey: "status",
+      options: ["진행중|ing", "완료|done", "취소|cancel"],
+    },
+    {
+      id: "c10",
+      header: "이메일",
+      accessor: "email",
+      align: "left",
+      sortable: false,
+      cellType: "text",
+      maskType: "email",
+      maskPattern: "idMid",
+    },
+    {
+      id: "c11",
+      header: "전화번호",
+      accessor: "phone",
+      align: "center",
+      sortable: false,
+      cellType: "text",
+      maskType: "phone",
+      maskPattern: "mid4",
+    },
+    {
+      id: "c12",
+      header: "이름",
+      accessor: "name",
+      align: "center",
+      sortable: false,
+      cellType: "text",
+      maskType: "name",
+      maskPattern: "mid",
+    },
+    {
+      id: "c13",
+      header: "커스텀마스킹",
+      accessor: "customField",
+      align: "left",
+      sortable: false,
+      cellType: "text",
+      maskType: "custom",
+      maskCustomRegex: "\\d{4}$",
+      maskCustomReplacement: "****",
+    },
+    {
+      // 버튼 컬럼 — 퍼블리싱 샘플 (실제 설정 편집 UI·클릭 동작은 이후 개발 단계에서 구현 예정)
+      id: "c14",
+      header: "상세",
+      accessor: "_detailButton",
+      align: "center",
+      sortable: false,
+      cellType: "button",
+      buttonLabel: "상세보기",
+      buttonColor: "blue",
+      connType: "page",
+      targetSlug: "",
+      conditionParam: "",
+      passParam: "id",
+    },
+    {
+      id: "c6",
+      header: "관리",
+      accessor: "_actions",
+      align: "center",
+      sortable: false,
+      cellType: "actions",
+      actions: ["edit", "delete", "copy"],
+    },
+  ],
 };
 
 /** 폼 — input / select / date / dateRange / yearMonth / yearMonthRange / radio / checkbox / button / file / image 필드 포함 */
 const SAMPLE_FORM: FormWidget = {
-    type: 'form',
-    widgetId: 'guide-form',
-    contentKey: '',
-    title: '기본 정보',
-    description: '필수 입력 항목은 * 로 표시됩니다.',
-    showBorder: true,
-    fields: [
-        { id: 'ff1',  type: 'input',          label: '이름',           colSpan: 6,  rowSpan: 1, required: true,  placeholder: '이름을 입력하세요', description: '실명을 입력해주세요. 다른 사용자에게 표시됩니다.' },
-        { id: 'ff2',  type: 'input',          label: '이메일',          colSpan: 6,  rowSpan: 1, required: true,  placeholder: 'email@example.com' },
-        { id: 'ff3',  type: 'select',         label: '부서',            colSpan: 4,  rowSpan: 1, options: ['개발팀', '기획팀', '디자인팀', '마케팅팀'] },
-        { id: 'ff4',  type: 'select',         label: '직급',            colSpan: 4,  rowSpan: 1, options: ['사원', '대리', '과장', '차장', '부장'] },
-        { id: 'ff5',  type: 'date',           label: '입사일',          colSpan: 4,  rowSpan: 1 },
-        { id: 'ff17', type: 'yearMonth',      label: '정산년월',        colSpan: 6,  rowSpan: 1 },
-        { id: 'ff18', type: 'yearMonthRange', label: '계약기간(년월)',  colSpan: 6,  rowSpan: 1 },
-        { id: 'ff6',  type: 'dateRange',      label: '계약기간',        colSpan: 6,  rowSpan: 1 },
-        { id: 'ff7',  type: 'radio',          label: '고용형태',        colSpan: 6,  rowSpan: 1, options: ['정규직', '계약직', '파견직'] },
-        { id: 'ff8',  type: 'checkbox',       label: '권한',            colSpan: 6,  rowSpan: 1, options: ['읽기', '쓰기', '삭제', '관리'] },
-        { id: 'ff9',  type: 'button',         label: '상태',            colSpan: 6,  rowSpan: 1, options: ['활성', '비활성', '대기', '잠금'] },
-        { id: 'ff10', type: 'file',  label: '첨부파일',      colSpan: 12, rowSpan: 2, maxFileCount: 3, maxFileSizeMB: 5, maxTotalSizeMB: 15, fileTypeMode: 'doc' },
-        { id: 'ff11', type: 'image', label: '프로필 이미지', colSpan: 12, rowSpan: 2 },
-        { id: 'ff12', type: 'video', label: '동영상',        colSpan: 12, rowSpan: 2, videoMode: 'file' },
-        { id: 'ff13', type: 'video', label: '동영상 URL',    colSpan: 12, rowSpan: 2, videoMode: 'url' },
-        { id: 'ff14', type: 'media',  label: '컨텐츠 업로드', colSpan: 12, rowSpan: 2, required: true },
-        { id: 'ff16', type: 'editor', label: '내용',          colSpan: 12, rowSpan: 5 },
-        { id: 'ff20', type: 'time',   label: '시간',           colSpan: 6,  rowSpan: 1 },
-        {
-            id: 'ff15', type: 'color', label: '색상',         colSpan: 12, rowSpan: 1,
-            options: ['#4361ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6b7280'],
-        },
-        {
-            // 주소검색 — STEP2 퍼블리싱: 목데이터(샘플 주소 3개)로 입력창+드롭다운 UI만 확인.
-            // 저장값은 { address, lat, lng } 구조지만 위도/경도는 화면에 노출하지 않는다 (types.ts AddressFieldValue 참조).
-            id: 'ff21', type: 'address', label: '주소검색', colSpan: 6, rowSpan: 1,
-            placeholder: '주소를 검색하세요',
-            options: ['서울특별시 강남구 테헤란로 123', '경기도 성남시 분당구 판교역로 235', '부산광역시 해운대구 마린시티2로 33'],
-        },
-    ],
+  type: "form",
+  widgetId: "guide-form",
+  contentKey: "",
+  title: "기본 정보",
+  description: "필수 입력 항목은 * 로 표시됩니다.",
+  showBorder: true,
+  fields: [
+    {
+      id: "ff1",
+      type: "input",
+      label: "이름",
+      colSpan: 6,
+      rowSpan: 1,
+      required: true,
+      placeholder: "이름을 입력하세요",
+      description: "실명을 입력해주세요. 다른 사용자에게 표시됩니다.",
+    },
+    {
+      id: "ff2",
+      type: "input",
+      label: "이메일",
+      colSpan: 6,
+      rowSpan: 1,
+      required: true,
+      placeholder: "email@example.com",
+    },
+    {
+      id: "ff3",
+      type: "select",
+      label: "부서",
+      colSpan: 4,
+      rowSpan: 1,
+      options: ["개발팀", "기획팀", "디자인팀", "마케팅팀"],
+    },
+    {
+      id: "ff4",
+      type: "select",
+      label: "직급",
+      colSpan: 4,
+      rowSpan: 1,
+      options: ["사원", "대리", "과장", "차장", "부장"],
+    },
+    { id: "ff5", type: "date", label: "입사일", colSpan: 4, rowSpan: 1 },
+    { id: "ff17", type: "yearMonth", label: "정산년월", colSpan: 6, rowSpan: 1 },
+    { id: "ff18", type: "yearMonthRange", label: "계약기간(년월)", colSpan: 6, rowSpan: 1 },
+    { id: "ff6", type: "dateRange", label: "계약기간", colSpan: 6, rowSpan: 1 },
+    { id: "ff7", type: "radio", label: "고용형태", colSpan: 6, rowSpan: 1, options: ["정규직", "계약직", "파견직"] },
+    { id: "ff8", type: "checkbox", label: "권한", colSpan: 6, rowSpan: 1, options: ["읽기", "쓰기", "삭제", "관리"] },
+    { id: "ff9", type: "button", label: "상태", colSpan: 6, rowSpan: 1, options: ["활성", "비활성", "대기", "잠금"] },
+    {
+      id: "ff10",
+      type: "file",
+      label: "첨부파일",
+      colSpan: 12,
+      rowSpan: 2,
+      maxFileCount: 3,
+      maxFileSizeMB: 5,
+      maxTotalSizeMB: 15,
+      fileTypeMode: "doc",
+    },
+    { id: "ff11", type: "image", label: "프로필 이미지", colSpan: 12, rowSpan: 2 },
+    { id: "ff12", type: "video", label: "동영상", colSpan: 12, rowSpan: 2, videoMode: "file" },
+    { id: "ff13", type: "video", label: "동영상 URL", colSpan: 12, rowSpan: 2, videoMode: "url" },
+    { id: "ff14", type: "media", label: "컨텐츠 업로드", colSpan: 12, rowSpan: 2, required: true },
+    { id: "ff16", type: "editor", label: "내용", colSpan: 12, rowSpan: 5 },
+    { id: "ff20", type: "time", label: "시간", colSpan: 6, rowSpan: 1 },
+    {
+      id: "ff15",
+      type: "color",
+      label: "색상",
+      colSpan: 12,
+      rowSpan: 1,
+      options: ["#4361ee", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#6b7280"],
+    },
+    {
+      // 주소검색 — STEP2 퍼블리싱: 목데이터(샘플 주소 3개)로 입력창+드롭다운 UI만 확인.
+      // 저장값은 { address, lat, lng } 구조지만 위도/경도는 화면에 노출하지 않는다 (types.ts AddressFieldValue 참조).
+      id: "ff21",
+      type: "address",
+      label: "주소검색",
+      colSpan: 6,
+      rowSpan: 1,
+      placeholder: "주소를 검색하세요",
+      options: [
+        "서울특별시 강남구 테헤란로 123",
+        "경기도 성남시 분당구 판교역로 235",
+        "부산광역시 해운대구 마린시티2로 33",
+      ],
+    },
+  ],
 };
 
 /** 공간영역 — textarea(텍스트) + action-button(버튼) 아이템 포함 */
 const SAMPLE_SPACE: SpaceWidget = {
-    type: 'space',
-    widgetId: 'guide-space',
-    align: 'right',
-    showBorder: false,
-    items: [
-        {
-            id: 's1', type: 'textarea',      label: '안내 텍스트', colSpan: 1,
-            content: '※ 입력 후 저장 버튼을 클릭하세요.',
-        },
-        { id: 's2', type: 'action-button', label: '취소', colSpan: 1, color: 'gray',  connType: 'close' },
-        { id: 's3', type: 'action-button', label: '삭제', colSpan: 1, color: 'red',   connType: 'content', contentAction: 'delete' },
-        { id: 's4', type: 'action-button', label: '저장', colSpan: 1, color: 'black', connType: 'content', contentAction: 'save' },
-    ],
+  type: "space",
+  widgetId: "guide-space",
+  align: "right",
+  showBorder: false,
+  items: [
+    {
+      id: "s1",
+      type: "textarea",
+      label: "안내 텍스트",
+      colSpan: 1,
+      content: "※ 입력 후 저장 버튼을 클릭하세요.",
+    },
+    { id: "s2", type: "action-button", label: "취소", colSpan: 1, color: "gray", connType: "close" },
+    {
+      id: "s3",
+      type: "action-button",
+      label: "삭제",
+      colSpan: 1,
+      color: "red",
+      connType: "content",
+      contentAction: "delete",
+    },
+    {
+      id: "s4",
+      type: "action-button",
+      label: "저장",
+      colSpan: 1,
+      color: "black",
+      connType: "content",
+      contentAction: "save",
+    },
+  ],
 };
 
 /** 공간영역 엑셀 다운로드 — 개인정보 사유 팝업 사용 버튼 샘플 */
 const SAMPLE_SPACE_EXCEL: SpaceWidget = {
-    type: 'space',
-    widgetId: 'guide-space-excel',
-    align: 'right',
-    showBorder: false,
-    items: [
-        {
-            id: 'se1', type: 'action-button', label: '엑셀 다운로드', colSpan: 1,
-            color: 'green', connType: 'excel',
-            excelTableWidgetId: 'guide-table',
-            excelPrivacyPopup: true,
-        },
-    ],
+  type: "space",
+  widgetId: "guide-space-excel",
+  align: "right",
+  showBorder: false,
+  items: [
+    {
+      id: "se1",
+      type: "action-button",
+      label: "엑셀 다운로드",
+      colSpan: 1,
+      color: "green",
+      connType: "excel",
+      excelTableWidgetId: "guide-table",
+      excelPrivacyPopup: true,
+    },
+  ],
 };
 
 /** 카테고리 대분류 (depth 1) */
 const SAMPLE_CATEGORY_1: CategoryWidget = {
-    type: 'category', widgetId: 'guide-category-1', contentKey: '', dbSlug: '',
-    depth: 1, label: '대분류', allowCreate: true, allowEdit: true, allowDelete: true,
+  type: "category",
+  widgetId: "guide-category-1",
+  contentKey: "",
+  dbSlug: "",
+  depth: 1,
+  label: "대분류",
+  allowCreate: true,
+  allowEdit: true,
+  allowDelete: true,
 };
 
 /** 카테고리 중분류 (depth 2) */
 const SAMPLE_CATEGORY_2: CategoryWidget = {
-    type: 'category', widgetId: 'guide-category-2', contentKey: '', dbSlug: '',
-    depth: 2, label: '중분류', parentWidgetId: 'guide-category-1',
-    allowCreate: true, allowEdit: true, allowDelete: true,
+  type: "category",
+  widgetId: "guide-category-2",
+  contentKey: "",
+  dbSlug: "",
+  depth: 2,
+  label: "중분류",
+  parentWidgetId: "guide-category-1",
+  allowCreate: true,
+  allowEdit: true,
+  allowDelete: true,
 };
 
 /** 카테고리 소분류 (depth 3) */
 const SAMPLE_CATEGORY_3: CategoryWidget = {
-    type: 'category', widgetId: 'guide-category-3', contentKey: '', dbSlug: '',
-    depth: 3, label: '소분류', parentWidgetId: 'guide-category-2',
-    allowCreate: true, allowEdit: true, allowDelete: true,
+  type: "category",
+  widgetId: "guide-category-3",
+  contentKey: "",
+  dbSlug: "",
+  depth: 3,
+  label: "소분류",
+  parentWidgetId: "guide-category-2",
+  allowCreate: true,
+  allowEdit: true,
+  allowDelete: true,
 };
 
 /** 카테고리 세분류 (depth 4) */
 const SAMPLE_CATEGORY_4: CategoryWidget = {
-    type: 'category', widgetId: 'guide-category-4', contentKey: '', dbSlug: '',
-    depth: 4, label: '세분류', parentWidgetId: 'guide-category-3',
-    allowCreate: true, allowEdit: true, allowDelete: true,
+  type: "category",
+  widgetId: "guide-category-4",
+  contentKey: "",
+  dbSlug: "",
+  depth: 4,
+  label: "세분류",
+  parentWidgetId: "guide-category-3",
+  allowCreate: true,
+  allowEdit: true,
+  allowDelete: true,
 };
 
 /** 다중선택 — 담당자 선택 샘플 (name,dept + 추가 입력 필드 5종 전체 포함) */
 const SAMPLE_MULTISELECT: MultiSelectWidget = {
-    type: 'multiselect',
-    widgetId: 'guide-multiselect',
-    contentKey: 'assignedUsers',
-    sourceSlug: '',
-    connectedSlug: '',
-    labelFields: 'name,dept',
-    placeholder: '담당자를 선택하세요',
-    title: '담당자 선택',
-    showBorder: true,
-    extraFields: [
-        { id: 'ef-1', key: 'role',      type: 'select',   label: '역할',   options: ['개발자:개발자', '디자이너:디자이너', '기획자:기획자', 'QA:QA'] },
-        { id: 'ef-2', key: 'startDate', type: 'date',     label: '시작일' },
-        { id: 'ef-3', key: 'note',      type: 'input',    label: '메모',   placeholder: '비고 입력' },
-        { id: 'ef-4', key: 'level',     type: 'radio',    label: '중요도', options: ['높음:높음', '보통:보통', '낮음:낮음'] },
-        { id: 'ef-5', key: 'notify',    type: 'checkbox', label: '알림',   options: ['이메일:email', 'SMS:sms'] },
-    ],
+  type: "multiselect",
+  widgetId: "guide-multiselect",
+  contentKey: "assignedUsers",
+  sourceSlug: "",
+  connectedSlug: "",
+  labelFields: "name,dept",
+  placeholder: "담당자를 선택하세요",
+  title: "담당자 선택",
+  showBorder: true,
+  extraFields: [
+    {
+      id: "ef-1",
+      key: "role",
+      type: "select",
+      label: "역할",
+      options: ["개발자:개발자", "디자이너:디자이너", "기획자:기획자", "QA:QA"],
+    },
+    { id: "ef-2", key: "startDate", type: "date", label: "시작일" },
+    { id: "ef-3", key: "note", type: "input", label: "메모", placeholder: "비고 입력" },
+    { id: "ef-4", key: "level", type: "radio", label: "중요도", options: ["높음:높음", "보통:보통", "낮음:낮음"] },
+    { id: "ef-5", key: "notify", type: "checkbox", label: "알림", options: ["이메일:email", "SMS:sms"] },
+  ],
 };
 
 /** 기본정보 탭용 간단 폼 — 핵심 필드만 추출 */
 const SAMPLE_FORM_SIMPLE: FormWidget = {
-    type: 'form',
-    widgetId: 'guide-form-simple',
-    contentKey: '',
-    title: '기본 정보',
-    showBorder: true,
-    fields: [
-        { id: 'sf1', type: 'input',  label: '이름',     colSpan: 6, rowSpan: 1, required: true, placeholder: '이름을 입력하세요' },
-        { id: 'sf2', type: 'input',  label: '이메일',   colSpan: 6, rowSpan: 1, required: true, placeholder: 'email@example.com' },
-        { id: 'sf3', type: 'select', label: '부서',     colSpan: 4, rowSpan: 1, options: ['개발팀', '기획팀', '디자인팀', '마케팅팀'] },
-        { id: 'sf4', type: 'select', label: '직급',     colSpan: 4, rowSpan: 1, options: ['사원', '대리', '과장', '차장', '부장'] },
-        { id: 'sf5', type: 'date',   label: '입사일',   colSpan: 4, rowSpan: 1 },
-        { id: 'sf6', type: 'radio',  label: '고용형태', colSpan: 6, rowSpan: 1, options: ['정규직', '계약직', '파견직'] },
-        { id: 'sf7', type: 'button', label: '상태',     colSpan: 6, rowSpan: 1, options: ['활성', '비활성', '대기', '잠금'] },
-    ],
+  type: "form",
+  widgetId: "guide-form-simple",
+  contentKey: "",
+  title: "기본 정보",
+  showBorder: true,
+  fields: [
+    {
+      id: "sf1",
+      type: "input",
+      label: "이름",
+      colSpan: 6,
+      rowSpan: 1,
+      required: true,
+      placeholder: "이름을 입력하세요",
+    },
+    {
+      id: "sf2",
+      type: "input",
+      label: "이메일",
+      colSpan: 6,
+      rowSpan: 1,
+      required: true,
+      placeholder: "email@example.com",
+    },
+    {
+      id: "sf3",
+      type: "select",
+      label: "부서",
+      colSpan: 4,
+      rowSpan: 1,
+      options: ["개발팀", "기획팀", "디자인팀", "마케팅팀"],
+    },
+    {
+      id: "sf4",
+      type: "select",
+      label: "직급",
+      colSpan: 4,
+      rowSpan: 1,
+      options: ["사원", "대리", "과장", "차장", "부장"],
+    },
+    { id: "sf5", type: "date", label: "입사일", colSpan: 4, rowSpan: 1 },
+    { id: "sf6", type: "radio", label: "고용형태", colSpan: 6, rowSpan: 1, options: ["정규직", "계약직", "파견직"] },
+    { id: "sf7", type: "button", label: "상태", colSpan: 6, rowSpan: 1, options: ["활성", "비활성", "대기", "잠금"] },
+  ],
 };
 
 /** 서브리스트 — 코드 상세 목록 샘플 (코드값/코드명/정렬/기타/사용) */
 const SAMPLE_SUBLIST: SubListWidget = {
-    type: 'sublist',
-    widgetId: 'guide-sublist',
-    connectedSlug: '/api/codes/details',
-    contentKey: 'codeDetails',
-    title: '코드 상세',
-    addButtonLabel: '코드 추가',
-    showBorder: true,
-    columns: [
-        { id: 'c1', key: 'code',      label: '코드값', type: 'input',  required: true },
-        { id: 'c2', key: 'name',      label: '코드명', type: 'input',  required: true },
-        { id: 'c3', key: 'sortOrder', label: '정렬',   type: 'input'                  },
-        { id: 'c4', key: 'etc1',      label: '기타1',  type: 'input'                  },
-        { id: 'c5', key: 'etc2',      label: '기타2',  type: 'input'                  },
-        { id: 'c6', key: 'active',    label: '사용',   type: 'select', options: ['Y', 'N'] },
-    ],
+  type: "sublist",
+  widgetId: "guide-sublist",
+  connectedSlug: "/api/codes/details",
+  contentKey: "codeDetails",
+  title: "코드 상세",
+  addButtonLabel: "코드 추가",
+  showBorder: true,
+  columns: [
+    { id: "c1", key: "code", label: "코드값", type: "input", required: true },
+    { id: "c2", key: "name", label: "코드명", type: "input", required: true },
+    { id: "c3", key: "sortOrder", label: "정렬", type: "input" },
+    { id: "c4", key: "etc1", label: "기타1", type: "input" },
+    { id: "c5", key: "etc2", label: "기타2", type: "input" },
+    { id: "c6", key: "active", label: "사용", type: "select", options: ["Y", "N"] },
+  ],
 };
 
 /** 탭 컨텐츠 — 기본정보/상세정보/기타 3탭 구성 샘플 */
 const SAMPLE_TAB: TabWidget = {
-    type: 'tab',
-    widgetId: 'guide-tab',
-    tabs: [
-        {
-            id: 'tab1',
-            label: '기본정보',
-            required: true,
-            items: [
-                { widget: SAMPLE_FORM_SIMPLE, colSpan: 12, rowSpan: 9 },
-                { widget: SAMPLE_SPACE,       colSpan: 12, rowSpan: 2 },
-            ],
-        },
-        {
-            id: 'tab2',
-            label: '상세정보',
-            items: [
-                { widget: SAMPLE_FORM,  colSpan: 12, rowSpan: 24 },
-                { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2  },
-            ],
-        },
-        {
-            id: 'tab3',
-            label: '기타',
-            items: [
-                { widget: SAMPLE_SUBLIST,     colSpan: 12, rowSpan: 5 },
-                { widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 },
-            ],
-        },
-    ],
+  type: "tab",
+  widgetId: "guide-tab",
+  tabs: [
+    {
+      id: "tab1",
+      label: "기본정보",
+      required: true,
+      items: [
+        { widget: SAMPLE_FORM_SIMPLE, colSpan: 12, rowSpan: 9 },
+        { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2 },
+      ],
+    },
+    {
+      id: "tab2",
+      label: "상세정보",
+      items: [
+        { widget: SAMPLE_FORM, colSpan: 12, rowSpan: 24 },
+        { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2 },
+      ],
+    },
+    {
+      id: "tab3",
+      label: "기타",
+      items: [
+        { widget: SAMPLE_SUBLIST, colSpan: 12, rowSpan: 5 },
+        { widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 },
+      ],
+    },
+  ],
 };
 
 /* ══════════════════════════════════════════ */
 /*  탭별 위젯 + 그리드 크기 매핑              */
 /* ══════════════════════════════════════════ */
 
+const SAMPLE_FORM_CONTENT_ROWS = calculateFormContentRowSpan(
+  SAMPLE_FORM.fields,
+  12,
+  !!(SAMPLE_FORM.title || SAMPLE_FORM.titleMsgKey)
+);
+const SAMPLE_FORM_ROW_SPAN = calculateWidgetItemRowSpan([{ colSpan: 12, rowSpan: SAMPLE_FORM_CONTENT_ROWS }], 12);
+
 /* 탭별 위젯 배열 — 순서대로 PageLayout 그리드에 배치됨 */
 const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: number }[]> = {
-    search: [
-        { widget: SAMPLE_SEARCH,          colSpan: 12, rowSpan: 7 },
-        { widget: SAMPLE_SEARCH_SIMPLE,   colSpan: 12, rowSpan: 1 },
-        { widget: SAMPLE_SEARCH_CATEGORY, colSpan: 12, rowSpan: 3 },
-    ],
-    table:    [{ widget: SAMPLE_TABLE,    colSpan: 12, rowSpan: 6 }],
-    form:     [{ widget: SAMPLE_FORM,     colSpan: 12, rowSpan: 24 }],
-    space: [
-        { widget: SAMPLE_SPACE,       colSpan: 12, rowSpan: 2 },
-        { widget: SAMPLE_SPACE_EXCEL, colSpan: 12, rowSpan: 2 },
-    ],
-    category: [
-        { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },
-        { widget: SAMPLE_CATEGORY_2, colSpan: 3, rowSpan: 8 },
-        { widget: SAMPLE_CATEGORY_3, colSpan: 3, rowSpan: 8 },
-        { widget: SAMPLE_CATEGORY_4, colSpan: 3, rowSpan: 8 },
-    ],
-    sublist: [
-        { widget: SAMPLE_SUBLIST, colSpan: 12, rowSpan: 5 },
-    ],
-    multiselect: [
-        { widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 },
-    ],
-    tab: [
-        { widget: SAMPLE_TAB, colSpan: 12, rowSpan: 6 },
-    ],
+  search: [
+    { widget: SAMPLE_SEARCH, colSpan: 12, rowSpan: 7 },
+    { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
+    { widget: SAMPLE_SEARCH_CATEGORY, colSpan: 12, rowSpan: 3 },
+  ],
+  table: [{ widget: SAMPLE_TABLE, colSpan: 12, rowSpan: 6 }],
+  form: [{ widget: SAMPLE_FORM, colSpan: 12, rowSpan: SAMPLE_FORM_ROW_SPAN }],
+  space: [
+    { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2 },
+    { widget: SAMPLE_SPACE_EXCEL, colSpan: 12, rowSpan: 2 },
+  ],
+  category: [
+    { widget: SAMPLE_CATEGORY_1, colSpan: 3, rowSpan: 8 },
+    { widget: SAMPLE_CATEGORY_2, colSpan: 3, rowSpan: 8 },
+    { widget: SAMPLE_CATEGORY_3, colSpan: 3, rowSpan: 8 },
+    { widget: SAMPLE_CATEGORY_4, colSpan: 3, rowSpan: 8 },
+  ],
+  sublist: [{ widget: SAMPLE_SUBLIST, colSpan: 12, rowSpan: 5 }],
+  multiselect: [{ widget: SAMPLE_MULTISELECT, colSpan: 12, rowSpan: 8 }],
+  tab: [{ widget: SAMPLE_TAB, colSpan: 12, rowSpan: 6 }],
 };
 
 /* ══════════════════════════════════════════ */
@@ -496,58 +748,68 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
 /* ══════════════════════════════════════════ */
 
 export default function BuilderContentsLayoutPage() {
-    const [activeTab, setActiveTab] = useState<TabKey>('search');
-    /* 개인정보 사유 팝업 미리보기 상태 */
-    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>("search");
+  /* 개인정보 사유 팝업 미리보기 상태 */
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [tabContentRowSpan, setTabContentRowSpan] = useState(TAB_CONFIG.tab[0].rowSpan);
 
-    return (
-        <div className="space-y-4">
+  const currentTabConfig =
+    activeTab === "tab"
+      ? TAB_CONFIG.tab.map((item) => ({ ...item, rowSpan: tabContentRowSpan }))
+      : TAB_CONFIG[activeTab];
 
-            {/* 페이지 헤더 */}
-            <div>
-                <h1 className="text-lg font-bold text-slate-900">Builder 컨텐츠 레이아웃</h1>
-            </div>
+  return (
+    <div className="space-y-4">
+      {/* 페이지 헤더 */}
+      <div>
+        <h1 className="text-lg font-bold text-slate-900">Builder 컨텐츠 레이아웃</h1>
+      </div>
 
-            {/* 탭 네비게이션 */}
-            <div className="flex gap-1 border-b border-slate-200">
-                {TABS.map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                            activeTab === tab.key
-                                ? 'border-slate-900 text-slate-900'
-                                : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+      {/* 탭 네비게이션 */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === tab.key
+                ? "border-slate-900 text-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-            {/* 캔버스 — PageLayout: 격자 처음부터 표시 (mode="preview") */}
-            <PageLayout mode="preview">
-                {TAB_CONFIG[activeTab].map((item, idx) => (
-                    /* GridCell — colSpan/rowSpan/height/overflow 일괄 관리 */
-                    <GridCell key={idx} colSpan={item.colSpan} rowSpan={item.rowSpan}>
-                        <WidgetRenderer
-                            mode="preview"
-                            widget={item.widget}
-                            contentColSpan={item.colSpan}
-                            onExcelDownloadPreview={() => setShowPrivacyModal(true)}
-                        />
-                    </GridCell>
-                ))}
-            </PageLayout>
+      {/* 캔버스 — PageLayout: 격자 처음부터 표시 (mode="preview") */}
+      <PageLayout mode="preview">
+        {currentTabConfig.map((item, idx) => (
+          /* GridCell — colSpan/rowSpan/height/overflow 일괄 관리 */
+          <GridCell
+            key={idx}
+            colSpan={item.colSpan}
+            rowSpan={item.rowSpan}
+            autoHeight={isWidgetAutoEligible(item.widget)}
+          >
+            <WidgetRenderer
+              mode="preview"
+              widget={item.widget}
+              contentColSpan={item.colSpan}
+              onExcelDownloadPreview={() => setShowPrivacyModal(true)}
+              onTabContentRowsChange={item.widget.type === "tab" ? setTabContentRowSpan : undefined}
+            />
+          </GridCell>
+        ))}
+      </PageLayout>
 
-            {/* 개인정보 사유 팝업 미리보기 */}
-            {showPrivacyModal && (
-                <PrivacyReasonModal
-                    onConfirm={(_reason) => setShowPrivacyModal(false)}
-                    onCancel={() => setShowPrivacyModal(false)}
-                />
-            )}
-
-        </div>
-    );
+      {/* 개인정보 사유 팝업 미리보기 */}
+      {showPrivacyModal && (
+        <PrivacyReasonModal
+          onConfirm={(_reason) => setShowPrivacyModal(false)}
+          onCancel={() => setShowPrivacyModal(false)}
+        />
+      )}
+    </div>
+  );
 }
