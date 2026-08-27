@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Globe } from "lucide-react";
 import { toast } from "sonner";
 import api, { getApiErrorMessage } from "@/lib/api";
 import PageLayout from "@/components/layout/page-layout";
@@ -11,6 +10,7 @@ import { WidgetRenderer } from "@/app/admin/templates/make/_shared/components/re
 import type { SpaceWidget } from "@/app/admin/templates/make/_shared/components/renderer";
 import type { FormWidget } from "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 import { useI18n } from "@/hooks/use-i18n";
+import { I18nModeToggle } from "@/components/i18n/i18n-mode-toggle";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 
 /* ── 타입 ── */
@@ -259,19 +259,11 @@ export default function RolesDetailPage() {
       {/* 폼 위젯 */}
       <GridCell colSpan={12} rowSpan={5}>
         <div className="relative h-full">
-          <button
-            type="button"
-            title={i18nMode ? t("menu.title.switchToManualInput") : t("menu.title.switchToI18nMode")}
-            onClick={() => setI18nMode((v) => !v)}
-            className={`absolute top-3 right-3 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all ${
-              i18nMode
-                ? "text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100"
-                : "text-slate-400 bg-slate-50 border border-slate-200 hover:bg-slate-100"
-            }`}
-          >
-            <Globe className="w-3 h-3" />
-            {i18nMode ? t("menu.btn.i18nMode") : t("search.btn.manualInput")}
-          </button>
+          <I18nModeToggle
+            i18nMode={i18nMode}
+            onToggle={() => setI18nMode((v) => !v)}
+            className="absolute top-3 right-3 z-10"
+          />
           <WidgetRenderer
             mode="live"
             widget={FORM_WIDGET}

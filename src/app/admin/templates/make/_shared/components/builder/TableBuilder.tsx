@@ -22,6 +22,7 @@ import { Plus, Trash2, X, Pencil, GripVertical } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import api from "@/lib/api";
 import { ToggleRow } from "./fields/_ToggleRow";
+import { LABEL_CLS, INPUT_CLS } from "./fields/_FieldBase";
 import { CodeGroupDef, CellType, TableColumnConfig, DisplayMode, TemplateItem } from "../../types";
 import { createIdGenerator } from "../../utils";
 import { buildTableFromEntity } from "../../utils/entityBuild";
@@ -74,6 +75,14 @@ export interface TableWidget {
     inner?: { relationId: number };
     outer?: { relationIds: number[] };
   };
+  /**
+   * 서버 전용 필터 — evalConditionExpr 문법과 동일 ("status=1,type=Y")
+   * useWidgetPageState의 fetchTableData에서 filterExpr 파라미터로 서버에만 전달된다.
+   * MultiSelectWidget.sourceFilter와 달리 클라이언트 재필터링을 하지 않는다.
+   * totalElements/totalPages가 서버 응답 값을 그대로 쓰기 때문에, 클라이언트에서
+   * 다시 필터링하면 페이징 수치와 실제 목록이 어긋난다.
+   */
+  sourceFilter?: string;
 }
 
 /* ══════════════════════════════════════════ */
@@ -537,6 +546,19 @@ export function TableBuilder({
           label={widget.enableRowSelection ? "사용" : "미사용"}
           value={widget.enableRowSelection ?? false}
           onChange={(v) => onChange({ ...widget, enableRowSelection: v })}
+        />
+      </div>
+
+      <div>
+        <label className={LABEL_CLS}>
+          조회 필터 <span className="text-slate-300 font-normal">(선택)</span>
+        </label>
+        <input
+          type="text"
+          value={widget.sourceFilter ?? ""}
+          onChange={(e) => onChange({ ...widget, sourceFilter: e.target.value || undefined })}
+          placeholder="예: status=1,type=Y"
+          className={INPUT_CLS}
         />
       </div>
 

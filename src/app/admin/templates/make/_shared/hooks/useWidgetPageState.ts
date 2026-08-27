@@ -376,6 +376,8 @@ export function useWidgetPageState(
           Object.assign(params, buildSearchQueryParams(searchFields, sv));
         }
 
+        if (tableWidget.sourceFilter && !isEntity) params.filterExpr = tableWidget.sourceFilter;
+
         if (tableWidget.contentRelation?.inner) {
           const innerRelationId = tableWidget.contentRelation.inner.relationId;
           params[`innerRel_${innerRelationId}`] = String(innerRelationId);

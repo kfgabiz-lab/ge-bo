@@ -7,12 +7,16 @@ import { CodeDetailTable } from "./code-detail-table";
 import { toast } from "sonner";
 import { useI18n } from "@/hooks/use-i18n";
 import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { I18nModeToggle } from "@/components/i18n/i18n-mode-toggle";
 
 /* 에러 스타일 */
 const inputCls = (error: string) =>
   `w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 transition-all ${
     error ? "border-red-400 focus:ring-red-200" : "border-slate-200 focus:ring-slate-900/10 focus:border-slate-900"
   }`;
+
+/* 직접입력 모드 XSS 검증 */
+const XSS_CHARS = /[<>"']/;
 
 /* ══════════════════════════════════════ */
 /*  생성 폼                               */
@@ -22,6 +26,8 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
   const { t } = useI18n();
   const [groupCode, setGroupCode] = useState("");
   const [groupNameMsgKey, setGroupNameMsgKey] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [i18nMode, setI18nMode] = useState(true);
   const [description, setDescription] = useState("");
   const [codeError, setCodeError] = useState("");
   const [nameError, setNameError] = useState("");
@@ -30,7 +36,6 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
 
   /* t()를 클로저로 활용하는 validation 함수 */
   const GROUP_CODE_REGEX = /^[A-Z0-9_]{1,30}$/;
-  const XSS_CHARS = /[<>"']/;
 
   const validateGroupCode = (v: string): string => {
     if (!v.trim()) return t("validation.code.groupCode.required");
@@ -47,9 +52,15 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
     if (isSubmitting) return;
     const ce = validateGroupCode(groupCode);
     setCodeError(ce);
-    if (!groupNameMsgKey) {
+    const nameValue = i18nMode ? groupNameMsgKey : groupName;
+    if (!nameValue.trim()) {
       setNameError(t("validation.code.groupName.required"));
       toast.error(t("validation.code.groupName.required"));
+      return;
+    }
+    if (!i18nMode && XSS_CHARS.test(groupName)) {
+      setNameError(t("validation.xss"));
+      toast.error(t("validation.xss"));
       return;
     }
     if (ce) {
@@ -63,7 +74,8 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
     try {
       await createGroup({
         groupCode: groupCode.trim().toUpperCase(),
-        groupNameMsgKey,
+        groupNameMsgKey: i18nMode ? groupNameMsgKey : "",
+        groupName: i18nMode ? "" : groupName.trim(),
         description: description.trim() || undefined,
       });
       toast.success(t("code.group.created"));
@@ -108,17 +120,40 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
           />
         </div>
         <div>
-          <label className="text-sm font-medium text-slate-600 mb-1.5 block">
-            {t("common.label.groupName")} <span className="text-red-500">*</span>
-          </label>
-          <MessageKeySelector
-            value={groupNameMsgKey}
-            onChange={(v) => {
-              setGroupNameMsgKey(v);
-              if (nameError) setNameError("");
-            }}
-            resourceType="WORD"
-          />
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-medium text-slate-600 flex items-center gap-1">
+              {t("common.label.groupName")} <span className="text-red-500">*</span>
+            </label>
+            <I18nModeToggle
+              i18nMode={i18nMode}
+              onToggle={() => {
+                setI18nMode((v) => !v);
+                setNameError("");
+              }}
+            />
+          </div>
+          {i18nMode ? (
+            <MessageKeySelector
+              value={groupNameMsgKey}
+              onChange={(v) => {
+                setGroupNameMsgKey(v);
+                if (nameError) setNameError("");
+              }}
+              resourceType="WORD"
+            />
+          ) : (
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => {
+                setGroupName(e.target.value);
+                if (nameError) setNameError("");
+              }}
+              className={inputCls(nameError)}
+              placeholder={t("common.label.groupName")}
+              maxLength={50}
+            />
+          )}
         </div>
         <div>
           <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t("common.label.description")}</label>
@@ -141,7 +176,7 @@ function CreateGroupForm({ onCancel, onCreated }: { onCancel: () => void; onCrea
         </button>
         <button
           onClick={handleSubmit}
-          disabled={isSubmitting || !groupCode.trim() || !groupNameMsgKey.trim()}
+          disabled={isSubmitting || !groupCode.trim() || (i18nMode ? !groupNameMsgKey.trim() : !groupName.trim())}
           className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-md hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
           {isSubmitting ? t("common.loading") : t("code.title.groupNew")}
@@ -167,6 +202,8 @@ export function CodeDetail() {
   const { t } = useI18n();
 
   const [groupNameMsgKey, setGroupNameMsgKey] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [i18nMode, setI18nMode] = useState(true);
   const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
   const [nameError, setNameError] = useState("");
@@ -176,7 +213,10 @@ export function CodeDetail() {
   /* 선택 그룹 동기화 */
   useEffect(() => {
     if (selectedGroup) {
+      const hasMsgKey = !!selectedGroup.groupNameMsgKey;
+      setI18nMode(hasMsgKey);
       setGroupNameMsgKey(selectedGroup.groupNameMsgKey || "");
+      setGroupName(hasMsgKey ? "" : selectedGroup.groupName || "");
       setDescription(selectedGroup.description || "");
       setActive(selectedGroup.active);
       setNameError("");
@@ -189,12 +229,14 @@ export function CodeDetail() {
     if (selectedGroup) {
       const dirty =
         groupNameMsgKey !== (selectedGroup.groupNameMsgKey || "") ||
+        groupName !== (selectedGroup.groupName || "") ||
+        i18nMode !== !!selectedGroup.groupNameMsgKey ||
         description !== (selectedGroup.description || "") ||
         active !== selectedGroup.active;
       setIsDirty(dirty);
       setStoreDirty(dirty);
     }
-  }, [groupNameMsgKey, description, active, selectedGroup, setStoreDirty]);
+  }, [groupNameMsgKey, groupName, i18nMode, description, active, selectedGroup, setStoreDirty]);
 
   /* beforeunload — 미저장 보호 */
   useEffect(() => {
@@ -231,14 +273,22 @@ export function CodeDetail() {
   /* 저장 */
   const handleSave = async () => {
     if (isSubmitting) return;
-    if (!groupNameMsgKey) {
+    const nameValue = i18nMode ? groupNameMsgKey : groupName;
+    if (!nameValue.trim()) {
+      setNameError(t("validation.code.groupName.required"));
       toast.error(t("validation.code.groupName.required"));
+      return;
+    }
+    if (!i18nMode && XSS_CHARS.test(groupName)) {
+      setNameError(t("validation.xss"));
+      toast.error(t("validation.xss"));
       return;
     }
     if (!isDirty) {
       toast.info(t("common.noChange"));
       return;
     }
+    setNameError("");
 
     setIsSubmitting(true);
     try {
@@ -251,7 +301,8 @@ export function CodeDetail() {
       }
       await updateGroup(selectedGroup.id, {
         groupCode: selectedGroup.groupCode,
-        groupNameMsgKey,
+        groupNameMsgKey: i18nMode ? groupNameMsgKey : "",
+        groupName: i18nMode ? "" : groupName.trim(),
         description: description.trim() || undefined,
         active,
       });
@@ -334,17 +385,40 @@ export function CodeDetail() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-500 mb-1 block">
-              {t("common.label.groupName")} <span className="text-red-500">*</span>
-            </label>
-            <MessageKeySelector
-              value={groupNameMsgKey}
-              onChange={(v) => {
-                setGroupNameMsgKey(v);
-                if (nameError) setNameError("");
-              }}
-              resourceType="WORD"
-            />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-medium text-slate-500 flex items-center gap-1">
+                {t("common.label.groupName")} <span className="text-red-500">*</span>
+              </label>
+              <I18nModeToggle
+                i18nMode={i18nMode}
+                onToggle={() => {
+                  setI18nMode((v) => !v);
+                  setNameError("");
+                }}
+              />
+            </div>
+            {i18nMode ? (
+              <MessageKeySelector
+                value={groupNameMsgKey}
+                onChange={(v) => {
+                  setGroupNameMsgKey(v);
+                  if (nameError) setNameError("");
+                }}
+                resourceType="WORD"
+              />
+            ) : (
+              <input
+                type="text"
+                value={groupName}
+                onChange={(e) => {
+                  setGroupName(e.target.value);
+                  if (nameError) setNameError("");
+                }}
+                className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
+                placeholder={t("common.label.groupName")}
+                maxLength={50}
+              />
+            )}
           </div>
           <div>
             <label className="text-sm font-medium text-slate-500 mb-1 block">{t("common.label.description")}</label>

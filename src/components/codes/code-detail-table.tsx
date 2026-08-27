@@ -6,6 +6,7 @@ import { useCodeStore, CodeDetail } from "@/store/use-code-store";
 import { toast } from "sonner";
 import { useI18n } from "@/hooks/use-i18n";
 import { MessageKeySelector } from "@/components/i18n/message-key-selector";
+import { I18nModeToggle } from "@/components/i18n/i18n-mode-toggle";
 
 /* 기타 필드 목록 */
 const EXTRAS = ["extra1", "extra2", "extra3", "extra4", "extra5"] as const;
@@ -16,6 +17,7 @@ type EditRow = {
   code: string;
   name: string;
   nameMsgKey: string;
+  i18nMode: boolean;
   sortOrder: number;
   active: boolean;
   extras: Record<ExtraKey, string>;
@@ -45,6 +47,8 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newNameMsgKey, setNewNameMsgKey] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newI18nMode, setNewI18nMode] = useState(true);
   const [newSort, setNewSort] = useState(details.length + 1);
   const [newExtras, setNewExtras] = useState<Record<ExtraKey, string>>({
     extra1: "",
@@ -85,8 +89,9 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
     setEditingRows((prev) =>
       new Map(prev).set(d.id, {
         code: d.code,
-        name: d.name,
+        name: d.nameMsgKey ? "" : d.name,
         nameMsgKey: d.nameMsgKey || "",
+        i18nMode: !!d.nameMsgKey,
         sortOrder: d.sortOrder,
         active: d.active,
         extras: {
@@ -128,9 +133,17 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
   const handleAdd = async () => {
     const ce = validateCode(newCode);
     setAddCodeErr(ce);
-    if (!newNameMsgKey) {
-      setAddNameErr(t("validation.code.codeName.required"));
-      return;
+    if (newI18nMode) {
+      if (!newNameMsgKey) {
+        setAddNameErr(t("validation.code.codeName.required"));
+        return;
+      }
+    } else {
+      const ne = validateName(newName);
+      if (ne) {
+        setAddNameErr(ne);
+        return;
+      }
     }
     if (ce) {
       toast.error(ce);
@@ -146,8 +159,8 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
     try {
       await addDetail(groupId, {
         code: newCode.trim().toUpperCase(),
-        name: "",
-        nameMsgKey: newNameMsgKey,
+        name: newI18nMode ? "" : newName.trim(),
+        nameMsgKey: newI18nMode ? newNameMsgKey : "",
         sortOrder: newSort,
         active: true,
         ...newExtras,
@@ -155,6 +168,8 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
       toast.success(t("code.detail.added"));
       setNewCode("");
       setNewNameMsgKey("");
+      setNewName("");
+      setNewI18nMode(true);
       setNewSort(details.length + 2);
       setNewExtras({ extra1: "", extra2: "", extra3: "", extra4: "", extra5: "" });
       setAddCodeErr("");
@@ -175,9 +190,17 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
       toast.error(ce);
       return;
     }
-    if (!row.nameMsgKey) {
-      toast.error(t("validation.code.codeName.required"));
-      return;
+    if (row.i18nMode) {
+      if (!row.nameMsgKey) {
+        toast.error(t("validation.code.codeName.required"));
+        return;
+      }
+    } else {
+      const ne = validateName(row.name);
+      if (ne) {
+        toast.error(ne);
+        return;
+      }
     }
 
     if (details.some((d) => d.id !== detailId && d.code === row.code.trim().toUpperCase())) {
@@ -188,8 +211,8 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
     try {
       await updateDetail(groupId, detailId, {
         code: row.code.trim().toUpperCase(),
-        name: "",
-        nameMsgKey: row.nameMsgKey,
+        name: row.i18nMode ? "" : row.name.trim(),
+        nameMsgKey: row.i18nMode ? row.nameMsgKey : "",
         sortOrder: row.sortOrder,
         active: row.active,
         ...row.extras,
@@ -221,6 +244,7 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
       await updateDetail(groupId, d.id, {
         code: d.code,
         name: d.name,
+        nameMsgKey: d.nameMsgKey,
         sortOrder: d.sortOrder,
         active: !d.active,
         extra1: d.extra1,
@@ -336,14 +360,38 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
                   {addCodeErr && <p className="text-[9px] text-red-500 mt-0.5">{addCodeErr}</p>}
                 </td>
                 <td className="px-2 py-1.5">
-                  <MessageKeySelector
-                    value={newNameMsgKey}
-                    onChange={(v) => {
-                      setNewNameMsgKey(v);
-                      if (addNameErr) setAddNameErr("");
-                    }}
-                    resourceType={undefined}
-                  />
+                  <div className="space-y-1">
+                    <div className="flex justify-end">
+                      <I18nModeToggle
+                        i18nMode={newI18nMode}
+                        onToggle={() => {
+                          setNewI18nMode((v) => !v);
+                          if (addNameErr) setAddNameErr("");
+                        }}
+                      />
+                    </div>
+                    {newI18nMode ? (
+                      <MessageKeySelector
+                        value={newNameMsgKey}
+                        onChange={(v) => {
+                          setNewNameMsgKey(v);
+                          if (addNameErr) setAddNameErr("");
+                        }}
+                        resourceType={undefined}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => {
+                          setNewName(e.target.value);
+                          if (addNameErr) setAddNameErr("");
+                        }}
+                        placeholder={t("common.label.codeName")}
+                        className={inputCls}
+                      />
+                    )}
+                  </div>
                   {addNameErr && <p className="text-[9px] text-red-500 mt-0.5">{addNameErr}</p>}
                 </td>
                 <td className="px-2 py-1.5">
@@ -411,17 +459,41 @@ export function CodeDetailTable({ groupId }: { groupId: number }) {
                         />
                       </td>
                       <td className="px-2 py-1.5">
-                        <MessageKeySelector
-                          value={editing.nameMsgKey}
-                          onChange={(v) =>
-                            setEditingRows((prev) => {
-                              const row = prev.get(d.id);
-                              if (!row) return prev;
-                              return new Map(prev).set(d.id, { ...row, nameMsgKey: v });
-                            })
-                          }
-                          resourceType={undefined}
-                        />
+                        <div className="space-y-1">
+                          <div className="flex justify-end">
+                            <I18nModeToggle
+                              i18nMode={editing.i18nMode}
+                              onToggle={() =>
+                                setEditingRows((prev) => {
+                                  const row = prev.get(d.id);
+                                  if (!row) return prev;
+                                  return new Map(prev).set(d.id, { ...row, i18nMode: !row.i18nMode });
+                                })
+                              }
+                            />
+                          </div>
+                          {editing.i18nMode ? (
+                            <MessageKeySelector
+                              value={editing.nameMsgKey}
+                              onChange={(v) =>
+                                setEditingRows((prev) => {
+                                  const row = prev.get(d.id);
+                                  if (!row) return prev;
+                                  return new Map(prev).set(d.id, { ...row, nameMsgKey: v });
+                                })
+                              }
+                              resourceType={undefined}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={editing.name}
+                              onChange={(e) => setEditField(d.id, "name", e.target.value)}
+                              placeholder={t("common.label.codeName")}
+                              className={inputCls}
+                            />
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-1.5">
                         <input
