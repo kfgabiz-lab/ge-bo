@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   /* AppScan 보안 스캔 지적: X-Powered-By 헤더로 프레임워크 노출 방지 */
   poweredByHeader: false,
+  // ge-api(SPRING_PROFILES_ACTIVE: local/developer/dev/prod)와 동일한 배포 프로필 값을
+  // 클라이언트 번들에도 노출 — ge-fo/next.config.ts와 동일 패턴
+  env: {
+    NEXT_PUBLIC_PROFILE: process.env.SPRING_PROFILES_ACTIVE || "",
+  },
   /* Turbopack 기본 사용 — 별도 webpack 설정 불필요 */
   turbopack: {},
   /* 브라우저 → Next.js 서버 → API 서버(8080) 프록시 */
