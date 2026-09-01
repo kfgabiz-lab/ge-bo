@@ -48,6 +48,9 @@ interface RendererContainerProps {
   gapSize?: number;
   /** 내부 grid 행별 auto/고정 지정 — PageGridRenderer의 동일 패턴 재사용 (필드 단위 자동 축소용) */
   rowIsAuto?: boolean[];
+  /** 컨텐츠가 박스보다 넘칠 때 잘라낼지 여부 (기본 true) — SpaceRenderer의 action-button 그룹처럼
+   *  잘리면 안 되는(가려지면 버튼 자체가 안 보이는) 컨텐츠는 false로 전달 */
+  clipOverflow?: boolean;
 }
 
 export function RendererContainer({
@@ -61,6 +64,7 @@ export function RendererContainer({
   rowPitch,
   gapSize,
   rowIsAuto,
+  clipOverflow = true,
 }: RendererContainerProps) {
   /* overflow:clip — 시각 클리핑(rounded border 포함)은 유지, GPU 합성 레이어(video)는 clip 안 함
        overflow:hidden을 쓰면 Edge에서 video GPU 레이어가 clip돼 화면에 안 보이는 버그 발생 */
@@ -69,8 +73,8 @@ export function RendererContainer({
 
   const bgStyle =
     !bgColor || bgColor === "none"
-      ? { overflow: "clip" as const }
-      : { backgroundColor: bgColor, overflow: "clip" as const };
+      ? { overflow: (clipOverflow ? "clip" : "visible") as const }
+      : { backgroundColor: bgColor, overflow: (clipOverflow ? "clip" : "visible") as const };
 
   /* contentColSpan 있으면 CSS Grid 활성화 — Form/Space 공통 격자 배치 */
   const gap = gapSize ?? GAP_SIZE;

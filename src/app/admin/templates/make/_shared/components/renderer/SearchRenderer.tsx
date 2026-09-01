@@ -102,6 +102,25 @@ export function SearchRenderer({
   /* 보임 → 숨김 전환 시 해당 필드 값을 기본값(없으면 빈값)으로 되돌림 — 훅 규칙상 아래 조건부 return보다 위에서 호출 */
   useHiddenSearchFieldReset({ isPreview, fields: flatFields, hiddenMap, values, onChangeValues });
 
+  const handleDateRangeGenerationChange = (sourceFieldId: string, part: "from" | "to", value: string) => {
+    if (isPreview) return;
+
+    const sourceField = flatFields.find((f) => f.id === sourceFieldId);
+    if (!sourceField) return;
+
+    (sourceField.dataGenerations ?? []).forEach((dg) => {
+      if (!dg.generationKey || dg.datePart !== part) return;
+
+      const targetFieldId = keyToId[dg.generationKey];
+      if (!targetFieldId || targetFieldId === sourceFieldId) return;
+
+      const targetField = flatFields.find((f) => f.id === targetFieldId);
+      const targetIsRange = targetField?.type === "dateRange" || targetField?.type === "yearMonthRange";
+
+      onChangeValues?.(targetIsRange ? `${targetFieldId}_${part}` : targetFieldId, value);
+    });
+  };
+
   /* 행이 없을 때 — preview는 안내 텍스트, live는 null */
   if (!rows.length) {
     return isPreview ? <p className="text-sm text-slate-400 text-center py-2">검색 행을 추가하세요</p> : null;
@@ -168,12 +187,18 @@ export function SearchRenderer({
                   }
                   onFromChange={
                     field.type === "dateRange" || field.type === "yearMonthRange"
-                      ? (v) => onChangeValues?.(field.id + "_from", v)
+                      ? (v) => {
+                          onChangeValues?.(field.id + "_from", v);
+                          handleDateRangeGenerationChange(field.id, "from", v);
+                        }
                       : undefined
                   }
                   onToChange={
                     field.type === "dateRange" || field.type === "yearMonthRange"
-                      ? (v) => onChangeValues?.(field.id + "_to", v)
+                      ? (v) => {
+                          onChangeValues?.(field.id + "_to", v);
+                          handleDateRangeGenerationChange(field.id, "to", v);
+                        }
                       : undefined
                   }
                   codeGroups={codeGroups}
@@ -245,12 +270,18 @@ export function SearchRenderer({
                     }
                     onFromChange={
                       field.type === "dateRange" || field.type === "yearMonthRange"
-                        ? (v) => onChangeValues?.(field.id + "_from", v)
+                        ? (v) => {
+                            onChangeValues?.(field.id + "_from", v);
+                            handleDateRangeGenerationChange(field.id, "from", v);
+                          }
                         : undefined
                     }
                     onToChange={
                       field.type === "dateRange" || field.type === "yearMonthRange"
-                        ? (v) => onChangeValues?.(field.id + "_to", v)
+                        ? (v) => {
+                            onChangeValues?.(field.id + "_to", v);
+                            handleDateRangeGenerationChange(field.id, "to", v);
+                          }
                         : undefined
                     }
                     codeGroups={codeGroups}

@@ -177,6 +177,34 @@ export function FormRenderer({
 
   const lastGeneratedRef = useRef<Record<string, string>>({});
 
+  /* generationKey로 대상 fieldId 탐색
+   * - 도트 포함(예: form3.title): allFieldKeyToId에서 cross-form 탐색
+   * - 단순 key(예: title): keyToId(현재 폼) 우선, 없으면 allFieldKeyToId(같은 탭 내 다른 폼) 탐색 */
+  const resolveTargetFieldId = useCallback(
+    (generationKey: string): string | undefined => {
+      if (generationKey.includes(".")) return allFieldKeyToId?.[generationKey];
+      return keyToId[generationKey] ?? allFieldKeyToId?.[generationKey];
+    },
+    [keyToId, allFieldKeyToId]
+  );
+
+  /* 대상 fieldId에 변환값 전달
+   * - 현재 폼 소속: onChangeValues
+   * - 다른 폼 소속: onChangeAllFormValues */
+  const dispatchValue = useCallback(
+    (targetFieldId: string, transformed: string, writeFieldId: string = targetFieldId) => {
+      if (
+        keyToId[Object.keys(keyToId).find((k) => keyToId[k] === targetFieldId) ?? ""] !== undefined ||
+        Object.values(keyToId).includes(targetFieldId)
+      ) {
+        onChangeValues?.(writeFieldId, transformed);
+      } else {
+        onChangeAllFormValues?.(writeFieldId, transformed);
+      }
+    },
+    [keyToId, onChangeValues, onChangeAllFormValues]
+  );
+
   /**
    * 필드값 변경 핸들러 — generationKey 설정 시 대상 필드에 변환값 자동 입력
    * - generationKey 마지막 '.' 이후 세그먼트 = 대상 fieldKey
@@ -208,28 +236,6 @@ export function FormRenderer({
       }
 
       /* generationKey 자동입력 처리 */
-
-      /* generationKey로 대상 fieldId 탐색
-       * - 도트 포함(예: form3.title): allFieldKeyToId에서 cross-form 탐색
-       * - 단순 key(예: title): keyToId(현재 폼) 우선, 없으면 allFieldKeyToId(같은 탭 내 다른 폼) 탐색 */
-      const resolveTargetFieldId = (generationKey: string): string | undefined => {
-        if (generationKey.includes(".")) return allFieldKeyToId?.[generationKey];
-        return keyToId[generationKey] ?? allFieldKeyToId?.[generationKey];
-      };
-
-      /* 대상 fieldId에 변환값 전달
-       * - 현재 폼 소속: onChangeValues
-       * - 다른 폼 소속: onChangeAllFormValues */
-      const dispatchValue = (targetFieldId: string, transformed: string) => {
-        if (
-          keyToId[Object.keys(keyToId).find((k) => keyToId[k] === targetFieldId) ?? ""] !== undefined ||
-          Object.values(keyToId).includes(targetFieldId)
-        ) {
-          onChangeValues?.(targetFieldId, transformed);
-        } else {
-          onChangeAllFormValues?.(targetFieldId, transformed);
-        }
-      };
 
       /* 단일 generationKey 처리 (기존 호환) */
       if (sourceField.generationKey) {
@@ -290,8 +296,8 @@ export function FormRenderer({
     },
     [
       fields,
-      keyToId,
-      allFieldKeyToId,
+      resolveTargetFieldId,
+      dispatchValue,
       onChangeValues,
       onChangeAllFormValues,
       contentKey,
@@ -299,6 +305,34 @@ export function FormRenderer({
       allFormValues,
       crossTabFormValues,
     ]
+  );
+
+  const handleDateRangeGenerationChange = useCallback(
+    (sourceFieldId: string, part: "from" | "to", value: string) => {
+      if (isPreview) return;
+
+      const sourceField = fields.find((f) => f.id === sourceFieldId);
+      if (!sourceField) return;
+
+      (sourceField.dataGenerations ?? []).forEach((dg) => {
+        if (!dg.generationKey || dg.datePart !== part) return;
+
+        const targetFieldId = resolveTargetFieldId(dg.generationKey);
+
+        if (!targetFieldId) {
+          onChangeAllFormValues?.(`${dg.generationKey}_${part}`, value);
+          return;
+        }
+        if (targetFieldId === sourceFieldId) return;
+
+        const targetField = fields.find((f) => f.id === targetFieldId);
+        const targetIsRange = targetField?.type === "dateRange" || targetField?.type === "yearMonthRange";
+        const writeFieldId = !targetField || targetIsRange ? `${targetFieldId}_${part}` : targetFieldId;
+
+        dispatchValue(targetFieldId, value, writeFieldId);
+      });
+    },
+    [fields, isPreview, resolveTargetFieldId, dispatchValue, onChangeAllFormValues]
   );
 
   const hasTitleBlock = !!(titleMsgKey || title);
@@ -393,14 +427,20 @@ export function FormRenderer({
                   f.type === "dateRange" || f.type === "yearMonthRange"
                     ? isPreview
                       ? undefined
-                      : (v) => handleFieldChange(f.id + "_from", v)
+                      : (v) => {
+                          handleFieldChange(f.id + "_from", v);
+                          handleDateRangeGenerationChange(f.id, "from", v);
+                        }
                     : undefined
                 }
                 onToChange={
                   f.type === "dateRange" || f.type === "yearMonthRange"
                     ? isPreview
                       ? undefined
-                      : (v) => handleFieldChange(f.id + "_to", v)
+                      : (v) => {
+                          handleFieldChange(f.id + "_to", v);
+                          handleDateRangeGenerationChange(f.id, "to", v);
+                        }
                     : undefined
                 }
                 /* address 전용: Places 후보 선택 시 주소+위도+경도 3값을 fieldId/_lat/_lng 3키로 한 번에 저장

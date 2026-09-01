@@ -214,8 +214,8 @@ export interface SearchFieldConfig {
   /* ── editor 전용 ── */
   /** 에디터 종류 선택 — tiptap(기본) 또는 toast (과도기 공존) */
   editorType?: "tiptap" | "toast";
-  /* ── 데이터생성 전용 (Input/FormTextarea) ── */
-  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+  /* ── 데이터생성 전용 (Input/FormTextarea/Date/DateRange) ── */
+  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey */
   generationKey?: string;
   /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
   dataReplacement?: "none" | "hyphen";
@@ -234,6 +234,7 @@ export interface SearchFieldConfig {
     caseChange?: "none" | "upper" | "lower";
     appendText?: string;
     truncateLength?: number;
+    datePart?: "from" | "to";
   }[];
   /* ── select SLUG 옵션 소스 전용 ── */
   /** SLUG 옵션 소스 연결 SLUG — live 모드에서 해당 SLUG 데이터를 API fetch하여 옵션 생성 */

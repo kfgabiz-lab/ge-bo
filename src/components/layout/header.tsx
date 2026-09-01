@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { LogOut, ChevronRight, Home, Globe } from "lucide-react";
+import { LogOut, ChevronRight, Home, Globe, Clock } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { usePageTitleStore } from "@/store/use-page-title-store";
 import { LanguageSelector } from "@/components/layout/language-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
+import { getTimezoneLabel } from "@/lib/timezoneOptions";
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
 function findMenuBreadcrumb(
@@ -34,6 +35,22 @@ function findMenuBreadcrumb(
     }
   }
   return null;
+}
+
+/** 활성 사이트의 설정된 타임존 표시 컴포넌트 */
+function ActiveSiteTimezone() {
+  const activeSiteId = useSiteStore((state) => state.activeSiteId);
+  const mySites = useSiteStore((state) => state.sites);
+  const activeSite = mySites.find((s) => s.id === activeSiteId);
+
+  if (!activeSite?.timezone) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
+      <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+      <span className="text-xs font-semibold text-slate-700">{getTimezoneLabel(activeSite.timezone)}</span>
+    </div>
+  );
 }
 
 /** 홈페이지 선택 셀렉트박스 컴포넌트 */
@@ -207,6 +224,8 @@ export function Header() {
         <SiteSelector />
         {/* 다국어 선택 드롭다운 */}
         <LanguageSelector />
+        {/* 활성 사이트 타임존 표시 */}
+        <ActiveSiteTimezone />
 
         {/* 알림 아이콘 — 추후 활성화
                 <button className="relative w-8 h-8 flex items-center justify-center rounded-sm text-gray-500 hover:bg-gray-100 hover:text-slate-900 transition-all">

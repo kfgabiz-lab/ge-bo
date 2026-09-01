@@ -9,6 +9,7 @@
 import type { SearchRowConfig, TableColumnConfig, SearchFieldConfig, DateSubType } from "../../types";
 import type { FormWidget } from "../builder/FormBuilder";
 import type { TableWidget } from "../builder/TableBuilder";
+import type { DataGenerationEntry } from "../builder/fields/types";
 
 /* ── 렌더링 맥락 ── */
 
@@ -214,6 +215,12 @@ export interface SubListColumn {
   optionOrderDir?: "ASC" | "DESC";
   /** select(SLUG 옵션) 선택 시 함께 추출할 파생 키 목록 — 콤마구분 (예: "product_category,product_line") */
   optionDerivedKeys?: string;
+  generationKey?: string;
+  dataReplacement?: "none" | "hyphen";
+  caseChange?: "none" | "upper" | "lower";
+  appendText?: string;
+  truncateLength?: number;
+  dataGenerations?: DataGenerationEntry[];
   /* ── date/dateRange 필드간 대소비교 검증 — 콤마구분 단일 표현식 (types.ts SearchFieldConfig.compareExpr와 동일 문법) ──
    *   [part]연산자$대상fieldKey[_from|_to] 를 콤마(,)로 나열(AND)
    * @example "<$endDate,<$dueDate" / "to<$endDate_from" */

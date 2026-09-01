@@ -365,6 +365,12 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       /* 조인 검색 연동 (select/input 전용) */
       joinRelationSlugId,
       joinSlaveKey,
+      generationKey,
+      dataReplacement,
+      caseChange,
+      appendText,
+      truncateLength,
+      dataGenerations,
     } = pendingValues;
 
     const isDefaultAllSelect = pendingType === "select" && !placeholder?.trim();
@@ -467,6 +473,12 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       joinRelationSlugId:
         pendingType === "select" || pendingType === "input" ? joinRelationSlugId || undefined : undefined,
       joinSlaveKey: pendingType === "select" || pendingType === "input" ? joinSlaveKey?.trim() || undefined : undefined,
+      generationKey,
+      dataReplacement,
+      caseChange,
+      appendText,
+      truncateLength,
+      dataGenerations,
     };
 
     onChange(rows.map((r) => (r.id === showFieldPicker ? { ...r, fields: [...r.fields, newField] } : r)));
@@ -774,6 +786,12 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                                           /* 조인 검색 연동 (select/input 전용) */
                                           joinRelationSlugId: field.joinRelationSlugId,
                                           joinSlaveKey: field.joinSlaveKey,
+                                          generationKey: field.generationKey,
+                                          dataReplacement: field.dataReplacement,
+                                          caseChange: field.caseChange,
+                                          appendText: field.appendText,
+                                          truncateLength: field.truncateLength,
+                                          dataGenerations: field.dataGenerations,
                                         },
                                         (updates) => updateSearchField(field.id, updates as Partial<SearchFieldConfig>)
                                       )}

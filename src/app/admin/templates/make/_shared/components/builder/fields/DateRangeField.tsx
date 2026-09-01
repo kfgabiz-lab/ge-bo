@@ -14,6 +14,7 @@ import React from "react";
 import { FieldEditProps } from "./types";
 import { FieldBase, LABEL_CLS, INPUT_CLS } from "./_FieldBase";
 import { ToggleRow } from "./_ToggleRow";
+import { DataGenerationSection } from "./DataGenerationSection";
 
 type RangeSubType = "date" | "yearMonth" | "datetime" | "time" | "timeSec";
 
@@ -437,6 +438,8 @@ export function DateRangeField({
           </div>
         </div>
       )}
+
+      <DataGenerationSection values={values} onChange={onChange} fieldType="dateRange" />
     </div>
   );
 }

@@ -1782,6 +1782,7 @@ export function buildDataJson(
        * 2단계: "ck.fieldKey"      → dataJson.ck.fieldKey
        * 3단계: "tk.ck.fieldKey"   → dataJson.tk.ck.fieldKey */
       (w.fields ?? []).forEach((f) => {
+        if (f.type === "dateRange" || f.type === "yearMonthRange") return;
         if (FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
         const sourceValue = rawValues[f.id] ?? "";
 
@@ -1815,6 +1816,8 @@ export function buildDataJson(
           writeToGenerationPath(dataJson, dg.generationKey, transformed);
         });
       });
+
+      applyDateRangeGenerationToDataJson(w.fields ?? [], rawValues, dataJson, generationTargetKeyToId, isCrossTabKey);
     } else if (w.type === "multiselect") {
       if (w.contentKey) {
         const selectedIds = multiSelectMap[w.widgetId ?? ""] ?? [];
@@ -1948,6 +1951,25 @@ function writeToGenerationPath(dataJson: Record<string, unknown>, generationKey:
     if (!tabSection[ck] || typeof tabSection[ck] !== "object" || Array.isArray(tabSection[ck])) tabSection[ck] = {};
     (tabSection[ck] as Record<string, unknown>)[fk] = value;
   }
+}
+
+function applyDateRangeGenerationToDataJson(
+  fields: import("./components/builder/FormBuilder").FormFieldItem[],
+  rawValues: Record<string, string>,
+  dataJson: Record<string, unknown>,
+  generationTargetKeyToId: Record<string, string>,
+  isCrossTabKey: (generationKey: string) => boolean
+) {
+  fields.forEach((f) => {
+    if (f.type !== "dateRange" && f.type !== "yearMonthRange") return;
+    (f.dataGenerations ?? []).forEach((dg) => {
+      if (!dg.generationKey || !dg.datePart) return;
+      if (isCrossTabKey(dg.generationKey)) return;
+      if (generationTargetKeyToId[dg.generationKey]) return;
+      const value = rawValues[f.id + "_" + dg.datePart] ?? "";
+      writeToGenerationPath(dataJson, dg.generationKey, value);
+    });
+  });
 }
 
 /**

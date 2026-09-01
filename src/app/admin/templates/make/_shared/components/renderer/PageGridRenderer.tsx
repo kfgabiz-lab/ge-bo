@@ -29,6 +29,18 @@ import type { FormWidget } from "../builder/FormBuilder";
 import { useNormalizedWidgetItems } from "../../hooks/useNormalizedWidgetItems";
 import { packedRowLayout } from "../../utils/formGridLayout";
 
+const RANGE_FIELD_TYPES: readonly string[] = ["dateRange", "yearMonthRange"];
+
+function splitRangePartSuffix(key: string): { base: string; part: "from" | "to" } | undefined {
+  if (key.endsWith("_from")) return { base: key.slice(0, -"_from".length), part: "from" };
+  if (key.endsWith("_to")) return { base: key.slice(0, -"_to".length), part: "to" };
+  return undefined;
+}
+
+function isRangeFieldType(type: string | undefined): boolean {
+  return !!type && RANGE_FIELD_TYPES.includes(type);
+}
+
 /* ── 공유 타입 (generated/[slug], widget/[slug], 빌더 미리보기 모두 사용) ── */
 
 /** PageLayout 내부의 개별 컨텐츠 아이템 (위젯 + 그리드 크기) */
@@ -281,6 +293,19 @@ export function PageGridRenderer({
     return map;
   }, [widgetItems]);
 
+  const fieldIdToType = useMemo(() => {
+    const map: Record<string, string> = {};
+    widgetItems
+      .flatMap((item) => item.contents.map((c) => c.widget))
+      .filter((w): w is FormWidget => w.type === "form")
+      .forEach((w) =>
+        w.fields?.forEach((f) => {
+          map[f.id] = f.type;
+        })
+      );
+    return map;
+  }, [widgetItems]);
+
   /* crossTabFormValues를 formValuesMap에 병합 — 다른 탭에서 생성된 값을 현재 탭 폼에 주입
    * crossTabFormValues 키는 fieldKey("form3.title" 등) 형태
    * → allFieldKeyToId로 fieldId로 변환 후 fieldIdToWidgetId로 widgetId 매핑
@@ -298,22 +323,31 @@ export function PageGridRenderer({
 
     /* crossTabFormValues 전체 순회 — widgetId가 merged에 없어도 추가 */
     Object.entries(crossTabFormValues).forEach(([fieldKey, crossVal]) => {
-      const targetFieldId = allFieldKeyToId[fieldKey];
+      const directFieldId = allFieldKeyToId[fieldKey];
+      const rangePart = directFieldId ? undefined : splitRangePartSuffix(fieldKey);
+      const baseFieldId = rangePart ? allFieldKeyToId[rangePart.base] : undefined;
+
+      const targetFieldId = directFieldId ?? baseFieldId;
       if (!targetFieldId) return;
       const widgetId = fieldIdToWidgetId[targetFieldId];
       if (!widgetId) return;
 
+      const writeFieldId =
+        rangePart && baseFieldId && isRangeFieldType(fieldIdToType[baseFieldId])
+          ? `${baseFieldId}_${rangePart.part}`
+          : targetFieldId;
+
       const currentVals = merged[widgetId] ?? {};
-      const existingVal = currentVals[targetFieldId];
+      const existingVal = currentVals[writeFieldId];
 
       /* formValuesMap에 실제 입력 값이 있으면 보호, 없거나 빈값이면 crossTab 값 사용 */
       if (!existingVal || existingVal === "") {
-        merged[widgetId] = { ...currentVals, [targetFieldId]: crossVal };
+        merged[widgetId] = { ...currentVals, [writeFieldId]: crossVal };
       }
     });
 
     return merged;
-  }, [formValuesMap, crossTabFormValues, allFieldKeyToId, fieldIdToWidgetId]);
+  }, [formValuesMap, crossTabFormValues, allFieldKeyToId, fieldIdToWidgetId, fieldIdToType]);
 
   /* mergedFormValuesMap 기반 통합 allFormValues — cross-tab 값 포함 */
   const allFormValues = useMemo(() => {
@@ -505,11 +539,23 @@ export function PageGridRenderer({
       const widgetId = fieldIdToWidgetId[fieldId];
       if (widgetId) {
         onFormValuesChange?.(widgetId, fieldId, value);
-      } else {
-        onCrossTabFormChange?.(fieldId, value);
+        return;
       }
+
+      const rangePart = splitRangePartSuffix(fieldId);
+      const baseFieldId = rangePart?.base;
+      const baseWidgetId = baseFieldId ? fieldIdToWidgetId[baseFieldId] : undefined;
+      if (rangePart && baseFieldId && baseWidgetId) {
+        const writeFieldId = isRangeFieldType(fieldIdToType[baseFieldId])
+          ? `${baseFieldId}_${rangePart.part}`
+          : baseFieldId;
+        onFormValuesChange?.(baseWidgetId, writeFieldId, value);
+        return;
+      }
+
+      onCrossTabFormChange?.(fieldId, value);
     },
-    [fieldIdToWidgetId, onFormValuesChange, onCrossTabFormChange]
+    [fieldIdToWidgetId, fieldIdToType, onFormValuesChange, onCrossTabFormChange]
   );
 
   /* ── 카테고리 dbSlug 상속 맵 ──

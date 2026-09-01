@@ -281,6 +281,39 @@ export function SubListRenderer({
     [rows, onChange]
   );
 
+  const handleRangeCellChange = useCallback(
+    (row: SubListRow, col: SubListColumn, part: "from" | "to", writeKey: string, value: string) => {
+      if (mode === "preview") return;
+
+      const patch: Record<string, string> = { [writeKey]: value };
+
+      (col.dataGenerations ?? []).forEach((dg) => {
+        if (!dg.generationKey || dg.datePart !== part || dg.generationKey.includes(".")) return;
+
+        const targetCol = visibleColumns.find((c) => c.key === dg.generationKey);
+        if (!targetCol || targetCol.id === col.id) return;
+
+        const targetKey =
+          targetCol.type === "dateRange"
+            ? part === "from"
+              ? targetCol.key2
+                ? targetCol.key
+                : `${targetCol.key}_from`
+              : targetCol.key2
+                ? targetCol.key2
+                : `${targetCol.key}_to`
+            : targetCol.key;
+
+        patch[targetKey] = value;
+      });
+
+      const updated = rows.map((r) => (r._rowId === row._rowId ? { ...r, ...patch } : r));
+      setRows(updated);
+      onChange?.(updated);
+    },
+    [mode, visibleColumns, rows, onChange]
+  );
+
   /** 행 복사 — 해당 row를 바로 아래에 삽입 (새 UUID 생성) */
   const handleCopy = useCallback(
     (rowId: string) => {
@@ -485,9 +518,11 @@ export function SubListRenderer({
                             valueFrom={isRangeType ? String(row[rangeStartKey] ?? "") : undefined}
                             valueTo={isRangeType ? String(row[rangeEndKey] ?? "") : undefined}
                             onFromChange={
-                              isRangeType ? (v) => handleRowChange(row._rowId, rangeStartKey, v) : undefined
+                              isRangeType ? (v) => handleRangeCellChange(row, col, "from", rangeStartKey, v) : undefined
                             }
-                            onToChange={isRangeType ? (v) => handleRowChange(row._rowId, rangeEndKey, v) : undefined}
+                            onToChange={
+                              isRangeType ? (v) => handleRangeCellChange(row, col, "to", rangeEndKey, v) : undefined
+                            }
                             codeGroups={codeGroups}
                             fileList={isFileType ? (effectiveFileMap[row._rowId]?.[col.id] ?? []) : undefined}
                             existingFileMeta={isFileType ? (existingMetaMap[row._rowId]?.[col.id] ?? []) : undefined}

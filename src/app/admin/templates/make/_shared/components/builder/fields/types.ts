@@ -16,9 +16,8 @@ export type ColSpanMode =
 
 /** 데이터생성 세트 1개 — 생성KEY + 변환옵션 */
 export interface DataGenerationEntry {
-  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey */
   generationKey: string;
-  /** 빈값일 때만 반영 — true 시 대상 필드가 빈값인 경우에만 생성값 적용 */
   onlyIfEmpty?: boolean;
   /** HTML제거 — true 이면 HTML 태그 제거 후 변환 (에디터 전용) */
   stripHtml?: boolean;
@@ -30,6 +29,7 @@ export interface DataGenerationEntry {
   appendText?: string;
   /** 글자자르기 — N자 미만으로 자름 */
   truncateLength?: number;
+  datePart?: "from" | "to";
 }
 
 /** 공통 필드 편집 값 */
@@ -194,8 +194,8 @@ export interface FieldEditValues {
   afterText?: string; // 날짜 이후 표시 텍스트 (예: '종료')
   afterTextMsgKey?: string; // 이후 텍스트 다국어 키
   statusDisplayStyle?: "select" | "radio"; // 검색 UI 표시 방식 (기본: select)
-  /* ── 데이터생성 전용 (Input/FormTextarea) ── */
-  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey / tabKey.contentKey.fieldKey */
+  /* ── 데이터생성 전용 (Input/FormTextarea/Date/DateRange) ── */
+  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey */
   generationKey?: string;
   /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
   dataReplacement?: "none" | "hyphen";

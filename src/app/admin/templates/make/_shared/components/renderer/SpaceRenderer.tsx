@@ -79,6 +79,7 @@ interface SpaceRendererProps {
 export function SpaceRenderer({
   mode,
   items,
+  align = "left",
   contentColSpan = 5,
   showBorder = true,
   bgColor,
@@ -175,6 +176,24 @@ export function SpaceRenderer({
 
   const itemRowIsAuto = calculateSpaceItemRowTracks(items, contentColSpan);
 
+  /* 연속된 action-button 아이템끼리 하나의 그룹으로 묶어 렌더링 —
+   * 그룹이 차지하는 grid 영역(각 아이템 colSpan 합)은 기존 계산(calculateSpaceItemRowTracks)과
+   * 완전히 동일하게 유지하고, 그 안에서만 flex + gap + 정렬(align)로 버튼을 콘텐츠 크기만큼만 배치한다.
+   * → 저장 시 사용되는 행/높이 계산 로직은 전혀 건드리지 않음(다른 화면 rowSpan 재기록 위험 없음) */
+  type RenderGroup = { key: string; colSpan: number; rowSpan: number; fields: SearchFieldConfig[] };
+  const groups: RenderGroup[] = [];
+  items.forEach((field) => {
+    const last = groups[groups.length - 1];
+    if (field.type === "action-button" && last?.fields[0]?.type === "action-button") {
+      last.fields.push(field);
+      last.colSpan += field.colSpan ?? 1;
+    } else {
+      groups.push({ key: field.id, colSpan: field.colSpan ?? 1, rowSpan: field.rowSpan ?? 1, fields: [field] });
+    }
+  });
+
+  const justifyClass = align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+
   return (
     /* RendererContainer — grid 배치 공통 처리 (FormRenderer와 동일한 방식) */
     <RendererContainer
@@ -183,23 +202,29 @@ export function SpaceRenderer({
       contentColSpan={contentColSpan}
       fillHeight={fillHeight}
       rowIsAuto={itemRowIsAuto}
+      clipOverflow={false}
     >
-      {/* 각 아이템 — gridColumn/gridRow로 자리만 지정 */}
-      {items.map((field) => (
+      {groups.map((group) => (
         <div
-          key={field.id}
-          className="flex items-center-safe px-3 min-w-0"
+          key={group.key}
+          className={`flex items-center-safe gap-2 px-3 min-w-0 ${
+            group.fields[0].type === "action-button" ? justifyClass : ""
+          }`}
           style={{
-            gridColumn: `span ${Math.min(field.colSpan ?? 1, contentColSpan)}`,
-            gridRow: `span ${field.rowSpan ?? 1}`,
+            gridColumn: `span ${Math.min(group.colSpan, contentColSpan)}`,
+            gridRow: `span ${group.rowSpan}`,
           }}
         >
-          <FieldRenderer
-            mode={mode}
-            field={field}
-            value={field.type === "textarea" ? (field.content ?? "") : undefined}
-            onButtonClick={field.type === "action-button" ? () => handleButtonClick(field) : undefined}
-          />
+          {group.fields.map((field) => (
+            <FieldRenderer
+              key={field.id}
+              wrapCapable={group.fields.length > 1}
+              mode={mode}
+              field={field}
+              value={field.type === "textarea" ? (field.content ?? "") : undefined}
+              onButtonClick={field.type === "action-button" ? () => handleButtonClick(field) : undefined}
+            />
+          ))}
         </div>
       ))}
     </RendererContainer>

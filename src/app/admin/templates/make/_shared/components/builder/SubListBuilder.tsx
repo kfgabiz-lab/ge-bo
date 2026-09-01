@@ -167,6 +167,12 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
     optionDerivedKeys: col.optionDerivedKeys,
     /* date/dateRange 필드간 대소비교 검증 (콤마구분 단일 표현식) */
     compareExpr: col.compareExpr,
+    generationKey: col.generationKey,
+    dataReplacement: col.dataReplacement,
+    caseChange: col.caseChange,
+    appendText: col.appendText,
+    truncateLength: col.truncateLength,
+    dataGenerations: col.dataGenerations,
   };
 }
 
@@ -242,6 +248,12 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
   /* date/dateRange 필드간 대소비교 검증 — 입력값을 비우면(빈 문자열) 명시적으로 undefined를 보내 초기화해야 하므로
        다른 항목과 달리 `!== undefined` 대신 `in` 체크로 "값이 아예 안 왔는지"만 구분한다 */
   if ("compareExpr" in updates) patch.compareExpr = updates.compareExpr;
+  if ("generationKey" in updates) patch.generationKey = updates.generationKey;
+  if ("dataReplacement" in updates) patch.dataReplacement = updates.dataReplacement;
+  if ("caseChange" in updates) patch.caseChange = updates.caseChange;
+  if ("appendText" in updates) patch.appendText = updates.appendText;
+  if ("truncateLength" in updates) patch.truncateLength = updates.truncateLength;
+  if ("dataGenerations" in updates) patch.dataGenerations = updates.dataGenerations;
   return patch;
 }
 

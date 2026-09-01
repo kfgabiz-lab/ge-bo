@@ -200,6 +200,9 @@ interface FieldRendererProps {
   codeGroups?: CodeGroupDef[];
   /** action-button 클릭 시 호출 (SpaceRenderer 등에서 주입) */
   onButtonClick?: () => void;
+  /** action-button 전용: 같은 그룹(연속 배치)에 버튼이 2개 이상일 때만 true — 그룹 폭이 부족하면 줄바꿈 허용(SpaceRenderer가 주입).
+   *  버튼이 1개뿐이면 기존과 동일하게 한 줄 고정(줄바꿈 없음) */
+  wrapCapable?: boolean;
   /* ── 파일/이미지/비디오 전용 (live 모드) ── */
   /** 새로 선택한 파일 목록 */
   fileList?: File[];
@@ -1012,6 +1015,7 @@ export function FieldRenderer({
   onAddressSelect,
   codeGroups = [],
   onButtonClick,
+  wrapCapable,
   fileList,
   existingFileMeta,
   imgBlobUrls,
@@ -1603,7 +1607,7 @@ export function FieldRenderer({
           type="button"
           disabled={isActionDisabled}
           onClick={onButtonClick}
-          className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] min-w-[72px] w-full whitespace-nowrap hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
+          className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
         >
           {field.labelMsgKey ? t(field.labelMsgKey) : field.label || t("common.btn.default")}
         </button>
