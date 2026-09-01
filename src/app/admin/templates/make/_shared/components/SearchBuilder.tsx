@@ -595,7 +595,9 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
                   <RowHeader
                     rowIdx={ri}
                     rowCount={rows.length}
-                    cols={row.cols}
+                    /* RowHeader의 열 선택 탭은 1~5까지만 제공(6은 코드로만 만드는 dateRange 전용
+                       한 줄 배치용) — 6짜리 행이 와도 탭 표시는 5로 clamp, 실제 저장값은 그대로 둠 */
+                    cols={Math.min(row.cols, 5) as 1 | 2 | 3 | 4 | 5}
                     onChangeCols={(n) => updateRowCols(row.id, n)}
                     onMoveUp={() => moveRow(row.id, "up")}
                     onMoveDown={() => moveRow(row.id, "down")}

@@ -129,7 +129,9 @@ export default function EmailSendHisPage() {
       rows: [
         {
           id: "r1",
-          cols: 5,
+          /* 5칸으로는 f1~f4(1칸씩)+f5 dateRange(2칸)=6칸이 안 들어가 다음 줄로 밀려났음 —
+             6칸으로 늘려 전부 한 줄에 들어가게 함(분류/발송상태 등은 원래도 최소 폭인 1칸) */
+          cols: 6,
           fields: [
             {
               id: "f1",
@@ -149,8 +151,10 @@ export default function EmailSendHisPage() {
               colSpan: 1,
               options: ["Engineering Training 신청:01", "Service Training 신청:02", "Sales Training:03"],
               codeGroupCode: "TRAININGCOURSE",
-              /* 분류 선택 전까지 비활성화 (기획서 반영) */
-              disableCondition: "emailSendCategory=''",
+              /* 분류 미선택 시 비활성화, 분류=뉴스레터(01) 선택 시에도 비활성화(기획서 반영) —
+                 상세분류는 Training 발송(02/03)에만 존재하는 개념이라 OR 조건을 지원하지 않는
+                 조건식 문법 특성상 드모르간으로 뒤집어 "02, 03이 아니면 비활성화"로 표현 */
+              disableCondition: "emailSendCategory!='02',emailSendCategory!='03'",
             },
             {
               id: "f3",
@@ -177,7 +181,9 @@ export default function EmailSendHisPage() {
               labelMsgKey: "email.label.sentDate",
               label2: "종료일",
               label2MsgKey: "common.label.endDate",
-              colSpan: 1,
+              /* colSpan 1은 시작/종료 두 날짜 입력을 나란히 담기엔 좁아 영역을 벗어나 보임 —
+                 2칸으로 늘려 access/error 로그 페이지의 dateRange 필드와 동일하게 맞춤 */
+              colSpan: 2,
             },
           ],
         },
@@ -283,7 +289,15 @@ export default function EmailSendHisPage() {
   );
 
   const handleSearchChange = useCallback((fieldId: string, value: string) => {
-    setSearchValues((prev) => ({ ...prev, [fieldId]: value }));
+    setSearchValues((prev) => {
+      const next = { ...prev, [fieldId]: value };
+      /* 분류(f1)가 Training(02/03) 외의 값으로 바뀌면 상세분류(f2)는 비활성화되므로
+         이전에 선택돼 있던 값이 숨겨진 채 검색 조건에 남지 않도록 함께 비움 */
+      if (fieldId === "f1" && value !== "02" && value !== "03") {
+        next.f2 = "";
+      }
+      return next;
+    });
   }, []);
 
   const handleSearch = useCallback(() => {
