@@ -71,10 +71,11 @@ export function RendererContainer({
   const borderCls = showBorder ? "border border-slate-200" : "";
   const cls = [fillHeight ? "h-full w-full rounded" : "w-full rounded", borderCls, className].filter(Boolean).join(" ");
 
+  const overflowValue: "clip" | "visible" = clipOverflow ? "clip" : "visible";
   const bgStyle =
     !bgColor || bgColor === "none"
-      ? { overflow: (clipOverflow ? "clip" : "visible") as const }
-      : { backgroundColor: bgColor, overflow: (clipOverflow ? "clip" : "visible") as const };
+      ? { overflow: overflowValue }
+      : { backgroundColor: bgColor, overflow: overflowValue };
 
   /* contentColSpan 있으면 CSS Grid 활성화 — Form/Space 공통 격자 배치 */
   const gap = gapSize ?? GAP_SIZE;
