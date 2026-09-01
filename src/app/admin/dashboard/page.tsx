@@ -26,13 +26,21 @@ import { CircleCountCard } from "./CircleCountCard";
 const ERROR_PAGE_SIZE = 10;
 
 /**
- * 통계 리포트 embed URL — 지금은 개발 서버 도메인에서만 임베드 허용된 리포트라 하드코딩된 기본값을 씀.
- * 운영 배포 시에는 운영 도메인이 Looker Studio 공유 설정에 허용 도메인으로 등록된 별도 리포트 URL을
- * NEXT_PUBLIC_DASHBOARD_REPORT_URL 환경변수로 주입해서 교체한다 (코드 수정 불필요).
+ * 통계 리포트 embed URL — 배포 프로필(ge-api SPRING_PROFILES_ACTIVE와 동일 값,
+ * next.config.ts가 NEXT_PUBLIC_PROFILE로 클라이언트 번들에 노출)에 따라 개발/운영
+ * Looker Studio 리포트를 자동 분기한다. "prod"가 명시적으로 와야 운영으로 취급하고,
+ * 그 외(미설정 포함)는 전부 개발 리포트로 간주 — 프로필 설정을 깜빡해서 운영 리포트가
+ * 잘못 노출되는 사고를 막는다. 특정 값을 강제로 쓰고 싶을 때만
+ * NEXT_PUBLIC_DASHBOARD_REPORT_URL 환경변수로 override.
  */
+const IS_PROD_DEPLOYMENT = process.env.NEXT_PUBLIC_PROFILE === "prod";
+const DASHBOARD_REPORT_URL_DEV =
+  "https://datastudio.google.com/embed/reporting/b5c26230-9ca5-480b-96f0-343318ccd141/page/H6p6F";
+const DASHBOARD_REPORT_URL_PROD =
+  "https://datastudio.google.com/embed/reporting/94f34571-9f04-4766-96fa-9eb459f4350c/page/H6p6F";
 const DASHBOARD_REPORT_URL =
   process.env.NEXT_PUBLIC_DASHBOARD_REPORT_URL ??
-  "https://datastudio.google.com/embed/reporting/b5c26230-9ca5-480b-96f0-343318ccd141/page/H6p6F";
+  (IS_PROD_DEPLOYMENT ? DASHBOARD_REPORT_URL_PROD : DASHBOARD_REPORT_URL_DEV);
 
 interface DashboardErrorLogItem {
   id: number;

@@ -67,7 +67,9 @@ export interface SearchFieldConfig {
   /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
   description?: string;
   descriptionMsgKey?: string; // 설명 다국어 키 (있으면 t(key), 없으면 description 표시)
-  colSpan: 1 | 2 | 3 | 4 | 5;
+  /** 6은 dateRange처럼 시작/종료 두 입력을 담아 다른 필드보다 넓은 폭이 필요한 필드가
+   *  같은 행에서 한 줄에 들어가야 할 때, 행의 총 단위(cols)를 6까지 늘리기 위해 추가됨 */
+  colSpan: 1 | 2 | 3 | 4 | 5 | 6;
   rowSpan?: number;
   required?: boolean;
   options?: string[];
@@ -283,7 +285,7 @@ export interface AddressFieldValue {
 /** 검색폼 행 설정 */
 export interface SearchRowConfig {
   id: string;
-  cols: 1 | 2 | 3 | 4 | 5;
+  cols: 1 | 2 | 3 | 4 | 5 | 6;
   fields: SearchFieldConfig[];
 }
 
