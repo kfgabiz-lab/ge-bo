@@ -418,3 +418,8 @@ export interface SearchHandlers {
   onSearch: () => void;
   onReset: () => void;
 }
+
+export interface GenerationBaseline {
+  pending: boolean;
+  values: Record<string, string>;
+}

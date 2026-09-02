@@ -25,7 +25,7 @@
 
 import { useMemo, useCallback, useRef } from "react";
 import type { FormFieldItem } from "../builder/FormBuilder";
-import type { RendererMode } from "./types";
+import type { RendererMode, GenerationBaseline } from "./types";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import type { CodeGroupDef, SearchFieldConfig } from "../../types";
@@ -37,6 +37,9 @@ import {
   buildKeyToId,
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
+  splitGenerationKeys,
+  FLATTEN_META_KEYS,
+  resolveGenerationBaselineValue,
 } from "../../utils";
 import {
   fieldLabelCls,
@@ -47,9 +50,6 @@ import {
   FORM_FIELD_GAP,
 } from "../../styles";
 import { calculateFormFieldRowTracks } from "../../utils/formGridLayout";
-
-/** flattenPageDataItem이 항상 붙이는 부가 키 — rowData 병합 시 제외 */
-const FLATTEN_META_KEYS = new Set(["_id", "_groupId", "_pathMap", "createdAt", "createdBy", "updatedAt", "updatedBy"]);
 
 interface FormRendererProps {
   mode: RendererMode;
@@ -78,6 +78,8 @@ interface FormRendererProps {
   onDerivedValueChange?: (fieldId: string, value: string) => void;
   /** cross-form 데이터생성 실시간 자동입력 콜백 — 어느 폼이든 fieldId로 값 업데이트 */
   onChangeAllFormValues?: (fieldId: string, value: string) => void;
+  /** 데이터생성 전용 채널 — 조건평가용 fieldKey 브로드캐스트와 분리하여 대상 폼에 실제 기록할 값만 전달 */
+  onGenerateAllFormValues?: (fieldId: string, value: string) => void;
   /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 (fieldId → value) */
   allFormValues?: Record<string, string>;
   /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
@@ -86,6 +88,7 @@ interface FormRendererProps {
   urlParams?: Record<string, string>;
   /** cross-tab 공유 폼 값 — TabRenderer가 관리, 다른 탭 필드 hide/disable 조건 평가용 (fieldKey → value) */
   crossTabFormValues?: Record<string, string>;
+  generationBaseline?: GenerationBaseline;
   /** 이 폼 위젯의 contentKey — cross-tab 에스컬레이션 시 contentKey.fieldKey 형식으로도 저장하여 탭 간 명시 참조 지원 */
   contentKey?: string;
   /* ── 파일/이미지/비디오 전용 (live 모드) ── */
@@ -120,10 +123,12 @@ export function FormRenderer({
   onChangeValues,
   onDerivedValueChange,
   onChangeAllFormValues,
+  onGenerateAllFormValues,
   allFormValues,
   allFieldKeyToId,
   urlParams,
   crossTabFormValues,
+  generationBaseline,
   contentKey,
   fileValues,
   existingFileMeta,
@@ -135,6 +140,8 @@ export function FormRenderer({
 }: FormRendererProps) {
   const isPreview = mode === "preview";
   const { t } = useI18n();
+
+  const emitGeneration = onGenerateAllFormValues ?? onChangeAllFormValues;
 
   /* fieldKey → fieldId 역매핑 테이블 — hideCondition 평가에 사용 (공통함수로 분리) */
   const keyToId = useMemo(() => buildKeyToId(fields), [fields]);
@@ -237,9 +244,8 @@ export function FormRenderer({
 
       /* generationKey 자동입력 처리 */
 
-      /* 단일 generationKey 처리 (기존 호환) */
+      /* 단일 generationKey 처리 (기존 호환, 콤마 다중지정 지원) */
       if (sourceField.generationKey) {
-        const targetFieldId = resolveTargetFieldId(sourceField.generationKey);
         const transformed = applyDataGeneration(
           value,
           sourceField.dataReplacement,
@@ -248,18 +254,20 @@ export function FormRenderer({
           sourceField.truncateLength,
           undefined
         );
-        if (targetFieldId && targetFieldId !== fieldId) {
-          dispatchValue(targetFieldId, transformed);
-        } else if (!targetFieldId) {
-          /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
-          onChangeAllFormValues?.(sourceField.generationKey, transformed);
-        }
+        splitGenerationKeys(sourceField.generationKey).forEach((key) => {
+          const targetFieldId = resolveTargetFieldId(key);
+          if (targetFieldId && targetFieldId !== fieldId) {
+            dispatchValue(targetFieldId, transformed);
+          } else if (!targetFieldId) {
+            /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
+            emitGeneration?.(key, transformed);
+          }
+        });
       }
 
-      /* 다중 dataGenerations 배열 처리 */
+      /* 다중 dataGenerations 배열 처리 (콤마 다중지정 지원) */
       (sourceField.dataGenerations ?? []).forEach((dg) => {
         if (!dg.generationKey) return;
-        const targetFieldId = resolveTargetFieldId(dg.generationKey);
         const transformed = applyDataGeneration(
           value,
           dg.dataReplacement,
@@ -276,21 +284,26 @@ export function FormRenderer({
 
         const nextValue = sourceIsBlank ? "" : transformed;
 
-        if (targetFieldId && targetFieldId !== fieldId) {
-          if (dg.onlyIfEmpty && !sourceIsBlank) {
-            const currentTargetValue = values[targetFieldId] ?? allFormValues?.[targetFieldId] ?? "";
-            if (currentTargetValue !== "" && currentTargetValue !== lastGeneratedRef.current[targetFieldId]) return;
+        for (const key of splitGenerationKeys(dg.generationKey)) {
+          const targetFieldId = resolveTargetFieldId(key);
+          if (targetFieldId && targetFieldId !== fieldId) {
+            if (dg.onlyIfEmpty && !sourceIsBlank) {
+              const currentTargetValue = values[targetFieldId] ?? allFormValues?.[targetFieldId] ?? "";
+              if (currentTargetValue !== "" && currentTargetValue !== lastGeneratedRef.current[targetFieldId]) continue;
+            }
+            dispatchValue(targetFieldId, nextValue);
+            if (dg.onlyIfEmpty) lastGeneratedRef.current[targetFieldId] = nextValue;
+          } else if (!targetFieldId) {
+            /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
+            if (dg.onlyIfEmpty && !sourceIsBlank) {
+              if (generationBaseline?.pending) continue;
+              const currentTargetValue =
+                crossTabFormValues?.[key] ?? resolveGenerationBaselineValue(generationBaseline?.values, key) ?? "";
+              if (currentTargetValue !== "" && currentTargetValue !== lastGeneratedRef.current[key]) continue;
+            }
+            emitGeneration?.(key, nextValue);
+            if (dg.onlyIfEmpty) lastGeneratedRef.current[key] = nextValue;
           }
-          dispatchValue(targetFieldId, nextValue);
-          if (dg.onlyIfEmpty) lastGeneratedRef.current[targetFieldId] = nextValue;
-        } else if (!targetFieldId) {
-          /* 현재 탭에서 못 찾음 → generationKey(fieldKey)를 키로 cross-tab 에스컬레이션 */
-          if (dg.onlyIfEmpty && !sourceIsBlank) {
-            const currentTargetValue = crossTabFormValues?.[dg.generationKey] ?? "";
-            if (currentTargetValue !== "" && currentTargetValue !== lastGeneratedRef.current[dg.generationKey]) return;
-          }
-          onChangeAllFormValues?.(dg.generationKey, nextValue);
-          if (dg.onlyIfEmpty) lastGeneratedRef.current[dg.generationKey] = nextValue;
         }
       });
     },
@@ -300,10 +313,12 @@ export function FormRenderer({
       dispatchValue,
       onChangeValues,
       onChangeAllFormValues,
+      emitGeneration,
       contentKey,
       values,
       allFormValues,
       crossTabFormValues,
+      generationBaseline,
     ]
   );
 
@@ -317,22 +332,24 @@ export function FormRenderer({
       (sourceField.dataGenerations ?? []).forEach((dg) => {
         if (!dg.generationKey || dg.datePart !== part) return;
 
-        const targetFieldId = resolveTargetFieldId(dg.generationKey);
+        for (const key of splitGenerationKeys(dg.generationKey)) {
+          const targetFieldId = resolveTargetFieldId(key);
 
-        if (!targetFieldId) {
-          onChangeAllFormValues?.(`${dg.generationKey}_${part}`, value);
-          return;
+          if (!targetFieldId) {
+            emitGeneration?.(`${key}_${part}`, value);
+            continue;
+          }
+          if (targetFieldId === sourceFieldId) continue;
+
+          const targetField = fields.find((f) => f.id === targetFieldId);
+          const targetIsRange = targetField?.type === "dateRange" || targetField?.type === "yearMonthRange";
+          const writeFieldId = !targetField || targetIsRange ? `${targetFieldId}_${part}` : targetFieldId;
+
+          dispatchValue(targetFieldId, value, writeFieldId);
         }
-        if (targetFieldId === sourceFieldId) return;
-
-        const targetField = fields.find((f) => f.id === targetFieldId);
-        const targetIsRange = targetField?.type === "dateRange" || targetField?.type === "yearMonthRange";
-        const writeFieldId = !targetField || targetIsRange ? `${targetFieldId}_${part}` : targetFieldId;
-
-        dispatchValue(targetFieldId, value, writeFieldId);
       });
     },
-    [fields, isPreview, resolveTargetFieldId, dispatchValue, onChangeAllFormValues]
+    [fields, isPreview, resolveTargetFieldId, dispatchValue, emitGeneration]
   );
 
   const hasTitleBlock = !!(titleMsgKey || title);

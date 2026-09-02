@@ -70,7 +70,7 @@ import { MultiSelectRenderer } from "./MultiSelectRenderer";
 import { TabRenderer } from "./TabRenderer";
 import CenterPopupLayout from "@/components/layout/popup/center-popup-layout";
 import RightDrawerLayout from "@/components/layout/popup/right-drawer-layout";
-import type { AnyWidget, RendererMode, TableActionHandlers } from "./types";
+import type { AnyWidget, RendererMode, TableActionHandlers, GenerationBaseline } from "./types";
 import type { TableWidget } from "../builder/TableBuilder";
 import type { FormFieldItem } from "../builder/FormBuilder";
 import { fetchTemplateConfig } from "../../templateApi";
@@ -212,6 +212,8 @@ interface WidgetRendererProps {
   onDerivedValueChange?: (fieldId: string, value: string) => void;
   /** cross-form 데이터생성 실시간 자동입력 콜백 — 어느 폼이든 fieldId로 값 업데이트 */
   onChangeAllFormValues?: (fieldId: string, value: string) => void;
+  /** 데이터생성 전용 채널 — 조건평가용 fieldKey 브로드캐스트와 분리하여 대상 폼에 실제 기록할 값만 전달 */
+  onGenerateAllFormValues?: (fieldId: string, value: string) => void;
   /** 페이지 내 모든 Form 위젯 통합 values — cross-form hideCondition 평가용 */
   allFormValues?: Record<string, string>;
   /** 페이지 내 모든 Form 위젯 fieldKey → fieldId 역매핑 — cross-form hideCondition 평가용 */
@@ -220,6 +222,7 @@ interface WidgetRendererProps {
   urlParams?: Record<string, string>;
   /** cross-tab 공유 폼 값 — TabRenderer가 관리, 다른 탭 필드 hide/disable 조건 평가용 (fieldKey → value) */
   crossTabFormValues?: Record<string, string>;
+  generationBaseline?: GenerationBaseline;
   /** Space 위젯 버튼 클릭 시 컨텐츠(Form+SubList) 저장/삭제 동작 */
   onContentAction?: (
     connectedContentWidgetIds: string[],
@@ -388,10 +391,12 @@ export function WidgetRenderer({
   onFormValuesChange,
   onDerivedValueChange,
   onChangeAllFormValues,
+  onGenerateAllFormValues,
   allFormValues,
   allFieldKeyToId,
   urlParams,
   crossTabFormValues,
+  generationBaseline,
   onContentAction,
   onDataSave,
   onApiCall,
@@ -2166,10 +2171,12 @@ export function WidgetRenderer({
         onChangeValues={onFormValuesChange}
         onDerivedValueChange={onDerivedValueChange}
         onChangeAllFormValues={onChangeAllFormValues}
+        onGenerateAllFormValues={onGenerateAllFormValues}
         allFormValues={allFormValues}
         allFieldKeyToId={allFieldKeyToId}
         urlParams={urlParams}
         crossTabFormValues={crossTabFormValues}
+        generationBaseline={generationBaseline}
         contentKey={widget.contentKey}
         fileValues={fileValues}
         existingFileMeta={existingFileMeta}

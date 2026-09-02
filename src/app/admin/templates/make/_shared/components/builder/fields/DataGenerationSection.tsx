@@ -81,7 +81,7 @@ function GenerationEntryRow({
           <input
             type="text"
             value={entry.generationKey}
-            placeholder="fieldKey / contentKey.fieldKey"
+            placeholder="fieldKey / contentKey.fieldKey (콤마 다중)"
             onChange={(e) => onChange({ ...entry, generationKey: e.target.value })}
             className={INPUT_CLS}
           />

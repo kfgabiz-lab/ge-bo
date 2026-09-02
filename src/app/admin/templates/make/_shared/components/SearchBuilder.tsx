@@ -350,6 +350,8 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       rangeSubType,
       dateSubType,
       singleDateRange,
+      maxRangeValue,
+      maxRangeUnit,
       /* select 표시 방식 */
       selectType,
       /* select SLUG 옵션 소스 */
@@ -427,6 +429,10 @@ export function SearchBuilder({ rows, onChange }: SearchBuilderProps) {
       /* singleDateRange — dateRange 단일 date 컬럼 범위 검색 옵션 */
       singleDateRange:
         pendingType === "dateRange" || pendingType === "yearMonthRange" ? singleDateRange || undefined : undefined,
+      maxRangeValue:
+        pendingType === "dateRange" || pendingType === "yearMonthRange" ? (maxRangeValue ?? undefined) : undefined,
+      maxRangeUnit:
+        pendingType === "dateRange" || pendingType === "yearMonthRange" ? maxRangeUnit || undefined : undefined,
       /* category 전용 */
       dbSlug: pendingType === "category" ? dbSlug || undefined : undefined,
       relationSlugId: pendingType === "category" ? relationSlugId || undefined : undefined,

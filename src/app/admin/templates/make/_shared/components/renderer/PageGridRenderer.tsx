@@ -22,7 +22,7 @@ import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { getSpaceGridColumn, evalWidgetHideCondition } from "../../utils";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { WidgetRenderer } from "./WidgetRenderer";
-import type { AnyWidget, RendererMode, MultiSelectWidget } from "./types";
+import type { AnyWidget, RendererMode, MultiSelectWidget, GenerationBaseline } from "./types";
 import type { TableWidget } from "../builder/TableBuilder";
 import type { CodeGroupDef } from "../../types";
 import type { FormWidget } from "../builder/FormBuilder";
@@ -191,6 +191,10 @@ interface PageGridRendererProps {
   crossTabFormValues?: Record<string, string>;
   /** cross-tab 데이터생성 자동입력 콜백 — 현재 탭에서 못 찾은 fieldId를 TabRenderer로 에스컬레이션 */
   onCrossTabFormChange?: (fieldId: string, value: string) => void;
+  /** cross-tab 데이터생성 전용 값 — TabRenderer가 seq와 함께 관리, 이 탭 폼에 1회만 기록 */
+  crossTabGeneratedValues?: Record<string, { value: string; seq: number }>;
+  /** cross-tab 데이터생성 전용 에스컬레이션 콜백 — 조건평가용 채널과 분리 */
+  onCrossTabGeneratedChange?: (fieldId: string, value: string) => void;
   /** 진입 페이지의 메인 연결 slug — TabRenderer에 전달하여 탭 내부 저장 시 우선 적용 */
   mainConnectedSlug?: string;
   /** 이탈체크 활성 여부 — TabRenderer에 전달하여 탭 내부 폼 변경 감지 */
@@ -201,6 +205,7 @@ interface PageGridRendererProps {
    * WidgetRenderer 이하로는 isEntity 이름으로 전달(파일 다운로드 경로 분기용, FieldRenderer까지) */
   pageIsEntity?: boolean;
   recordLoaded?: boolean;
+  generationBaseline?: GenerationBaseline;
   onContentRowsChange?: (rows: number) => void;
 }
 
@@ -254,11 +259,14 @@ export function PageGridRenderer({
   urlParams,
   crossTabFormValues,
   onCrossTabFormChange,
+  crossTabGeneratedValues,
+  onCrossTabGeneratedChange,
   mainConnectedSlug,
   leaveCheck,
   formFetchRelMap,
   pageIsEntity,
   recordLoaded,
+  generationBaseline,
   onContentRowsChange,
 }: PageGridRendererProps) {
   /* ── cross-form hideCondition 평가용 통합 맵 ──
@@ -558,6 +566,77 @@ export function PageGridRenderer({
     [fieldIdToWidgetId, fieldIdToType, onFormValuesChange, onCrossTabFormChange]
   );
 
+  /* 데이터생성 전용 자동입력 콜백
+   * - 현재 탭 내 폼 소속이면 → onFormValuesChange로 즉시 반영 (기존과 동일)
+   * - 못 찾으면 → 조건평가 맵(onCrossTabFormChange)과 생성 채널(onCrossTabGeneratedChange) 모두 갱신 */
+  const handleGenerateAllFormValues = useCallback(
+    (fieldId: string, value: string) => {
+      const widgetId = fieldIdToWidgetId[fieldId];
+      if (widgetId) {
+        onFormValuesChange?.(widgetId, fieldId, value);
+        return;
+      }
+
+      const rangePart = splitRangePartSuffix(fieldId);
+      const baseFieldId = rangePart?.base;
+      const baseWidgetId = baseFieldId ? fieldIdToWidgetId[baseFieldId] : undefined;
+      if (rangePart && baseFieldId && baseWidgetId) {
+        const writeFieldId = isRangeFieldType(fieldIdToType[baseFieldId])
+          ? `${baseFieldId}_${rangePart.part}`
+          : baseFieldId;
+        onFormValuesChange?.(baseWidgetId, writeFieldId, value);
+        return;
+      }
+
+      onCrossTabFormChange?.(fieldId, value);
+      onCrossTabGeneratedChange?.(fieldId, value);
+    },
+    [fieldIdToWidgetId, fieldIdToType, onFormValuesChange, onCrossTabFormChange, onCrossTabGeneratedChange]
+  );
+
+  const appliedGeneratedSeqRef = useRef<Record<string, number>>({});
+
+  /* 다른 탭에서 에스컬레이션된 생성값을 이 탭 폼 상태에 1회만 기록
+   * - seq 기준 중복 적용 방지, 해석 실패(다른 탭 대상)면 seq를 소비하지 않는다
+   * - generationBaseline.pending(수정 진입 DB값 로딩 중)에는 보류 후 로딩 완료 시 재실행
+   * - 대상 위젯이 formValuesMap에 아직 없으면(기본값 초기화/DB복원 전) seq를 소비하지 않고 다음 커밋에서 재시도 */
+  useEffect(() => {
+    if (mode !== "live") return;
+    if (!crossTabGeneratedValues) return;
+    if (generationBaseline?.pending) return;
+
+    Object.entries(crossTabGeneratedValues).forEach(([fieldKey, entry]) => {
+      if (appliedGeneratedSeqRef.current[fieldKey] === entry.seq) return;
+
+      const directFieldId = allFieldKeyToId[fieldKey];
+      const rangePart = directFieldId ? undefined : splitRangePartSuffix(fieldKey);
+      const baseFieldId = rangePart ? allFieldKeyToId[rangePart.base] : undefined;
+
+      const targetFieldId = directFieldId ?? baseFieldId;
+      if (!targetFieldId) return;
+      const widgetId = fieldIdToWidgetId[targetFieldId];
+      if (!widgetId) return;
+      if (!formValuesMap?.[widgetId]) return;
+
+      const writeFieldId =
+        rangePart && baseFieldId && isRangeFieldType(fieldIdToType[baseFieldId])
+          ? `${baseFieldId}_${rangePart.part}`
+          : targetFieldId;
+
+      onFormValuesChange?.(widgetId, writeFieldId, entry.value);
+      appliedGeneratedSeqRef.current[fieldKey] = entry.seq;
+    });
+  }, [
+    mode,
+    crossTabGeneratedValues,
+    generationBaseline?.pending,
+    allFieldKeyToId,
+    fieldIdToWidgetId,
+    fieldIdToType,
+    formValuesMap,
+    onFormValuesChange,
+  ]);
+
   /* ── 카테고리 dbSlug 상속 맵 ──
    * depth 2+ 위젯은 dbSlug가 없으므로 parentWidgetId 체인을 타고 올라가 상위 dbSlug 상속.
    * widgetId → resolvedDbSlug */
@@ -666,14 +745,16 @@ export function PageGridRenderer({
                     onReset={wid ? () => onReset?.(wid) : undefined}
                     codeGroups={codeGroups}
                     /* 폼 */
-                    formValues={mergedFormValuesMap?.[wid] ?? {}}
+                    formValues={formValuesMap?.[wid] ?? {}}
                     onFormValuesChange={(fieldId, value) => onFormValuesChange?.(wid, fieldId, value)}
                     onDerivedValueChange={(fieldId, value) => onDerivedValueChange?.(wid, fieldId, value)}
                     onChangeAllFormValues={handleChangeAllFormValues}
+                    onGenerateAllFormValues={handleGenerateAllFormValues}
                     allFormValues={allFormValues}
                     allFieldKeyToId={allFieldKeyToId}
                     urlParams={urlParams}
                     crossTabFormValues={crossTabFormValues}
+                    generationBaseline={generationBaseline}
                     onContentAction={(widgetIds, action, goBack, contentValidationRuleIds?: Record<string, number[]>) =>
                       onContentAction?.(widgetIds, action, goBack, mergedFormValuesMap, contentValidationRuleIds)
                     }

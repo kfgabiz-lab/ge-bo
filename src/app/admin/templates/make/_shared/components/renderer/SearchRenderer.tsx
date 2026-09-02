@@ -31,7 +31,7 @@ import { useMemo } from "react";
 import { Search, RotateCcw } from "lucide-react";
 import { SearchForm, SearchRow, SearchField, isEnterSearchTrigger } from "@/components/search";
 import { SearchRowConfig, CodeGroupDef } from "../../types";
-import { evalFieldCondition, buildKeyToId, resolveSearchFieldLabel } from "../../utils";
+import { evalFieldCondition, buildKeyToId, resolveSearchFieldLabel, buildDateRangeGenerationPatch } from "../../utils";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import { useHiddenSearchFieldReset } from "./useHiddenSearchFieldReset";
@@ -105,20 +105,9 @@ export function SearchRenderer({
   const handleDateRangeGenerationChange = (sourceFieldId: string, part: "from" | "to", value: string) => {
     if (isPreview) return;
 
-    const sourceField = flatFields.find((f) => f.id === sourceFieldId);
-    if (!sourceField) return;
-
-    (sourceField.dataGenerations ?? []).forEach((dg) => {
-      if (!dg.generationKey || dg.datePart !== part) return;
-
-      const targetFieldId = keyToId[dg.generationKey];
-      if (!targetFieldId || targetFieldId === sourceFieldId) return;
-
-      const targetField = flatFields.find((f) => f.id === targetFieldId);
-      const targetIsRange = targetField?.type === "dateRange" || targetField?.type === "yearMonthRange";
-
-      onChangeValues?.(targetIsRange ? `${targetFieldId}_${part}` : targetFieldId, value);
-    });
+    Object.entries(buildDateRangeGenerationPatch(flatFields, sourceFieldId, part, value)).forEach(
+      ([targetKey, targetValue]) => onChangeValues?.(targetKey, targetValue)
+    );
   };
 
   /* 행이 없을 때 — preview는 안내 텍스트, live는 null */

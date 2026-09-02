@@ -20,6 +20,7 @@ import {
   initFormDefaultValues,
   computeFieldDefaultValue,
   buildSearchFieldDefaultValues,
+  buildDateRangeGenerationPatch,
   validateDataSaveWidgets,
   saveTableRows,
   processFormFilesAndSubList,
@@ -33,6 +34,7 @@ import {
   extractMultiSelectSelection,
   evalWidgetHideCondition,
   resolveFetchSortKey,
+  buildGenerationBaselineValues,
 } from "../utils";
 import {
   entityApiPath,
@@ -47,7 +49,7 @@ import {
 import { FILE_FIELD_TYPES } from "../constants";
 import { useI18n } from "@/hooks/use-i18n";
 import type { PageWidgetItem, PageTableData } from "../components/renderer/PageGridRenderer";
-import type { AnyWidget } from "../components/renderer/types";
+import type { AnyWidget, GenerationBaseline } from "../components/renderer/types";
 import type { TableWidget } from "../components/builder/TableBuilder";
 import type { FormWidget } from "../components/builder/FormBuilder";
 import type { SubListWidget, MultiSelectWidget } from "../components/renderer/types";
@@ -57,6 +59,8 @@ import type { SearchFieldConfig } from "../types";
 import type { ConnectedType } from "./useOutputMode";
 
 const DEFAULT_PAGE_SIZE = 10;
+
+const DATE_RANGE_GENERATION_PARTS: ("from" | "to")[] = ["from", "to"];
 
 export function flatWidgets(items: PageWidgetItem[]): AnyWidget[] {
   return items.flatMap((item) => item.contents.map((c) => c.widget));
@@ -316,6 +320,7 @@ export function useWidgetPageState(
   const [formFetchRelMap, setFormFetchRelMap] = useState<Record<string, Record<string, unknown>>>({});
 
   const [recordLoaded, setRecordLoaded] = useState(false);
+  const [generationBaseline, setGenerationBaseline] = useState<GenerationBaseline>({ pending: false, values: {} });
 
   const [apiInfoOptions, setApiInfoOptions] = useState<ApiInfoOption[]>([]);
   useEffect(() => {
@@ -444,11 +449,25 @@ export function useWidgetPageState(
     const initVals: Record<string, string> = {};
     flatWidgets(widgetItems).forEach((w) => {
       if (w.type !== "search") return;
-      (w.rows as { fields: SearchFieldConfig[] }[])
-        .flatMap((r) => r.fields)
-        .forEach((f: SearchFieldConfig) => {
-          Object.assign(initVals, buildSearchFieldDefaultValues(f));
+
+      const fields = (w.rows as { fields: SearchFieldConfig[] }[]).flatMap((r) => r.fields);
+
+      const widgetVals: Record<string, string> = {};
+      fields.forEach((f: SearchFieldConfig) => {
+        Object.assign(widgetVals, buildSearchFieldDefaultValues(f));
+      });
+
+      const defaultsSnapshot = { ...widgetVals };
+      fields.forEach((f: SearchFieldConfig) => {
+        if (f.type !== "dateRange" && f.type !== "yearMonthRange") return;
+        DATE_RANGE_GENERATION_PARTS.forEach((part) => {
+          const sourceValue = defaultsSnapshot[`${f.id}_${part}`];
+          if (!sourceValue) return;
+          Object.assign(widgetVals, buildDateRangeGenerationPatch(fields, f.id, part, sourceValue));
         });
+      });
+
+      Object.assign(initVals, widgetVals);
     });
 
     let effectiveSv = searchValuesRef.current;
@@ -654,18 +673,18 @@ export function useWidgetPageState(
 
   useEffect(() => {
     if (!widgetItems.length) return;
-    setRecordLoaded(false);
-    const id = options?.sharedDataId ?? null;
-    if (!id) return;
 
+    const id = options?.sharedDataId ?? null;
     const allWidgets = flatWidgets(widgetItems);
     const forms = allWidgets.filter((w) => w.type === "form") as FormWidget[];
     const sublists = allWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
     const multiSels = allWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
-    if (!forms.length) return;
+    const connectedSlug = forms[0]?.connectedSlug;
 
-    const connectedSlug = forms[0].connectedSlug;
-    if (!connectedSlug) return;
+    const willFetch = !!id && forms.length > 0 && !!connectedSlug;
+    setGenerationBaseline({ pending: willFetch, values: {} });
+    setRecordLoaded(false);
+    if (!id || !forms.length || !connectedSlug) return;
 
     const fetchPromise = pageIsEntity
       ? api.get(entityItemPath(connectedSlug, id)).then((r) => {
@@ -690,6 +709,7 @@ export function useWidgetPageState(
           pageIsEntity,
           t
         );
+        setGenerationBaseline({ pending: false, values: buildGenerationBaselineValues(rawDataJson) });
         const fetchRelData = extractFetchRelData(rawDataJson);
         if (Object.keys(fetchRelData).length > 0) {
           forms.forEach((fw) => {
@@ -698,7 +718,7 @@ export function useWidgetPageState(
         }
         setRecordLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => setGenerationBaseline({ pending: false, values: {} }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgetItems, options?.sharedDataId]);
 
@@ -1877,6 +1897,7 @@ export function useWidgetPageState(
     formFetchRelMap,
     pageIsEntity,
     recordLoaded,
+    generationBaseline,
   };
 
   return { gridProps, setSubListRowsMap, confirmLeave };

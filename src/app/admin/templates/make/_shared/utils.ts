@@ -5,79 +5,10 @@
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { useSiteStore } from "@/store/use-site-store";
-import { serverNowMs } from "@/store/use-server-clock-store";
+import { getDateParts, getNowParts } from "@/lib/serverClockFormat";
 import { FILE_FIELD_TYPES } from "./constants";
 import type { DateSubType, CodeGroupDef, TableColumnConfig } from "./types";
 import { buildFetchKey } from "./components/builder/fields/utils";
-
-/** getDateParts가 반환하는 시각의 연/월/일/시/분/초 문자열 조각 */
-interface NowParts {
-  YYYY: string;
-  MM: string;
-  DD: string;
-  hh: string;
-  mm: string;
-  ss: string;
-}
-
-/**
- * 현재 활성 사이트(useSiteStore)의 timezone 조회
- * - 아직 사이트 목록이 로드되지 않았거나(activeSiteId 없음), 해당 사이트에 timezone이 비어있으면 undefined 반환
- *   → 호출부(getNowParts)에서 브라우저 로컬 시각으로 안전하게 폴백
- * - 컴포넌트 바깥(순수 함수)에서 zustand 상태를 읽어야 하므로 훅이 아닌 getState()를 사용
- */
-function getActiveSiteTimezone(): string | undefined {
-  const { activeSiteId, sites } = useSiteStore.getState();
-  if (!activeSiteId) return undefined;
-  const site = sites.find((s) => s.id === activeSiteId);
-  return site?.timezone || undefined;
-}
-
-/**
- * 임의의 시각(Date)을 "활성 사이트의 timezone" 기준 연/월/일/시/분/초 문자열로 분해
- * - 활성 사이트 timezone이 없거나(로드 전 등) Intl 변환에 실패하면(잘못된 timezone 문자열 등)
- *   기존 동작과 동일하게 브라우저 로컬 시각(Date의 로컬 getter)으로 폴백 — 절대 예외를 던지지 않음
- * - en-CA 로케일 + formatToParts는 다른 로케일의 자릿수/구분자 표기 차이 없이 항상 4자리 연도·2자리 월일시분초를
- *   안정적으로 뽑아낼 수 있어 문자열 파싱 없이 그대로 조립 가능
- */
-function getDateParts(date: Date): NowParts {
-  const zone = getActiveSiteTimezone();
-  if (zone) {
-    try {
-      const parts = new Intl.DateTimeFormat("en-CA", {
-        timeZone: zone,
-        hour12: false,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }).formatToParts(date);
-      const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-      /* 일부 브라우저는 hour12:false에서 자정을 "24"로 표기 — input[type=time] 등은 00~23 범위만 허용하므로 보정 */
-      const hh = get("hour") === "24" ? "00" : get("hour");
-      return { YYYY: get("year"), MM: get("month"), DD: get("day"), hh, mm: get("minute"), ss: get("second") };
-    } catch {
-      /* 잘못된 timezone 문자열 등 — 아래 로컬 폴백으로 진행 */
-    }
-  }
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return {
-    YYYY: String(date.getFullYear()),
-    MM: pad(date.getMonth() + 1),
-    DD: pad(date.getDate()),
-    hh: pad(date.getHours()),
-    mm: pad(date.getMinutes()),
-    ss: pad(date.getSeconds()),
-  };
-}
-
-/** 현재 시각을 "활성 사이트의 timezone" 기준 연/월/일/시/분/초 문자열로 분해 (getDateParts 참고) */
-function getNowParts(): NowParts {
-  return getDateParts(new Date(serverNowMs()));
-}
 
 /**
  * 서버(bo-api) 응답의 OffsetDateTime ISO 문자열 → 화면 표시용 "YYYY-MM-DD HH:mm:ss" 문자열 변환
@@ -415,6 +346,19 @@ export const buildKeyToId = (fields: { id: string; fieldKey?: string }[]): Recor
     if (f.fieldKey) map[f.fieldKey] = f.id;
   });
   return map;
+};
+
+/**
+ * generationKey 콤마 다중지정 문자열을 개별 키 배열로 분리 — trim + 빈 문자열 제거 + 순서 유지 중복 제거
+ * @example splitGenerationKeys("a, b ,b,,c") // ["a", "b", "c"]
+ */
+export const splitGenerationKeys = (generationKey?: string): string[] => {
+  if (!generationKey) return [];
+  const keys = generationKey
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  return Array.from(new Set(keys));
 };
 
 const extractOptionFilterParentKeys = (optionFilter: string): string[] => {
@@ -1252,6 +1196,39 @@ export function flattenPageDataItem(item: {
   };
 }
 
+export const FLATTEN_META_KEYS = new Set([
+  "_id",
+  "_groupId",
+  "_pathMap",
+  "createdAt",
+  "createdBy",
+  "updatedAt",
+  "updatedBy",
+]);
+
+export function buildGenerationBaselineValues(dataJson: Record<string, unknown>): Record<string, string> {
+  const flat = flattenPageDataItem({ id: 0, dataJson });
+  const baseline: Record<string, string> = {};
+  Object.entries(flat).forEach(([k, v]) => {
+    if (FLATTEN_META_KEYS.has(k)) return;
+    if (k.startsWith("_fetchedRel")) return;
+    if (v === null || v === undefined) return;
+    if (typeof v === "object") return;
+    baseline[k] = String(v);
+  });
+  return baseline;
+}
+
+export function resolveGenerationBaselineValue(
+  baseline: Record<string, string> | undefined,
+  generationKey: string
+): string | undefined {
+  if (!baseline) return undefined;
+  if (baseline[generationKey] !== undefined) return baseline[generationKey];
+  const segs = generationKey.split(".");
+  return baseline[segs[segs.length - 1]];
+}
+
 /**
  * 연결 Slug(FETCH) 다건 매칭 시 서버가 함께 내려주는 구분자(sep) 조회
  * - TABLE/CATEGORY(EQ) relation에서 매칭이 2건 이상이면 서버가 `_fetchedRel{id}` 값 배열과 함께
@@ -1786,9 +1763,9 @@ export function buildDataJson(
         if (FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
         const sourceValue = rawValues[f.id] ?? "";
 
-        /* 단일 generationKey 처리 (기존 호환)
+        /* 단일 generationKey 처리 (기존 호환, 콤마 다중지정 지원)
          * cross-tab 참조(다른 탭 contentKey)는 UI에서 이미 반영되므로 저장 단계에서 skip */
-        if (f.generationKey && !isCrossTabKey(f.generationKey)) {
+        if (f.generationKey) {
           const transformed = applyDataGeneration(
             sourceValue,
             f.dataReplacement,
@@ -1796,15 +1773,15 @@ export function buildDataJson(
             f.appendText,
             f.truncateLength
           );
-          writeToGenerationPath(dataJson, f.generationKey, transformed);
+          splitGenerationKeys(f.generationKey).forEach((key) => {
+            if (isCrossTabKey(key)) return;
+            writeToGenerationPath(dataJson, key, transformed);
+          });
         }
 
-        /* 다중 dataGenerations 배열 처리 */
+        /* 다중 dataGenerations 배열 처리 (콤마 다중지정 지원) */
         (f.dataGenerations ?? []).forEach((dg) => {
           if (!dg.generationKey) return;
-          /* cross-tab 참조는 저장 단계에서 skip — UI(crossTabFormValues 경로)에서 이미 반영됨 */
-          if (isCrossTabKey(dg.generationKey)) return;
-          if (dg.onlyIfEmpty && generationTargetKeyToId[dg.generationKey]) return;
           const transformed = applyDataGeneration(
             sourceValue,
             dg.dataReplacement,
@@ -1813,7 +1790,12 @@ export function buildDataJson(
             dg.truncateLength,
             dg.stripHtml
           );
-          writeToGenerationPath(dataJson, dg.generationKey, transformed);
+          splitGenerationKeys(dg.generationKey).forEach((key) => {
+            /* cross-tab 참조는 저장 단계에서 skip — UI(crossTabFormValues 경로)에서 이미 반영됨 */
+            if (isCrossTabKey(key)) return;
+            if (dg.onlyIfEmpty && generationTargetKeyToId[key]) return;
+            writeToGenerationPath(dataJson, key, transformed);
+          });
         });
       });
 
@@ -1964,10 +1946,12 @@ function applyDateRangeGenerationToDataJson(
     if (f.type !== "dateRange" && f.type !== "yearMonthRange") return;
     (f.dataGenerations ?? []).forEach((dg) => {
       if (!dg.generationKey || !dg.datePart) return;
-      if (isCrossTabKey(dg.generationKey)) return;
-      if (generationTargetKeyToId[dg.generationKey]) return;
       const value = rawValues[f.id + "_" + dg.datePart] ?? "";
-      writeToGenerationPath(dataJson, dg.generationKey, value);
+      splitGenerationKeys(dg.generationKey).forEach((key) => {
+        if (isCrossTabKey(key)) return;
+        if (generationTargetKeyToId[key]) return;
+        writeToGenerationPath(dataJson, key, value);
+      });
     });
   });
 }
@@ -2739,6 +2723,47 @@ export function buildSearchFieldDefaultValues(f: import("./types").SearchFieldCo
     vals[f.id] = f.defaultValue;
   }
   return vals;
+}
+
+/**
+ * dateRange/yearMonthRange 검색필드의 시작일·종료일 변경분을 dataGenerations 타깃 필드 값으로 전개한다.
+ * 런타임 입력 경로(SearchRenderer.handleDateRangeGenerationChange)와 마운트 기본값 경로
+ * (useWidgetPageState 검색 기본값 초기화 effect)가 동일한 타깃 키 규약을 공유하기 위한 공통 함수.
+ *
+ * @param fields        전파 판정 범위가 되는 검색 위젯 1개의 필드 목록
+ * @param sourceFieldId 값이 바뀐 소스 필드 id
+ * @param part          from | to — dataGenerations.datePart와 일치하는 항목만 전파
+ * @param value         타깃에 채울 값
+ * @example buildDateRangeGenerationPatch(fields, 'f1', 'to', '2026-09-02') // { 'f2_to': '2026-09-02' }
+ */
+export function buildDateRangeGenerationPatch(
+  fields: import("./types").SearchFieldConfig[],
+  sourceFieldId: string,
+  part: "from" | "to",
+  value: string
+): Record<string, string> {
+  const patch: Record<string, string> = {};
+
+  const sourceField = fields.find((f) => f.id === sourceFieldId);
+  if (!sourceField) return patch;
+
+  const keyToId = buildKeyToId(fields);
+
+  (sourceField.dataGenerations ?? []).forEach((dg) => {
+    if (!dg.generationKey || dg.datePart !== part) return;
+
+    splitGenerationKeys(dg.generationKey).forEach((key) => {
+      const targetFieldId = keyToId[key];
+      if (!targetFieldId || targetFieldId === sourceFieldId) return;
+
+      const targetField = fields.find((f) => f.id === targetFieldId);
+      const targetIsRange = targetField?.type === "dateRange" || targetField?.type === "yearMonthRange";
+
+      patch[targetIsRange ? `${targetFieldId}_${part}` : targetFieldId] = value;
+    });
+  });
+
+  return patch;
 }
 
 /**

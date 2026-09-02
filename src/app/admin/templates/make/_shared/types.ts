@@ -217,7 +217,7 @@ export interface SearchFieldConfig {
   /** 에디터 종류 선택 — tiptap(기본) 또는 toast (과도기 공존) */
   editorType?: "tiptap" | "toast";
   /* ── 데이터생성 전용 (Input/FormTextarea/Date/DateRange) ── */
-  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey */
+  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey, 콤마로 여러 타깃 동시 지정 가능 */
   generationKey?: string;
   /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
   dataReplacement?: "none" | "hyphen";

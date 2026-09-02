@@ -195,7 +195,7 @@ export interface FieldEditValues {
   afterTextMsgKey?: string; // 이후 텍스트 다국어 키
   statusDisplayStyle?: "select" | "radio"; // 검색 UI 표시 방식 (기본: select)
   /* ── 데이터생성 전용 (Input/FormTextarea/Date/DateRange) ── */
-  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey */
+  /** 생성KEY — dot notation: fieldKey / contentKey.fieldKey, 콤마로 여러 타깃 동시 지정 가능 */
   generationKey?: string;
   /** 데이터변경: 없음(none) / 공백·특수문자→하이픈(hyphen) */
   dataReplacement?: "none" | "hyphen";

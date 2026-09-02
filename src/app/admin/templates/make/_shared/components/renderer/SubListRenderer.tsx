@@ -28,6 +28,7 @@ import { FieldRenderer } from "./FieldRenderer";
 import type { RendererMode, SubListWidget, SubListColumn } from "./types";
 import type { SearchFieldConfig, CodeGroupDef } from "../../types";
 import { FIELD_DESC_HEIGHT_PX } from "../../styles";
+import { splitGenerationKeys } from "../../utils";
 import { useI18n } from "@/hooks/use-i18n";
 
 /* 파일 업로드가 필요한 컬럼 타입 */
@@ -288,23 +289,27 @@ export function SubListRenderer({
       const patch: Record<string, string> = { [writeKey]: value };
 
       (col.dataGenerations ?? []).forEach((dg) => {
-        if (!dg.generationKey || dg.datePart !== part || dg.generationKey.includes(".")) return;
+        if (!dg.generationKey || dg.datePart !== part) return;
 
-        const targetCol = visibleColumns.find((c) => c.key === dg.generationKey);
-        if (!targetCol || targetCol.id === col.id) return;
+        splitGenerationKeys(dg.generationKey).forEach((key) => {
+          if (key.includes(".")) return;
 
-        const targetKey =
-          targetCol.type === "dateRange"
-            ? part === "from"
-              ? targetCol.key2
-                ? targetCol.key
-                : `${targetCol.key}_from`
-              : targetCol.key2
+          const targetCol = visibleColumns.find((c) => c.key === key);
+          if (!targetCol || targetCol.id === col.id) return;
+
+          const targetKey =
+            targetCol.type === "dateRange"
+              ? part === "from"
                 ? targetCol.key2
-                : `${targetCol.key}_to`
-            : targetCol.key;
+                  ? targetCol.key
+                  : `${targetCol.key}_from`
+                : targetCol.key2
+                  ? targetCol.key2
+                  : `${targetCol.key}_to`
+              : targetCol.key;
 
-        patch[targetKey] = value;
+          patch[targetKey] = value;
+        });
       });
 
       const updated = rows.map((r) => (r._rowId === row._rowId ? { ...r, ...patch } : r));

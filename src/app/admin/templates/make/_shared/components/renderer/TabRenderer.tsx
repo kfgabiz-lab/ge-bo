@@ -120,12 +120,25 @@ export function TabRenderer({
   /* 탭 간 공유 데이터생성 자동입력 상태 — fieldId → value (모든 탭 공유) */
   const [crossTabFormValues, setCrossTabFormValues] = useState<Record<string, string>>({});
 
+  /* 탭 간 데이터생성 전용 값 — seq를 증가시켜 같은 값 재전송도 대상 탭이 1회 적용하도록 구분 */
+  const [crossTabGeneratedValues, setCrossTabGeneratedValues] = useState<
+    Record<string, { value: string; seq: number }>
+  >({});
+
   /* 탭별 이탈 확인 함수 — LiveTabPanel이 마운트 시 등록, 탭 전환 전 호출 */
   const confirmLeaveMap = useRef<Record<number, () => boolean>>({});
 
   /* 어느 탭 PageGridRenderer에서도 escalate 될 수 있는 cross-tab 값 업데이트 콜백 */
   const handleCrossTabFormChange = useCallback((fieldId: string, value: string) => {
     setCrossTabFormValues((prev) => ({ ...prev, [fieldId]: value }));
+  }, []);
+
+  /* 데이터생성 전용 에스컬레이션 — 값이 같아도 seq를 올려 대상 탭이 새 생성으로 인식하게 한다 */
+  const handleCrossTabGeneratedChange = useCallback((fieldId: string, value: string) => {
+    setCrossTabGeneratedValues((prev) => ({
+      ...prev,
+      [fieldId]: { value, seq: (prev[fieldId]?.seq ?? 0) + 1 },
+    }));
   }, []);
 
   /**
@@ -210,6 +223,8 @@ export function TabRenderer({
                   onSaved={handleTabSaved}
                   crossTabFormValues={crossTabFormValues}
                   onCrossTabFormChange={handleCrossTabFormChange}
+                  crossTabGeneratedValues={crossTabGeneratedValues}
+                  onCrossTabGeneratedChange={handleCrossTabGeneratedChange}
                   leaveCheck={leaveCheck}
                   onRegisterConfirmLeave={(tabIdx, fn) => {
                     confirmLeaveMap.current[tabIdx] = fn;
@@ -301,6 +316,10 @@ interface LiveTabPanelProps {
   crossTabFormValues: Record<string, string>;
   /** 어떤 탭에서도 대상 fieldId를 못 찾으면 TabRenderer로 에스컬레이션 */
   onCrossTabFormChange: (fieldId: string, value: string) => void;
+  /** TabRenderer 레벨에서 관리하는 데이터생성 전용 값 (fieldKey → { value, seq }) */
+  crossTabGeneratedValues: Record<string, { value: string; seq: number }>;
+  /** 데이터생성 전용 에스컬레이션 — 조건평가 채널과 분리 */
+  onCrossTabGeneratedChange: (fieldId: string, value: string) => void;
   /** 이탈체크 활성 여부 — 상위 페이지에서 전달 */
   leaveCheck?: boolean;
   /** 탭 전환 가드용 confirmLeave 함수 등록 콜백 */
@@ -326,6 +345,8 @@ function LiveTabPanel({
   onSaved,
   crossTabFormValues,
   onCrossTabFormChange,
+  crossTabGeneratedValues,
+  onCrossTabGeneratedChange,
   leaveCheck,
   onRegisterConfirmLeave,
   urlParams,
@@ -446,6 +467,8 @@ function LiveTabPanel({
         urlParams={urlParams}
         crossTabFormValues={crossTabFormValues}
         onCrossTabFormChange={onCrossTabFormChange}
+        crossTabGeneratedValues={crossTabGeneratedValues}
+        onCrossTabGeneratedChange={onCrossTabGeneratedChange}
         onContentRowsChange={handleContentRowsChange}
         {...gridProps}
       />
