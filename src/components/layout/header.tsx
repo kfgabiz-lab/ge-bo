@@ -2,7 +2,7 @@
 
 import { LogOut, ChevronRight, Home, Globe, Clock } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
@@ -15,6 +15,7 @@ import { LanguageSelector } from "@/components/layout/language-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 import { getTimezoneLabel } from "@/lib/timezoneOptions";
+import { formatServerClockTime } from "@/lib/serverClockFormat";
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
 function findMenuBreadcrumb(
@@ -41,14 +42,32 @@ function findMenuBreadcrumb(
 function ActiveSiteTimezone() {
   const activeSiteId = useSiteStore((state) => state.activeSiteId);
   const mySites = useSiteStore((state) => state.sites);
+  const sitesLoaded = useSiteStore((state) => state.sitesLoaded);
   const activeSite = mySites.find((s) => s.id === activeSiteId);
 
-  if (!activeSite?.timezone) return null;
+  const [clock, setClock] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      setClock((prev) => {
+        const next = formatServerClockTime();
+        return next === prev ? prev : next;
+      });
+    };
+    tick();
+    const timer = setInterval(tick, 250);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!sitesLoaded) return null;
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
       <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-      <span className="text-xs font-semibold text-slate-700">{getTimezoneLabel(activeSite.timezone)}</span>
+      {activeSite?.timezone && (
+        <span className="text-xs font-semibold text-slate-700">{getTimezoneLabel(activeSite.timezone)}</span>
+      )}
+      <span className="text-xs font-semibold text-slate-700 tabular-nums">{clock}</span>
     </div>
   );
 }
