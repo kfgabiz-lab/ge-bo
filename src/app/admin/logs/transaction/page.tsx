@@ -14,6 +14,7 @@ import api from "@/lib/api";
 /* ── 트랜잭션 로그 단건 타입 ── */
 interface TransactionLogItem {
   id: number;
+  source: string | null;
   actionType: string | null;
   method: string | null;
   requestUrl: string | null;
@@ -221,6 +222,22 @@ export default function TransactionLogPage() {
           width: 160,
         },
         {
+          id: "c1b",
+          header: "구분",
+          headerMsgKey: "common.label.gubun",
+          accessor: "source",
+          cellType: "badge",
+          align: "center",
+          sortable: true,
+          width: 90,
+          cellOptions: [
+            { value: "BO", text: "BO", color: "blue" },
+            { value: "FO", text: "FO", color: "emerald" },
+            { value: "BATCH", text: "BATCH", color: "amber" },
+            { value: "EXTERNAL", text: "EXTERNAL", color: "purple" },
+          ],
+        },
+        {
           id: "c2",
           header: "상태코드",
           headerMsgKey: "dashboard.label.statusCode",
@@ -361,6 +378,7 @@ export default function TransactionLogPage() {
         _id: item.id,
         /* 발생일시 — ISO 문자열에서 앞 19자(YYYY-MM-DD HH:mm:ss) 추출 */
         createdAt: item.createdAt ? item.createdAt.slice(0, 19).replace("T", " ") : "-",
+        source: item.source ?? "-",
         httpStatus: String(item.httpStatus),
         method: item.method ?? "-",
         actionType: item.actionType ?? "-",

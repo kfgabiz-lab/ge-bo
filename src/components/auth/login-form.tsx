@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
+import { useSiteStore } from "@/store/use-site-store";
 import { User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Users, RefreshCw } from "lucide-react";
 import { LanguageSelector } from "@/components/layout/language-selector";
 import { useI18n } from "@/hooks/use-i18n";
@@ -35,6 +36,7 @@ export default function LoginForm() {
   const [tempToken, setTempToken] = useState("");
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
+  const loadActiveSiteFromStorage = useSiteStore((state) => state.loadActiveSiteFromStorage);
   const { t } = useI18n();
 
   /* t()는 언어 변경 시 참조가 바뀌므로 deps에 넣지 않는다(넣으면 언어 전환마다 캡차가 재발급됨) —
@@ -54,6 +56,10 @@ export default function LoginForm() {
   useEffect(() => {
     refreshCaptcha();
   }, [refreshCaptcha]);
+
+  useEffect(() => {
+    loadActiveSiteFromStorage();
+  }, [loadActiveSiteFromStorage]);
 
   /* 언어 변경 시 유효성 메시지도 함께 갱신되도록 useMemo로 스키마 생성 */
   const loginSchema = useMemo(

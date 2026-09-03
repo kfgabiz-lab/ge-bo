@@ -24,6 +24,7 @@ export interface MenuItem {
   visible: boolean;
   /** SYSTEM_ADMIN 전용 메뉴 여부 */
   isSystem?: boolean;
+  siteId?: number | null;
   children?: MenuItem[];
 }
 

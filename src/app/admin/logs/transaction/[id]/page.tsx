@@ -14,6 +14,7 @@ import api from "@/lib/api";
 /* ── 트랜잭션 로그 상세 타입 ── */
 interface TransactionLogDetail {
   id: number;
+  source: string | null;
   actionType: string | null;
   method: string | null;
   requestUrl: string | null;
@@ -49,6 +50,7 @@ export default function TransactionLogDetailPage() {
         const d = res.data;
         setFormValues({
           createdAt: d.createdAt ? d.createdAt.slice(0, 19).replace("T", " ") : "-",
+          source: d.source ?? "-",
           httpStatus: String(d.httpStatus),
           method: d.method ?? "-",
           actionType: d.actionType ?? "-",
@@ -155,6 +157,16 @@ export default function TransactionLogDetailPage() {
           colSpan: 6,
           rowSpan: 1,
           fieldKey: "loginUser",
+          readonly: true,
+        },
+        {
+          id: "source",
+          type: "input",
+          label: "구분",
+          labelMsgKey: "common.label.gubun",
+          colSpan: 6,
+          rowSpan: 1,
+          fieldKey: "source",
           readonly: true,
         },
       ],
