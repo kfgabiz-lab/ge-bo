@@ -322,6 +322,25 @@ export function FormRenderer({
     ]
   );
 
+  const handleFieldBlur = useCallback(
+    (fieldId: string) => {
+      const sourceField = fields.find((f) => f.id === fieldId);
+      if (!sourceField) return;
+
+      const keys: string[] = [];
+      if (sourceField.generationKey) keys.push(...splitGenerationKeys(sourceField.generationKey));
+      (sourceField.dataGenerations ?? []).forEach((dg) => {
+        if (dg.generationKey) keys.push(...splitGenerationKeys(dg.generationKey));
+      });
+
+      keys.forEach((key) => {
+        const targetFieldId = resolveTargetFieldId(key);
+        delete lastGeneratedRef.current[targetFieldId ?? key];
+      });
+    },
+    [fields, resolveTargetFieldId]
+  );
+
   const handleDateRangeGenerationChange = useCallback(
     (sourceFieldId: string, part: "from" | "to", value: string) => {
       if (isPreview) return;
@@ -424,6 +443,11 @@ export function FormRenderer({
                     : isPreview
                       ? () => {}
                       : (v) => handleFieldChange(f.id, v)
+                }
+                onBlur={
+                  f.type === "dateRange" || f.type === "yearMonthRange" || isPreview
+                    ? undefined
+                    : () => handleFieldBlur(f.id)
                 }
                 onDerivedChange={
                   !isPreview && f.fieldKey

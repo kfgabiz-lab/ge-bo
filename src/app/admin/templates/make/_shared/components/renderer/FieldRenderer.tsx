@@ -183,6 +183,7 @@ interface FieldRendererProps {
   field: SearchFieldConfig;
   value?: string;
   onChange?: (v: string) => void;
+  onBlur?: () => void;
   /** select(SLUG 옵션) 전용: optionDerivedKeys로 지정된 파생키들의 현재 선택 row 값을 emit (key는 파생키명만, 접두어 없이) */
   onDerivedChange?: (derived: Record<string, string>) => void;
   /** dateRange 전용: 시작일 (valueFrom/valueTo 사용 시 value 무시) */
@@ -1007,6 +1008,7 @@ export function FieldRenderer({
   field,
   value = "",
   onChange,
+  onBlur,
   onDerivedChange,
   valueFrom,
   valueTo,
@@ -1118,6 +1120,7 @@ export function FieldRenderer({
           className={`${inputCls}${readonlyCls}${hasCharCount ? ` ${fieldCharCountPadCls}` : ""}`}
           value={value}
           onChange={isReadOnly ? undefined : (e) => onChange?.(e.target.value)}
+          onBlur={isReadOnly ? undefined : () => onBlur?.()}
         />
       );
       if (hasCharCount) {

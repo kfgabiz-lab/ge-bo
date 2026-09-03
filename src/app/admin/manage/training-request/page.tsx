@@ -144,8 +144,8 @@ export default function TrainingRequestListPage() {
     if (from && to) {
       lastDateRangeRef.current = { from, to };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    searchValues.periodType,
     searchValues.createdRange_from,
     searchValues.createdRange_to,
     searchValues.scheduleStartRange_from,
