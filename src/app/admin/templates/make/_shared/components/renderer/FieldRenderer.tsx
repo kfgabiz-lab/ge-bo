@@ -42,6 +42,7 @@ import {
 } from "../../styles";
 import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS, SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from "../../constants";
 import { SelectArrow } from "../SelectArrow";
+import { SEARCH_DATE_ICON_CLS, SEARCH_DATE_RANGE_SEP_CLS } from "./rendererStyles";
 
 /** bytes → 사람이 읽기 쉬운 단위로 변환 (1MB 미만이면 KB, 이상이면 MB) */
 const fmtSize = (bytes: number) =>
@@ -1355,7 +1356,7 @@ export function FieldRenderer({
       return (
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Calendar className={SEARCH_DATE_ICON_CLS} />
             <input
               type={inputType}
               step={subType === "timeSec" ? 1 : undefined}
@@ -1368,9 +1369,9 @@ export function FieldRenderer({
               onClick={isReadOnly ? undefined : (e) => e.currentTarget.showPicker?.()}
             />
           </div>
-          <span className="text-sm text-slate-400 flex-shrink-0">~</span>
+          <span className={SEARCH_DATE_RANGE_SEP_CLS}>~</span>
           <div className="relative flex-1">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Calendar className={SEARCH_DATE_ICON_CLS} />
             <input
               type={inputType}
               step={subType === "timeSec" ? 1 : undefined}

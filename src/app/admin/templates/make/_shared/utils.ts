@@ -2860,6 +2860,38 @@ export function buildSearchQueryParams(
   return params;
 }
 
+export const SEARCH_QUERY_PARAM_FIELD_KEYS: (keyof import("./types").SearchFieldConfig)[] = [
+  "id",
+  "type",
+  "fieldKey",
+  "fieldKey2",
+  "label",
+  "excludeFromSearch",
+  "hideCondition",
+  "rangeSubType",
+  "singleDateRange",
+  "defaultStartToday",
+  "defaultEndToday",
+  "relationSlugId",
+  "joinRelationSlugId",
+  "joinSlaveKey",
+  "data",
+  "linkedDateRangeKey",
+];
+
+export function nextSortDir(isCurrentColumn: boolean, currentDir: "asc" | "desc" | null): "asc" | "desc" | null {
+  if (!isCurrentColumn) return "asc";
+  if (currentDir === "asc") return "desc";
+  if (currentDir === "desc") return null;
+  return "asc";
+}
+
+export function pageGroupRange(currentPage: number, totalPages: number): number[] {
+  const groupStart = Math.floor(currentPage / 10) * 10;
+  const groupEnd = Math.min(groupStart + 10, totalPages);
+  return Array.from({ length: Math.max(0, groupEnd - groupStart) }, (_, i) => groupStart + i);
+}
+
 /**
  * Table 위젯 컬럼 중 cellType==='dateRangeStatus'인 컬럼들의 linkedDateRangeKey를 모아
  * BE가 파생 필드(`_drs_{rangeKey}`)를 계산해 내려주도록 요청하는 `drsKeys` 파라미터 값을 만든다.

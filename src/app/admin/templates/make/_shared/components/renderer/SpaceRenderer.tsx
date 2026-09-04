@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import { calculateSpaceItemRowTracks } from "../../utils/formGridLayout";
+import { spaceGroupClass } from "./rendererStyles";
 import type { SearchFieldConfig } from "../../types";
 import type { RendererMode } from "./types";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
@@ -207,9 +208,7 @@ export function SpaceRenderer({
       {groups.map((group) => (
         <div
           key={group.key}
-          className={`flex items-center-safe gap-2 px-3 min-w-0 ${
-            group.fields[0].type === "action-button" ? justifyClass : ""
-          }`}
+          className={spaceGroupClass(group.fields[0].type === "action-button", justifyClass)}
           style={{
             gridColumn: `span ${Math.min(group.colSpan, contentColSpan)}`,
             gridRow: `span ${group.rowSpan}`,

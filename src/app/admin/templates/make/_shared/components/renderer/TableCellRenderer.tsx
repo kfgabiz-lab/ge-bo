@@ -32,36 +32,16 @@ import {
   getColumnRelationIds,
 } from "../../utils";
 import { CUSTOM_ACTION_COLORS } from "../builder/fields/col-types";
-
-/* ────────────────────────────────────────────────────────── */
-/*  색상 정적 맵 (Tailwind purge 방지 — 동적 문자열 사용 금지) */
-/* ────────────────────────────────────────────────────────── */
-
-/** badge 색상 (배경·텍스트·테두리) */
-const BADGE_CLS: Record<string, string> = {
-  emerald: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  blue: "bg-blue-50 text-blue-700 border border-blue-200",
-  amber: "bg-amber-50 text-amber-700 border border-amber-200",
-  red: "bg-red-50 text-red-700 border border-red-200",
-  purple: "bg-purple-50 text-purple-700 border border-purple-200",
-  slate: "bg-slate-100 text-slate-600 border border-slate-200",
-  pink: "bg-pink-50 text-pink-700 border border-pink-200",
-  sky: "bg-sky-50 text-sky-700 border border-sky-200",
-};
-
-/** badge 아이콘 도트 색상 */
-const BADGE_DOT: Record<string, string> = {
-  emerald: "bg-emerald-500",
-  blue: "bg-blue-500",
-  amber: "bg-amber-500",
-  red: "bg-red-500",
-  purple: "bg-purple-500",
-  slate: "bg-slate-500",
-  pink: "bg-pink-500",
-  sky: "bg-sky-500",
-};
-
-/* ────────────────────────────────────────────────────────── */
+import {
+  BADGE_CLS,
+  BADGE_DOT,
+  BADGE_BASE_CLS,
+  BADGE_DOT_BASE_CLS,
+  badgeShapeClass,
+  booleanCellClass,
+  DATE_CELL_CLS,
+  TEXT_CELL_CLS,
+} from "./rendererStyles";
 
 interface TableCellRendererProps {
   mode: RendererMode;
@@ -100,10 +80,8 @@ export function TableCellRenderer({
         if (!opt) return <span className="text-slate-400 text-sm">샘플</span>;
         const shapeCls = (col.badgeShape || "round") === "round" ? "rounded-full" : "rounded-md font-semibold";
         return (
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium ${shapeCls} ${BADGE_CLS[opt.color] || BADGE_CLS.slate}`}
-          >
-            {col.showIcon && <span className={`w-1.5 h-1.5 rounded-full ${BADGE_DOT[opt.color] || BADGE_DOT.slate}`} />}
+          <span className={`${BADGE_BASE_CLS} ${shapeCls} ${BADGE_CLS[opt.color] || BADGE_CLS.slate}`}>
+            {col.showIcon && <span className={`${BADGE_DOT_BASE_CLS} ${BADGE_DOT[opt.color] || BADGE_DOT.slate}`} />}
             {opt.textMsgKey ? t(opt.textMsgKey) : opt.text}
           </span>
         );
@@ -111,14 +89,10 @@ export function TableCellRenderer({
       /* live: 실제 값으로 cellOptions에서 매칭 */
       const liveOpt = col.cellOptions?.find((o) => o.value === String(value ?? ""));
       if (!liveOpt) return <span className="text-sm text-slate-600">{String(value ?? "")}</span>;
-      const shapeCls = col.badgeShape === "square" ? "rounded" : "rounded-full";
+      const shapeCls = badgeShapeClass(col.badgeShape);
       return (
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium ${shapeCls} ${BADGE_CLS[liveOpt.color] || BADGE_CLS.slate}`}
-        >
-          {col.showIcon && (
-            <span className={`w-1.5 h-1.5 rounded-full ${BADGE_DOT[liveOpt.color] || BADGE_DOT.slate}`} />
-          )}
+        <span className={`${BADGE_BASE_CLS} ${shapeCls} ${BADGE_CLS[liveOpt.color] || BADGE_CLS.slate}`}>
+          {col.showIcon && <span className={`${BADGE_DOT_BASE_CLS} ${BADGE_DOT[liveOpt.color] || BADGE_DOT.slate}`} />}
           {liveOpt.textMsgKey ? t(liveOpt.textMsgKey) : liveOpt.text}
         </span>
       );
@@ -136,10 +110,7 @@ export function TableCellRenderer({
           ? t(col.falseTextMsgKey)
           : col.falseText || t("common.label.private");
       return (
-        <span
-          className={`text-sm truncate block ${boolVal ? "text-emerald-600 font-medium" : "text-slate-400"}`}
-          title={boolText}
-        >
+        <span className={booleanCellClass(boolVal)} title={boolText}>
           {boolText}
         </span>
       );
@@ -247,7 +218,7 @@ export function TableCellRenderer({
       /* dateFormat 없으면 원본값 그대로 표시 */
       if (!col.dateFormat)
         return (
-          <span className="text-sm text-slate-700 truncate block" title={rawVal}>
+          <span className={DATE_CELL_CLS} title={rawVal}>
             {rawVal}
           </span>
         );
@@ -255,7 +226,7 @@ export function TableCellRenderer({
       const d = new Date(rawVal);
       if (isNaN(d.getTime()))
         return (
-          <span className="text-sm text-slate-700 truncate block" title={rawVal}>
+          <span className={DATE_CELL_CLS} title={rawVal}>
             {rawVal}
           </span>
         );
@@ -273,7 +244,7 @@ export function TableCellRenderer({
         .replace("mm", mm)
         .replace("ss", ss);
       return (
-        <span className="text-sm text-slate-700 truncate block" title={formatted}>
+        <span className={DATE_CELL_CLS} title={formatted}>
           {formatted}
         </span>
       );
@@ -476,7 +447,7 @@ export function TableCellRenderer({
           );
         }
         return (
-          <span className="text-sm text-slate-700 truncate block" title={multiFormatted}>
+          <span className={TEXT_CELL_CLS} title={multiFormatted}>
             {multiFormatted}
           </span>
         );
@@ -503,7 +474,7 @@ export function TableCellRenderer({
           );
         }
         return (
-          <span className="text-sm text-slate-700 truncate block" title={formatted}>
+          <span className={TEXT_CELL_CLS} title={formatted}>
             {formatted}
           </span>
         );
@@ -514,7 +485,7 @@ export function TableCellRenderer({
       if (col.codeGroupCode && col.displayAs !== "value") {
         const displayNames = resolveCodeLabel(strVal, col.codeGroupCode, col.displayAs, codeGroups, t);
         return (
-          <span className="text-sm text-slate-700 truncate block" title={displayNames}>
+          <span className={TEXT_CELL_CLS} title={displayNames}>
             {displayNames}
           </span>
         );
@@ -523,7 +494,7 @@ export function TableCellRenderer({
       if (col.maskType) {
         const masked = applyMask(strVal, col.maskType, col.maskPattern, col.maskCustomRegex, col.maskCustomReplacement);
         return (
-          <span className="text-sm text-slate-700 truncate block" title={masked}>
+          <span className={TEXT_CELL_CLS} title={masked}>
             {masked}
           </span>
         );
@@ -532,7 +503,7 @@ export function TableCellRenderer({
       const displayVal =
         col.isNumber && strVal !== "" && !isNaN(Number(strVal)) ? Number(strVal).toLocaleString() : strVal;
       return (
-        <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+        <span className={TEXT_CELL_CLS} title={displayVal}>
           {displayVal}
         </span>
       );

@@ -41,8 +41,21 @@ import { useRef, useEffect } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import { TableColumnConfig, CodeGroupDef } from "../../types";
+import { nextSortDir, pageGroupRange } from "../../utils";
 import { TableCellRenderer } from "./TableCellRenderer";
 import { RendererContainer } from "./RendererContainer";
+import {
+  TABLE_COUNT_BAR_CLS,
+  TABLE_THEAD_CLS,
+  TABLE_HEADER_CELL_CLS,
+  TABLE_HEADER_STATIC_TEXT_CLS,
+  TABLE_TD_CLS,
+  tableSortButtonClass,
+  sortIconClass,
+  PAGER_WRAP_CLS,
+  PAGER_NAV_BTN_CLS,
+  pagerNumberBtnClass,
+} from "./rendererStyles";
 import type { RendererMode, TableActionHandlers } from "./types";
 
 /** preview 샘플 행 기본값 (pageSize prop 미지정 시) */
@@ -51,9 +64,10 @@ const DEFAULT_PAGE_SIZE = 10;
 
 /* ── 정렬 아이콘 (live 모드 헤더 전용) ── */
 const SortIcon = ({ sorted }: { sorted: false | "asc" | "desc" }) => {
-  if (sorted === "asc") return <ChevronUp className="w-3.5 h-3.5 text-blue-500" />;
-  if (sorted === "desc") return <ChevronDown className="w-3.5 h-3.5 text-blue-500" />;
-  return <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />;
+  const cls = sortIconClass(sorted);
+  if (sorted === "asc") return <ChevronUp className={cls} />;
+  if (sorted === "desc") return <ChevronDown className={cls} />;
+  return <ChevronsUpDown className={cls} />;
 };
 
 interface TableRendererProps {
@@ -201,7 +215,7 @@ export function TableRenderer({
            scroll+live: flex-col 추가로 내부 스크롤 레이아웃 활성화 */
     <RendererContainer className={`bg-white${isScroll && !isPreview ? " flex flex-col" : ""}`}>
       {/* 총 건수 / 표시 범위 (preview: 샘플값, live: 실제값) */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+      <div className={TABLE_COUNT_BAR_CLS}>
         <p className="text-xs text-slate-500">
           {t("common.pagination.total", { count: isPreview ? "00" : totalElements.toLocaleString() })}
         </p>
@@ -233,7 +247,7 @@ export function TableRenderer({
       >
         <table className="w-full text-sm">
           {/* ── 헤더 ── */}
-          <thead className="sticky top-0 z-10">
+          <thead className={TABLE_THEAD_CLS}>
             <tr className="border-b border-slate-200 bg-slate-50/80">
               {/* 전체선택 체크박스 — enableRowSelection=true 일 때만 표시 */}
               {enableRowSelection && (
@@ -256,7 +270,7 @@ export function TableRenderer({
               {columns.map((col) => (
                 <th
                   key={col.id}
-                  className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                  className={TABLE_HEADER_CELL_CLS}
                   style={{
                     textAlign: "center",
                     width: col.width ? `${col.width}${col.widthUnit || "px"}` : undefined,
@@ -269,17 +283,12 @@ export function TableRenderer({
                         !isPreview
                           ? () => {
                               const isCurrentCol = sortKey === col.accessor;
-                              /* asc → desc → default(null) → asc 순환 */
-                              const nextDir: "asc" | "desc" | null = !isCurrentCol
-                                ? "asc"
-                                : sortDir === "asc"
-                                  ? "desc"
-                                  : null;
-                              onSort?.(col.accessor, nextDir, col.data);
+                              const dir = nextSortDir(isCurrentCol, isCurrentCol ? sortDir : null);
+                              onSort?.(col.accessor, dir, col.data);
                             }
                           : undefined
                       }
-                      className={`flex items-center justify-center gap-1 w-full transition-colors ${isPreview ? "cursor-default" : "hover:text-slate-900"}`}
+                      className={tableSortButtonClass(isPreview)}
                     >
                       {col.headerMsgKey
                         ? t(col.headerMsgKey)
@@ -287,7 +296,7 @@ export function TableRenderer({
                       <SortIcon sorted={isPreview ? false : sortKey === col.accessor ? sortDir : false} />
                     </button>
                   ) : (
-                    <span className="flex items-center justify-center gap-1">
+                    <span className={TABLE_HEADER_STATIC_TEXT_CLS}>
                       {col.headerMsgKey
                         ? t(col.headerMsgKey)
                         : col.header || (col.cellType === "actions" ? t("common.label.action") : "—")}
@@ -313,7 +322,7 @@ export function TableRenderer({
                   {columns.map((col) => (
                     <td
                       key={col.id}
-                      className="px-4 py-3 max-w-[200px] overflow-hidden"
+                      className={TABLE_TD_CLS}
                       style={{
                         textAlign: col.align,
                         width: col.width ? `${col.width}${col.widthUnit || "px"}` : undefined,
@@ -426,11 +435,11 @@ export function TableRenderer({
 
       {/* 페이지네이션 (scroll 모드 제외 / preview: 샘플 3페이지 disabled, live: totalPages >= 1이면 항상 표시) */}
       {!isScroll && (isPreview || totalPages >= 1) && (
-        <div className="flex-shrink-0 flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
+        <div className={PAGER_WRAP_CLS}>
           <button
             disabled={isPreview || currentPage === 0}
             onClick={() => onPageChange?.(currentPage - 1)}
-            className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className={PAGER_NAV_BTN_CLS}
           >
             {t("common.btn.prev")}
           </button>
@@ -448,27 +457,15 @@ export function TableRenderer({
                 </button>
               ))
             : /* live: 실제 페이지 버튼 — 10개 단위 그룹 표시 */
-              (() => {
-                const groupStart = Math.floor(currentPage / 10) * 10;
-                const groupEnd = Math.min(groupStart + 10, totalPages);
-                return Array.from({ length: groupEnd - groupStart }, (_, i) => groupStart + i);
-              })().map((p) => (
-                <button
-                  key={p}
-                  onClick={() => onPageChange?.(p)}
-                  className={`px-2.5 py-1.5 text-xs rounded border transition-all ${
-                    currentPage === p
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
+              pageGroupRange(currentPage, totalPages).map((p) => (
+                <button key={p} onClick={() => onPageChange?.(p)} className={pagerNumberBtnClass(currentPage === p)}>
                   {p + 1}
                 </button>
               ))}
           <button
             disabled={isPreview || currentPage >= totalPages - 1}
             onClick={() => onPageChange?.(currentPage + 1)}
-            className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className={PAGER_NAV_BTN_CLS}
           >
             {t("common.btn.next")}
           </button>

@@ -27,6 +27,7 @@
  */
 
 import { ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
+import { rendererContainerClassName, rendererContainerOverflow } from "./rendererStyles";
 
 interface RendererContainerProps {
   children: React.ReactNode;
@@ -68,10 +69,9 @@ export function RendererContainer({
 }: RendererContainerProps) {
   /* overflow:clip — 시각 클리핑(rounded border 포함)은 유지, GPU 합성 레이어(video)는 clip 안 함
        overflow:hidden을 쓰면 Edge에서 video GPU 레이어가 clip돼 화면에 안 보이는 버그 발생 */
-  const borderCls = showBorder ? "border border-slate-200" : "";
-  const cls = [fillHeight ? "h-full w-full rounded" : "w-full rounded", borderCls, className].filter(Boolean).join(" ");
+  const cls = rendererContainerClassName(fillHeight, showBorder, className);
 
-  const overflowValue: "clip" | "visible" = clipOverflow ? "clip" : "visible";
+  const overflowValue = rendererContainerOverflow(clipOverflow);
   const bgStyle =
     !bgColor || bgColor === "none"
       ? { overflow: overflowValue }

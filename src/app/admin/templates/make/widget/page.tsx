@@ -27,11 +27,12 @@ import {
   GripVertical,
   PanelTop,
   ShieldCheck,
+  Zap,
 } from "lucide-react";
 
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import api from "@/lib/api";
+import api, { getApiErrorMessage } from "@/lib/api";
 import { CommonBuilderDispatcher } from "../_shared/components/builder/CommonBuilderDispatcher";
 import { SizeSettingPanel } from "../_shared/components/builder/SizeSettingPanel";
 import { BuilderI18nModeProvider } from "../_shared/contexts/BuilderI18nModeContext";
@@ -56,10 +57,11 @@ import { createIdGenerator, toSlug } from "../_shared/utils";
 import { buildFormFromEntity } from "../_shared/utils/entityBuild";
 import { normalizeFormItemRowSpans } from "../_shared/utils/formGridLayout";
 import { stampConnectedSlug } from "../_shared/hooks/useWidgetPageState";
+import { buildWidgetTsxFile } from "../_shared/generators/widgetGenerator";
 import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
 import type { SlugOption } from "../_shared/components/builder/fields/SlugSelectField";
 import PageLayout from "@/components/layout/page-layout";
-import { SaveModal, RuleCreateModal } from "../_shared/components/TemplateModals";
+import { SaveModal, RuleCreateModal, GenerateModal } from "../_shared/components/TemplateModals";
 import { SortableRowWrapper } from "../_shared/components/DndWrappers";
 import { TemplateItem } from "../_shared/types";
 import { toast } from "sonner";
@@ -292,6 +294,12 @@ export default function PageBuilderPage() {
 
   /* ── 검증 규칙 생성 — BE ValidationRule API와 직접 연동하는 RuleCreateModal(자기완결형)을 여닫는 상태만 관리 ── */
   const [showRuleModal, setShowRuleModal] = useState(false); // 검증 규칙 생성 모달 표시 여부
+
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateName, setGenerateName] = useState("");
+  const [generateSlug, setGenerateSlug] = useState("");
+  const [generateFileName, setGenerateFileName] = useState("page");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   /* ── 공통 템플릿 관리 훅 (불러오기 + 저장 상태/핸들러) ── */
   const tm = useTemplateManagement("PAGE");
@@ -789,6 +797,82 @@ export default function PageBuilderPage() {
     });
   };
 
+  const handleGenerateOpen = () => {
+    if (!validateBeforeSave()) return;
+    setGenerateName(tm.saveModalName || tm.currentTemplateName || "");
+    setGenerateSlug(tm.saveModalSlug || "");
+    setGenerateFileName("page");
+    setShowGenerateModal(true);
+  };
+
+  const handleGenerateConfirm = async () => {
+    if (!generateName.trim() || !generateSlug.trim() || !generateFileName.trim()) return;
+    setIsGenerating(true);
+
+    const slugStamped = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
+    const itemsToBuild = slugStamped.map((item) => {
+      const normalized = normalizeFormItemRowSpans(item.colSpan, item.rowSpan, item.contents);
+      return { ...item, contents: normalized.contents, rowSpan: normalized.rowSpan };
+    });
+
+    const configJson = JSON.stringify({
+      widgetItems: itemsToBuild,
+      outputMode: om.outputMode,
+      pageTitle: om.pageTitle,
+      pageTitleMsgKey: om.pageTitleMsgKey || undefined,
+      layerType: om.layerType,
+      layerTitle: om.layerTitle,
+      layerTitleMsgKey: om.layerTitleMsgKey || undefined,
+      layerWidth: om.layerWidth,
+      mainConnectedSlug: om.mainConnectedSlug || undefined,
+      leaveCheck: om.leaveCheck || undefined,
+      singlePage: om.singlePage || undefined,
+      connectedType: om.connectedType,
+      pageRelations: om.pageRelations.length > 0 ? om.pageRelations : undefined,
+    });
+
+    try {
+      const { tsxCode, unsupported, unhandled } = buildWidgetTsxFile(
+        itemsToBuild as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
+        {
+          pageTitle: om.pageTitle || undefined,
+          mainConnectedSlug: om.mainConnectedSlug || undefined,
+          isEntity: om.connectedType === "data",
+        }
+      );
+
+      const fileRes = await api.post("/page-templates/generate", {
+        slug: generateSlug,
+        fileName: generateFileName,
+        tsxCode,
+        templateType: "PAGE",
+      });
+
+      await api.post("/tsx-generation", {
+        name: generateName,
+        folderName: generateSlug,
+        fileName: generateFileName + ".tsx",
+        templateType: "PAGE",
+        configJson,
+        tsxCode,
+      });
+
+      toast.success(`TSX 파일 생성 완료! → ${fileRes.data.pageUrl}`);
+      if (unsupported.length > 0) {
+        toast.warning(`아직 코드 생성이 지원되지 않는 위젯이 있습니다: ${unsupported.join(", ")}`);
+      }
+      if (unhandled.length > 0) {
+        const detail = unhandled.map((u) => `${u.widget}(${u.scope}): ${u.keys.join(", ")}`).join(" / ");
+        toast.warning(`생성기가 처리하지 않은 설정 값이 있습니다 — 산출물의 TODO 주석을 확인해주세요. ${detail}`);
+      }
+      setShowGenerateModal(false);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "TSX 파일 생성 중 오류가 발생했습니다."));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   /* ═══════════════════════════════════════ */
   /*  렌더                                    */
   /* ═══════════════════════════════════════ */
@@ -1233,6 +1317,14 @@ export default function PageBuilderPage() {
                 <Save className="w-3.5 h-3.5" />
                 {tm.currentTemplateId ? "수정" : "저장"}
               </button>
+              <button
+                onClick={handleGenerateOpen}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-500 rounded-md hover:bg-emerald-600 transition-all"
+                title="TSX 파일 생성"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                파일빌드
+              </button>
             </div>
           </div>
 
@@ -1293,6 +1385,19 @@ export default function PageBuilderPage() {
 
       {/* ── 검증 규칙 생성 모달 ── */}
       <RuleCreateModal show={showRuleModal} onClose={() => setShowRuleModal(false)} slugOptions={slugOptions} />
+
+      <GenerateModal
+        show={showGenerateModal}
+        onClose={() => setShowGenerateModal(false)}
+        name={generateName}
+        onNameChange={setGenerateName}
+        slug={generateSlug}
+        onSlugChange={setGenerateSlug}
+        fileName={generateFileName}
+        onFileNameChange={setGenerateFileName}
+        isGenerating={isGenerating}
+        onConfirm={handleGenerateConfirm}
+      />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { evalFieldCondition, buildKeyToId, resolveSearchFieldLabel, buildDateRan
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import { useHiddenSearchFieldReset } from "./useHiddenSearchFieldReset";
+import { SEARCH_SIMPLE_CONTAINER_CLS, SEARCH_RESET_BTN_CLS, SEARCH_SUBMIT_BTN_CLS } from "./rendererStyles";
 import type { RendererMode } from "./types";
 import { useI18n } from "@/hooks/use-i18n";
 
@@ -138,7 +139,7 @@ export function SearchRenderer({
     };
     return (
       /* RendererContainer — h-full w-full + 테두리 공통 처리 (simple: flex 인라인) */
-      <RendererContainer className="flex items-center gap-3 bg-white px-4">
+      <RendererContainer className={SEARCH_SIMPLE_CONTAINER_CLS}>
         {/* 필드 영역 — SearchRow와 동일한 grid gap-4 방식 */}
         {/* Enter 검색 — 필드 영역에서만 발화. 루트에 달면 검색/초기화 버튼과 이중 실행됨 */}
         <div
@@ -201,16 +202,10 @@ export function SearchRenderer({
           })}
         </div>
         {/* 검색/초기화 버튼 — SearchForm과 동일한 버튼 스타일, 항상 표시 */}
-        <button
-          onClick={isPreview ? undefined : onReset}
-          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"
-        >
+        <button onClick={isPreview ? undefined : onReset} className={SEARCH_RESET_BTN_CLS}>
           <RotateCcw className="w-3 h-3" /> {t("common.btn.reset")}
         </button>
-        <button
-          onClick={isPreview ? undefined : onSearch}
-          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"
-        >
+        <button onClick={isPreview ? undefined : onSearch} className={SEARCH_SUBMIT_BTN_CLS}>
           <Search className="w-3 h-3" /> {t("common.btn.search")}
         </button>
       </RendererContainer>
