@@ -25,7 +25,8 @@ export const btnSecondary =
 export const fieldLabelCls = "block text-sm font-medium text-slate-700 flex-shrink-0";
 
 /** Form/Search 필드 서브타이틀(설명) 스타일 */
-export const fieldDescCls = "text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight line-clamp-2 min-h-[18px]";
+export const fieldDescCls =
+  "text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]";
 
 /** Form 필드 본체 영역 스타일 — 여유가 있으면 세로 중앙, 넘치면 상단 정렬로 자동 폴백 */
 export const fieldBodyCls = "flex-1 min-h-0 flex flex-col justify-center-safe";
