@@ -450,9 +450,9 @@ export function MultiSelectRenderer({
               onClick={() => setIsOpen((prev) => !prev)}
               className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-300 rounded-md bg-white text-sm hover:border-slate-400 transition-colors disabled:cursor-default"
             >
-              <span className={selected.length > 0 ? "text-slate-800" : "text-slate-400"}>
-                {selected.length > 0
-                  ? t("common.multiselect.selected_count", { count: String(selected.length) })
+              <span className={selectedEntries.length > 0 ? "text-slate-800" : "text-slate-400"}>
+                {selectedEntries.length > 0
+                  ? t("common.multiselect.selected_count", { count: String(selectedEntries.length) })
                   : widget.placeholderMsgKey
                     ? t(widget.placeholderMsgKey)
                     : (widget.placeholder ?? t("common.multiselect.placeholder"))}
