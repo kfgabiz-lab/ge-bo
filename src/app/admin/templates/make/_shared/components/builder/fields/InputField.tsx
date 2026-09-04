@@ -161,8 +161,10 @@ export function InputField({
           showCharCount: values.showCharCount,
           pattern: values.pattern ?? "",
           patternDesc: values.patternDesc ?? "",
+          patternDescMsgKey: values.patternDescMsgKey,
         }}
         onChange={(updates) => onChange(updates)}
+        i18nMode={i18nMode}
       />
       {/* 공통코드 연동 — codeGroups가 전달된 경우에만 표시 */}
       {codeGroups && codeGroups.length > 0 && (

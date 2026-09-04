@@ -134,6 +134,7 @@ function toFieldValues(col: SubListColumn): FieldEditValues {
     showCharCount: col.showCharCount,
     pattern: col.pattern,
     patternDesc: col.patternDesc,
+    patternDescMsgKey: col.patternDescMsgKey,
     /* 기본값 */
     defaultValue: col.defaultValue,
     defaultValueMsgKey: col.defaultValueMsgKey,
@@ -214,6 +215,7 @@ function fromFieldValues(updates: Partial<FieldEditValues>): Partial<SubListColu
   if (updates.showCharCount !== undefined) patch.showCharCount = updates.showCharCount;
   if (updates.pattern !== undefined) patch.pattern = updates.pattern;
   if (updates.patternDesc !== undefined) patch.patternDesc = updates.patternDesc;
+  if (updates.patternDescMsgKey !== undefined) patch.patternDescMsgKey = updates.patternDescMsgKey;
   /* 기본값 */
   if (updates.defaultValue !== undefined) patch.defaultValue = updates.defaultValue;
   if (updates.defaultValueMsgKey !== undefined) patch.defaultValueMsgKey = updates.defaultValueMsgKey;

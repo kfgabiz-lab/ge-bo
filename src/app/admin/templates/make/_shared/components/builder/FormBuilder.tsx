@@ -14,7 +14,7 @@
 import React, { useState, useEffect } from "react";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
 import { useI18n } from "@/hooks/use-i18n";
-import { Plus, GripVertical, Pencil, X, Globe } from "lucide-react";
+import { Plus, GripVertical, Pencil, X } from "lucide-react";
 import { MessageKeySelector } from "@/components/i18n/message-key-selector";
 import { useBuilderI18nMode } from "../../contexts/BuilderI18nModeContext";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -353,6 +353,7 @@ export function FormBuilder({
         showCharCount: f.showCharCount,
         pattern: f.pattern,
         patternDesc: f.patternDesc,
+        patternDescMsgKey: f.patternDescMsgKey,
         minSelect: f.minSelect,
         maxSelect: f.maxSelect,
         isPk: f.isPk,

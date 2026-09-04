@@ -99,8 +99,10 @@ export function FormTextareaField({
           showCharCount: values.showCharCount,
           pattern: values.pattern ?? "",
           patternDesc: values.patternDesc ?? "",
+          patternDescMsgKey: values.patternDescMsgKey,
         }}
         onChange={(updates) => onChange(updates)}
+        i18nMode={i18nMode}
       />
       {/* 데이터생성 — 이 필드 값을 변환하여 생성KEY 대상 필드에 자동 입력 */}
       <DataGenerationSection values={values} onChange={onChange} />

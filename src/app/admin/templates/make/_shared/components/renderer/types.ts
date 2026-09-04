@@ -172,6 +172,7 @@ export interface SubListColumn {
   showCharCount?: boolean;
   pattern?: string;
   patternDesc?: string;
+  patternDescMsgKey?: string;
   /* ── 기본값 ── */
   defaultValue?: string; // input/textarea 기본 텍스트
   defaultValueMsgKey?: string; // input/textarea 다국어 기본값 키

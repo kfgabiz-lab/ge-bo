@@ -14,6 +14,7 @@ import Subscript from "@tiptap/extension-subscript";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { uploadFiles } from "@/app/admin/templates/make/_shared/utils";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
+import { useI18n } from "@/hooks/use-i18n";
 import {
   Bold,
   Italic,
@@ -100,6 +101,7 @@ interface ImageDialogProps {
 }
 
 function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
+  const { t } = useI18n();
   /* 탭 상태: 'url' | 'file' */
   const [tab, setTab] = useState<"url" | "file">("url");
   const [urlInput, setUrlInput] = useState("");
@@ -113,7 +115,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
     if (!trimmedUrl) return;
     /* blob: 임시 URL은 새로고침 시 깨지므로 직접 입력도 차단 */
     if (/^blob:/i.test(trimmedUrl)) {
-      alert("blob: 임시 URL은 사용할 수 없습니다. 이미지를 다시 업로드해주세요.");
+      alert(t("common.editor.blob_url_not_allowed"));
       return;
     }
     onInsert(trimmedUrl, altInput.trim() || undefined);
@@ -130,7 +132,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
       const [fileId] = await uploadFiles([file], "", "editor-image");
       onInsert(`/api/v1/fo/page-files/${fileId}`, file.name);
     } catch {
-      alert("이미지 업로드에 실패했습니다.");
+      alert(t("common.editor.image_upload_failed"));
     } finally {
       setIsUploading(false);
       /* 같은 파일 재선택 가능하도록 input 초기화 */
@@ -149,7 +151,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
       <div className="bg-white rounded-lg shadow-xl w-[440px] overflow-hidden">
         {/* 팝업 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <span className="text-sm font-semibold text-slate-800">이미지 삽입</span>
+          <span className="text-sm font-semibold text-slate-800">{t("common.editor.insert_image")}</span>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
             <X size={16} />
           </button>
@@ -158,10 +160,10 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
         {/* 탭 선택 */}
         <div className="flex border-b border-slate-200">
           <button type="button" className={tabCls(tab === "url")} onClick={() => setTab("url")}>
-            URL 입력
+            {t("common.editor.url_input_tab")}
           </button>
           <button type="button" className={tabCls(tab === "file")} onClick={() => setTab("file")}>
-            파일 업로드
+            {t("common.editor.file_upload_tab")}
           </button>
         </div>
 
@@ -170,7 +172,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
           {tab === "url" ? (
             <>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">이미지 URL</label>
+                <label className="block text-sm text-slate-500 mb-1">{t("common.editor.image_url_label")}</label>
                 <input
                   type="text"
                   value={urlInput}
@@ -182,12 +184,12 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-500 mb-1">대체 텍스트 (선택)</label>
+                <label className="block text-sm text-slate-500 mb-1">{t("common.editor.alt_text_label")}</label>
                 <input
                   type="text"
                   value={altInput}
                   onChange={(e) => setAltInput(e.target.value)}
-                  placeholder="이미지 설명"
+                  placeholder={t("common.editor.image_description_placeholder")}
                   className="w-full border border-slate-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 bg-white"
                 />
               </div>
@@ -197,7 +199,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
                   onClick={onClose}
                   className="px-3 py-1.5 text-sm border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  취소
+                  {t("common.editor.cancel")}
                 </button>
                 <button
                   type="button"
@@ -205,14 +207,16 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
                   disabled={!urlInput.trim()}
                   className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded hover:bg-slate-700 disabled:opacity-50 transition-colors"
                 >
-                  삽입
+                  {t("common.editor.insert")}
                 </button>
               </div>
             </>
           ) : (
             <>
               <div>
-                <label className="block text-sm text-slate-500 mb-2">이미지 파일 선택</label>
+                <label className="block text-sm text-slate-500 mb-2">
+                  {t("common.editor.select_image_file_label")}
+                </label>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                 <button
                   type="button"
@@ -220,7 +224,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
                   disabled={isUploading}
                   className="w-full border-2 border-dashed border-slate-300 rounded py-8 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 disabled:opacity-50 transition-colors"
                 >
-                  {isUploading ? "업로드 중..." : "클릭하여 이미지 선택"}
+                  {isUploading ? t("common.editor.uploading") : t("common.editor.click_to_select_image")}
                 </button>
               </div>
               <div className="flex justify-end pt-1">
@@ -229,7 +233,7 @@ function ImageDialog({ onInsert, onClose }: ImageDialogProps) {
                   onClick={onClose}
                   className="px-3 py-1.5 text-sm border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  닫기
+                  {t("common.editor.close")}
                 </button>
               </div>
             </>
@@ -251,6 +255,7 @@ interface LinkDialogProps {
 }
 
 function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProps) {
+  const { t } = useI18n();
   const [hrefInput, setHrefInput] = useState(currentHref);
 
   const handleInsert = () => {
@@ -263,7 +268,7 @@ function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProp
       <div className="bg-white rounded-lg shadow-xl w-[400px] overflow-hidden">
         {/* 팝업 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <span className="text-sm font-semibold text-slate-800">링크 삽입</span>
+          <span className="text-sm font-semibold text-slate-800">{t("common.editor.insert_link")}</span>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
             <X size={16} />
           </button>
@@ -289,7 +294,7 @@ function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProp
                 onClick={onRemove}
                 className="px-3 py-1.5 text-sm border border-red-300 rounded text-red-600 hover:bg-red-50 transition-colors"
               >
-                링크 제거
+                {t("common.editor.remove_link")}
               </button>
             )}
             <div className="flex gap-2 ml-auto">
@@ -298,7 +303,7 @@ function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProp
                 onClick={onClose}
                 className="px-3 py-1.5 text-sm border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                취소
+                {t("common.editor.cancel")}
               </button>
               <button
                 type="button"
@@ -306,7 +311,7 @@ function LinkDialog({ currentHref, onInsert, onRemove, onClose }: LinkDialogProp
                 disabled={!hrefInput.trim()}
                 className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded hover:bg-slate-700 disabled:opacity-50 transition-colors"
               >
-                삽입
+                {t("common.editor.insert")}
               </button>
             </div>
           </div>
@@ -325,6 +330,7 @@ interface TableSizeDialogProps {
 }
 
 function TableSizeDialog({ onInsert, onClose }: TableSizeDialogProps) {
+  const { t } = useI18n();
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
 
@@ -338,7 +344,7 @@ function TableSizeDialog({ onInsert, onClose }: TableSizeDialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-lg shadow-xl w-[320px] overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <span className="text-sm font-semibold text-slate-800">표 삽입</span>
+          <span className="text-sm font-semibold text-slate-800">{t("common.editor.table_size_dialog_title")}</span>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 transition-colors">
             <X size={16} />
           </button>
@@ -346,7 +352,7 @@ function TableSizeDialog({ onInsert, onClose }: TableSizeDialogProps) {
         <div className="p-4 space-y-3">
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm text-slate-500 mb-1">행(row)</label>
+              <label className="block text-sm text-slate-500 mb-1">{t("common.editor.row_label")}</label>
               <input
                 type="number"
                 min={1}
@@ -358,7 +364,7 @@ function TableSizeDialog({ onInsert, onClose }: TableSizeDialogProps) {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm text-slate-500 mb-1">열(column)</label>
+              <label className="block text-sm text-slate-500 mb-1">{t("common.editor.column_label")}</label>
               <input
                 type="number"
                 min={1}
@@ -376,14 +382,14 @@ function TableSizeDialog({ onInsert, onClose }: TableSizeDialogProps) {
               onClick={onClose}
               className="px-3 py-1.5 text-sm border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              취소
+              {t("common.editor.cancel")}
             </button>
             <button
               type="button"
               onClick={handleInsert}
               className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded hover:bg-slate-700 transition-colors"
             >
-              삽입
+              {t("common.editor.insert")}
             </button>
           </div>
         </div>
@@ -437,9 +443,12 @@ interface PreviewPanelProps {
 }
 
 function PreviewPanel({ html }: PreviewPanelProps) {
+  const { t } = useI18n();
   return (
     <div className="border-t border-slate-200 p-3 bg-slate-50 max-h-64 overflow-y-auto">
-      <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-2">미리보기</p>
+      <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-2">
+        {t("common.editor.preview")}
+      </p>
       <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />
     </div>
   );
@@ -497,6 +506,7 @@ function EditorToolbar({
   showPreview,
   onTogglePreview,
 }: EditorToolbarProps) {
+  const { t } = useI18n();
   const tableCommandState = useEditorState({
     editor,
     selector: ({ editor: snapshotEditor }) =>
@@ -577,7 +587,7 @@ function EditorToolbar({
 
   /* 유튜브 URL 입력 후 임베드 삽입 */
   const handleYoutube = () => {
-    const url = window.prompt("유튜브 URL을 입력하세요:");
+    const url = window.prompt(t("common.editor.youtube_url_prompt"));
     if (!url) return;
     editor.chain().focus().setYoutubeVideo({ src: url }).run();
   };
@@ -589,9 +599,9 @@ function EditorToolbar({
         value={currentHeadingValue}
         onChange={handleHeadingChange}
         className="h-7 text-xs border border-slate-300 rounded px-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer mr-0.5"
-        title="제목 스타일"
+        title={t("common.editor.heading_style")}
       >
-        <option value="paragraph">본문</option>
+        <option value="paragraph">{t("common.editor.paragraph")}</option>
         <option value="h1">H1</option>
         <option value="h2">H2</option>
         <option value="h3">H3</option>
@@ -603,7 +613,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
         active={editor.isActive("bold")}
-        title="굵게 (Ctrl+B)"
+        title={t("common.editor.bold")}
       >
         <Bold size={14} />
       </ToolbarButton>
@@ -611,7 +621,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleItalic().run()}
         active={editor.isActive("italic")}
-        title="기울임 (Ctrl+I)"
+        title={t("common.editor.italic")}
       >
         <Italic size={14} />
       </ToolbarButton>
@@ -619,7 +629,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleStrike().run()}
         active={editor.isActive("strike")}
-        title="취소선"
+        title={t("common.editor.strike")}
       >
         <Strikethrough size={14} />
       </ToolbarButton>
@@ -627,7 +637,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         active={editor.isActive("underline")}
-        title="밑줄 (Ctrl+U)"
+        title={t("common.editor.underline")}
       >
         <UnderlineIcon size={14} />
       </ToolbarButton>
@@ -635,7 +645,10 @@ function EditorToolbar({
       <ToolbarDivider />
 
       {/* ── 그룹2: 수평선 ── */}
-      <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="수평선 삽입">
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        title={t("common.editor.insert_horizontal_rule")}
+      >
         <Minus size={14} />
       </ToolbarButton>
 
@@ -645,7 +658,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         active={editor.isActive("bulletList")}
-        title="글머리 목록"
+        title={t("common.editor.bullet_list")}
       >
         <List size={14} />
       </ToolbarButton>
@@ -653,7 +666,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         active={editor.isActive("orderedList")}
-        title="번호 목록"
+        title={t("common.editor.ordered_list")}
       >
         <ListOrdered size={14} />
       </ToolbarButton>
@@ -661,7 +674,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().sinkListItem("listItem").run()}
         disabled={!editor.can().sinkListItem("listItem")}
-        title="들여쓰기"
+        title={t("common.editor.indent")}
       >
         <Indent size={14} />
       </ToolbarButton>
@@ -669,7 +682,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().liftListItem("listItem").run()}
         disabled={!editor.can().liftListItem("listItem")}
-        title="내어쓰기"
+        title={t("common.editor.outdent")}
       >
         <Outdent size={14} />
       </ToolbarButton>
@@ -677,22 +690,30 @@ function EditorToolbar({
       <ToolbarDivider />
 
       {/* ── 그룹4: 테이블, 이미지, 링크 ── */}
-      <ToolbarButton onClick={onTableOpen} title="테이블 삽입">
+      <ToolbarButton onClick={onTableOpen} title={t("common.editor.insert_table")}>
         <TableIcon size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={handleAddRowBefore} disabled={!tableCommandState?.canAddRowBefore} title="행 위에 추가">
+      <ToolbarButton
+        onClick={handleAddRowBefore}
+        disabled={!tableCommandState?.canAddRowBefore}
+        title={t("common.editor.add_row_before")}
+      >
         <ArrowUpToLine size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={handleAddRowAfter} disabled={!tableCommandState?.canAddRowAfter} title="행 아래에 추가">
+      <ToolbarButton
+        onClick={handleAddRowAfter}
+        disabled={!tableCommandState?.canAddRowAfter}
+        title={t("common.editor.add_row_after")}
+      >
         <ArrowDownToLine size={14} />
       </ToolbarButton>
 
       <ToolbarButton
         onClick={handleDeleteRow}
         disabled={!tableCommandState?.isInTable}
-        title="행 삭제 (마지막 행이면 표 삭제)"
+        title={t("common.editor.delete_row")}
       >
         <Trash2 size={14} />
       </ToolbarButton>
@@ -700,7 +721,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={handleAddColumnBefore}
         disabled={!tableCommandState?.canAddColumnBefore}
-        title="열 왼쪽에 추가"
+        title={t("common.editor.add_col_before")}
       >
         <ArrowLeftToLine size={14} />
       </ToolbarButton>
@@ -708,7 +729,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={handleAddColumnAfter}
         disabled={!tableCommandState?.canAddColumnAfter}
-        title="열 오른쪽에 추가"
+        title={t("common.editor.add_col_after")}
       >
         <ArrowRightToLine size={14} />
       </ToolbarButton>
@@ -716,17 +737,21 @@ function EditorToolbar({
       <ToolbarButton
         onClick={handleDeleteColumn}
         disabled={!tableCommandState?.isInTable}
-        title="열 삭제 (마지막 열이면 표 삭제)"
+        title={t("common.editor.delete_col")}
       >
         <Trash2 size={14} className="rotate-90" />
       </ToolbarButton>
 
-      <ToolbarButton onClick={handleDeleteTable} disabled={!tableCommandState?.canDeleteTable} title="표 삭제">
+      <ToolbarButton
+        onClick={handleDeleteTable}
+        disabled={!tableCommandState?.canDeleteTable}
+        title={t("common.editor.delete_table")}
+      >
         <X size={14} />
       </ToolbarButton>
 
       <label
-        title="셀 배경색"
+        title={t("common.editor.cell_bg_color")}
         className="relative inline-flex items-center justify-center w-7 h-7 rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer transition-colors aria-disabled:opacity-40 aria-disabled:pointer-events-none aria-disabled:cursor-default"
         aria-disabled={!tableCommandState?.isInTable}
       >
@@ -744,18 +769,18 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().setCellAttribute("backgroundColor", null).run()}
         disabled={!tableCommandState?.isInTable}
-        title="배경색 지우기"
+        title={t("common.editor.clear_bg_color")}
       >
         <Eraser size={14} />
       </ToolbarButton>
 
       <ToolbarDivider />
 
-      <ToolbarButton onClick={onImageOpen} title="이미지 삽입">
+      <ToolbarButton onClick={onImageOpen} title={t("common.editor.insert_image")}>
         <ImageIcon size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={onLinkOpen} active={editor.isActive("link")} title="링크 삽입">
+      <ToolbarButton onClick={onLinkOpen} active={editor.isActive("link")} title={t("common.editor.insert_link")}>
         <LinkIcon size={14} />
       </ToolbarButton>
 
@@ -765,7 +790,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHighlight().run()}
         active={editor.isActive("highlight")}
-        title="형광펜"
+        title={t("common.editor.highlight")}
       >
         <Highlighter size={14} />
       </ToolbarButton>
@@ -773,7 +798,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign("left").run()}
         active={editor.isActive({ textAlign: "left" })}
-        title="왼쪽 정렬"
+        title={t("common.editor.align_left")}
       >
         <AlignLeft size={14} />
       </ToolbarButton>
@@ -781,7 +806,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign("center").run()}
         active={editor.isActive({ textAlign: "center" })}
-        title="가운데 정렬"
+        title={t("common.editor.align_center")}
       >
         <AlignCenter size={14} />
       </ToolbarButton>
@@ -789,7 +814,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign("right").run()}
         active={editor.isActive({ textAlign: "right" })}
-        title="오른쪽 정렬"
+        title={t("common.editor.align_right")}
       >
         <AlignRight size={14} />
       </ToolbarButton>
@@ -797,14 +822,14 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign("justify").run()}
         active={editor.isActive({ textAlign: "justify" })}
-        title="양쪽 정렬"
+        title={t("common.editor.align_justify")}
       >
         <AlignJustify size={14} />
       </ToolbarButton>
 
       {/* 글자 색상 — input[type=color] 위에 아이콘 레이블 오버레이 */}
       <label
-        title="글자 색상"
+        title={t("common.editor.text_color")}
         className="relative inline-flex items-center justify-center w-7 h-7 rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer transition-colors"
       >
         <Palette size={14} />
@@ -820,7 +845,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
         active={editor.isActive("superscript")}
-        title="위첨자"
+        title={t("common.editor.superscript")}
       >
         <SuperscriptIcon size={14} />
       </ToolbarButton>
@@ -828,7 +853,7 @@ function EditorToolbar({
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleSubscript().run()}
         active={editor.isActive("subscript")}
-        title="아래첨자"
+        title={t("common.editor.subscript")}
       >
         <SubscriptIcon size={14} />
       </ToolbarButton>
@@ -836,22 +861,22 @@ function EditorToolbar({
       <ToolbarDivider />
 
       {/* ── 그룹7: 유튜브 임베드 ── */}
-      <ToolbarButton onClick={handleYoutube} title="유튜브 영상 삽입">
+      <ToolbarButton onClick={handleYoutube} title={t("common.editor.insert_youtube")}>
         <YoutubeIcon size={14} />
       </ToolbarButton>
 
       <ToolbarDivider />
 
       {/* ── 그룹8: HTML 소스뷰, 텍스트 모드, 미리보기 토글 ── */}
-      <ToolbarButton onClick={onToggleSourceView} active={showSourceView} title="HTML 소스 보기">
+      <ToolbarButton onClick={onToggleSourceView} active={showSourceView} title={t("common.editor.view_html_source")}>
         <Code2 size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={onToggleTextMode} active={showTextMode} title="텍스트 모드">
+      <ToolbarButton onClick={onToggleTextMode} active={showTextMode} title={t("common.editor.text_mode")}>
         <FileText size={14} />
       </ToolbarButton>
 
-      <ToolbarButton onClick={onTogglePreview} active={showPreview} title="미리보기">
+      <ToolbarButton onClick={onTogglePreview} active={showPreview} title={t("common.editor.preview")}>
         <Eye size={14} />
       </ToolbarButton>
     </div>
@@ -864,6 +889,7 @@ function EditorToolbar({
    과도기 공존 방식으로 사용됨
 ───────────────────────────────────────────── */
 export default function TiptapEditor({ initialValue = "", onChange, height = "400px" }: TiptapEditorProps) {
+  const { t } = useI18n();
   /* 마운트 직후 초기 onUpdate 차단용 */
   const isReadyRef = useRef(false);
   /* 사용자가 직접 수정한 이후 외부 initialValue 덮어쓰기 차단용 */
@@ -943,7 +969,7 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
             view.dispatch(transaction);
           })
           .catch(() => {
-            alert("이미지 업로드에 실패했습니다.");
+            alert(t("common.editor.image_upload_failed"));
           });
 
         return true;
@@ -1036,7 +1062,7 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
 
     /* blob: 임시 URL은 새로고침 시 깨지므로 저장 차단 (따옴표 유무 상관없이 매칭) */
     if (/src\s*=\s*["']?blob:/i.test(sourceValue)) {
-      alert("blob: 임시 URL은 저장할 수 없습니다. 이미지를 다시 업로드해주세요.");
+      alert(t("common.editor.blob_url_not_saveable"));
       return;
     }
 
@@ -1053,7 +1079,7 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
     onChange?.(sourceValue);
 
     setShowSourceView(false);
-  }, [editor, sourceValue, onChange]);
+  }, [editor, sourceValue, onChange, t]);
 
   /* 텍스트 모드 입력 — 즉시 반영, Tiptap 파싱 전혀 거치지 않음(위험 차단 핵심) */
   const handleTextChange = useCallback(
@@ -1134,14 +1160,14 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
                 onClick={handleCancelSourceView}
                 className="px-3 py-1.5 text-sm border border-slate-300 rounded text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                취소
+                {t("common.editor.cancel")}
               </button>
               <button
                 type="button"
                 onClick={handleApplySourceView}
                 className="px-3 py-1.5 text-sm bg-slate-900 text-white rounded hover:bg-slate-700 transition-colors"
               >
-                적용
+                {t("common.editor.apply")}
               </button>
             </div>
           </div>

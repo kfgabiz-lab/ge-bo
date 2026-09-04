@@ -596,10 +596,11 @@ export const validateFormFields = (
     if (val && f.pattern) {
       try {
         if (!new RegExp(f.pattern).test(val)) {
+          const patternDesc = f.patternDescMsgKey && t ? t(f.patternDescMsgKey) : f.patternDesc;
           toast.warning(
             (t
               ? t("common.validation.pattern_mismatch", { label: String(label) })
-              : `'${label}' 형식이 올바르지 않습니다.`) + (f.patternDesc ? ` (${f.patternDesc})` : "")
+              : `'${label}' 형식이 올바르지 않습니다.`) + (patternDesc ? ` (${patternDesc})` : "")
           );
           return false;
         }
@@ -918,11 +919,12 @@ export const validateSubListRows = (
             if (col.pattern) {
               try {
                 if (!new RegExp(col.pattern).test(val)) {
+                  const patternDesc = col.patternDescMsgKey && t ? t(col.patternDescMsgKey) : col.patternDesc;
                   toast.warning(
                     (t
                       ? t("common.validation.row_pattern_mismatch", { label: String(label), row: String(i + 1) })
                       : `'${label}' 항목은 ${i + 1}번째 행의 형식이 올바르지 않습니다.`) +
-                      (col.patternDesc ? ` (${col.patternDesc})` : "")
+                      (patternDesc ? ` (${patternDesc})` : "")
                   );
                   return false;
                 }

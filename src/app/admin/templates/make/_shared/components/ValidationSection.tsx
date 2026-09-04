@@ -1,25 +1,28 @@
-'use client';
+"use client";
 
-import { ToggleRow } from './builder/fields/_ToggleRow';
+import { ToggleRow } from "./builder/fields/_ToggleRow";
+import { MessageKeySelector } from "@/components/i18n/message-key-selector";
 
 export interface ValidationValues {
-    required?: boolean;  // _FieldBase에서 처리 — ValidationSection에서는 미사용
-    minLength?: number;
-    maxLength?: number;
-    showCharCount?: boolean;  // 글자수 표시 여부 (input/textarea 전용)
-    pattern: string;
-    patternDesc: string;
-    minSelect?: number;
-    maxSelect?: number;
+  required?: boolean; // _FieldBase에서 처리 — ValidationSection에서는 미사용
+  minLength?: number;
+  maxLength?: number;
+  showCharCount?: boolean; // 글자수 표시 여부 (input/textarea 전용)
+  pattern: string;
+  patternDesc: string;
+  patternDescMsgKey?: string;
+  minSelect?: number;
+  maxSelect?: number;
 }
 
 interface ValidationSectionProps {
-    /** 필드 유형 (input/checkbox 등에 따라 표시 항목 결정) */
-    fieldType: string | null;
-    /** 현재 값 */
-    values: ValidationValues;
-    /** 변경 핸들러 */
-    onChange: (updates: Partial<ValidationValues>) => void;
+  /** 필드 유형 (input/checkbox 등에 따라 표시 항목 결정) */
+  fieldType: string | null;
+  /** 현재 값 */
+  values: ValidationValues;
+  /** 변경 핸들러 */
+  onChange: (updates: Partial<ValidationValues>) => void;
+  i18nMode?: boolean;
 }
 
 /**
@@ -29,92 +32,101 @@ interface ValidationSectionProps {
  * @example
  * <ValidationSection fieldType={pendingType} values={validation} onChange={setValidation} />
  */
-export const ValidationSection = ({ fieldType, values, onChange }: ValidationSectionProps) => (
-    <div className="space-y-2">
-        {/* input 전용: 글자수 표시 + 최소/최대 글자, 정규식 */}
-        {fieldType === 'input' && (
-            <div className="space-y-1.5 pt-1 border-t border-slate-100">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Validation</p>
-                {/* 글자수 표시 토글 */}
-                <ToggleRow
-                    label="글자수 표시"
-                    value={values.showCharCount ?? false}
-                    onChange={v => onChange({ showCharCount: v })}
-                />
-                <div className="grid grid-cols-2 gap-1.5">
-                    <div>
-                        <label className="text-[10px] text-slate-500 mb-0.5 block">최소 글자</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={values.minLength ?? ''}
-                            onChange={e => onChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
-                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-[10px] text-slate-500 mb-0.5 block">최대 글자</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={values.maxLength ?? ''}
-                            onChange={e => onChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
-                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
-                        />
-                    </div>
-                </div>
-                <div>
-                    <label className="text-[10px] text-slate-500 mb-0.5 block">정규식 패턴</label>
-                    <input
-                        type="text"
-                        value={values.pattern}
-                        onChange={e => onChange({ pattern: e.target.value })}
-                        placeholder="예: ^[0-9]+$"
-                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none"
-                    />
-                </div>
-                {values.pattern && (
-                    <div>
-                        <label className="text-[10px] text-slate-500 mb-0.5 block">패턴 설명</label>
-                        <input
-                            type="text"
-                            value={values.patternDesc}
-                            onChange={e => onChange({ patternDesc: e.target.value })}
-                            placeholder="예: 숫자만 입력"
-                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
-                        />
-                    </div>
-                )}
-            </div>
+export const ValidationSection = ({ fieldType, values, onChange, i18nMode = false }: ValidationSectionProps) => (
+  <div className="space-y-2">
+    {/* input 전용: 글자수 표시 + 최소/최대 글자, 정규식 */}
+    {fieldType === "input" && (
+      <div className="space-y-1.5 pt-1 border-t border-slate-100">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Validation</p>
+        {/* 글자수 표시 토글 */}
+        <ToggleRow
+          label="글자수 표시"
+          value={values.showCharCount ?? false}
+          onChange={(v) => onChange({ showCharCount: v })}
+        />
+        <div className="grid grid-cols-2 gap-1.5">
+          <div>
+            <label className="text-[10px] text-slate-500 mb-0.5 block">최소 글자</label>
+            <input
+              type="number"
+              min={0}
+              value={values.minLength ?? ""}
+              onChange={(e) => onChange({ minLength: e.target.value ? Number(e.target.value) : undefined })}
+              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-500 mb-0.5 block">최대 글자</label>
+            <input
+              type="number"
+              min={0}
+              value={values.maxLength ?? ""}
+              onChange={(e) => onChange({ maxLength: e.target.value ? Number(e.target.value) : undefined })}
+              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 mb-0.5 block">정규식 패턴</label>
+          <input
+            type="text"
+            value={values.pattern}
+            onChange={(e) => onChange({ pattern: e.target.value })}
+            placeholder="예: ^[0-9]+$"
+            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono focus:outline-none"
+          />
+        </div>
+        {values.pattern && (
+          <div>
+            <label className="text-[10px] text-slate-500 mb-0.5 block">패턴 설명</label>
+            {i18nMode ? (
+              <MessageKeySelector
+                value={values.patternDescMsgKey ?? ""}
+                onChange={(key) => onChange({ patternDescMsgKey: key })}
+                resourceType="SENTENCE"
+                size="sm"
+              />
+            ) : (
+              <input
+                type="text"
+                value={values.patternDesc}
+                onChange={(e) => onChange({ patternDesc: e.target.value })}
+                placeholder="예: 숫자만 입력"
+                className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
+              />
+            )}
+          </div>
         )}
+      </div>
+    )}
 
-        {/* checkbox 전용: 최소/최대 선택 수 */}
-        {fieldType === 'checkbox' && (
-            <div className="space-y-1.5 pt-1 border-t border-slate-100">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">선택 제한</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                    <div>
-                        <label className="text-[10px] text-slate-500 mb-0.5 block">최소 선택</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={values.minSelect ?? ''}
-                            onChange={e => onChange({ minSelect: e.target.value ? Number(e.target.value) : undefined })}
-                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-[10px] text-slate-500 mb-0.5 block">최대 선택</label>
-                        <input
-                            type="number"
-                            min={0}
-                            value={values.maxSelect ?? ''}
-                            onChange={e => onChange({ maxSelect: e.target.value ? Number(e.target.value) : undefined })}
-                            className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
-                        />
-                    </div>
-                </div>
-            </div>
-        )}
-    </div>
+    {/* checkbox 전용: 최소/최대 선택 수 */}
+    {fieldType === "checkbox" && (
+      <div className="space-y-1.5 pt-1 border-t border-slate-100">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">선택 제한</p>
+        <div className="grid grid-cols-2 gap-1.5">
+          <div>
+            <label className="text-[10px] text-slate-500 mb-0.5 block">최소 선택</label>
+            <input
+              type="number"
+              min={0}
+              value={values.minSelect ?? ""}
+              onChange={(e) => onChange({ minSelect: e.target.value ? Number(e.target.value) : undefined })}
+              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-500 mb-0.5 block">최대 선택</label>
+            <input
+              type="number"
+              min={0}
+              value={values.maxSelect ?? ""}
+              onChange={(e) => onChange({ maxSelect: e.target.value ? Number(e.target.value) : undefined })}
+              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
 );

@@ -80,6 +80,7 @@ export interface SearchFieldConfig {
   showCharCount?: boolean; // 글자수 표시 여부 (input/textarea 전용)
   pattern?: string;
   patternDesc?: string;
+  patternDescMsgKey?: string;
   minSelect?: number;
   maxSelect?: number;
   codeGroupCode?: string;
