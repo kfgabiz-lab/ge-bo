@@ -23,15 +23,45 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChevronDown, X, Search } from "lucide-react";
-import api from "@/lib/api";
 import { RendererContainer } from "./RendererContainer";
 import { FieldRenderer } from "./FieldRenderer";
 import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from "./types";
 import type { SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { flattenPageDataItem, evalConditionExpr, formatFetchedRelValue, extractFetchedRelItems } from "../../utils";
+import { flattenPageDataItem, evalConditionExpr } from "../../utils";
+import {
+  fetchMultiSelectSourceRows,
+  buildLabelPathEntries,
+  type MultiSelectOptionItem,
+} from "../../utils/multiSelectSource";
 import { PortalDropdown } from "@/components/ui/portal-dropdown";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
+import { fieldRequiredMarkCls, fieldOptionTextCls } from "../../styles";
+import {
+  MULTISELECT_BODY_CLS,
+  MULTISELECT_TITLE_CLS,
+  MULTISELECT_DESC_CLS,
+  MULTISELECT_TOGGLE_WRAP_CLS,
+  MULTISELECT_TOGGLE_BTN_CLS,
+  MULTISELECT_PANEL_CLS,
+  MULTISELECT_SEARCH_WRAP_CLS,
+  MULTISELECT_SEARCH_BOX_CLS,
+  MULTISELECT_SEARCH_ICON_CLS,
+  MULTISELECT_SEARCH_INPUT_CLS,
+  MULTISELECT_OPTION_LIST_CLS,
+  MULTISELECT_EMPTY_CLS,
+  MULTISELECT_CHECKBOX_CLS,
+  MULTISELECT_TAG_SCROLL_WRAP_CLS,
+  MULTISELECT_TAG_LIST_CLS,
+  MULTISELECT_TAG_ROW_CLS,
+  MULTISELECT_TAG_TEXT_CLS,
+  MULTISELECT_TAG_REMOVE_BTN_CLS,
+  MULTISELECT_TAG_REMOVE_ICON_CLS,
+  multiSelectFieldWrapClass,
+  multiSelectToggleTextClass,
+  multiSelectChevronClass,
+  multiSelectOptionItemClass,
+} from "./rendererStyles";
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
 const PREVIEW_OPTIONS = [
@@ -43,11 +73,7 @@ const PREVIEW_OPTIONS = [
 ];
 const PREVIEW_SELECTED_IDS = [1, 3];
 
-/* ── 옵션 항목 타입 ── */
-interface OptionItem {
-  id: number;
-  [key: string]: unknown;
-}
+type OptionItem = MultiSelectOptionItem;
 
 /* ── Props ── */
 export interface MultiSelectRendererProps {
@@ -80,152 +106,6 @@ function toFieldConfig(f: MultiSelectExtraField): SearchFieldConfig {
     required: f.required,
     placeholder: f.placeholder,
   };
-}
-
-/* ── 옵션 소스 요청 원본 응답 타입 (flattenPageDataItem 입력과 동일) ── */
-type SourceRow = { dataJson: Record<string, unknown> };
-
-/* ── 모듈 레벨 in-flight 요청 캐시 ──
- * 한 페이지에 동일 sourceSlug(예: "category-data")를 쓰는 MultiSelectRenderer 인스턴스가
- * 여러 개 동시에 마운트되면, 각 인스턴스가 각자 GET /page-data/{slug}를 호출해서
- * 완전히 동일한 요청이 동시에 여러 건 나간다. 이 중 하나가 브라우저에 의해
- * net::ERR_ABORTED로 취소되면 해당 위젯만 옵션 0건으로 남는 문제가 있었다(실제 재현 확인).
- *
- * → 같은 slug에 대한 요청이 진행 중이면 새 요청을 만들지 않고 진행 중인 Promise를 그대로 공유한다.
- * → 이 캐시는 "필터링 전 원본 응답(rows)"만 공유하며, sourceFilter에 따른 필터링은
- *   각 인스턴스가 응답을 받은 뒤 개별적으로 수행한다(아래 useEffect 참고) — 위젯별 필터 결과가 섞이지 않는다.
- * → 요청이 끝나면(성공/실패 상관없이) 캐시에서 즉시 제거하여, 다음 조회 시 항상 새 데이터를 받는다.
- */
-const inFlightSourceRequests = new Map<string, Promise<SourceRow[]>>();
-
-/**
- * 옵션 소스 목록 조회
- * - depthGte/depthLte 지정 시 depth_gte/depth_lte 쿼리파라미터를 추가한다.
- *   서버(PageDataService)가 category/product 등 1단계 중첩 객체까지 자동으로 찾아
- *   범위조건을 걸어주므로, FE는 depth 값을 직접 읽거나 판별할 필요가 없다.
- * - 캐시 키에 depth 범위를 포함시켜, 같은 slug라도 depth 조건이 다른 위젯끼리
- *   요청/응답이 섞이지 않도록 한다.
- */
-function fetchSourceRows(
-  slug: string,
-  depthGte?: number,
-  depthLte?: number,
-  fetchRelationIds?: number[],
-  innerRelationId?: number,
-  sourceFilter?: string
-): Promise<SourceRow[]> {
-  const cacheKey = `${slug}|${depthGte ?? ""}|${depthLte ?? ""}|${fetchRelationIds?.join(",") ?? ""}|${innerRelationId ?? ""}|${sourceFilter ?? ""}`;
-  const cached = inFlightSourceRequests.get(cacheKey);
-  if (cached) return cached;
-
-  const params: Record<string, number | string> = { size: 9999 };
-  if (depthGte !== undefined) params.depth_gte = depthGte;
-  if (depthLte !== undefined) params.depth_lte = depthLte;
-  if (fetchRelationIds && fetchRelationIds.length > 0) params.fetchRelationIds = fetchRelationIds.join(",");
-  if (innerRelationId !== undefined) params[`innerRel_${innerRelationId}`] = String(innerRelationId);
-  if (sourceFilter) params.filterExpr = sourceFilter;
-
-  const request = api
-    .get(`/page-data/${slug}`, { params })
-    .then((res) => (res.data.content ?? []) as SourceRow[])
-    .finally(() => {
-      /* 성공/실패 무관하게 캐시 제거 — 다음 호출은 항상 새 요청을 보낸다 */
-      inFlightSourceRequests.delete(cacheKey);
-    });
-
-  inFlightSourceRequests.set(cacheKey, request);
-  return request;
-}
-
-/* ── 유틸: dot notation 경로로 중첩 객체 값 접근 (예: "form.title" → item['form']['title']) ── */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  return path.split(".").reduce<unknown>((acc, key) => {
-    if (acc !== null && typeof acc === "object") {
-      return (acc as Record<string, unknown>)[key];
-    }
-    return undefined;
-  }, obj);
-}
-
-/* ── 옵션 항목의 표시행(row) 1건 — 라벨 텍스트 + 그 행을 선택/해제할 때 쓸 고유 값 ── */
-interface LabelPathEntry {
-  path: string;
-  /** 체크박스 토글/선택 상태 판단에 쓰는 값 — 매핑(depth3) 고유 id가 있으면 그 값, 없으면 opt.id(기존 동작 그대로) */
-  selectionId: number;
-}
-
-/* ── 유틸: 옵션 항목을 "행 목록"으로 생성 ──
- * - outerRelationIds(depth별 relation 조합): 같은 제품이 카테고리 여러 경로에 매핑된 경우
- *   relation별 값이 다건(배열)로 내려온다. index로 짝지어(zip) relation 순서(depth1 > depth2 > ...)대로
- *   경로를 복원하며, 경로가 여러 개면 옵션/선택목록에서 별도 행(row)으로 표시한다.
- *   같은 인덱스의 매핑(depth3) 고유 id는 BE가 `_fetchedRel{outerRelationIds[0]}_mappingId`에 라벨과
- *   동일 순서로 내려주므로, 그 값이 있으면 selectionId로 써서 행마다 독립적으로 선택/해제되게 한다
- *   (id가 없으면 — 미매핑 등 예외 케이스 — opt.id로 폴백, 기존 동작과 동일).
- * - sourceMode='relation': item['_fetchedRel{sourceRelationSlugId}'] 값을 그대로 사용
- *   (BE가 카테고리 계층이면 categoryDepth/categoryDepthFrom 기준으로 이미 ' > '로 합쳐서 내려준 문자열)
- *   다건 매칭(배열)이면 formatFetchedRelValue 공통함수로 구분자 합침 (TableCellRenderer와 동일 패턴,
- *   이 경로는 현재 프로젝트에서 사용 중인 위젯이 없어 행 분리 대상에서 제외 — outerRelationIds만 적용)
- * - sourceMode='call'(기본): labelFields로 지정한 필드들을 dot notation으로 읽어 ' > '로 연결 (기존 동작 그대로)
- * 위 두 경로(relation 단일값, labelFields)는 항상 1건이며 selectionId는 항상 opt.id다. */
-function buildLabelPathEntries(item: OptionItem, widget: MultiSelectWidget): LabelPathEntry[] {
-  const outerRelationIds = widget.contentRelation?.outer?.relationIds;
-  if (outerRelationIds && outerRelationIds.length > 0) {
-    const perRelationValues = outerRelationIds.map((id) =>
-      extractFetchedRelItems(item as Record<string, unknown>, id, undefined)
-    );
-    const mappingIdRaw =
-      outerRelationIds[0] !== undefined
-        ? (item as Record<string, unknown>)[`_fetchedRel${outerRelationIds[0]}_mappingId`]
-        : undefined;
-    const mappingIds = Array.isArray(mappingIdRaw)
-      ? (mappingIdRaw as unknown[]).map((v) => Number(v))
-      : mappingIdRaw !== undefined && mappingIdRaw !== null
-        ? [Number(mappingIdRaw)]
-        : [];
-    const pathCount = Math.max(0, ...perRelationValues.map((v) => v.length));
-    const entries: LabelPathEntry[] = [];
-    for (let i = 0; i < pathCount; i++) {
-      const parts = perRelationValues.map((v) => v[i]).filter((v): v is string => Boolean(v));
-      if (parts.length > 0) {
-        const mappingId = mappingIds[i];
-        entries.push({
-          path: parts.join(" > "),
-          selectionId: Number.isFinite(mappingId) ? mappingId : item.id,
-        });
-      }
-    }
-    if (entries.length > 0) return entries;
-  }
-  if ((widget.sourceMode ?? "call") === "relation" && widget.sourceRelationSlugId) {
-    const raw = item[`_fetchedRel${widget.sourceRelationSlugId}`];
-    if (Array.isArray(raw)) {
-      return [
-        {
-          path: formatFetchedRelValue(
-            raw,
-            item as Record<string, unknown>,
-            widget.sourceRelationSlugId,
-            undefined,
-            "ONE_LINE"
-          ),
-          selectionId: item.id,
-        },
-      ];
-    }
-    /* fetch_fields 미설정 relation을 잘못 선택한 경우 Map 전체가 내려올 수 있음 — 빈 문자열로 방어 (TableCellRenderer와 동일 가드) */
-    return [{ path: raw == null || typeof raw === "object" ? "" : String(raw), selectionId: item.id }];
-  }
-  const labelFields = widget.labelFields || "name";
-  return [
-    {
-      path: labelFields
-        .split(",")
-        .map((f) => String(getNestedValue(item as Record<string, unknown>, f.trim()) ?? ""))
-        .filter(Boolean)
-        .join(" > "),
-      selectionId: item.id,
-    },
-  ];
 }
 
 /**
@@ -320,7 +200,14 @@ export function MultiSelectRenderer({
            FETCH relation을 자동 병합(_fetchedRel{id})해 내려주므로 조회 로직 자체는 동일하다
            동일 slug를 쓰는 다른 위젯 인스턴스와 요청 자체는 fetchSourceRows에서 공유하되,
            필터링(sourceFilter)은 아래에서 이 인스턴스가 개별적으로 수행한다 */
-    fetchSourceRows(effectiveSourceSlug, depthGte, depthLte, outerRelationIds, innerRelationId, widget.sourceFilter)
+    fetchMultiSelectSourceRows(
+      effectiveSourceSlug,
+      depthGte,
+      depthLte,
+      outerRelationIds,
+      innerRelationId,
+      widget.sourceFilter
+    )
       .then((rows) => {
         if (cancelled) return;
         /* flattenPageDataItem으로 nested dataJson을 flat 병합 — 테이블과 동일한 공통 패턴 */
@@ -423,43 +310,41 @@ export function MultiSelectRenderer({
 
   return (
     <RendererContainer showBorder={widget.showBorder ?? true} bgColor={widget.bgColor}>
-      <div className="p-3 flex flex-col gap-3 h-full">
+      <div className={MULTISELECT_BODY_CLS}>
         {/* 타이틀 */}
         {(widget.titleMsgKey || widget.title) && (
-          <p className="text-sm font-medium text-slate-700">
+          <p className={MULTISELECT_TITLE_CLS}>
             {widget.titleMsgKey ? t(widget.titleMsgKey) : widget.title}
-            {widget.required && <span className="text-red-500 ml-0.5">*</span>}
+            {widget.required && <span className={fieldRequiredMarkCls}>*</span>}
           </p>
         )}
 
         {/* 설명 */}
         {(widget.descriptionMsgKey || widget.description) && (
-          <p className="text-xs text-slate-500">
+          <p className={MULTISELECT_DESC_CLS}>
             {widget.descriptionMsgKey ? t(widget.descriptionMsgKey) : widget.description}
           </p>
         )}
 
-        <div className={fieldWidthStyle ? "flex flex-col gap-3" : "contents"} style={fieldWidthStyle}>
+        <div className={multiSelectFieldWrapClass(!!fieldWidthStyle)} style={fieldWidthStyle}>
           {/* 드롭다운 영역 */}
-          <div ref={containerRef} className="relative">
+          <div ref={containerRef} className={MULTISELECT_TOGGLE_WRAP_CLS}>
             {/* 토글 버튼 */}
             <button
               ref={buttonRef}
               type="button"
               disabled={isPreview}
               onClick={() => setIsOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-300 rounded-md bg-white text-sm hover:border-slate-400 transition-colors disabled:cursor-default"
+              className={MULTISELECT_TOGGLE_BTN_CLS}
             >
-              <span className={selectedEntries.length > 0 ? "text-slate-800" : "text-slate-400"}>
+              <span className={multiSelectToggleTextClass(selectedEntries.length > 0)}>
                 {selectedEntries.length > 0
                   ? t("common.multiselect.selected_count", { count: String(selectedEntries.length) })
                   : widget.placeholderMsgKey
                     ? t(widget.placeholderMsgKey)
                     : (widget.placeholder ?? t("common.multiselect.placeholder"))}
               </span>
-              <ChevronDown
-                className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-              />
+              <ChevronDown className={multiSelectChevronClass(isOpen)} />
             </button>
 
             {/* 드롭다운 패널 — Portal(body)로 렌더링하여 부모 overflow에 잘리지 않음. preview는 버튼 disabled라 열리지 않음 */}
@@ -467,44 +352,42 @@ export function MultiSelectRenderer({
               open={isOpen}
               anchorRef={buttonRef}
               onOutsideClick={() => setIsOpen(false)}
-              className="bg-white border border-slate-200 rounded-md shadow-lg"
+              className={MULTISELECT_PANEL_CLS}
             >
               {/* 검색 입력 */}
-              <div className="p-2 border-b border-slate-100">
-                <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded border border-slate-200">
-                  <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <div className={MULTISELECT_SEARCH_WRAP_CLS}>
+                <div className={MULTISELECT_SEARCH_BOX_CLS}>
+                  <Search className={MULTISELECT_SEARCH_ICON_CLS} />
                   <input
                     type="text"
                     disabled={isPreview}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={t("common.input.search_placeholder")}
-                    className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none"
+                    className={MULTISELECT_SEARCH_INPUT_CLS}
                   />
                 </div>
               </div>
 
               {/* 옵션 목록 */}
-              <ul className="max-h-48 overflow-y-auto py-1">
+              <ul className={MULTISELECT_OPTION_LIST_CLS}>
                 {displayRows.length === 0 ? (
-                  <li className="px-3 py-2 text-xs text-slate-400 text-center">{t("common.table.no_data")}</li>
+                  <li className={MULTISELECT_EMPTY_CLS}>{t("common.table.no_data")}</li>
                 ) : (
                   /* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
                    별도 행(row)으로 나열한다 — 매핑(depth3) 고유 id가 있으면 행별로 독립 토글되고,
                    없는 일반 옵션은 기존과 동일하게 opt.id 기준으로 전체가 함께 토글된다 */
                   displayRows.map(({ opt, entry, pathIdx }) => (
                     <li key={`${opt.id}-${pathIdx}`}>
-                      <label
-                        className={`flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`}
-                      >
+                      <label className={multiSelectOptionItemClass(isPreview)}>
                         <input
                           type="checkbox"
                           checked={selected.includes(entry.selectionId)}
                           disabled={isPreview}
                           onChange={() => !isPreview && toggleItem(entry.selectionId)}
-                          className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-800"
+                          className={MULTISELECT_CHECKBOX_CLS}
                         />
-                        <span className="text-sm text-slate-700">{entry.path}</span>
+                        <span className={fieldOptionTextCls}>{entry.path}</span>
                       </label>
                     </li>
                   ))
@@ -519,8 +402,8 @@ export function MultiSelectRenderer({
              (flex-col 컨테이너 자체에 max-height를 주면 그 자식 row들이 flex-shrink로 찌그러지므로,
               반드시 별도 block 레벨 wrapper로 감싸서 안쪽 flex-col은 원래 크기 그대로 유지시킨다) */}
           {selectedEntries.length > 0 && (
-            <div className="max-h-56 overflow-y-auto">
-              <div className="flex flex-col gap-1.5">
+            <div className={MULTISELECT_TAG_SCROLL_WRAP_CLS}>
+              <div className={MULTISELECT_TAG_LIST_CLS}>
                 {/* 옵션 하나가 카테고리 경로를 여러 개 가지면(제품이 여러 카테고리에 매핑) 경로 개수만큼
                   별도 행(row)으로 나열한다 — 추가입력필드는 같은 opt.id 값을 공유(제품 단위 데이터이므로 동일하게 표시),
                   X버튼은 매핑(depth3) 고유 id가 있으면 그 행만 선택 해제하고, 없는 일반 옵션은 기존처럼 opt.id 전체가 해제됨 */}
@@ -532,10 +415,7 @@ export function MultiSelectRenderer({
                   const itemVals = extraFieldValues[opt.id] ?? {};
 
                   return (
-                    <div
-                      key={`${opt.id}-${pathIdx}`}
-                      className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
-                    >
+                    <div key={`${opt.id}-${pathIdx}`} className={MULTISELECT_TAG_ROW_CLS}>
                       {/* 좌측 추가 입력 필드 */}
                       {leftFields.length > 0 &&
                         renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
@@ -544,9 +424,7 @@ export function MultiSelectRenderer({
                       {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
 
                       {/* 항목명 — 고정 너비로 잘림 방지 */}
-                      <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
-                        {entry.path}
-                      </span>
+                      <span className={MULTISELECT_TAG_TEXT_CLS}>{entry.path}</span>
 
                       {/* 항목명 ↔ 우측 필드 구분선 */}
                       {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
@@ -560,9 +438,9 @@ export function MultiSelectRenderer({
                         type="button"
                         disabled={isPreview}
                         onClick={() => removeItem(entry.selectionId)}
-                        className="ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0"
+                        className={MULTISELECT_TAG_REMOVE_BTN_CLS}
                       >
-                        <X className="w-3 h-3" />
+                        <X className={MULTISELECT_TAG_REMOVE_ICON_CLS} />
                       </button>
                     </div>
                   );

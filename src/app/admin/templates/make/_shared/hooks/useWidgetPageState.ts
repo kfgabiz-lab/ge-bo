@@ -18,7 +18,6 @@ import {
   flattenPageDataItem,
   applySortChange,
   initFormDefaultValues,
-  computeFieldDefaultValue,
   buildSearchFieldDefaultValues,
   buildDateRangeGenerationPatch,
   validateDataSaveWidgets,
@@ -32,10 +31,24 @@ import {
   buildDateRangeStatusSortExpr,
   extractSubListRows,
   extractMultiSelectSelection,
-  evalWidgetHideCondition,
   resolveFetchSortKey,
   buildGenerationBaselineValues,
+  findSection,
+  buildFormValuesFromDataJson,
+  buildFieldKeyIdAndLabelMaps,
+  findMissingRequiredMultiSelect,
 } from "../utils";
+import {
+  uploadContentFormFiles,
+  uploadContentSubListFiles,
+  buildFormFileIdsMap,
+  persistContentDataJson,
+  deleteContentRecord,
+  collectFileIdsDeep,
+  fetchFileMetaByIds,
+  fetchFileBlobUrl,
+  deletePendingFiles,
+} from "../utils/contentSave";
 import {
   entityApiPath,
   entityItemPath,
@@ -100,23 +113,6 @@ interface UseWidgetPageStateOptions {
   menuId?: number | null;
 }
 
-function findSection(dataJson: Record<string, unknown>, contentKey: string | undefined): Record<string, unknown> {
-  if (!contentKey) return dataJson;
-  if (dataJson[contentKey] && typeof dataJson[contentKey] === "object") {
-    return dataJson[contentKey] as Record<string, unknown>;
-  }
-  for (const [key, val] of Object.entries(dataJson)) {
-    if (key.startsWith("_fetchedRel")) continue;
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      const nested = (val as Record<string, unknown>)[contentKey];
-      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
-        return nested as Record<string, unknown>;
-      }
-    }
-  }
-  return dataJson;
-}
-
 async function restoreFormDataFromJson(
   dataJson: Record<string, unknown>,
   forms: FormWidget[],
@@ -135,38 +131,10 @@ async function restoreFormDataFromJson(
   isEntity?: boolean,
   t?: (key: string) => string
 ): Promise<void> {
+  const valuesByWidgetId = buildFormValuesFromDataJson(dataJson, forms, t);
+
   forms.forEach((fw) => {
-    const section = findSection(dataJson, fw.contentKey);
-    const vals: Record<string, string> = {};
-    fw.fields.forEach((f) => {
-      const key = f.fieldKey || f.label;
-      if (!key) return;
-      if (f.type === "dateRange" || f.type === "yearMonthRange") {
-        const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
-        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
-        if (fromVal === undefined && toVal === undefined) {
-          Object.assign(vals, computeFieldDefaultValue(f, t));
-        } else {
-          if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
-          if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
-        }
-      } else if (f.type === "address") {
-        const hasAddressVal =
-          section[key] !== undefined || section[key + "_lat"] !== undefined || section[key + "_lng"] !== undefined;
-        if (!hasAddressVal) {
-          Object.assign(vals, computeFieldDefaultValue(f, t));
-        } else {
-          if (section[key] !== undefined) vals[f.id] = String(section[key] ?? "");
-          if (section[key + "_lat"] !== undefined) vals[f.id + "_lat"] = String(section[key + "_lat"] ?? "");
-          if (section[key + "_lng"] !== undefined) vals[f.id + "_lng"] = String(section[key + "_lng"] ?? "");
-        }
-      } else if (section[key] !== undefined) {
-        const raw = section[key];
-        if (!Array.isArray(raw)) vals[f.id] = String(raw ?? "");
-      } else {
-        Object.assign(vals, computeFieldDefaultValue(f, t));
-      }
-    });
+    const vals = valuesByWidgetId[fw.widgetId] ?? {};
     setFormValuesMap((prev) => {
       const existingVals = prev[fw.widgetId] ?? {};
       const preservedVirtualVals: Record<string, string> = {};
@@ -194,27 +162,10 @@ async function restoreFormDataFromJson(
   });
 
   try {
-    const fileIds: number[] = [];
-    const collectIds = (obj: Record<string, unknown>) => {
-      Object.values(obj).forEach((v) => {
-        if (Array.isArray(v) && v.every((x) => typeof x === "number")) fileIds.push(...(v as number[]));
-        else if (v && typeof v === "object" && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
-      });
-    };
-    collectIds(dataJson);
+    const fileIds = collectFileIdsDeep(dataJson);
 
     if (fileIds.length > 0) {
-      const metaList = isEntity
-        ? await api.get("/file-meta", { params: { ids: fileIds.join(",") } }).then((r) =>
-            (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[]).map((m) => ({
-              id: m.id,
-              origName: m.originalName,
-              fileSize: m.fileSize,
-            }))
-          )
-        : await api
-            .get("/page-files/meta", { params: { ids: fileIds.join(",") } })
-            .then((r) => r.data as { id: number; origName: string; fileSize: number; mimeType: string }[]);
+      const metaList = await fetchFileMetaByIds(fileIds, !!isEntity);
       forms.forEach((fw) => {
         const section = findSection(dataJson, fw.contentKey);
         const metaByFieldId: Record<string, { id: number; origName: string; fileSize: number }[]> = {};
@@ -230,11 +181,8 @@ async function restoreFormDataFromJson(
             .filter((m): m is { id: number; origName: string; fileSize: number } => m !== null);
           if (f.type === "image" || f.type === "video" || f.type === "media") {
             (ids as number[]).forEach((id) => {
-              const blobReq = isEntity
-                ? api.get(`/file-meta/${id}/download`, { responseType: "blob" })
-                : api.get(`/page-files/${id}`, { responseType: "blob" });
-              blobReq
-                .then((r) => setImgBlobUrls((prev) => ({ ...prev, [id]: URL.createObjectURL(r.data) })))
+              fetchFileBlobUrl(id, !!isEntity)
+                .then((url) => setImgBlobUrls((prev) => ({ ...prev, [id]: url })))
                 .catch(() => {});
             });
           }
@@ -943,14 +891,12 @@ export function useWidgetPageState(
           if (!confirm(t("common.confirm.delete"))) return;
 
           const firstSlug = slugGroupsMap.keys().next().value!;
-          if (pageIsEntity) {
-            const entityRecordId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
-            if (entityRecordId) await api.delete(entityItemPath(firstSlug, entityRecordId));
-          } else if (storedGroupId) {
-            await api.delete(`/page-data/${firstSlug}/group/${storedGroupId}`);
-          } else {
-            await api.delete(`/page-data/${firstSlug}/${storedId}`);
-          }
+          await deleteContentRecord({
+            connectedSlug: firstSlug,
+            isEntity: pageIsEntity,
+            storedId,
+            storedGroupId,
+          });
           toast.success(t("common.deleted"));
           markClean();
           if (goBackAfterAction) options?.onGoBack?.();
@@ -958,19 +904,10 @@ export function useWidgetPageState(
         }
 
         const allFormValues = Object.assign({}, ...Object.values(mapToUse)) as Record<string, string>;
-        const allFieldKeyToId: Record<string, string> = {};
-        const allFieldLabels: Record<string, string> = {};
-        flatWidgets(widgetItems)
-          .filter((w) => w.type === "form")
-          .forEach((w) => {
-            const fw = w as FormWidget;
-            fw.fields?.forEach((f) => {
-              if (!f.fieldKey) return;
-              allFieldKeyToId[f.fieldKey] = f.id;
-              allFieldLabels[f.fieldKey] = String((f.labelMsgKey && t ? t(f.labelMsgKey) : f.label) || f.fieldKey);
-              if (fw.contentKey) allFieldKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
-            });
-          });
+        const { allFieldKeyToId, allFieldLabels } = buildFieldKeyIdAndLabelMaps(
+          flatWidgets(widgetItems).filter((w) => w.type === "form") as FormWidget[],
+          t
+        );
 
         for (const w of targetWidgets) {
           if (w.type !== "form") continue;
@@ -1009,18 +946,19 @@ export function useWidgetPageState(
         )
           return;
 
-        for (const w of targetWidgets) {
-          if (w.type !== "multiselect") continue;
-          const mw = w as MultiSelectWidget;
-          if (!mw.required) continue;
-          if (mw.hideCondition && evalWidgetHideCondition(mw.hideCondition, allFieldKeyToId, allFormValues)) continue;
-          if ((multiSelectValuesMap[mw.widgetId] ?? []).length === 0) {
-            const title = mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
-            toast.warning(
-              t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
-            );
-            return;
-          }
+        const missingMultiSelectTitle = findMissingRequiredMultiSelect(
+          targetWidgets,
+          multiSelectValuesMap,
+          allFieldKeyToId,
+          allFormValues,
+          t
+        );
+        if (missingMultiSelectTitle !== null) {
+          const title = missingMultiSelectTitle;
+          toast.warning(
+            t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
+          );
+          return;
         }
 
         const slugGroups = options?.mainConnectedSlug
@@ -1032,83 +970,22 @@ export function useWidgetPageState(
         for (let groupIdx = 0; groupIdx < slugGroups.length; groupIdx++) {
           const [connectedSlug, widgets] = slugGroups[groupIdx];
           const isFirstSlugGroup = groupIdx === 0;
-          const newFileIdsByFieldId: Record<string, number[]> = {};
 
           const groupValidationRuleIds = contentValidationRuleIds
             ? [...new Set(widgets.flatMap((w) => contentValidationRuleIds[(w as { widgetId: string }).widgetId] ?? []))]
             : [];
 
-          for (const w of widgets) {
-            if (w.type !== "form") continue;
-            const fw = w as FormWidget;
-            for (const [fieldId, files] of Object.entries(fileValuesMap[fw.widgetId] ?? {})) {
-              const field = fw.fields.find((f) => f.id === fieldId);
-              if (!field?.fieldKey || !files.length) continue;
-              const ids: number[] = [];
-              for (const file of files) {
-                const fd = new FormData();
-                fd.append("file", file);
-                let uploadRes;
-                if (pageIsEntity) {
-                  uploadRes = await api.post("/file-meta/upload", fd, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                  });
-                } else {
-                  fd.append("templateSlug", connectedSlug);
-                  fd.append("fieldKey", field.fieldKey);
-                  uploadRes = await api.post("/page-files/upload", fd, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                  });
-                }
-                ids.push(uploadRes.data.id);
-              }
-              newFileIdsByFieldId[fieldId] = ids;
-            }
-          }
+          const newFileIdsByFieldId = await uploadContentFormFiles(widgets, fileValuesMap, connectedSlug, pageIsEntity);
 
-          const processedSubListRowsMap: Record<string, Record<string, unknown>[]> = {};
-          for (const w of widgets) {
-            if (w.type !== "sublist") continue;
-            const sw = w as SubListWidget;
-            const processedRows: Record<string, unknown>[] = [];
-            for (const row of subListRowsMap[sw.widgetId] ?? []) {
-              const { _rowId, ...rest } = row;
-              const processedRow: Record<string, unknown> = { ...rest };
-              for (const col of sw.columns ?? []) {
-                if (!["file", "image"].includes(col.type)) continue;
-                const existingIds = Array.isArray(processedRow[col.key]) ? (processedRow[col.key] as number[]) : [];
-                const newFiles = subListFileMap[sw.widgetId]?.[_rowId]?.[col.id] ?? [];
-                const allIds = [...existingIds];
-                for (const file of newFiles) {
-                  const fd = new FormData();
-                  fd.append("file", file);
-                  fd.append("templateSlug", connectedSlug);
-                  fd.append("fieldKey", col.key);
-                  const uploadRes = await api.post("/page-files/upload", fd, {
-                    headers: { "Content-Type": "multipart/form-data" },
-                  });
-                  const newId = uploadRes.data.id;
-                  allIds.push(newId);
-                  newFileIdsByFieldId[col.id] = [...(newFileIdsByFieldId[col.id] ?? []), newId];
-                }
-                processedRow[col.key] = allIds;
-              }
-              processedRows.push(processedRow);
-            }
-            processedSubListRowsMap[sw.widgetId] = processedRows;
-          }
+          const processedSubListRowsMap = await uploadContentSubListFiles(
+            widgets,
+            subListRowsMap,
+            subListFileMap,
+            connectedSlug,
+            newFileIdsByFieldId
+          );
 
-          const formFileIdsMap: Record<string, Record<string, number[]>> = {};
-          for (const w of widgets) {
-            if (w.type !== "form") continue;
-            const fw = w as FormWidget;
-            formFileIdsMap[fw.widgetId] = {};
-            for (const f of fw.fields) {
-              if (!FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) continue;
-              const existingIds = (existingFileMetaMap[fw.widgetId]?.[f.id] ?? []).map((m) => m.id);
-              formFileIdsMap[fw.widgetId][f.id] = [...existingIds, ...(newFileIdsByFieldId[f.id] ?? [])];
-            }
-          }
+          const formFileIdsMap = buildFormFileIdsMap(widgets, existingFileMetaMap, newFileIdsByFieldId);
 
           const multiSelectMap: Record<string, number[]> = {};
           for (const w of widgets) {
@@ -1145,115 +1022,37 @@ export function useWidgetPageState(
             });
           }
 
-          let savedDataId: number;
-
-          if (pageIsEntity) {
-            const entityRecordId = storedId ?? (storedGroupId ? Number(storedGroupId) : null);
-            const dateFieldMeta = buildEntityDateFieldMeta(
-              widgets.filter((w) => w.type === "form").flatMap((w) => (w as FormWidget).fields)
-            );
-            const entityBody = buildEntityRequestBody(dataJson, dateFieldMeta);
-            if (entityRecordId) {
-              await api.put(entityItemPath(connectedSlug, entityRecordId), entityBody);
-              savedDataId = entityRecordId;
-            } else {
-              const res = await api.post(entityApiPath(connectedSlug), entityBody);
-              savedDataId = res.data.id;
-              options?.onDataIdCreated?.(connectedSlug, savedDataId);
-            }
-            options?.onSaved?.();
-          } else {
-            const slugStoredId = storedGroupId
-              ? await api
-                  .get(`/page-data/${connectedSlug}/group/${storedGroupId}`)
-                  .then((r) => r.data.id as number)
-                  .catch(() => null)
-              : storedId;
-
-            let finalDataJson = dataJson;
-            if (options?.contentKey) {
-              let baseDataJson: Record<string, unknown> = {};
-              if (slugStoredId) {
-                try {
-                  const getRes = await api.get(`/page-data/${connectedSlug}/${slugStoredId}`);
-                  baseDataJson = (getRes.data.dataJson ?? {}) as Record<string, unknown>;
-                } catch {}
-              }
-              finalDataJson = { ...baseDataJson, ...dataJson };
-            }
-
-            if (slugStoredId) {
-              await api.put(
-                `/page-data/${connectedSlug}/${slugStoredId}`,
-                buildDataSavePayload({
-                  dataJson: finalDataJson,
-                  pkKeys: [],
-                  templateSlug: pageSlug,
-                  validationRuleIds: groupValidationRuleIds,
-                })
-              );
-              savedDataId = slugStoredId;
-            } else {
-              const res = await api.post(
-                `/page-data/${connectedSlug}`,
-                buildDataSavePayload({
-                  dataJson: finalDataJson,
-                  pkKeys,
-                  groupId,
-                  templateSlug: pageSlug,
-                  validationRuleIds: groupValidationRuleIds,
-                })
-              );
-              savedDataId = res.data.id;
-              if (groupId && !storedGroupId) setCurrentGroupId(groupId);
-              options?.onDataIdCreated?.(connectedSlug, savedDataId);
-            }
-            options?.onSaved?.();
-          }
-
-          if (!pageIsEntity) {
-            const allNewIds = Object.values(newFileIdsByFieldId).flat();
-            if (allNewIds.length > 0) {
-              await api.patch("/page-files/link", { fileIds: allNewIds, dataId: savedDataId });
+          await persistContentDataJson({
+            connectedSlug,
+            dataJson,
+            pkKeys,
+            templateSlug: pageSlug,
+            groupId,
+            storedId,
+            storedGroupId,
+            validationRuleIds: groupValidationRuleIds,
+            isEntity: pageIsEntity,
+            entityDateFields: widgets.filter((w) => w.type === "form").flatMap((w) => (w as FormWidget).fields),
+            newFileIdsByFieldId,
+            mergeExistingBeforeSave: !!options?.contentKey,
+            onDataIdCreated: (slug, id) => options?.onDataIdCreated?.(slug, id),
+            onGroupIdCreated: (createdGroupId) => setCurrentGroupId(createdGroupId),
+            onSaved: () => options?.onSaved?.(),
+            onFilesLinked: () =>
               setFileValuesMap((prev) => {
                 const next = { ...prev };
                 widgets.forEach((w) => {
                   if (w.type === "form") delete next[(w as FormWidget).widgetId];
                 });
                 return next;
-              });
-            }
-          }
+              }),
+          });
 
           try {
-            const fileIds: number[] = [];
-            const collectIds = (obj: Record<string, unknown>) => {
-              Object.values(obj).forEach((v) => {
-                if (Array.isArray(v) && v.every((x) => typeof x === "number")) fileIds.push(...(v as number[]));
-                else if (v && typeof v === "object" && !Array.isArray(v)) collectIds(v as Record<string, unknown>);
-              });
-            };
-            collectIds(dataJson);
+            const fileIds = collectFileIdsDeep(dataJson);
 
             if (fileIds.length > 0) {
-              const metaList = pageIsEntity
-                ? await api
-                    .get("/file-meta", { params: { ids: fileIds.join(",") } })
-                    .then((r) =>
-                      (r.data as { id: number; originalName: string; fileSize: number; mimeType: string }[]).map(
-                        (m) => ({ id: m.id, origName: m.originalName, fileSize: m.fileSize })
-                      )
-                    )
-                : await api.get("/page-files/meta", { params: { ids: fileIds.join(",") } }).then(
-                    (r) =>
-                      r.data as {
-                        id: number;
-                        fieldKey: string;
-                        origName: string;
-                        fileSize: number;
-                        mimeType: string;
-                      }[]
-                  );
+              const metaList = await fetchFileMetaByIds(fileIds, pageIsEntity);
 
               for (const w of widgets) {
                 if (w.type !== "form") continue;
@@ -1274,14 +1073,11 @@ export function useWidgetPageState(
                   if (imageFieldIds.has(f.id) || f.type === "video" || f.type === "media") {
                     (ids as number[]).forEach((id) => {
                       if (imgBlobUrls[id]) return;
-                      const blobReq = pageIsEntity
-                        ? api.get(`/file-meta/${id}/download`, { responseType: "blob" })
-                        : api.get(`/page-files/${id}`, { responseType: "blob" });
-                      blobReq
-                        .then((blobRes) =>
+                      fetchFileBlobUrl(id, pageIsEntity)
+                        .then((url) =>
                           setImgBlobUrls((prev) => ({
                             ...prev,
-                            [id]: URL.createObjectURL(blobRes.data),
+                            [id]: url,
                           }))
                         )
                         .catch(() => {});
@@ -1296,17 +1092,7 @@ export function useWidgetPageState(
 
         if (pendingDeleteFileIdsRef.current.size > 0) {
           const fileIdsToDelete = Array.from(pendingDeleteFileIdsRef.current);
-          for (const fileId of fileIdsToDelete) {
-            try {
-              if (pageIsEntity) {
-                await api.delete(`/file-meta/${fileId}`);
-              } else {
-                await api.delete(`/page-files/${fileId}`);
-              }
-            } catch {
-              console.error(`[handleContentAction] 삭제 대기 파일 커밋 실패: fileId=${fileId}`);
-            }
-          }
+          await deletePendingFiles(fileIdsToDelete, pageIsEntity);
           pendingDeleteFileIdsRef.current.clear();
         }
 

@@ -3,11 +3,31 @@ import type { TableWidget } from "../../components/builder/TableBuilder";
 import type { SearchFieldConfig, SearchFieldType } from "../../types";
 import { varName, parseOpt, buildSearchQueryParams, SEARCH_QUERY_PARAM_FIELD_KEYS } from "../../utils";
 import { SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from "../../constants";
-import { inputCls, selectCls, fieldOptionGroupCls } from "../../styles";
+import {
+  inputCls,
+  selectCls,
+  fieldOptionGroupCls,
+  fieldOptionItemClass,
+  fieldOptionTextCls,
+  fieldRadioInputCls,
+  fieldCheckboxInputCls,
+  fieldRelativeWrapCls,
+  fieldCharCountCls,
+  fieldCharCountPadCls,
+  fieldDateRangeInputPadCls,
+} from "../../styles";
 import {
   SELECT_ARROW_CLS,
   SEARCH_DATE_ICON_CLS,
   SEARCH_DATE_RANGE_SEP_CLS,
+  SEARCH_DATE_RANGE_WRAP_CLS,
+  SEARCH_DATE_RANGE_INPUT_WRAP_CLS,
+  SEARCH_SIMPLE_CONTAINER_CLS,
+  SEARCH_RESET_BTN_CLS,
+  SEARCH_SUBMIT_BTN_CLS,
+  SEARCH_BTN_ICON_CLS,
+  searchSimpleGridClass,
+  searchSimpleColSpanClass,
 } from "../../components/renderer/rendererStyles";
 import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
 import { jsStringLiteral, collectUnhandledKeys, emitContainerOpen, emitContainerClose } from "../widgetGenerator";
@@ -21,23 +41,6 @@ const PHASE1_SEARCH_TYPES = new Set<SearchFieldType>([
   "radio",
   "hidden",
 ]);
-
-const GRID_COLS_LITERAL: Record<number, string> = {
-  1: "grid-cols-1",
-  2: "grid-cols-2",
-  3: "grid-cols-3",
-  4: "grid-cols-4",
-  5: "grid-cols-5",
-  6: "grid-cols-6",
-};
-const COL_SPAN_LITERAL: Record<number, string> = {
-  1: "col-span-1",
-  2: "col-span-2",
-  3: "col-span-3",
-  4: "col-span-4",
-  5: "col-span-5",
-  6: "col-span-6",
-};
 
 const HANDLED_WIDGET_KEYS = new Set(["type", "widgetId", "rows", "displayStyle"]);
 const IGNORED_WIDGET_KEYS = new Map<string, string>([
@@ -70,110 +73,193 @@ const HANDLED_FIELD_KEYS = new Set([
   "excludeFromSearch",
   "defaultStartToday",
   "defaultEndToday",
-  "data",
   "joinRelationSlugId",
   "joinSlaveKey",
+  "maxLength",
+  "showCharCount",
+  "displayAs",
 ]);
+
+interface TypeScopedFieldKeyPolicy {
+  handledTypes: ReadonlySet<SearchFieldType>;
+  ignoredTypes: ReadonlySet<SearchFieldType>;
+  handledReason: string;
+  ignoredReason: string;
+}
+
+const TYPE_SCOPED_FIELD_KEY_POLICIES = new Map<string, TypeScopedFieldKeyPolicy>([
+  [
+    "data",
+    {
+      handledTypes: new Set<SearchFieldType>(["select"]),
+      ignoredTypes: new Set<SearchFieldType>(["date", "dateRange", "checkbox", "radio", "hidden"]),
+      handledReason:
+        "select 전용 — utils.ts:2843 buildSearchQueryParams가 f.type==='select' && f.data?.includes('?') 조건에서 condexpr_/condval_ 파라미터로 조립하고, 산출물은 SEARCH_FIELDS 리터럴(SEARCH_QUERY_PARAM_FIELD_KEYS에 'data' 포함)을 그대로 넘겨 동일 동작을 재현한다. 마크업에는 select 옵션만 방출되며 런타임 FieldRenderer.tsx case 'select'(1151)도 field.data를 읽지 않아 표시 파리티 차이가 없다",
+      ignoredReason:
+        "FieldRenderer.tsx의 field.data 참조는 :1030 :1032 :1040 :1057 :1058(case 'input' 1026~1114 내부)과 :1127 :1142 :1143(case 'text' 1115~1150 내부) 8곳뿐이다. 'text'는 PHASE1_SEARCH_TYPES에 없어 supportedFields 진입 자체가 불가하고, utils.ts:2843 조회 파라미터 분기도 f.type==='select' 가드라 date/dateRange/checkbox/radio/hidden 타입에서는 런타임이 f.data를 읽는 지점이 없다",
+    },
+  ],
+]);
+
+const handledFieldKeysFor = (f: SearchFieldConfig): ReadonlySet<string> => {
+  const keys = new Set(HANDLED_FIELD_KEYS);
+  TYPE_SCOPED_FIELD_KEY_POLICIES.forEach((policy, key) => {
+    if (policy.handledTypes.has(f.type)) keys.add(key);
+  });
+  return keys;
+};
+
+const PHASE1_SEARCH_TYPE_LIST = [...PHASE1_SEARCH_TYPES].join("/");
+
+const typeScopedIgnored = (ownerTypes: string, runtimeRef: string, keys: string[]): [string, string][] =>
+  keys.map((key) => [
+    key,
+    `'${ownerTypes}' 필드 타입 전용 — 런타임 참조 지점은 ${runtimeRef} 뿐이고, searchBlock.ts PHASE1_SEARCH_TYPES(${PHASE1_SEARCH_TYPE_LIST})에 해당 타입이 없어 supportedFields 진입 불가`,
+  ]);
 
 const IGNORED_FIELD_KEYS = new Map<string, string>([
   [
     "rowSpan",
-    "검색행은 rowSpan을 사용하지 않음(항상 1행) — SearchRow는 colSpan만 사용, utils.ts:2781 buildSearchQueryParams도 rowSpan을 읽지 않음",
+    "검색행은 rowSpan을 사용하지 않음(항상 1행) — SearchRow는 colSpan만 사용, utils.ts:2781 buildSearchQueryParams도 rowSpan을 읽지 않음. FieldRenderer.tsx의 rowSpan 참조(1566/1755/1987/2239/2573)는 file/image/video/media/editor 타입 전용이며 PHASE1_SEARCH_TYPES에 없음",
   ],
   [
     "accessor",
-    "utils.ts:2781-2861 buildSearchQueryParams는 f.fieldKey||f.label만 읽고 f.accessor는 읽지 않는 사문화 필드",
-  ],
-  ["selectType", "autocomplete 등 select 하위기능 — Phase1 미구현 값 필드"],
-  ["minLength", "input 유효성 검증 — Phase1 미검증 값 필드"],
-  ["maxLength", "input 유효성 검증 — Phase1 미검증 값 필드"],
-  ["showCharCount", "input 글자수 표시 — Phase1 미구현 값 필드"],
-  ["pattern", "input 정규식 검증 — Phase1 미검증 값 필드"],
-  ["patternDesc", "input 정규식 설명 — Phase1 미구현 값 필드"],
-  ["patternDescMsgKey", "input 정규식 설명 다국어 — Phase1 미구현 값 필드"],
-  ["minSelect", "button 다중선택 전용 — Search Phase1은 PHASE1_SEARCH_TYPES에 button을 포함하지 않음"],
-  ["maxSelect", "button 다중선택 전용 — Search Phase1은 PHASE1_SEARCH_TYPES에 button을 포함하지 않음"],
-  ["displayAs", "select 옵션은 codeGroupCode 텍스트만 사용, value 표시모드 Phase1 미구현"],
-  ["multiSelect", "button 전용 — Search Phase1은 PHASE1_SEARCH_TYPES에 button을 포함하지 않음"],
-  ["fetchDisplayMode", "text 타입(연결Slug 값 표시) 전용 — Search Phase1은 PHASE1_SEARCH_TYPES에 text를 포함하지 않음"],
-  ["content", "textarea 전용 — Space 위젯에서만 사용"],
-  ["contentMsgKey", "textarea 전용 — Space 위젯에서만 사용"],
-  ["fontSize", "textarea 전용 — Space 위젯에서만 사용"],
-  ["bold", "textarea 전용 — Space 위젯에서만 사용"],
-  ["textColor", "textarea/action-button 전용 — Space 위젯에서만 사용"],
-  ["color", "action-button 전용 — Space 위젯에서만 사용"],
-  ["bgColor", "action-button 전용 — Space 위젯에서만 사용"],
-  ["connType", "action-button 전용 — Space 위젯에서만 사용"],
-  ["popupSlug", "action-button 전용 — Space 위젯에서만 사용"],
-  ["fileLayerSlug", "action-button 전용 — Space 위젯에서만 사용"],
-  ["params", "action-button 전용 — Space 위젯에서만 사용"],
-  ["connectedSlug", "action-button 전용 — Space 위젯에서만 사용"],
-  ["connectedContentWidgetIds", "action-button 전용 — Space 위젯에서만 사용"],
-  ["excelTableWidgetId", "action-button excel 전용 — Space 위젯에서만 사용"],
-  ["excelPrivacyPopup", "action-button excel 전용 — Space 위젯에서만 사용"],
-  ["excelDownloadMode", "action-button excel 전용 — Space 위젯에서만 사용"],
-  ["excelRelationIds", "action-button excel 전용 — Space 위젯에서만 사용"],
-  ["excelExtraColumns", "action-button excel 전용 — Space 위젯에서만 사용"],
-  ["contentAction", "action-button 전용 — Space 위젯에서만 사용"],
-  ["goBackAfterAction", "action-button 전용 — Space 위젯에서만 사용"],
-  ["dataSaveSlug", "action-button 전용 — Space 위젯에서만 사용"],
-  ["apiInfoId", "action-button 전용 — Space 위젯에서만 사용"],
-  ["apiDownloadFile", "action-button 전용 — Space 위젯에서만 사용"],
-  ["apiIncludeSearchParams", "action-button 전용 — Space 위젯에서만 사용"],
-  ["saveConfirm", "action-button 전용 — Space 위젯에서만 사용"],
-  ["validationRuleIds", "action-button 전용 — Space 위젯에서만 사용"],
-  ["contentValidationRuleIds", "action-button 전용 — Space 위젯에서만 사용"],
-  ["isPk", "Form 전용 — Search에서는 사용하지 않음"],
-  ["readonly", "Form 전용 — Search에서는 사용하지 않음"],
-  ["maxFileCount", "파일/이미지/비디오 전용 필드타입 — Search Phase1 미지원"],
-  ["maxFileSizeMB", "파일/이미지/비디오 전용 필드타입 — Search Phase1 미지원"],
-  ["maxTotalSizeMB", "파일/이미지/비디오 전용 필드타입 — Search Phase1 미지원"],
-  ["fileTypeMode", "파일/이미지/비디오 전용 필드타입 — Search Phase1 미지원"],
-  ["allowedExtensions", "파일/이미지/비디오 전용 필드타입 — Search Phase1 미지원"],
-  ["videoMode", "파일/이미지/비디오 전용 필드타입 — Search Phase1 미지원"],
-  ["mediaImageMaxSizeMB", "media 전용 필드타입 — Search Phase1 미지원"],
-  ["mediaVideoMaxSizeMB", "media 전용 필드타입 — Search Phase1 미지원"],
-  ["imageMaxWidthPx", "image 전용 필드타입 — Search Phase1 미지원"],
-  ["imageMaxHeightPx", "image 전용 필드타입 — Search Phase1 미지원"],
-  ["maxFileSizeUnit", "파일 전용 필드타입 — Search Phase1 미지원"],
-  ["mediaImageMaxSizeUnit", "media 전용 필드타입 — Search Phase1 미지원"],
-  [
-    "dbSlug",
-    "category 전용 필드타입 — PHASE1_SEARCH_TYPES는 category를 포함하지 않아 이 키를 가진 필드가 supportedFields에 들어오지 않음",
+    "utils.ts:2781-2861 buildSearchQueryParams는 f.fieldKey||f.label만 읽고 f.accessor는 읽지 않는 사문화 필드. FieldRenderer.tsx 전문에도 field.accessor 참조 0건",
   ],
   [
-    "relationSlugId",
-    'category 전용 필드타입 — utils.ts:2826 f.type===\"category\"에서만 읽으며 PHASE1_SEARCH_TYPES가 category를 제외함',
+    "minLength",
+    "utils.ts:579 validateFormFields(Form 전용)와 utils.ts:895 validateSubListRows에서만 읽는다 — SearchRenderer.tsx는 두 함수를 호출하지 않고 FieldRenderer.tsx에도 minLength 참조가 0건이라 검색 경로에서 읽는 지점이 없다",
   ],
-  ["maxDepth", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["activeDepths", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["depthLabels", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["depthLabelMsgKeys", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["depthValueFields", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["depthTextFields", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["depthFilters", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["depthParentFields", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["optionFilterRelationSlugId", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["optionFilterDepth", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["optionFilterParentField", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["optionFilterExpr", "category 전용 필드타입 — Search Phase1 미지원"],
-  ["defaultTime", "time 전용 필드타입 — Search Phase1 미지원"],
-  ["timeStep", "time 전용 필드타입 — Search Phase1 미지원"],
   [
-    "linkedDateRangeKey",
-    'dateRangeStatus 전용 필드타입 — utils.ts:2852 f.type===\"dateRangeStatus\"에서만 읽으며 PHASE1_SEARCH_TYPES가 dateRangeStatus를 제외함',
+    "pattern",
+    "utils.ts:596-603 validateFormFields / utils.ts:918-927 validateSubListRows에서만 읽는다 — FieldRenderer.tsx에 field.pattern 참조 0건, 검색 경로에서 읽는 지점이 없다",
   ],
-  ["beforeText", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["beforeTextMsgKey", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["inRangeText", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["inRangeTextMsgKey", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["afterText", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["afterTextMsgKey", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["statusDisplayStyle", "dateRangeStatus 전용 필드타입 — Search Phase1 미지원"],
-  ["editorType", "editor 전용 필드타입 — Search Phase1 미지원"],
-  ["addressLanguage", "address 전용 필드타입 — Search Phase1 미지원"],
-  ["compareExpr", "Form/SubList 전용 — 타입 정의상 Search 미사용"],
+  [
+    "patternDesc",
+    "utils.ts:599 validateFormFields의 오류 문구 조립에서만 읽는다 — FieldRenderer.tsx에 참조 0건, 검색 경로에서 읽는 지점이 없다",
+  ],
+  [
+    "patternDescMsgKey",
+    "utils.ts:599 validateFormFields의 오류 문구 조립에서만 읽는다 — FieldRenderer.tsx에 참조 0건, 검색 경로에서 읽는 지점이 없다",
+  ],
+  [
+    "minSelect",
+    "button 다중선택 전용 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함이라 supportedFields 진입 불가. FieldRenderer.tsx 전문에도 field.minSelect 참조 0건",
+  ],
+  [
+    "maxSelect",
+    "button 다중선택 전용 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함이라 supportedFields 진입 불가. FieldRenderer.tsx 전문에도 field.maxSelect 참조 0건",
+  ],
+  [
+    "multiSelect",
+    "FieldRenderer.tsx:1430이 case 'button' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
+  ],
+  [
+    "fetchDisplayMode",
+    "FieldRenderer.tsx:1122-1133이 case 'text' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
+  ],
+  [
+    "isPk",
+    "utils.ts:1746 buildDataJson(Form 저장 경로)에서만 읽는다 — SearchRenderer.tsx/FieldRenderer.tsx 전문에 field.isPk 참조 0건",
+  ],
+  [
+    "compareExpr",
+    "utils.ts:492 validateFormFields/validateSubListRows 공용 검증에서만 읽는다 — 검색 경로는 이 함수들을 호출하지 않고 FieldRenderer.tsx에도 참조 0건",
+  ],
+  ...typeScopedIgnored("textarea", "FieldRenderer.tsx:1486 case 'textarea'", [
+    "content",
+    "contentMsgKey",
+    "fontSize",
+    "bold",
+  ]),
+  ...typeScopedIgnored("action-button", "FieldRenderer.tsx:1547 case 'action-button' / SpaceRenderer.tsx:108-176", [
+    "textColor",
+    "color",
+    "bgColor",
+    "connType",
+    "popupSlug",
+    "fileLayerSlug",
+    "params",
+    "connectedSlug",
+    "connectedContentWidgetIds",
+    "excelTableWidgetId",
+    "excelPrivacyPopup",
+    "excelDownloadMode",
+    "excelRelationIds",
+    "excelExtraColumns",
+    "contentAction",
+    "goBackAfterAction",
+    "dataSaveSlug",
+    "apiInfoId",
+    "apiDownloadFile",
+    "apiIncludeSearchParams",
+    "saveConfirm",
+    "validationRuleIds",
+    "contentValidationRuleIds",
+  ]),
+  ...typeScopedIgnored(
+    "file/image/video/media",
+    "FieldRenderer.tsx:1564 case 'file' / :1753 case 'image' / :1984 case 'video' / :2237 case 'media'",
+    [
+      "maxFileCount",
+      "maxFileSizeMB",
+      "maxFileSizeUnit",
+      "maxTotalSizeMB",
+      "fileTypeMode",
+      "allowedExtensions",
+      "videoMode",
+      "mediaImageMaxSizeMB",
+      "mediaImageMaxSizeUnit",
+      "mediaVideoMaxSizeMB",
+      "imageMaxWidthPx",
+      "imageMaxHeightPx",
+    ]
+  ),
+  ...typeScopedIgnored(
+    "category",
+    "FieldRenderer.tsx:2634 case 'category' → useCategoryCascade.ts:129-321 / utils.ts:2826 f.type==='category'",
+    [
+      "dbSlug",
+      "maxDepth",
+      "activeDepths",
+      "depthLabels",
+      "depthLabelMsgKeys",
+      "depthValueFields",
+      "depthTextFields",
+      "depthFilters",
+      "depthParentFields",
+      "optionFilterRelationSlugId",
+      "optionFilterDepth",
+      "optionFilterParentField",
+      "optionFilterExpr",
+    ]
+  ),
+  ...typeScopedIgnored("time", "FieldRenderer.tsx:2611 case 'time' (:2619 timeStep)", ["defaultTime", "timeStep"]),
+  ...typeScopedIgnored(
+    "dateRangeStatus",
+    "FieldRenderer.tsx:2640 case 'dateRangeStatus' / utils.ts:2852 f.type==='dateRangeStatus'",
+    [
+      "linkedDateRangeKey",
+      "beforeText",
+      "beforeTextMsgKey",
+      "inRangeText",
+      "inRangeTextMsgKey",
+      "afterText",
+      "afterTextMsgKey",
+      "statusDisplayStyle",
+    ]
+  ),
+  ...typeScopedIgnored("editor", "FieldRenderer.tsx:2571 case 'editor' (:2576 editorType)", ["editorType"]),
+  ...typeScopedIgnored("address", "FieldRenderer.tsx:2700 case 'address' (:2742 addressLanguage)", ["addressLanguage"]),
 ]);
+
+const ignoredFieldKeysFor = (f: SearchFieldConfig): ReadonlySet<string> => {
+  const keys = new Set(IGNORED_FIELD_KEYS.keys());
+  TYPE_SCOPED_FIELD_KEY_POLICIES.forEach((policy, key) => {
+    if (policy.ignoredTypes.has(f.type)) keys.add(key);
+  });
+  return keys;
+};
 
 const fieldVar = (f: SearchFieldConfig): string => f.fieldKey || varName(f.label);
 
@@ -205,8 +291,10 @@ const selectAllOptionExprOf = (f: SearchFieldConfig): string => {
 const defaultValueExprOf = (f: SearchFieldConfig): string =>
   f.defaultValueMsgKey ? `t(${jsStringLiteral(f.defaultValueMsgKey)})` : jsStringLiteral(f.defaultValue ?? "");
 
+const isCodeLabelInput = (f: SearchFieldConfig): boolean => f.type === "input" && !!f.codeGroupCode;
+
 const needsI18nOf = (fields: SearchFieldConfig[]): boolean =>
-  fields.some((f) => f.type === "select" || f.type === "radio" || f.type === "checkbox") ||
+  fields.some((f) => f.type === "select" || f.type === "radio" || f.type === "checkbox" || isCodeLabelInput(f)) ||
   fields.some((f) => !!f.labelMsgKey || !!f.label2MsgKey || !!f.placeholderMsgKey || !!f.defaultValueMsgKey);
 
 const selectArrowSvg = (ind: (n: number) => string, level: number): string =>
@@ -241,13 +329,38 @@ const pushFieldMarkup = (
   const readExpr = `String(${paramsVar}['${id}'] ?? '')`;
 
   switch (f.type) {
-    case "input":
+    case "input": {
+      const hasCharCount = !!(f.showCharCount && f.maxLength);
+      const inputCharCountCls = hasCharCount ? `${inputCls} ${fieldCharCountPadCls}` : inputCls;
+      const maxLengthAttr = hasCharCount ? ` maxLength={${f.maxLength}}` : "";
+      const inputLine = `<input type="text" value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} placeholder={${placeholderExprOf(f)}}${maxLengthAttr} className=${jsStringLiteral(inputCharCountCls)} />`;
+      const plainLines: string[] = [];
+      if (hasCharCount) {
+        plainLines.push(`<div className=${jsStringLiteral(fieldRelativeWrapCls)}>`);
+        plainLines.push(`    ${inputLine}`);
+        plainLines.push(
+          `    <span className=${jsStringLiteral(fieldCharCountCls)}>{${readExpr}.length}/{${f.maxLength}}</span>`
+        );
+        plainLines.push(`</div>`);
+      } else {
+        plainLines.push(inputLine);
+      }
+      if (!f.codeGroupCode) {
+        plainLines.forEach((l) => jsxLines.push(`${ind(3)}${l}`));
+        break;
+      }
+      const displayAsArg = f.displayAs ? jsStringLiteral(f.displayAs) : "undefined";
+      jsxLines.push(`${ind(3)}{groups.length > 0 ? (`);
       jsxLines.push(
-        `${ind(3)}<input type="text" value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} placeholder={${placeholderExprOf(f)}} className=${jsStringLiteral(inputCls)} />`
+        `${ind(4)}<input type="text" readOnly value={resolveCodeLabel(${readExpr}, ${jsStringLiteral(f.codeGroupCode)}, ${displayAsArg}, groups, t, true)} className=${jsStringLiteral(inputCls)} />`
       );
+      jsxLines.push(`${ind(3)}) : (`);
+      plainLines.forEach((l) => jsxLines.push(`${ind(4)}${l}`));
+      jsxLines.push(`${ind(3)})}`);
       break;
+    }
     case "select":
-      jsxLines.push(`${ind(3)}<div className="relative">`);
+      jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(fieldRelativeWrapCls)}>`);
       jsxLines.push(
         `${ind(4)}<select value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} className=${jsStringLiteral(selectCls)}>`
       );
@@ -275,19 +388,23 @@ const pushFieldMarkup = (
       const endKey = `${id}_to`;
       const readExprStart = `String(${paramsVar}['${startKey}'] ?? '')`;
       const readExprEnd = `String(${paramsVar}['${endKey}'] ?? '')`;
-      const rangeInputCls = jsStringLiteral(`${inputCls} pl-9`);
-      jsxLines.push(`${ind(3)}<div className="flex items-center gap-2">`);
+      const rangeInputCls = jsStringLiteral(`${inputCls} ${fieldDateRangeInputPadCls}`);
+      const rangeWrapCls = jsStringLiteral(SEARCH_DATE_RANGE_INPUT_WRAP_CLS);
+      jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(SEARCH_DATE_RANGE_WRAP_CLS)}>`);
       jsxLines.push(
-        `${ind(4)}<div className="relative flex-1"><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprStart}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${startKey}']: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
+        `${ind(4)}<div className=${rangeWrapCls}><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprStart}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${startKey}']: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
       );
       jsxLines.push(`${ind(4)}<span className=${jsStringLiteral(SEARCH_DATE_RANGE_SEP_CLS)}>~</span>`);
       jsxLines.push(
-        `${ind(4)}<div className="relative flex-1"><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprEnd}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${endKey}']: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
+        `${ind(4)}<div className=${rangeWrapCls}><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprEnd}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${endKey}']: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
       );
       jsxLines.push(`${ind(3)}</div>`);
       break;
     }
-    case "radio":
+    case "radio": {
+      const optionLabelCls = jsStringLiteral(fieldOptionItemClass(false));
+      const radioInput = jsStringLiteral(fieldRadioInputCls);
+      const optionTextCls = jsStringLiteral(fieldOptionTextCls);
       jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(fieldOptionGroupCls)}>`);
       pushOptions(
         jsxLines,
@@ -295,14 +412,18 @@ const pushFieldMarkup = (
         4,
         f,
         (value, textExpr) =>
-          `<label className="flex items-center gap-2 cursor-pointer"><input type="radio" name="${id}" value={${jsStringLiteral(value)}} checked={${readExpr} === ${jsStringLiteral(value)}} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: ${jsStringLiteral(value)} }))} className="w-4 h-4" /><span className="text-sm">{${textExpr}}</span></label>`,
+          `<label className=${optionLabelCls}><input type="radio" name="${id}" value={${jsStringLiteral(value)}} checked={${readExpr} === ${jsStringLiteral(value)}} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: ${jsStringLiteral(value)} }))} className=${radioInput} /><span className=${optionTextCls}>{${textExpr}}</span></label>`,
         () =>
-          `{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className="flex items-center gap-2 cursor-pointer"><input type="radio" name="${id}" value={d.code} checked={${readExpr} === d.code} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: d.code }))} className="w-4 h-4" /><span className="text-sm">{t(d.nameMsgKey || d.name)}</span></label>)}`
+          `{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className=${optionLabelCls}><input type="radio" name="${id}" value={d.code} checked={${readExpr} === d.code} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: d.code }))} className=${radioInput} /><span className=${optionTextCls}>{t(d.nameMsgKey || d.name)}</span></label>)}`
       );
       jsxLines.push(`${ind(3)}</div>`);
       break;
+    }
     case "checkbox": {
       const selectedExpr = `${readExpr}.split(',').filter(Boolean)`;
+      const optionLabelCls = jsStringLiteral(fieldOptionItemClass(false));
+      const checkboxInput = jsStringLiteral(fieldCheckboxInputCls);
+      const optionTextCls = jsStringLiteral(fieldOptionTextCls);
       jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(fieldOptionGroupCls)}>`);
       pushOptions(
         jsxLines,
@@ -310,9 +431,9 @@ const pushFieldMarkup = (
         4,
         f,
         (value, textExpr) =>
-          `<label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" value={${jsStringLiteral(value)}} checked={${selectedExpr}.includes(${jsStringLiteral(value)})} onChange={() => { const cur = ${selectedExpr}; const next = cur.includes(${jsStringLiteral(value)}) ? cur.filter(v => v !== ${jsStringLiteral(value)}) : [...cur, ${jsStringLiteral(value)}]; ${setParamsVar}(prev => ({ ...prev, ['${id}']: next.join(',') })); }} className="w-4 h-4 rounded cursor-pointer" /><span className="text-sm">{${textExpr}}</span></label>`,
+          `<label className=${optionLabelCls}><input type="checkbox" value={${jsStringLiteral(value)}} checked={${selectedExpr}.includes(${jsStringLiteral(value)})} onChange={() => { const cur = ${selectedExpr}; const next = cur.includes(${jsStringLiteral(value)}) ? cur.filter(v => v !== ${jsStringLiteral(value)}) : [...cur, ${jsStringLiteral(value)}]; ${setParamsVar}(prev => ({ ...prev, ['${id}']: next.join(',') })); }} className=${checkboxInput} /><span className=${optionTextCls}>{${textExpr}}</span></label>`,
         () =>
-          `{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" value={d.code} checked={${selectedExpr}.includes(d.code)} onChange={() => { const cur = ${selectedExpr}; const next = cur.includes(d.code) ? cur.filter(v => v !== d.code) : [...cur, d.code]; ${setParamsVar}(prev => ({ ...prev, ['${id}']: next.join(',') })); }} className="w-4 h-4 rounded cursor-pointer" /><span className="text-sm">{t(d.nameMsgKey || d.name)}</span></label>)}`
+          `{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className=${optionLabelCls}><input type="checkbox" value={d.code} checked={${selectedExpr}.includes(d.code)} onChange={() => { const cur = ${selectedExpr}; const next = cur.includes(d.code) ? cur.filter(v => v !== d.code) : [...cur, d.code]; ${setParamsVar}(prev => ({ ...prev, ['${id}']: next.join(',') })); }} className=${checkboxInput} /><span className=${optionTextCls}>{t(d.nameMsgKey || d.name)}</span></label>)}`
       );
       jsxLines.push(`${ind(3)}</div>`);
       break;
@@ -375,12 +496,13 @@ const buildUnhandled = (widget: SearchWidget, supportedFields: SearchFieldConfig
     HANDLED_WIDGET_KEYS,
     new Set(IGNORED_WIDGET_KEYS.keys())
   );
-  const ignoredFieldKeySet = new Set(IGNORED_FIELD_KEYS.keys());
   const fieldUnhandledSet = new Set<string>();
   supportedFields.forEach((f) => {
-    collectUnhandledKeys(f as unknown as Record<string, unknown>, HANDLED_FIELD_KEYS, ignoredFieldKeySet).forEach((k) =>
-      fieldUnhandledSet.add(k)
-    );
+    collectUnhandledKeys(
+      f as unknown as Record<string, unknown>,
+      handledFieldKeysFor(f),
+      ignoredFieldKeysFor(f)
+    ).forEach((k) => fieldUnhandledSet.add(k));
   });
   return [
     { scope: "widget", keys: widgetUnhandled },
@@ -403,9 +525,9 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   const needsCalendar = supportedFields.some((f) => f.type === "dateRange");
   const needsCodeGroup = supportedFields.some((f) => f.codeGroupCode);
   const needsHideCondition = supportedFields.some((f) => f.hideCondition);
+  const needsCodeLabel = supportedFields.some(isCodeLabelInput);
   const needsI18n = isSimple || needsI18nOf(supportedFields);
 
-  /* id를 fieldKey||varName(label)로 치환 — 충돌 시 이 위젯은 원본 id로 전체 폴백 */
   const idCandidates = supportedFields.map((f) => fieldVar(f));
   const hasIdCollision = new Set(idCandidates).size !== idCandidates.length;
   const substitutedFields = supportedFields.map((f, i) =>
@@ -413,7 +535,6 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   );
   const idFor = (idx: number): string => substitutedFields[idx].id;
 
-  /* 리터럴 프루닝 자기검증 — 원본 config와 추린 리터럴이 동일한 파라미터를 만드는지 실측 비교 (§5.1.2 D7) */
   const prunedFields = substitutedFields.map((f) => buildPrunedFieldLiteral(f, f.id));
   const probeSv = buildProbeSv(substitutedFields.map((f) => ({ id: f.id, type: f.type })));
   const fullResult = buildSearchQueryParams(substitutedFields, probeSv);
@@ -436,6 +557,9 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   if (needsI18n) imports.push({ module: "@/hooks/use-i18n", named: ["useI18n"] });
   if (needsHideCondition) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["evalFieldCondition"] });
+  }
+  if (needsCodeLabel) {
+    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveCodeLabel"] });
   }
 
   const helperLines: string[] = [];
@@ -515,10 +639,9 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   if (isSimple) {
     const row = widget.rows[0];
     const cols = row?.cols ?? 5;
-    const gridColsCls = GRID_COLS_LITERAL[cols] ?? "grid-cols-5";
-    jsxLines.push(emitContainerOpen({ className: "flex items-center gap-3 bg-white px-4" }));
+    jsxLines.push(emitContainerOpen({ className: SEARCH_SIMPLE_CONTAINER_CLS }));
     jsxLines.push(
-      `${ind(1)}<div className="flex-1 grid ${gridColsCls} gap-4" onKeyDown={e => { if (isEnterSearchTrigger(e)) handleSearch${suffix}(); }}>`
+      `${ind(1)}<div className=${jsStringLiteral(searchSimpleGridClass(cols))} onKeyDown={e => { if (isEnterSearchTrigger(e)) handleSearch${suffix}(); }}>`
     );
     (row?.fields ?? []).forEach((f) => {
       if (f.type === "hidden") return;
@@ -530,9 +653,9 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
       }
       const idx = supportedFields.indexOf(f);
       const id = idFor(idx);
-      const colSpanCls = COL_SPAN_LITERAL[Math.min(f.colSpan ?? 1, cols)] ?? "col-span-1";
+      const colSpanCls = searchSimpleColSpanClass(f.colSpan ?? 1, cols);
       const fieldLines: string[] = [];
-      fieldLines.push(`${ind(2)}<div className="${colSpanCls}">`);
+      fieldLines.push(`${ind(2)}<div className=${jsStringLiteral(colSpanCls)}>`);
       pushFieldMarkup(fieldLines, ind, f, id, paramsVar, setParamsVar);
       fieldLines.push(`${ind(2)}</div>`);
       wrapHideCondition(f, ind, 2, keyToIdVar, paramsVar, fieldLines).forEach((l) => jsxLines.push(l));
@@ -540,19 +663,15 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
     jsxLines.push(`${ind(1)}</div>`);
     jsxLines.push(`${ind(1)}<button`);
     jsxLines.push(`${ind(2)}onClick={handleReset${suffix}}`);
-    jsxLines.push(
-      `${ind(2)}className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"`
-    );
+    jsxLines.push(`${ind(2)}className=${jsStringLiteral(SEARCH_RESET_BTN_CLS)}`);
     jsxLines.push(`${ind(1)}>`);
-    jsxLines.push(`${ind(2)}<RotateCcw className="w-3 h-3" /> {t('common.btn.reset')}`);
+    jsxLines.push(`${ind(2)}<RotateCcw className=${jsStringLiteral(SEARCH_BTN_ICON_CLS)} /> {t('common.btn.reset')}`);
     jsxLines.push(`${ind(1)}</button>`);
     jsxLines.push(`${ind(1)}<button`);
     jsxLines.push(`${ind(2)}onClick={handleSearch${suffix}}`);
-    jsxLines.push(
-      `${ind(2)}className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"`
-    );
+    jsxLines.push(`${ind(2)}className=${jsStringLiteral(SEARCH_SUBMIT_BTN_CLS)}`);
     jsxLines.push(`${ind(1)}>`);
-    jsxLines.push(`${ind(2)}<Search className="w-3 h-3" /> {t('common.btn.search')}`);
+    jsxLines.push(`${ind(2)}<Search className=${jsStringLiteral(SEARCH_BTN_ICON_CLS)} /> {t('common.btn.search')}`);
     jsxLines.push(`${ind(1)}</button>`);
     jsxLines.push(emitContainerClose());
     if (widget.rows.length > 1) {

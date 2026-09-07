@@ -28,7 +28,6 @@ import { Image as ImageIcon } from "lucide-react";
 /* 에디터는 SSR 불가 — 클라이언트에서만 로드 */
 const WysiwygEditor = dynamic(() => import("@/components/common/wysiwyg-editor"), { ssr: false });
 const TiptapEditor = dynamic(() => import("@/components/common/tiptap-editor"), { ssr: false });
-import { ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { SearchFieldConfig, CodeGroupDef } from "../../types";
 import {
   inputCls,
@@ -36,13 +35,51 @@ import {
   fieldCharCountCls,
   fieldCharCountPadCls,
   fieldOptionGroupCls,
-  FIELD_LABEL_HEIGHT_PX,
-  FIELD_DESC_HEIGHT_PX,
-  FIELD_CELL_SLACK_PX,
+  fieldContentHeight,
+  fieldOptionItemClass,
+  fieldOptionTextCls,
+  fieldRadioInputCls,
+  fieldCheckboxInputCls,
+  readonlyFieldCls,
+  textareaFlexCls,
+  textareaFullCls,
+  textareaCharCountWrapCls,
+  textareaCharCountCls,
+  imageDropZoneClass,
+  imagePlaceholderCls,
+  imagePlaceholderStaticCls,
+  imageCellExistingCls,
+  imageCellNewCls,
+  imageRemoveBtnCls,
+  imageAddCellCls,
+  fileInfoBarCls,
+  fileInfoBarBtnCls,
+  fileInfoBarSizeCls,
+  fieldRelativeWrapCls,
+  fieldDateRangeInputPadCls,
+  textareaStaticCls,
+  imagePlaceholderIconCls,
+  imagePlaceholderTitleCls,
+  imagePlaceholderInfoCls,
+  imageGridWrapCls,
+  imageGridCls,
+  imageCellBodyCls,
+  imagePreviewImgCls,
+  imageFallbackBoxCls,
+  imageFallbackIconCls,
+  imageRemoveIconCls,
+  imageAddIconCls,
+  imageAddTextCls,
+  actionButtonClass,
 } from "../../styles";
 import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS, SELECT_ALL_PLACEHOLDER, SELECT_ALL_MSG_KEY } from "../../constants";
 import { SelectArrow } from "../SelectArrow";
-import { SEARCH_DATE_ICON_CLS, SEARCH_DATE_RANGE_SEP_CLS } from "./rendererStyles";
+import {
+  SEARCH_DATE_ICON_CLS,
+  SEARCH_DATE_RANGE_SEP_CLS,
+  SEARCH_DATE_RANGE_WRAP_CLS,
+  SEARCH_DATE_RANGE_INPUT_WRAP_CLS,
+} from "./rendererStyles";
 
 /** bytes → 사람이 읽기 쉬운 단위로 변환 (1MB 미만이면 KB, 이상이면 MB) */
 const fmtSize = (bytes: number) =>
@@ -61,38 +98,14 @@ import {
   getImageNaturalSize,
   unitToBytes,
   checkImagePixelLimit,
+  resolveFieldOptions,
+  filterByAccept,
 } from "../../utils";
 import { searchAddressPredictions, getAddressDetail, type AddressPrediction } from "../../utils/googlePlaces";
 import type { RendererMode } from "./types";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { PortalDropdown } from "@/components/ui/portal-dropdown";
-
-/**
- * 필드 위쪽에 그려지는 라벨/설명이 차지하는 높이(px).
- * 실제로 무엇을 그리는지는 호출하는 렌더러가 알고 있으므로, 렌더러가 직접 계산해 넘긴다.
- * (SubListRenderer처럼 라벨·설명을 전혀 그리지 않는 렌더러는 자기 값을 명시한다)
- */
-export function fieldChromeHeight(hasLabel: boolean, hasDesc: boolean): number {
-  return (hasLabel ? FIELD_LABEL_HEIGHT_PX : 0) + (hasDesc ? FIELD_DESC_HEIGHT_PX : 0);
-}
-
-/**
- * file/image/video/media/editor 필드의 실제 콘텐츠 영역 높이(px)를 계산한다.
- * GridCell 실제 트랙 높이 공식(rowSpan × ROW_HEIGHT - GAP_SIZE)에서
- * 라벨/설명 영역(chromeHeight)과 여유분을 뺀 나머지를 콘텐츠 높이로 사용한다.
- */
-function fieldContentHeight(
-  field: SearchFieldConfig,
-  rowSpan: number,
-  chromeHeight?: number,
-  rowPitch: number = ROW_HEIGHT
-): number {
-  const chrome =
-    chromeHeight ??
-    fieldChromeHeight(!!(field.label || field.labelMsgKey), !!(field.description || field.descriptionMsgKey));
-  return rowSpan * rowPitch - GAP_SIZE - chrome - FIELD_CELL_SLACK_PX;
-}
 
 /**
  * 서버에 저장된 파일 다운로드
@@ -145,23 +158,6 @@ function getAcceptStr(mode: string, customExts: string[]): string {
   if (mode === "video") return FILE_TYPE_PRESETS.video;
   if (mode === "custom") return customExts.join(",");
   return "";
-}
-
-/**
- * 선택된 파일 목록에서 허용 확장자를 벗어난 파일 걸러내기
- * accept 문자열이 비어있으면 모든 파일 허용
- */
-function filterByAccept(files: File[], acceptStr: string): { valid: File[]; rejected: string[] } {
-  if (!acceptStr) return { valid: files, rejected: [] };
-  const exts = new Set(acceptStr.split(",").map((e) => e.trim().toLowerCase()));
-  const valid: File[] = [];
-  const rejected: string[] = [];
-  for (const f of files) {
-    const ext = "." + (f.name.split(".").pop() ?? "").toLowerCase();
-    if (exts.has(ext)) valid.push(f);
-    else rejected.push(f.name);
-  }
-  return { valid, rejected };
 }
 
 /**
@@ -228,23 +224,6 @@ interface FieldRendererProps {
   /** file/image/video/media/editor 콘텐츠 높이 계산에 쓰는 행 간격(px) — 미지정 시 ROW_HEIGHT 사용 */
   contentRowPitch?: number;
 }
-
-/**
- * 공통코드 → 옵션 문자열 배열 변환
- * codeGroupCode 있으면 codeGroups에서 해당 그룹 조회, 없으면 field.options 반환
- */
-const resolveOptions = (field: SearchFieldConfig, codeGroups: CodeGroupDef[]): string[] => {
-  if (field.codeGroupCode) {
-    return (
-      codeGroups
-        .find((g) => g.groupCode === field.codeGroupCode)
-        ?.details.filter((d) => d.active)
-        /* nameMsgKey 있으면 msgKey를 text로 저장 → FieldRenderer에서 t(text)로 번역 */
-        .map((d) => `${d.nameMsgKey ? d.nameMsgKey : d.name}:${d.code}`) ?? []
-    );
-  }
-  return field.options ?? [];
-};
 
 /**
  * 파일 선택 입력 — useRef + programmatic click() 방식
@@ -365,15 +344,10 @@ const FILE_INFO_BAR_HEIGHT = 26;
 function FileInfoBar({ name, size, onDownload }: { name: string; size: number; onDownload: () => void }) {
   const { t } = useI18n();
   return (
-    <div className="flex-shrink-0 px-1.5 py-1 bg-slate-50/80 border-t border-slate-100">
-      <button
-        type="button"
-        title={t("common.field.download_hint")}
-        onClick={onDownload}
-        className="block w-full text-left text-xs font-medium truncate hover:text-blue-600 hover:underline transition-colors"
-      >
+    <div className={fileInfoBarCls}>
+      <button type="button" title={t("common.field.download_hint")} onClick={onDownload} className={fileInfoBarBtnCls}>
         {name}
-        <span className="text-[10px] text-slate-400 font-normal">({fmtSize(size)})</span>
+        <span className={fileInfoBarSizeCls}>({fmtSize(size)})</span>
       </button>
     </div>
   );
@@ -497,7 +471,7 @@ function AutocompleteInput({
   };
 
   /* 읽기 전용 스타일 */
-  const readonlyCls = isReadOnly ? " bg-slate-50 text-slate-500 cursor-default" : "";
+  const readonlyCls = isReadOnly ? readonlyFieldCls : "";
 
   return (
     <div className="relative" ref={wrapperRef}>
@@ -653,7 +627,7 @@ function AddressAutocompleteInput({
     onAddressSelect?.(detail.address, detail.lat, detail.lng);
   };
 
-  const readonlyCls = isReadOnly ? " bg-slate-50 text-slate-500 cursor-default" : "";
+  const readonlyCls = isReadOnly ? readonlyFieldCls : "";
 
   return (
     <div className="relative">
@@ -1040,11 +1014,11 @@ export function FieldRenderer({
   /* live 모드에서 읽기 전용 여부 */
   const isReadOnly = !isPreview && !!field.readonly;
   /* 읽기 전용 스타일 — 입력 불가 시각적 표시 */
-  const readonlyCls = isReadOnly ? " bg-slate-50 text-slate-500 cursor-default" : "";
+  const readonlyCls = isReadOnly ? readonlyFieldCls : "";
 
   /* preview: field.options 앞 3~4개 샘플, live: 실제 옵션 (공통코드 포함) */
   const previewOpts = field.options?.slice(0, 4) ?? [];
-  const liveOpts = resolveOptions(field, codeGroups);
+  const liveOpts = resolveFieldOptions(field, codeGroups);
   const opts = isPreview ? previewOpts : liveOpts;
 
   switch (field.type) {
@@ -1126,7 +1100,7 @@ export function FieldRenderer({
       );
       if (hasCharCount) {
         return (
-          <div className="relative">
+          <div className={fieldRelativeWrapCls}>
             {inputEl}
             <span className={fieldCharCountCls}>
               {value.length}/{field.maxLength}
@@ -1257,7 +1231,7 @@ export function FieldRenderer({
       }
       /* 수동/공통코드 기존 렌더링 */
       return (
-        <div className="relative">
+        <div className={fieldRelativeWrapCls}>
           <select
             disabled={isDisabled || isReadOnly}
             className={`${selectCls}${readonlyCls}`}
@@ -1354,15 +1328,15 @@ export function FieldRenderer({
       const endMin = field.disableEndPast ? endDefault || todayVal : undefined;
 
       return (
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+        <div className={SEARCH_DATE_RANGE_WRAP_CLS}>
+          <div className={SEARCH_DATE_RANGE_INPUT_WRAP_CLS}>
             <Calendar className={SEARCH_DATE_ICON_CLS} />
             <input
               type={inputType}
               step={subType === "timeSec" ? 1 : undefined}
               disabled={isDisabled}
               readOnly={isReadOnly}
-              className={`${inputCls} pl-9${readonlyCls}`}
+              className={`${inputCls} ${fieldDateRangeInputPadCls}${readonlyCls}`}
               value={from}
               min={startMin}
               onChange={isReadOnly ? undefined : (e) => onFromChange?.(e.target.value)}
@@ -1370,14 +1344,14 @@ export function FieldRenderer({
             />
           </div>
           <span className={SEARCH_DATE_RANGE_SEP_CLS}>~</span>
-          <div className="relative flex-1">
+          <div className={SEARCH_DATE_RANGE_INPUT_WRAP_CLS}>
             <Calendar className={SEARCH_DATE_ICON_CLS} />
             <input
               type={inputType}
               step={subType === "timeSec" ? 1 : undefined}
               disabled={isDisabled}
               readOnly={isReadOnly}
-              className={`${inputCls} pl-9${readonlyCls}`}
+              className={`${inputCls} ${fieldDateRangeInputPadCls}${readonlyCls}`}
               value={to}
               min={endMin}
               onChange={isReadOnly ? undefined : (e) => onToChange?.(e.target.value)}
@@ -1396,10 +1370,7 @@ export function FieldRenderer({
           {radioOpts.map((opt) => {
             const { text, value: val } = parseOpt(opt);
             return (
-              <label
-                key={opt}
-                className={`flex items-center gap-2 ${isReadOnly ? "cursor-default" : "cursor-pointer"}`}
-              >
+              <label key={opt} className={fieldOptionItemClass(isReadOnly)}>
                 <input
                   type="radio"
                   name={`${uid}-field-${field.id}`}
@@ -1407,9 +1378,9 @@ export function FieldRenderer({
                   value={val}
                   checked={!isPreview && value === val}
                   onChange={isReadOnly ? undefined : () => onChange?.(val)}
-                  className="w-4 h-4 cursor-pointer"
+                  className={fieldRadioInputCls}
                 />
-                <span className="text-sm text-slate-700">{t(text)}</span>
+                <span className={fieldOptionTextCls}>{t(text)}</span>
               </label>
             );
           })}
@@ -1427,10 +1398,7 @@ export function FieldRenderer({
             const { text, value: val } = parseOpt(opt);
             const isChecked = selected.includes(val);
             return (
-              <label
-                key={opt}
-                className={`flex items-center gap-2 ${isReadOnly ? "cursor-default" : "cursor-pointer"}`}
-              >
+              <label key={opt} className={fieldOptionItemClass(isReadOnly)}>
                 <input
                   type="checkbox"
                   disabled={isDisabled || isReadOnly}
@@ -1444,9 +1412,9 @@ export function FieldRenderer({
                           onChange?.(next.join(","));
                         }
                   }
-                  className="w-4 h-4 rounded cursor-pointer"
+                  className={fieldCheckboxInputCls}
                 />
-                <span className="text-sm text-slate-700">{t(text)}</span>
+                <span className={fieldOptionTextCls}>{t(text)}</span>
               </label>
             );
           })}
@@ -1524,7 +1492,7 @@ export function FieldRenderer({
           color: field.textColor || "#334155",
         };
         return (
-          <div style={style} className="whitespace-pre-wrap leading-relaxed px-1">
+          <div style={style} className={textareaStaticCls}>
             {field.contentMsgKey
               ? t(field.contentMsgKey)
               : field.content || value || <span className="text-slate-300 italic">{t("common.field.no_content")}</span>}
@@ -1535,11 +1503,11 @@ export function FieldRenderer({
       /* 글자수 표시 ON + maxLength 설정된 경우: 카운터 표시 */
       if (field.showCharCount && field.maxLength) {
         return (
-          <div className="flex flex-col h-full">
+          <div className={textareaCharCountWrapCls}>
             <textarea
               disabled={isDisabled}
               readOnly={isReadOnly}
-              className={`${inputCls} resize-none flex-1 min-h-0${readonlyCls}`}
+              className={`${inputCls} ${textareaFlexCls}${readonlyCls}`}
               value={value}
               maxLength={field.maxLength}
               placeholder={
@@ -1551,7 +1519,7 @@ export function FieldRenderer({
               }
               onChange={isReadOnly ? undefined : (e) => onChange(e.target.value)}
             />
-            <div className="text-right text-[10px] text-slate-400 mt-0.5">
+            <div className={textareaCharCountCls}>
               {value.length}/{field.maxLength}
             </div>
           </div>
@@ -1561,7 +1529,7 @@ export function FieldRenderer({
         <textarea
           disabled={isDisabled}
           readOnly={isReadOnly}
-          className={`${inputCls} resize-none h-full${readonlyCls}`}
+          className={`${inputCls} ${textareaFullCls}${readonlyCls}`}
           value={value}
           placeholder={
             isReadOnly
@@ -1577,32 +1545,6 @@ export function FieldRenderer({
 
     /* ── action-button ── */
     case "action-button": {
-      /* 버튼 색상 → Tailwind 정적 클래스 맵 (동적 문자열 사용 금지) */
-      /* 배경색 맵 */
-      const BG_COLOR_MAP: Record<string, string> = {
-        black: "bg-slate-900",
-        green: "bg-emerald-500",
-        blue: "bg-blue-500",
-        yellow: "bg-yellow-400",
-        red: "bg-red-500",
-        gray: "bg-slate-400",
-        pink: "bg-pink-400",
-      };
-      /* 글자색 맵 */
-      const TEXT_COLOR_MAP: Record<string, string> = {
-        white: "text-white",
-        black: "text-slate-900",
-        green: "text-emerald-500",
-        blue: "text-blue-500",
-        yellow: "text-yellow-400",
-        red: "text-red-500",
-        gray: "text-slate-400",
-        pink: "text-pink-400",
-      };
-
-      const bgCls = BG_COLOR_MAP[field.color ?? "black"] ?? BG_COLOR_MAP.black;
-      const textCls = TEXT_COLOR_MAP[field.textColor ?? "white"] ?? TEXT_COLOR_MAP.white;
-
       // 엑셀 다운로드 버튼은 preview 모드에서도 onButtonClick이 있으면 클릭 허용 (팝업 UI 미리보기용)
       const isActionDisabled = field.connType === "excel" && !!onButtonClick ? false : isDisabled;
 
@@ -1611,7 +1553,7 @@ export function FieldRenderer({
           type="button"
           disabled={isActionDisabled}
           onClick={onButtonClick}
-          className={`text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`}
+          className={actionButtonClass(field.color, field.textColor)}
         >
           {field.labelMsgKey ? t(field.labelMsgKey) : field.label || t("common.btn.default")}
         </button>
@@ -1819,9 +1761,9 @@ export function FieldRenderer({
       /* preview / live 빈 상태 공통 UI */
       const imgPlaceholder = (
         <>
-          <ImageIcon className="w-6 h-6" />
-          <span className="text-xs font-medium">{t("common.field.image_add")}</span>
-          <span className="text-[10px] text-center leading-relaxed">{imgFormatInfo}</span>
+          <ImageIcon className={imagePlaceholderIconCls} />
+          <span className={imagePlaceholderTitleCls}>{t("common.field.image_add")}</span>
+          <span className={imagePlaceholderInfoCls}>{imgFormatInfo}</span>
         </>
       );
 
@@ -1875,7 +1817,7 @@ export function FieldRenderer({
       return (
         <div
           style={{ height: imgHeight }}
-          className={`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? " opacity-75" : ""}`}
+          className={imageDropZoneClass(isReadOnly)}
           onDragOver={canAdd ? (e) => e.preventDefault() : undefined}
           onDrop={
             canAdd
@@ -1900,16 +1842,14 @@ export function FieldRenderer({
                     tabIndex={0}
                     onClick={() => inputRef.current?.click()}
                     onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-                    className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
+                    className={imagePlaceholderCls}
                   >
                     {imgPlaceholder}
                   </div>
                 )}
               />
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
-                {imgPlaceholder}
-              </div>
+              <div className={imagePlaceholderStaticCls}>{imgPlaceholder}</div>
             )
           ) : (
             (() => {
@@ -1937,9 +1877,9 @@ export function FieldRenderer({
               const cellH = Math.floor((containerH - PAD_PX - GAP_PX * (rows - 1)) / rows);
 
               return (
-                <div className="p-1 overflow-hidden" style={{ height: imgHeight }}>
+                <div className={imageGridWrapCls} style={{ height: imgHeight }}>
                   <div
-                    className="grid gap-1"
+                    className={imageGridCls}
                     style={{
                       gridTemplateColumns: `repeat(${cols}, 1fr)`,
                       gridAutoRows: `${cellH}px`,
@@ -1948,29 +1888,26 @@ export function FieldRenderer({
                     {displayItems.map((item, i) => {
                       if (item.kind === "existing") {
                         return (
-                          <div
-                            key={item.meta.id}
-                            className="relative rounded-md overflow-hidden border border-slate-200 group flex flex-col"
-                          >
-                            <div className="relative flex-1 min-h-0">
+                          <div key={item.meta.id} className={imageCellExistingCls}>
+                            <div className={imageCellBodyCls}>
                               {imgBlobUrls?.[item.meta.id] ? (
                                 <img
                                   src={imgBlobUrls[item.meta.id]}
                                   alt={item.meta.origName}
-                                  className="w-full h-full object-contain"
+                                  className={imagePreviewImgCls}
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                                  <ImageIcon className="w-5 h-5 text-slate-300" />
+                                <div className={imageFallbackBoxCls}>
+                                  <ImageIcon className={imageFallbackIconCls} />
                                 </div>
                               )}
                               {!isReadOnly && (
                                 <button
                                   type="button"
                                   onClick={() => onRemoveExisting?.(item.meta.id)}
-                                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className={imageRemoveBtnCls}
                                 >
-                                  <X className="w-2.5 h-2.5 text-white" />
+                                  <X className={imageRemoveIconCls} />
                                 </button>
                               )}
                             </div>
@@ -1991,19 +1928,16 @@ export function FieldRenderer({
                       }
                       if (item.kind === "new") {
                         return (
-                          <div
-                            key={`new-${item.idx}`}
-                            className="relative rounded-md overflow-hidden border border-blue-200 group flex flex-col"
-                          >
-                            <div className="relative flex-1 min-h-0">
-                              <FileImagePreview file={item.file} className="w-full h-full object-contain" />
+                          <div key={`new-${item.idx}`} className={imageCellNewCls}>
+                            <div className={imageCellBodyCls}>
+                              <FileImagePreview file={item.file} className={imagePreviewImgCls} />
                               {!isReadOnly && (
                                 <button
                                   type="button"
                                   onClick={() => onFileChange?.(fileList!.filter((_, fi) => fi !== item.idx))}
-                                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className={imageRemoveBtnCls}
                                 >
-                                  <X className="w-2.5 h-2.5 text-white" />
+                                  <X className={imageRemoveIconCls} />
                                 </button>
                               )}
                             </div>
@@ -2028,10 +1962,10 @@ export function FieldRenderer({
                               tabIndex={0}
                               onClick={() => inputRef.current?.click()}
                               onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-                              className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
+                              className={imageAddCellCls}
                             >
-                              <Plus className="w-4 h-4" />
-                              <span className="text-[10px] mt-0.5">{t("common.btn.add")}</span>
+                              <Plus className={imageAddIconCls} />
+                              <span className={imageAddTextCls}>{t("common.btn.add")}</span>
                             </div>
                           )}
                         />

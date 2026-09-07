@@ -3,9 +3,17 @@ import type { PageWidgetItem } from "../components/renderer/PageGridRenderer";
 import { generateSearchBlock } from "./widget/searchBlock";
 import { generateTableBlock } from "./widget/tableBlock";
 import { generateSpaceBlock } from "./widget/spaceBlock";
+import { generateFormBlock } from "./widget/formBlock";
+import { generateMultiSelectBlock } from "./widget/multiselectBlock";
 import { normalizeFormItemRowSpans, packedRowLayout } from "../utils/formGridLayout";
 import { getSpaceGridColumn } from "../utils";
-import { rendererContainerClassName, rendererContainerOverflow } from "../components/renderer/rendererStyles";
+import {
+  rendererContainerClassName,
+  rendererContainerOverflow,
+  SELECT_ARROW_CLS,
+  GENERATED_PAGE_ROOT_CLS,
+  GENERATED_UNSUPPORTED_WIDGET_CLS,
+} from "../components/renderer/rendererStyles";
 
 export type PageWidget = AnyWidget;
 export type PageWidgetType = AnyWidget["type"];
@@ -14,6 +22,7 @@ export interface ImportRequirement {
   module: string;
   named?: string[];
   defaultName?: string;
+  typeOnly?: boolean;
 }
 
 export interface UnhandledConfigKeys {
@@ -39,15 +48,66 @@ export interface WidgetGenContext {
   isEntity: boolean;
   contentColSpan: number;
   contentFillHeight: boolean;
+  pageSlug?: string;
+  leaveCheck: boolean;
+  leaveCheckNames: string[];
 }
+
+export const GENERATED_PAGE_BASE_CONST = "const GENERATED_PAGE_BASE = '/admin/generated';";
+
+export const formVarNames = (suffix: string) => ({
+  widget: `FORM_WIDGET_${suffix}`,
+  fields: `FORM_FIELDS_${suffix}`,
+  fieldById: `FORM_FIELD_BY_ID_${suffix}`,
+  fieldIds: `FORM_FIELD_IDS_${suffix}`,
+  keyToId: `FORM_KEY_TO_ID_${suffix}`,
+  evalCondition: `evalFieldCondition${suffix}`,
+  visibleFields: `visibleFields${suffix}`,
+  rowIsAuto: `fieldRowIsAuto${suffix}`,
+  imgBlobUrls: "imgBlobUrls",
+  values: `formValues${suffix}`,
+  setValues: `setFormValues${suffix}`,
+  files: `fileValues${suffix}`,
+  setFiles: `setFileValues${suffix}`,
+  existingMeta: `existingFileMeta${suffix}`,
+  setExistingMeta: `setExistingFileMeta${suffix}`,
+  change: `handleFieldChange${suffix}`,
+  blur: `handleFieldBlur${suffix}`,
+  fileChange: `handleFileChange${suffix}`,
+  removeExisting: `handleRemoveExisting${suffix}`,
+});
+
+export const multiSelectVarNames = (suffix: string) => ({
+  widget: `MULTISELECT_WIDGET_${suffix}`,
+  ids: `multiSelectIds${suffix}`,
+  setIds: `setMultiSelectIds${suffix}`,
+});
+
+export const PAGE_VAR = {
+  allFormValues: "allFormValues",
+  allFieldKeyToId: "allFieldKeyToId",
+  writeFormValue: "writeFormValue",
+  lastGeneratedRef: "lastGeneratedRef",
+  storedId: "storedId",
+  urlParams: "urlParams",
+  imgBlobUrls: "imgBlobUrls",
+  setImgBlobUrls: "setImgBlobUrls",
+  pendingDeleteFileIds: "pendingDeleteFileIds",
+  applyGenerations: "applyFieldGenerations",
+} as const;
+
+export const pageVar = (key: keyof typeof PAGE_VAR): string => PAGE_VAR[key];
 
 export type WidgetBlockGenerator = (widget: PageWidget, ctx: WidgetGenContext) => WidgetCodeBlock;
 
 export interface WidgetBuildOptions {
   pageTitle?: string;
+  pageTitleMsgKey?: string;
   mainConnectedSlug?: string;
   componentName?: string;
   isEntity?: boolean;
+  pageSlug?: string;
+  leaveCheck?: boolean;
 }
 
 export interface WidgetUnhandledEntry {
@@ -66,6 +126,8 @@ const WIDGET_BLOCK_GENERATORS: Partial<Record<PageWidgetType, WidgetBlockGenerat
   search: generateSearchBlock as WidgetBlockGenerator,
   table: generateTableBlock as WidgetBlockGenerator,
   space: generateSpaceBlock as WidgetBlockGenerator,
+  form: generateFormBlock as WidgetBlockGenerator,
+  multiselect: generateMultiSelectBlock as WidgetBlockGenerator,
 };
 
 const TYPE_LABEL: Record<PageWidgetType, string> = {
@@ -100,6 +162,10 @@ export interface ContainerOpenOptions {
   fillHeight?: boolean;
   contentColSpan?: number;
   rowIsAuto?: boolean[];
+  rowPitch?: number;
+  gapSize?: number;
+  contentPaddingTop?: number;
+  gridTemplateRowsExpr?: string;
 }
 
 export const emitContainerOpen = (o: ContainerOpenOptions): string => {
@@ -111,20 +177,32 @@ export const emitContainerOpen = (o: ContainerOpenOptions): string => {
   const styleParts = [`overflow: '${overflowValue}'`];
   if (o.bgColor) styleParts.push(`backgroundColor: '${o.bgColor}'`);
   if (o.contentColSpan) {
+    const custom = o.rowPitch !== undefined || o.gapSize !== undefined;
+    const trackExpr = custom ? `${(o.rowPitch ?? 80) - (o.gapSize ?? 8)}px` : "${ROW_HEIGHT - GAP_SIZE}px";
+    const gapExpr = custom ? `${o.gapSize ?? 8}px` : "${GAP_SIZE}px";
     styleParts.push(`display: 'grid'`);
     styleParts.push(`gridTemplateColumns: 'repeat(${o.contentColSpan}, 1fr)'`);
-    if (o.rowIsAuto && o.rowIsAuto.length > 0) {
-      const rowTracks = o.rowIsAuto.map((auto) => (auto ? "auto" : "${ROW_HEIGHT - GAP_SIZE}px")).join(" ");
+    if (o.gridTemplateRowsExpr) {
+      styleParts.push(`gridTemplateRows: ${o.gridTemplateRowsExpr}`);
+    } else if (o.rowIsAuto && o.rowIsAuto.length > 0) {
+      const rowTracks = o.rowIsAuto.map((auto) => (auto ? "auto" : trackExpr)).join(" ");
       styleParts.push("gridTemplateRows: `" + rowTracks + "`");
     }
-    styleParts.push("gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`");
-    styleParts.push("rowGap: `${GAP_SIZE}px`");
-    styleParts.push("columnGap: `${GAP_SIZE}px`");
+    styleParts.push("gridAutoRows: `" + trackExpr + "`");
+    styleParts.push("rowGap: `" + gapExpr + "`");
+    styleParts.push("columnGap: `" + gapExpr + "`");
+  }
+  if (o.contentPaddingTop) {
+    styleParts.push(`paddingTop: '${o.contentPaddingTop}px'`);
+    styleParts.push(`paddingBottom: '${o.contentPaddingTop}px'`);
   }
   return `<div className=${jsStringLiteral(cls)} style={{ ${styleParts.join(", ")} }}>`;
 };
 
 export const emitContainerClose = (): string => "</div>";
+
+export const emitSelectArrow = (ind: (n: number) => string, level: number): string =>
+  `${ind(level)}<svg className=${jsStringLiteral(SELECT_ARROW_CLS)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>`;
 
 const dedupeLines = (lines: string[]): string[] => {
   const seen = new Set<string>();
@@ -142,15 +220,42 @@ const dedupeLines = (lines: string[]): string[] => {
   return out;
 };
 
+const CLOSER_LINE = /^[)}\]]+[;,]?$/;
+
+const dedupeHelperChunks = (lines: string[]): string[] => {
+  const chunks: string[][] = [];
+  lines.forEach((line) => {
+    const isBlank = line.trim() === "";
+    const startsNewChunk = !isBlank && line === line.trimStart() && !CLOSER_LINE.test(line.trim());
+    if (isBlank || startsNewChunk || chunks.length === 0) chunks.push([line]);
+    else chunks[chunks.length - 1].push(line);
+  });
+  const seen = new Set<string>();
+  const out: string[] = [];
+  chunks.forEach((chunk) => {
+    const key = chunk.join("\n");
+    if (key.trim() === "") {
+      out.push(...chunk);
+      return;
+    }
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(...chunk);
+  });
+  return out;
+};
+
 const mergeImports = (all: ImportRequirement[]): ImportRequirement[] => {
   const map = new Map<string, ImportRequirement>();
   all.forEach((req) => {
-    const existing = map.get(req.module);
+    const mapKey = req.typeOnly ? `type:${req.module}` : req.module;
+    const existing = map.get(mapKey);
     if (!existing) {
-      map.set(req.module, {
+      map.set(mapKey, {
         module: req.module,
         named: req.named ? [...new Set(req.named)] : undefined,
         defaultName: req.defaultName,
+        typeOnly: req.typeOnly,
       });
       return;
     }
@@ -163,6 +268,7 @@ const mergeImports = (all: ImportRequirement[]): ImportRequirement[] => {
 
 const buildImportLines = (reqs: ImportRequirement[]): string[] =>
   reqs.map((req) => {
+    if (req.typeOnly) return `import type { ${(req.named ?? []).join(", ")} } from '${req.module}';`;
     if (req.defaultName && req.named && req.named.length > 0) {
       return `import ${req.defaultName}, { ${req.named.join(", ")} } from '${req.module}';`;
     }
@@ -171,6 +277,20 @@ const buildImportLines = (reqs: ImportRequirement[]): string[] =>
   });
 
 const widgetIdOf = (widget: PageWidget): string => widget.widgetId;
+
+const collectLeaveCheckNames = (allWidgets: PageWidget[]): string[] => {
+  const names: string[] = [];
+  const hasDirtySource = allWidgets.some((w) => w.type === "form" || w.type === "multiselect");
+  const spaceItems = allWidgets
+    .filter((w) => w.type === "space")
+    .flatMap((w) => (w as { items?: { type?: string; connType?: string }[] }).items ?? []);
+  const hasContentAction = spaceItems.some((it) => it.type === "action-button" && it.connType === "content");
+  const hasCloseAction = spaceItems.some((it) => it.type === "action-button" && it.connType === "close");
+  if (hasDirtySource) names.push("markDirty");
+  if (hasContentAction) names.push("markClean");
+  if (hasCloseAction) names.push("confirmLeave");
+  return names;
+};
 
 const buildUnsupportedBlock = (widget: PageWidget, suffix: string): WidgetCodeBlock => {
   const label = TYPE_LABEL[widget.type] ?? widget.type;
@@ -181,7 +301,7 @@ const buildUnsupportedBlock = (widget: PageWidget, suffix: string): WidgetCodeBl
     handlerLines: [],
     jsxLines: [
       `{/* TODO(파일빌드 Phase 2): ${label}(${widget.type}) 위젯은 아직 코드 생성이 지원되지 않습니다. 빌더 화면에서 확인 후 직접 구현해주세요. (widgetId: ${widgetIdOf(widget) || suffix}) */}`,
-      '<div className="border border-dashed border-slate-300 rounded-md p-4 text-xs text-slate-400 text-center">',
+      `<div className=${jsStringLiteral(GENERATED_UNSUPPORTED_WIDGET_CLS)}>`,
       `${label} 위젯 (미지원 — 직접 구현 필요)`,
       "</div>",
     ],
@@ -246,6 +366,8 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   const unsupportedSet = new Set<PageWidgetType>();
   const blockByWidget = new Map<PageWidget, WidgetCodeBlock>();
 
+  const leaveCheckNames = collectLeaveCheckNames(allWidgets);
+
   allWidgets.forEach((widget) => {
     const wid = widgetIdOf(widget);
     const suffix = suffixOf(wid);
@@ -259,6 +381,9 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
       isEntity,
       contentColSpan: contentColSpanByWidget.get(widget) ?? 12,
       contentFillHeight: contentFillHeightByWidget.get(widget) ?? true,
+      pageSlug: options.pageSlug,
+      leaveCheck: options.leaveCheck ?? false,
+      leaveCheckNames,
     };
     if (!generator) {
       unsupportedSet.add(widget.type);
@@ -289,15 +414,55 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   });
 
   const allBlocks = [...blockByWidget.values()];
-  const mergedImports = mergeImports(allBlocks.flatMap((b) => b.imports));
-  const helperLines = dedupeLines(allBlocks.flatMap((b) => b.helperLines));
-  const stateLines = dedupeLines(allBlocks.flatMap((b) => b.stateLines));
+
+  const pageImports: ImportRequirement[] = [];
+  const pageStateLines: string[] = [];
+  const hasPageTitle = !!(options.pageTitleMsgKey || options.pageTitle);
+  if (hasPageTitle) {
+    pageImports.push({ module: "@/store/use-page-title-store", named: ["usePageTitleStore"] });
+    pageStateLines.push(`${ind(1)}const setPageTitle = usePageTitleStore((s) => s.setPageTitle);`);
+    if (options.pageTitleMsgKey) {
+      pageImports.push({ module: "@/hooks/use-i18n", named: ["useI18n"] });
+      pageStateLines.push(`${ind(1)}const { t } = useI18n();`);
+      pageStateLines.push(
+        `${ind(1)}useEffect(() => { setPageTitle(t(${jsStringLiteral(options.pageTitleMsgKey)})); }, [setPageTitle, t]);`
+      );
+    } else {
+      pageStateLines.push(
+        `${ind(1)}useEffect(() => { setPageTitle(${jsStringLiteral(options.pageTitle ?? "")}); }, [setPageTitle]);`
+      );
+    }
+  }
+  if (leaveCheckNames.length > 0) {
+    pageImports.push({
+      module: "@/app/admin/templates/make/_shared/hooks/useLeaveCheck",
+      named: ["useLeaveCheck"],
+    });
+    pageStateLines.push(
+      `${ind(1)}const { ${leaveCheckNames.join(", ")} } = useLeaveCheck(${options.leaveCheck ? "true" : "false"});`
+    );
+  }
+
+  const collectedImports = [...pageImports, ...allBlocks.flatMap((b) => b.imports)];
+  const reactNamed = new Set<string>(["useState", "useEffect"]);
+  collectedImports
+    .filter((r) => r.module === "react")
+    .forEach((r) => (r.named ?? []).forEach((n) => reactNamed.add(n)));
+  const mergedImports = mergeImports(collectedImports.filter((r) => r.module !== "react"));
+  const helperLines = dedupeHelperChunks(allBlocks.flatMap((b) => b.helperLines));
+  const stateLines = dedupeLines([...pageStateLines, ...allBlocks.flatMap((b) => b.stateLines)]);
   const handlerLines = allBlocks.flatMap((b) => b.handlerLines);
+
+  const REACT_HOOK_ORDER = ["useState", "useEffect", "useMemo", "useCallback", "useRef", "useId"];
+  const reactNamedOrdered = [
+    ...REACT_HOOK_ORDER.filter((n) => reactNamed.has(n)),
+    ...[...reactNamed].filter((n) => !REACT_HOOK_ORDER.includes(n)).sort(),
+  ];
 
   const lines: string[] = [];
   lines.push("'use client';");
   lines.push("");
-  lines.push("import React, { useState, useEffect } from 'react';");
+  lines.push(`import React, { ${reactNamedOrdered.join(", ")} } from 'react';`);
   lines.push("import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';");
   lines.push("import { PageGridContainer } from '@/components/layout/page-grid-container';");
   buildImportLines(mergedImports).forEach((l) => lines.push(l));
@@ -312,12 +477,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   handlerLines.forEach((l) => lines.push(l));
   if (handlerLines.length > 0) lines.push("");
   lines.push(`${ind(1)}return (`);
-  lines.push(`${ind(2)}<div className="space-y-3">`);
-  if (options.pageTitle) {
-    lines.push(
-      `${ind(3)}<h1 className="text-lg font-bold text-slate-900">{${jsStringLiteral(options.pageTitle)}}</h1>`
-    );
-  }
+  lines.push(`${ind(2)}<div className=${jsStringLiteral(GENERATED_PAGE_ROOT_CLS)}>`);
   lines.push(`${ind(3)}<PageGridContainer>`);
   normalizedItems.forEach((item, itemIdx) => {
     const autoHeightAttr = itemAutoHeightFlags[itemIdx] ? " autoHeight" : "";

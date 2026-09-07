@@ -3,7 +3,8 @@
  * - list/page.tsx, layer/page.tsx에서 공유
  */
 
-import { ROW_HEIGHT } from "@/components/layout/grid-cell";
+import { ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
+import type { SearchFieldConfig } from "./types";
 
 /** 기본 input 스타일 */
 export const inputCls =
@@ -64,3 +65,133 @@ export const FIELD_TEXT_LINE_HEIGHT_PX = 20;
 export const TAB_CHROME_HEIGHT_PX = 50;
 
 export const TAB_CHROME_ROWS = Math.ceil(TAB_CHROME_HEIGHT_PX / ROW_HEIGHT);
+
+export function fieldChromeHeight(hasLabel: boolean, hasDesc: boolean): number {
+  return (hasLabel ? FIELD_LABEL_HEIGHT_PX : 0) + (hasDesc ? FIELD_DESC_HEIGHT_PX : 0);
+}
+
+export function fieldContentHeight(
+  field: SearchFieldConfig,
+  rowSpan: number,
+  chromeHeight?: number,
+  rowPitch: number = ROW_HEIGHT
+): number {
+  const chrome =
+    chromeHeight ??
+    fieldChromeHeight(!!(field.label || field.labelMsgKey), !!(field.description || field.descriptionMsgKey));
+  return rowSpan * rowPitch - GAP_SIZE - chrome - FIELD_CELL_SLACK_PX;
+}
+
+export const fieldRequiredMarkCls = "text-red-500 ml-0.5";
+
+export const formTitleBlockCls = "flex flex-col justify-center px-3";
+
+export const formTitleCls = "text-sm font-bold text-slate-900";
+
+export const formTitleDescCls = "text-xs text-slate-400 mt-0.5";
+
+export const formFieldCellCls = "flex flex-col px-3 min-w-0";
+
+export function fieldOptionItemClass(isReadOnly: boolean): string {
+  return `flex items-center gap-2 ${isReadOnly ? "cursor-default" : "cursor-pointer"}`;
+}
+
+export const fieldOptionTextCls = "text-sm text-slate-700";
+
+export const fieldRadioInputCls = "w-4 h-4 cursor-pointer";
+
+export const fieldCheckboxInputCls = "w-4 h-4 rounded cursor-pointer";
+
+export const readonlyFieldCls = " bg-slate-50 text-slate-500 cursor-default";
+
+export const textareaFlexCls = "resize-none flex-1 min-h-0";
+
+export const textareaFullCls = "resize-none h-full";
+
+export const textareaCharCountWrapCls = "flex flex-col h-full";
+
+export const textareaCharCountCls = "text-right text-[10px] text-slate-400 mt-0.5";
+
+export function imageDropZoneClass(isReadOnly: boolean): string {
+  return `flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? " opacity-75" : ""}`;
+}
+
+export const imagePlaceholderCls =
+  "flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all";
+
+export const imagePlaceholderStaticCls =
+  "flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none";
+
+export const imageCellExistingCls = "relative rounded-md overflow-hidden border border-slate-200 group flex flex-col";
+
+export const imageCellNewCls = "relative rounded-md overflow-hidden border border-blue-200 group flex flex-col";
+
+export const imageRemoveBtnCls =
+  "absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity";
+
+export const imageAddCellCls =
+  "flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all";
+
+export const fileInfoBarCls = "flex-shrink-0 px-1.5 py-1 bg-slate-50/80 border-t border-slate-100";
+
+export const fileInfoBarBtnCls =
+  "block w-full text-left text-xs font-medium truncate hover:text-blue-600 hover:underline transition-colors";
+
+export const fileInfoBarSizeCls = "text-[10px] text-slate-400 font-normal";
+
+export const fieldRelativeWrapCls = "relative";
+
+export const fieldDateRangeInputPadCls = "pl-9";
+
+export const textareaStaticCls = "whitespace-pre-wrap leading-relaxed px-1";
+
+export const imagePlaceholderIconCls = "w-6 h-6";
+
+export const imagePlaceholderTitleCls = "text-xs font-medium";
+
+export const imagePlaceholderInfoCls = "text-[10px] text-center leading-relaxed";
+
+export const imageGridWrapCls = "p-1 overflow-hidden";
+
+export const imageGridCls = "grid gap-1";
+
+export const imageCellBodyCls = "relative flex-1 min-h-0";
+
+export const imagePreviewImgCls = "w-full h-full object-contain";
+
+export const imageFallbackBoxCls = "w-full h-full flex items-center justify-center bg-slate-100";
+
+export const imageFallbackIconCls = "w-5 h-5 text-slate-300";
+
+export const imageRemoveIconCls = "w-2.5 h-2.5 text-white";
+
+export const imageAddIconCls = "w-4 h-4";
+
+export const imageAddTextCls = "text-[10px] mt-0.5";
+
+export const ACTION_BUTTON_BG_CLS: Readonly<Record<string, string>> = {
+  black: "bg-slate-900",
+  green: "bg-emerald-500",
+  blue: "bg-blue-500",
+  yellow: "bg-yellow-400",
+  red: "bg-red-500",
+  gray: "bg-slate-400",
+  pink: "bg-pink-400",
+};
+
+export const ACTION_BUTTON_TEXT_CLS: Readonly<Record<string, string>> = {
+  white: "text-white",
+  black: "text-slate-900",
+  green: "text-emerald-500",
+  blue: "text-blue-500",
+  yellow: "text-yellow-400",
+  red: "text-red-500",
+  gray: "text-slate-400",
+  pink: "text-pink-400",
+};
+
+export function actionButtonClass(color: string | undefined, textColor: string | undefined): string {
+  const bgCls = ACTION_BUTTON_BG_CLS[color ?? "black"] ?? ACTION_BUTTON_BG_CLS.black;
+  const textCls = ACTION_BUTTON_TEXT_CLS[textColor ?? "white"] ?? ACTION_BUTTON_TEXT_CLS.white;
+  return `text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default ${bgCls} ${textCls}`;
+}

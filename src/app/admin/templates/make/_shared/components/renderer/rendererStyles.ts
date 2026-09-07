@@ -7,8 +7,16 @@ export function rendererContainerOverflow(clipOverflow: boolean): "clip" | "visi
   return clipOverflow ? "clip" : "visible";
 }
 
+export const TABLE_CONTAINER_CLS = "bg-white";
 export const TABLE_COUNT_BAR_CLS =
   "flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100";
+export const TABLE_COUNT_TOTAL_CLS = "text-xs text-slate-500";
+export const TABLE_COUNT_RANGE_CLS = "text-xs text-slate-400";
+export const TABLE_SCROLL_WRAP_CLS = "overflow-x-auto";
+export const TABLE_CLS = "w-full text-sm";
+export const TABLE_HEADER_ROW_CLS = "border-b border-slate-200 bg-slate-50/80";
+export const TABLE_STATE_CELL_CLS = "py-16 text-center";
+export const TABLE_EMPTY_CELL_CLS = "py-16 text-center text-sm text-slate-400";
 export const TABLE_THEAD_CLS = "sticky top-0 z-10";
 export const TABLE_HEADER_CELL_CLS = "px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap";
 export const TABLE_HEADER_STATIC_TEXT_CLS = "flex items-center justify-center gap-1";
@@ -69,9 +77,14 @@ export function booleanCellClass(boolVal: boolean): string {
 
 export const DATE_CELL_CLS = "text-sm text-slate-700 truncate block";
 export const TEXT_CELL_CLS = "text-sm text-slate-700 truncate block";
+export const BADGE_FALLBACK_TEXT_CLS = "text-sm text-slate-600";
 
 export function spaceGroupClass(isActionButtonGroup: boolean, justifyClass: string): string {
   return `flex items-center-safe gap-2 px-3 min-w-0 ${isActionButtonGroup ? justifyClass : ""}`;
+}
+
+export function spaceJustifyClass(align: "left" | "center" | "right" | undefined): string {
+  return align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
 }
 
 export const SEARCH_SIMPLE_CONTAINER_CLS = "flex items-center gap-3 bg-white px-4";
@@ -79,9 +92,103 @@ export const SEARCH_RESET_BTN_CLS =
   "flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all";
 export const SEARCH_SUBMIT_BTN_CLS =
   "flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all";
+export const SEARCH_BTN_ICON_CLS = "w-3 h-3";
+
+export const SEARCH_GRID_COLS_CLS: Readonly<Record<number, string>> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-5",
+  6: "grid-cols-6",
+};
+
+export const SEARCH_COL_SPAN_CLS: Readonly<Record<number, string>> = {
+  1: "col-span-1",
+  2: "col-span-2",
+  3: "col-span-3",
+  4: "col-span-4",
+  5: "col-span-5",
+  6: "col-span-6",
+};
+
+export function searchSimpleGridClass(cols: number): string {
+  return `flex-1 grid ${SEARCH_GRID_COLS_CLS[cols] ?? "grid-cols-5"} gap-4`;
+}
+
+export function searchSimpleColSpanClass(colSpan: number, cols: number): string {
+  return SEARCH_COL_SPAN_CLS[Math.min(colSpan, cols)] ?? "col-span-1";
+}
 
 export const SEARCH_DATE_ICON_CLS =
   "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none";
 export const SEARCH_DATE_RANGE_SEP_CLS = "text-sm text-slate-400 flex-shrink-0";
+export const SEARCH_DATE_RANGE_WRAP_CLS = "flex items-center gap-2";
+export const SEARCH_DATE_RANGE_INPUT_WRAP_CLS = "relative flex-1";
 export const SELECT_ARROW_CLS =
   "absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none";
+
+export const MULTISELECT_BODY_CLS = "p-3 flex flex-col gap-3 h-full";
+export const MULTISELECT_TITLE_CLS = "text-sm font-medium text-slate-700";
+export const MULTISELECT_DESC_CLS = "text-xs text-slate-500";
+
+export function multiSelectFieldWrapClass(hasFieldWidth: boolean): string {
+  return hasFieldWidth ? "flex flex-col gap-3" : "contents";
+}
+
+export const MULTISELECT_TOGGLE_WRAP_CLS = "relative";
+export const MULTISELECT_TOGGLE_BTN_CLS =
+  "w-full flex items-center justify-between gap-2 px-3 py-2 border border-slate-300 rounded-md bg-white text-sm hover:border-slate-400 transition-colors disabled:cursor-default";
+
+export function multiSelectToggleTextClass(hasSelection: boolean): string {
+  return hasSelection ? "text-slate-800" : "text-slate-400";
+}
+
+export function multiSelectChevronClass(isOpen: boolean): string {
+  return `w-4 h-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`;
+}
+
+export const MULTISELECT_PANEL_CLS = "bg-white border border-slate-200 rounded-md shadow-lg";
+export const MULTISELECT_SEARCH_WRAP_CLS = "p-2 border-b border-slate-100";
+export const MULTISELECT_SEARCH_BOX_CLS =
+  "flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded border border-slate-200";
+export const MULTISELECT_SEARCH_ICON_CLS = "w-3.5 h-3.5 text-slate-400 shrink-0";
+export const MULTISELECT_SEARCH_INPUT_CLS =
+  "flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none";
+export const MULTISELECT_OPTION_LIST_CLS = "max-h-48 overflow-y-auto py-1";
+export const MULTISELECT_EMPTY_CLS = "px-3 py-2 text-xs text-slate-400 text-center";
+
+export function multiSelectOptionItemClass(isPreview: boolean): string {
+  return `flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors ${isPreview ? "cursor-default" : "cursor-pointer"}`;
+}
+
+export const MULTISELECT_CHECKBOX_CLS = "w-3.5 h-3.5 rounded border-slate-300 accent-slate-800";
+export const MULTISELECT_TAG_SCROLL_WRAP_CLS = "max-h-56 overflow-y-auto";
+export const MULTISELECT_TAG_LIST_CLS = "flex flex-col gap-1.5";
+export const MULTISELECT_TAG_ROW_CLS =
+  "bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto";
+export const MULTISELECT_TAG_TEXT_CLS = "text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap";
+export const MULTISELECT_TAG_REMOVE_BTN_CLS =
+  "ml-auto text-slate-400 hover:text-slate-600 transition-colors disabled:cursor-default shrink-0";
+
+export function tableActionButtonClass(action: "edit" | "delete" | "copy"): string {
+  return action === "delete"
+    ? "p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+    : "p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all";
+}
+
+export function tableCellJustifyClass(align: string | undefined): string {
+  return align === "center" ? "justify-center" : align === "right" ? "justify-end" : "justify-start";
+}
+
+export const TABLE_ACTIONS_WRAP_CLS = "flex items-center gap-1 flex-nowrap";
+export const TABLE_BUTTON_CELL_CLS = "px-2.5 py-1 rounded text-[11px] font-medium transition-all";
+export const TABLE_ACTION_ICON_CLS = "w-3.5 h-3.5";
+export const TABLE_BUTTON_WRAP_CLS = "flex";
+export const MULTISELECT_TAG_REMOVE_ICON_CLS = "w-3 h-3";
+
+export const GENERATED_PAGE_ROOT_CLS = "space-y-3";
+export const GENERATED_TABLE_SCROLL_MORE_CLS = "py-4 text-center text-xs text-slate-400";
+export const GENERATED_TABLE_UNSUPPORTED_CELL_CLS = "text-slate-300";
+export const GENERATED_UNSUPPORTED_WIDGET_CLS =
+  "border border-dashed border-slate-300 rounded-md p-4 text-xs text-slate-400 text-center";

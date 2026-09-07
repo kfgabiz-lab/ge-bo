@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
+import { usePageTitleStore } from "@/store/use-page-title-store";
+import { useI18n } from "@/hooks/use-i18n";
 import {
   buildSearchQueryParams,
   buildKeyToId,
@@ -12,15 +14,16 @@ import {
   evalColumnDataExpr,
   resolveEvalExprI18n,
   resolveCodeLabel,
+  parseActionParams,
+  normalizeExternalUrl,
 } from "@/app/admin/templates/make/_shared/utils";
 import { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
 import { isEnterSearchTrigger } from "@/components/search";
-import { RotateCcw, Search, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { RotateCcw, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
 import { useCodeStore } from "@/store/use-code-store";
-import { useI18n } from "@/hooks/use-i18n";
-import api from "@/lib/api";
+import { useRouter } from "next/navigation";
+import api, { getApiErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
-import { pagerNumberBtnClass } from "@/app/admin/templates/make/_shared/components/renderer/rendererStyles";
 
 const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   {
@@ -47,6 +50,7 @@ const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   },
 ];
 const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
+const GENERATED_PAGE_BASE = "/admin/generated";
 function formatCellDate(rawVal: string, format?: string): string {
   if (!rawVal) return "-";
   if (!format) return rawVal;
@@ -69,15 +73,29 @@ function formatCellDate(rawVal: string, format?: string): string {
 const SORT_EXPRTable1: Record<string, string> = {
   publishStatus: "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
 };
+const EDIT_PAGE_RULES_Table1: { connType?: string; pageSlug?: string; passParam?: string; conditionParam?: string }[] =
+  [
+    {
+      connType: "page",
+      pageSlug: "blog-basicInfo",
+      passParam: "update=1",
+      conditionParam: "",
+    },
+  ];
 
 export default function GeneratedPage() {
+  const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
   const { t } = useI18n();
+  useEffect(() => {
+    setPageTitle(t("common.label.blog"));
+  }, [setPageTitle, t]);
   const { groups, fetchGroups } = useCodeStore();
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
   const initialParamsSearch1: Record<string, string> = { "blog.is_visible": "", status: "", "blog.title": "" };
   const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1);
+  const router = useRouter();
   const [rowsTable1, setRowsTable1] = useState<Record<string, unknown>[]>([]);
   const [totalTable1, setTotalTable1] = useState(0);
   const [pageTable1, setPageTable1] = useState(0);
@@ -92,7 +110,7 @@ export default function GeneratedPage() {
 
   const handleResetSearch1 = () => {
     setParamsSearch1(initialParamsSearch1);
-    fetchDataTable1(0, true, { Search1: initialParamsSearch1 });
+    fetchDataTable1(0, true, { Search1: initialParamsSearch1 }, { sk: null, sd: "asc" });
   };
 
   const handleSearchSearch1 = () => {
@@ -167,6 +185,59 @@ export default function GeneratedPage() {
     const isCurrentCol = sortKeyTable1 === accessor;
     const dir = nextSortDir(isCurrentCol, isCurrentCol ? sortDirTable1 : null);
     fetchDataTable1(0, false, undefined, { sk: dir === null ? null : accessor, sd: dir ?? "asc" });
+  };
+
+  const handleTableEditTable1 = (row: Record<string, unknown>) => {
+    const matched =
+      EDIT_PAGE_RULES_Table1.find((rule) => {
+        if (!rule.conditionParam) return false;
+        const eqIdx = rule.conditionParam.indexOf("=");
+        if (eqIdx === -1) return false;
+        return String(row[rule.conditionParam.slice(0, eqIdx)] ?? "") === rule.conditionParam.slice(eqIdx + 1);
+      }) ?? EDIT_PAGE_RULES_Table1.find((rule) => !rule.conditionParam);
+    if (!matched?.pageSlug) return;
+    const params = new URLSearchParams();
+    if (row._id != null) params.set("id", String(row._id));
+    if (matched.passParam) {
+      Object.entries(parseActionParams(matched.passParam, row)).forEach(([k, v]) => params.set(k, v));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    /* TODO(파일빌드): 이동 대상 산출물이 아직 생성되지 않았다면 404가 납니다. */
+    router.push(`${GENERATED_PAGE_BASE}/${matched.pageSlug}${qs}`);
+  };
+
+  const handleTableDeleteTable1 = async (id: number) => {
+    if (!confirm(t("common.confirm.delete"))) return;
+    try {
+      await api.delete(`/page-data/${dataSlugTable1}/${id}`);
+      toast.success(t("common.deleted"));
+      fetchDataTable1(pageTable1);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, t("common.error.delete")));
+    }
+  };
+
+  const handleTableButtonTable1_7 = (row: Record<string, unknown>) => {
+    const popup = window.open("", "_blank", "width=800,height=600");
+    if (!popup) {
+      toast.error("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.");
+      return;
+    }
+    const recordId = String(row._id ?? "");
+    (async () => {
+      try {
+        const res = await api.post<{ token: string }>("/preview-tokens", { slug: dataSlugTable1, recordId });
+        const normalizedBase = normalizeExternalUrl("https://nahpdev-web.ls-electric.com/company/blog/detail/").replace(
+          /\/$/,
+          ""
+        );
+        const detailUrl = new URL(`${normalizedBase}/${recordId}`);
+        popup.location.href = `${detailUrl.origin}/preview?token=${encodeURIComponent(res.data.token)}&redirect=${encodeURIComponent(detailUrl.pathname)}`;
+      } catch {
+        popup.close();
+        toast.error("미리보기 토큰 발급에 실패했습니다.");
+      }
+    })();
   };
 
   return (
@@ -289,9 +360,10 @@ export default function GeneratedPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      /* TODO(파일빌드 Phase 2): connType='popup' 버튼 동작은 빌더 런타임 전용이라 파일빌드에서 지원하지 않습니다. 직접 구현해주세요. */
+                      /* TODO(파일빌드): 연결 대상(blog-basicInfo)이 빌더에서 레이어 팝업으로 설정돼 있어도 산출물은 페이지 이동으로 동작합니다. 산출물이 아직 생성되지 않았다면 404가 납니다. */
+                      router.push(`${GENERATED_PAGE_BASE}/blog-basicInfo`);
                     }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 bg-slate-900 text-white"
+                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
                   >
                     {t("blog.btn.add")}
                   </button>
@@ -589,15 +661,38 @@ export default function GeneratedPage() {
                               className="px-4 py-3 max-w-[200px] overflow-hidden"
                               style={{ textAlign: "center", width: "150px" }}
                             >
-                              {/* TODO(파일빌드 Phase 2): cellType='button' 컬럼은 아직 코드 생성이 지원되지 않습니다. */}
-                              <span className="text-slate-300">-</span>
+                              <div className="flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTableButtonTable1_7(row)}
+                                  className="px-2.5 py-1 rounded text-[11px] font-medium transition-all bg-slate-500 hover:bg-slate-600 text-white"
+                                >
+                                  {t("common.label.preview")}
+                                </button>
+                              </div>
                             </td>
                             <td
                               className="px-4 py-3 max-w-[200px] overflow-hidden"
                               style={{ textAlign: "center", width: "120px" }}
                             >
-                              {/* TODO(파일빌드 Phase 2): cellType='actions' 컬럼은 아직 코드 생성이 지원되지 않습니다. */}
-                              <span className="text-slate-300">-</span>
+                              <div className="flex items-center gap-1 flex-nowrap justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTableEditTable1(row)}
+                                  className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                  title={t("common.btn.edit")}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTableDeleteTable1(row._id as number)}
+                                  className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                  title={t("common.btn.delete")}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -618,7 +713,11 @@ export default function GeneratedPage() {
                       <button
                         key={p}
                         onClick={() => fetchDataTable1(p)}
-                        className={pagerNumberBtnClass(pageTable1 === p)}
+                        className={
+                          pageTable1 === p
+                            ? "px-2.5 py-1.5 text-xs rounded border transition-all bg-slate-900 text-white border-slate-900"
+                            : "px-2.5 py-1.5 text-xs rounded border transition-all border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }
                       >
                         {p + 1}
                       </button>

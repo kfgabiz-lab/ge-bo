@@ -45,7 +45,15 @@ import { nextSortDir, pageGroupRange } from "../../utils";
 import { TableCellRenderer } from "./TableCellRenderer";
 import { RendererContainer } from "./RendererContainer";
 import {
+  TABLE_CONTAINER_CLS,
   TABLE_COUNT_BAR_CLS,
+  TABLE_COUNT_TOTAL_CLS,
+  TABLE_COUNT_RANGE_CLS,
+  TABLE_SCROLL_WRAP_CLS,
+  TABLE_CLS,
+  TABLE_HEADER_ROW_CLS,
+  TABLE_STATE_CELL_CLS,
+  TABLE_EMPTY_CELL_CLS,
   TABLE_THEAD_CLS,
   TABLE_HEADER_CELL_CLS,
   TABLE_HEADER_STATIC_TEXT_CLS,
@@ -213,13 +221,13 @@ export function TableRenderer({
   return (
     /* RendererContainer — h-full w-full + 테두리 공통 처리
            scroll+live: flex-col 추가로 내부 스크롤 레이아웃 활성화 */
-    <RendererContainer className={`bg-white${isScroll && !isPreview ? " flex flex-col" : ""}`}>
+    <RendererContainer className={`${TABLE_CONTAINER_CLS}${isScroll && !isPreview ? " flex flex-col" : ""}`}>
       {/* 총 건수 / 표시 범위 (preview: 샘플값, live: 실제값) */}
       <div className={TABLE_COUNT_BAR_CLS}>
-        <p className="text-xs text-slate-500">
+        <p className={TABLE_COUNT_TOTAL_CLS}>
           {t("common.pagination.total", { count: isPreview ? "00" : totalElements.toLocaleString() })}
         </p>
-        <p className="text-xs text-slate-400">
+        <p className={TABLE_COUNT_RANGE_CLS}>
           {isPreview
             ? t("common.pagination.showing", { start: "1", end: String(pageSize) })
             : totalElements > 0
@@ -243,12 +251,12 @@ export function TableRenderer({
        */}
       <div
         ref={isScroll && !isPreview ? scrollContainerRef : undefined}
-        className={`overflow-x-auto${isScroll && !isPreview ? " flex-1 overflow-y-auto" : ""}`}
+        className={`${TABLE_SCROLL_WRAP_CLS}${isScroll && !isPreview ? " flex-1 overflow-y-auto" : ""}`}
       >
-        <table className="w-full text-sm">
+        <table className={TABLE_CLS}>
           {/* ── 헤더 ── */}
           <thead className={TABLE_THEAD_CLS}>
-            <tr className="border-b border-slate-200 bg-slate-50/80">
+            <tr className={TABLE_HEADER_ROW_CLS}>
               {/* 전체선택 체크박스 — enableRowSelection=true 일 때만 표시 */}
               {enableRowSelection && (
                 <th className="w-10 px-2 py-3 text-center flex-shrink-0 sticky left-0 z-20 bg-slate-50/80">
@@ -336,7 +344,7 @@ export function TableRenderer({
             ) : isLoading ? (
               /* live: 초기/검색 로딩 중 */
               <tr>
-                <td colSpan={columns.length} className="py-16 text-center">
+                <td colSpan={columns.length} className={TABLE_STATE_CELL_CLS}>
                   <span className="inline-flex items-center gap-2 text-sm text-slate-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     {t("common.table.loading")}
@@ -346,7 +354,7 @@ export function TableRenderer({
             ) : !data.length ? (
               /* live: 데이터 없음 */
               <tr>
-                <td colSpan={columns.length} className="py-16 text-center text-sm text-slate-400">
+                <td colSpan={columns.length} className={TABLE_EMPTY_CELL_CLS}>
                   {t("common.table.no_data")}
                 </td>
               </tr>

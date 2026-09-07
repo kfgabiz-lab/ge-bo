@@ -2919,3 +2919,140 @@ export function buildDateRangeStatusSortExpr(col: TableColumnConfig): string | u
   const toKey = `${col.linkedDateRangeKey}_to`;
   return `${fromKey}>${nowToken}?'1':${toKey}<${nowToken}?'3':'2'`;
 }
+
+export function findSection(
+  dataJson: Record<string, unknown>,
+  contentKey: string | undefined
+): Record<string, unknown> {
+  if (!contentKey) return dataJson;
+  if (dataJson[contentKey] && typeof dataJson[contentKey] === "object") {
+    return dataJson[contentKey] as Record<string, unknown>;
+  }
+  for (const [key, val] of Object.entries(dataJson)) {
+    if (key.startsWith("_fetchedRel")) continue;
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      const nested = (val as Record<string, unknown>)[contentKey];
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        return nested as Record<string, unknown>;
+      }
+    }
+  }
+  return dataJson;
+}
+
+export function buildFormValuesFromDataJson(
+  dataJson: Record<string, unknown>,
+  forms: import("./components/builder/FormBuilder").FormWidget[],
+  t?: (key: string) => string
+): Record<string, Record<string, string>> {
+  const result: Record<string, Record<string, string>> = {};
+  forms.forEach((fw) => {
+    const section = findSection(dataJson, fw.contentKey);
+    const vals: Record<string, string> = {};
+    fw.fields.forEach((f) => {
+      const key = f.fieldKey || f.label;
+      if (!key) return;
+      if (f.type === "dateRange" || f.type === "yearMonthRange") {
+        const fromVal = f.fieldKey2 ? section[key] : section[key + "_from"];
+        const toVal = f.fieldKey2 ? section[f.fieldKey2] : section[key + "_to"];
+        if (fromVal === undefined && toVal === undefined) {
+          Object.assign(vals, computeFieldDefaultValue(f, t));
+        } else {
+          if (fromVal !== undefined) vals[f.id + "_from"] = String(fromVal ?? "");
+          if (toVal !== undefined) vals[f.id + "_to"] = String(toVal ?? "");
+        }
+      } else if (f.type === "address") {
+        const hasAddressVal =
+          section[key] !== undefined || section[key + "_lat"] !== undefined || section[key + "_lng"] !== undefined;
+        if (!hasAddressVal) {
+          Object.assign(vals, computeFieldDefaultValue(f, t));
+        } else {
+          if (section[key] !== undefined) vals[f.id] = String(section[key] ?? "");
+          if (section[key + "_lat"] !== undefined) vals[f.id + "_lat"] = String(section[key + "_lat"] ?? "");
+          if (section[key + "_lng"] !== undefined) vals[f.id + "_lng"] = String(section[key + "_lng"] ?? "");
+        }
+      } else if (section[key] !== undefined) {
+        const raw = section[key];
+        if (!Array.isArray(raw)) vals[f.id] = String(raw ?? "");
+      } else {
+        Object.assign(vals, computeFieldDefaultValue(f, t));
+      }
+    });
+    result[fw.widgetId] = vals;
+  });
+  return result;
+}
+
+export function buildFieldKeyIdAndLabelMaps(
+  forms: import("./components/builder/FormBuilder").FormWidget[],
+  t?: (key: string) => string
+): { allFieldKeyToId: Record<string, string>; allFieldLabels: Record<string, string> } {
+  const allFieldKeyToId: Record<string, string> = {};
+  const allFieldLabels: Record<string, string> = {};
+  forms.forEach((fw) => {
+    fw.fields?.forEach((f) => {
+      if (!f.fieldKey) return;
+      allFieldKeyToId[f.fieldKey] = f.id;
+      allFieldLabels[f.fieldKey] = String((f.labelMsgKey && t ? t(f.labelMsgKey) : f.label) || f.fieldKey);
+      if (fw.contentKey) allFieldKeyToId[`${fw.contentKey}.${f.fieldKey}`] = f.id;
+    });
+  });
+  return { allFieldKeyToId, allFieldLabels };
+}
+
+export function findMissingRequiredMultiSelect(
+  widgets: Array<{
+    type?: string;
+    widgetId?: string;
+    required?: boolean;
+    title?: string;
+    titleMsgKey?: string;
+    hideCondition?: string;
+  }>,
+  multiSelectValuesMap: Record<string, number[]>,
+  allFieldKeyToId: Record<string, string>,
+  allFormValues: Record<string, string>,
+  t?: (key: string) => string
+): string | null {
+  for (const mw of widgets) {
+    if (mw.type !== undefined && mw.type !== "multiselect") continue;
+    if (!mw.required) continue;
+    if (mw.hideCondition && evalWidgetHideCondition(mw.hideCondition, allFieldKeyToId, allFormValues)) continue;
+    if ((multiSelectValuesMap[mw.widgetId ?? ""] ?? []).length === 0) {
+      return mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
+    }
+  }
+  return null;
+}
+
+export const resolveFieldOptions = (
+  field: import("./types").SearchFieldConfig,
+  codeGroups: CodeGroupDef[]
+): string[] => {
+  if (field.codeGroupCode) {
+    return (
+      codeGroups
+        .find((g) => g.groupCode === field.codeGroupCode)
+        ?.details.filter((d) => d.active)
+        .map((d) => `${d.nameMsgKey ? d.nameMsgKey : d.name}:${d.code}`) ?? []
+    );
+  }
+  return field.options ?? [];
+};
+
+export function filterByAccept(files: File[], acceptStr: string): { valid: File[]; rejected: string[] } {
+  if (!acceptStr) return { valid: files, rejected: [] };
+  const exts = new Set(acceptStr.split(",").map((e) => e.trim().toLowerCase()));
+  const valid: File[] = [];
+  const rejected: string[] = [];
+  for (const f of files) {
+    const ext = "." + (f.name.split(".").pop() ?? "").toLowerCase();
+    if (exts.has(ext)) valid.push(f);
+    else rejected.push(f.name);
+  }
+  return { valid, rejected };
+}
+
+export function normalizeExternalUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}

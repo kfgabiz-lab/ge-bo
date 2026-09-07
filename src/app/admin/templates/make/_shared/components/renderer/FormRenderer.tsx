@@ -48,6 +48,11 @@ import {
   FORM_CONTENT_PADDING_TOP,
   FORM_FIELD_ROW_HEIGHT,
   FORM_FIELD_GAP,
+  fieldRequiredMarkCls,
+  formTitleBlockCls,
+  formTitleCls,
+  formTitleDescCls,
+  formFieldCellCls,
 } from "../../styles";
 import { calculateFormFieldRowTracks } from "../../utils/formGridLayout";
 
@@ -397,13 +402,10 @@ export function FormRenderer({
     >
       {/* 타이틀 — grid item으로 전체 너비 차지 (1행 고정) */}
       {hasTitleBlock && (
-        <div
-          className="flex flex-col justify-center px-3"
-          style={{ gridColumn: `span ${contentColSpan}`, gridRow: "span 1" }}
-        >
-          <h3 className="text-sm font-bold text-slate-900">{titleMsgKey ? t(titleMsgKey) : title}</h3>
+        <div className={formTitleBlockCls} style={{ gridColumn: `span ${contentColSpan}`, gridRow: "span 1" }}>
+          <h3 className={formTitleCls}>{titleMsgKey ? t(titleMsgKey) : title}</h3>
           {(descriptionMsgKey || description) && (
-            <p className="text-xs text-slate-400 mt-0.5">{descriptionMsgKey ? t(descriptionMsgKey) : description}</p>
+            <p className={formTitleDescCls}>{descriptionMsgKey ? t(descriptionMsgKey) : description}</p>
           )}
         </div>
       )}
@@ -414,7 +416,7 @@ export function FormRenderer({
         return (
           <div
             key={f.id}
-            className="flex flex-col px-3 min-w-0"
+            className={formFieldCellCls}
             style={{
               gridColumn: `span ${Math.min(f.colSpan, contentColSpan)}`,
               gridRow: `span ${f.rowSpan}`,
@@ -424,7 +426,7 @@ export function FormRenderer({
             {(f.labelMsgKey || f.label) && (
               <label className={fieldLabelCls}>
                 {f.labelMsgKey ? t(f.labelMsgKey) : f.label}
-                {f.required && <span className="text-red-500 ml-0.5">*</span>}
+                {f.required && <span className={fieldRequiredMarkCls}>*</span>}
               </label>
             )}
             {/* 설명 — descriptionMsgKey 우선, 없으면 description 직접 표시. 값 없으면 렌더링 스킵(공백 방지) */}

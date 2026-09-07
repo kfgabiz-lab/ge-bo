@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { FieldRenderer } from "./FieldRenderer";
 import { RendererContainer } from "./RendererContainer";
 import { calculateSpaceItemRowTracks } from "../../utils/formGridLayout";
-import { spaceGroupClass } from "./rendererStyles";
+import { spaceGroupClass, spaceJustifyClass } from "./rendererStyles";
 import type { SearchFieldConfig } from "../../types";
 import type { RendererMode } from "./types";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
@@ -193,7 +193,7 @@ export function SpaceRenderer({
     }
   });
 
-  const justifyClass = align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+  const justifyClass = spaceJustifyClass(align);
 
   return (
     /* RendererContainer — grid 배치 공통 처리 (FormRenderer와 동일한 방식) */

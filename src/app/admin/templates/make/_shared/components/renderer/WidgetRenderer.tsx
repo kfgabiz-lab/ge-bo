@@ -98,7 +98,8 @@ import {
   extractSubListRows,
   extractMultiSelectSelection,
   computeFieldDefaultValue,
-  evalWidgetHideCondition,
+  findMissingRequiredMultiSelect,
+  normalizeExternalUrl,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -358,11 +359,6 @@ interface WidgetRendererProps {
     /** Actions 파라미터 파싱 결과 — listGenerator가 setTablePopup 시 전달 */
     initialValues?: Record<string, string>;
   } | null;
-}
-
-/** 외부 URL 정규화 — 프로토콜(http/https)이 없으면 https:// 를 붙여준다 (버튼 셀 외부 URL 연결용) */
-function normalizeExternalUrl(url: string): string {
-  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
 /** dot notation으로 중첩 필드 값 업데이트 (inlineEdit 낙관적 업데이트용) */
@@ -1293,24 +1289,19 @@ export function WidgetRenderer({
         return;
 
       /* 유효성 검사 — multiselect 위젯별 required */
-      for (const c of saveMultiSelectContents) {
-        const mw = c.widget as {
-          widgetId?: string;
-          required?: boolean;
-          title?: string;
-          titleMsgKey?: string;
-          hideCondition?: string;
-        };
-        if (!mw.required) continue;
-        if (mw.hideCondition && evalWidgetHideCondition(mw.hideCondition, popupAllKeyToId, popupAllFormValues))
-          continue;
-        if ((popupMultiSelectValuesMap[mw.widgetId ?? ""] ?? []).length === 0) {
-          const title = mw.titleMsgKey ? (t ? t(mw.titleMsgKey) : mw.titleMsgKey) : mw.title || "다중선택";
-          toast.warning(
-            t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
-          );
-          return;
-        }
+      const missingMultiSelectTitle = findMissingRequiredMultiSelect(
+        saveMultiSelectContents.map((c) => c.widget),
+        popupMultiSelectValuesMap,
+        popupAllKeyToId,
+        popupAllFormValues,
+        t
+      );
+      if (missingMultiSelectTitle !== null) {
+        const title = missingMultiSelectTitle;
+        toast.warning(
+          t ? t("common.validation.multiselect_required", { title }) : `'${title}' 항목은 필수 선택입니다.`
+        );
+        return;
       }
 
       setPopupSaving(true);

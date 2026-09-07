@@ -2,8 +2,21 @@ import type { TableWidget } from "../../components/builder/TableBuilder";
 import type { SearchWidget } from "../../components/renderer/types";
 import type { CellType, TableColumnConfig } from "../../types";
 import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
-import { jsStringLiteral, collectUnhandledKeys, emitContainerOpen, emitContainerClose } from "../widgetGenerator";
 import {
+  jsStringLiteral,
+  collectUnhandledKeys,
+  emitContainerOpen,
+  emitContainerClose,
+  GENERATED_PAGE_BASE_CONST,
+} from "../widgetGenerator";
+import { CUSTOM_ACTION_COLORS } from "../../components/builder/fields/col-types";
+import {
+  TABLE_ACTIONS_WRAP_CLS,
+  TABLE_ACTION_ICON_CLS,
+  TABLE_BUTTON_CELL_CLS,
+  TABLE_BUTTON_WRAP_CLS,
+  tableActionButtonClass,
+  tableCellJustifyClass,
   TABLE_COUNT_BAR_CLS,
   TABLE_THEAD_CLS,
   TABLE_HEADER_CELL_CLS,
@@ -19,9 +32,23 @@ import {
   badgeShapeClass,
   DATE_CELL_CLS,
   TEXT_CELL_CLS,
+  BADGE_FALLBACK_TEXT_CLS,
+  booleanCellClass,
+  TABLE_CONTAINER_CLS,
+  TABLE_COUNT_TOTAL_CLS,
+  TABLE_COUNT_RANGE_CLS,
+  TABLE_SCROLL_WRAP_CLS,
+  TABLE_CLS,
+  TABLE_HEADER_ROW_CLS,
+  TABLE_EMPTY_CELL_CLS,
+  GENERATED_TABLE_SCROLL_MORE_CLS,
+  GENERATED_TABLE_UNSUPPORTED_CELL_CLS,
+  pagerNumberBtnClass,
 } from "../../components/renderer/rendererStyles";
 
-const PHASE1_CELL_TYPES = new Set<CellType>(["text", "badge", "boolean", "date"]);
+const PHASE1_CELL_TYPES = new Set<CellType>(["text", "badge", "boolean", "date", "button", "actions"]);
+
+const SUPPORTED_ACTIONS = new Set(["edit", "delete"]);
 
 const FORMAT_CELL_DATE_HELPER: string[] = [
   "function formatCellDate(rawVal: string, format?: string): string {",
@@ -52,7 +79,7 @@ const HANDLED_TABLE_WIDGET_KEYS = new Set([
 const IGNORED_TABLE_WIDGET_KEYS = new Map<string, string>([
   [
     "contentKey",
-    "생성 코드는 컴포넌트 로컬 state이므로 파라미터 네임스페이스가 필요 없음 — useWidgetPageState.ts:333-443 fetchTableData도 contentKey 인자를 받지 않음",
+    "생성 코드는 컴포넌트 로컬 state이므로 파라미터 네임스페이스가 필요 없음 — useWidgetPageState.ts:281-391 fetchTableData도 contentKey 인자를 받지 않음",
   ],
 ]);
 
@@ -80,6 +107,17 @@ const HANDLED_COLUMN_KEYS = new Set([
   "dateFormat",
   "relationSlugId",
   "relationSlugIds",
+  "actions",
+  "editPageRules",
+  "connType",
+  "targetType",
+  "externalUrl",
+  "buttonLabel",
+  "buttonLabelMsgKey",
+  "buttonColor",
+  "usePreviewToken",
+  "windowPopupOption",
+  "passParam",
 ]);
 const IGNORED_COLUMN_KEYS = new Map<string, string>([
   [
@@ -88,11 +126,50 @@ const IGNORED_COLUMN_KEYS = new Map<string, string>([
   ],
 ]);
 
+const hasUnconditionalEditPageRule = (col: TableColumnConfig): boolean => {
+  const rules = col.editPageRules ?? [];
+  return rules.every((rule) => !!rule.pageSlug) && rules.some((rule) => !rule.conditionParam && !!rule.pageSlug);
+};
+
+interface ConditionalIgnoredColumnKey {
+  isIgnorable: (col: TableColumnConfig) => boolean;
+  reason: string;
+}
+
+const CONDITIONAL_IGNORED_COLUMN_KEYS = new Map<string, ConditionalIgnoredColumnKey>([
+  [
+    "editPopupSlug",
+    {
+      isIgnorable: hasUnconditionalEditPageRule,
+      reason:
+        "모든 editPageRule이 pageSlug를 가지고 그중 conditionParam이 빈 폴백 룰이 하나 이상 있는 컬럼에서만 IGNORED — WidgetRenderer.tsx:1825-1833의 matched는 find(conditionParam 매칭) ?? find(!conditionParam)이라 conditionParam이 매칭된 룰이 있으면 그 룰이 그대로 matched가 되고(pageSlug가 빈 문자열이어도 객체는 truthy라 ?? 폴백이 발동하지 않음) 폴백 룰은 쓰이지 않는다. 따라서 전 룰이 pageSlug를 가져야만 :1834 if (matched?.pageSlug)가 항상 성립해 :1855 return으로 끝나고 :1860의 editPopupSlug 분기에 도달할 수 없다. 룰 중 하나라도 pageSlug가 비었거나 폴백 룰이 없으면 런타임이 :1860에서 editPopupSlug를 읽으므로 IGNORED에서 제외하고 unhandled로 노출한다",
+    },
+  ],
+]);
+
+const ignoredColumnKeysFor = (col: TableColumnConfig): Set<string> => {
+  const keys = new Set(IGNORED_COLUMN_KEYS.keys());
+  CONDITIONAL_IGNORED_COLUMN_KEYS.forEach((policy, key) => {
+    if (policy.isIgnorable(col)) keys.add(key);
+  });
+  return keys;
+};
+
 const hasUnsupportedRelation = (col: TableColumnConfig): boolean =>
   !!col.relationSlugId || !!(col.relationSlugIds && col.relationSlugIds.length > 0);
 
-const isColumnSupported = (col: TableColumnConfig): boolean =>
-  PHASE1_CELL_TYPES.has(col.cellType) && !hasUnsupportedRelation(col);
+const isButtonColumnSupported = (col: TableColumnConfig): boolean =>
+  (col.targetType ?? "slug") === "url" && !!col.externalUrl;
+
+const isActionsColumnSupported = (col: TableColumnConfig): boolean =>
+  (col.actions ?? []).some((a) => SUPPORTED_ACTIONS.has(a));
+
+const isColumnSupported = (col: TableColumnConfig): boolean => {
+  if (!PHASE1_CELL_TYPES.has(col.cellType) || hasUnsupportedRelation(col)) return false;
+  if (col.cellType === "button") return isButtonColumnSupported(col);
+  if (col.cellType === "actions") return isActionsColumnSupported(col);
+  return true;
+};
 
 const headerExprOf = (col: TableColumnConfig): string => {
   if (col.headerMsgKey) return `t(${jsStringLiteral(col.headerMsgKey)})`;
@@ -130,18 +207,83 @@ const pushHeaderCell = (
   jsxLines.push(`${ind(2)}</th>`);
 };
 
-const pushBodyCell = (jsxLines: string[], ind: (n: number) => string, col: TableColumnConfig): void => {
+const unsupportedColumnReason = (col: TableColumnConfig): string => {
+  if (hasUnsupportedRelation(col)) {
+    return `relationSlugId 연동 컬럼은 formatFetchedRelMulti 런타임 경로라 파일빌드에서 지원하지 않습니다.`;
+  }
+  if (col.cellType === "button") {
+    return `button 셀은 targetType='url' + externalUrl 조합만 코드 생성이 지원됩니다. 내부 slug 이동/레이어 팝업은 직접 구현해주세요.`;
+  }
+  if (col.cellType === "actions") {
+    return `actions 셀은 edit/delete 프리셋만 코드 생성이 지원됩니다.`;
+  }
+  return `cellType='${col.cellType}' 컬럼은 아직 코드 생성이 지원되지 않습니다.`;
+};
+
+const pushBodyCell = (
+  jsxLines: string[],
+  ind: (n: number) => string,
+  col: TableColumnConfig,
+  suffix: string,
+  colIdx: number
+): void => {
   const widthStyle = col.width ? `, width: '${col.width}${col.widthUnit || "px"}'` : "";
   jsxLines.push(
     `${ind(3)}<td className=${jsStringLiteral(TABLE_TD_CLS)} style={{ textAlign: '${col.align}'${widthStyle} }}>`
   );
 
   if (!isColumnSupported(col)) {
-    const reason = hasUnsupportedRelation(col)
-      ? `relationSlugId 연동 컬럼은 formatFetchedRelMulti 런타임 경로라 파일빌드에서 지원하지 않습니다.`
-      : `cellType='${col.cellType}' 컬럼은 아직 코드 생성이 지원되지 않습니다.`;
-    jsxLines.push(`${ind(4)}{/* TODO(파일빌드 Phase 2): ${reason} */}`);
-    jsxLines.push(`${ind(4)}<span className="text-slate-300">-</span>`);
+    jsxLines.push(`${ind(4)}{/* TODO(파일빌드): ${unsupportedColumnReason(col)} */}`);
+    jsxLines.push(`${ind(4)}<span className=${jsStringLiteral(GENERATED_TABLE_UNSUPPORTED_CELL_CLS)}>-</span>`);
+    jsxLines.push(`${ind(3)}</td>`);
+    return;
+  }
+
+  if (col.cellType === "actions") {
+    const actions = col.actions ?? [];
+    const unsupported = actions.filter((a) => !SUPPORTED_ACTIONS.has(a));
+    if (unsupported.length > 0) {
+      jsxLines.push(
+        `${ind(4)}{/* TODO(파일빌드): actions '${unsupported.join(", ")}'는 아직 코드 생성이 지원되지 않습니다. */}`
+      );
+    }
+    jsxLines.push(
+      `${ind(4)}<div className=${jsStringLiteral(`${TABLE_ACTIONS_WRAP_CLS} ${tableCellJustifyClass(col.align)}`)}>`
+    );
+    if (actions.includes("edit")) {
+      jsxLines.push(
+        `${ind(5)}<button type="button" onClick={() => handleTableEdit${suffix}(row)} className=${jsStringLiteral(tableActionButtonClass("edit"))} title={t('common.btn.edit')}>`
+      );
+      jsxLines.push(`${ind(6)}<Pencil className=${jsStringLiteral(TABLE_ACTION_ICON_CLS)} />`);
+      jsxLines.push(`${ind(5)}</button>`);
+    }
+    if (actions.includes("delete")) {
+      jsxLines.push(
+        `${ind(5)}<button type="button" onClick={() => handleTableDelete${suffix}(row._id as number)} className=${jsStringLiteral(tableActionButtonClass("delete"))} title={t('common.btn.delete')}>`
+      );
+      jsxLines.push(`${ind(6)}<Trash2 className=${jsStringLiteral(TABLE_ACTION_ICON_CLS)} />`);
+      jsxLines.push(`${ind(5)}</button>`);
+    }
+    jsxLines.push(`${ind(4)}</div>`);
+    jsxLines.push(`${ind(3)}</td>`);
+    return;
+  }
+
+  if (col.cellType === "button") {
+    const colorDef =
+      CUSTOM_ACTION_COLORS.find((c) => c.value === (col.buttonColor ?? "slate")) ?? CUSTOM_ACTION_COLORS[0];
+    const labelExpr = col.buttonLabelMsgKey
+      ? `t(${jsStringLiteral(col.buttonLabelMsgKey)})`
+      : col.buttonLabel
+        ? jsStringLiteral(col.buttonLabel)
+        : `t('common.btn.default')`;
+    jsxLines.push(
+      `${ind(4)}<div className=${jsStringLiteral(`${TABLE_BUTTON_WRAP_CLS} ${tableCellJustifyClass(col.align)}`)}>`
+    );
+    jsxLines.push(
+      `${ind(5)}<button type="button" onClick={() => handleTableButton${suffix}_${colIdx}(row)} className=${jsStringLiteral(`${TABLE_BUTTON_CELL_CLS} ${colorDef.cls}`)}>{${labelExpr}}</button>`
+    );
+    jsxLines.push(`${ind(4)}</div>`);
     jsxLines.push(`${ind(3)}</td>`);
     return;
   }
@@ -187,7 +329,9 @@ const pushBodyCell = (jsxLines: string[], ind: (n: number) => string, col: Table
           : `t('common.label.private')`;
       jsxLines.push(`${ind(5)}const boolVal = Boolean(value);`);
       jsxLines.push(`${ind(5)}const boolText = boolVal ? ${trueExpr} : ${falseExpr};`);
-      jsxLines.push(`${ind(5)}return <span className={booleanCellClass(boolVal)} title={boolText}>{boolText}</span>;`);
+      jsxLines.push(
+        `${ind(5)}return <span className={boolVal ? ${jsStringLiteral(booleanCellClass(true))} : ${jsStringLiteral(booleanCellClass(false))}} title={boolText}>{boolText}</span>;`
+      );
       break;
     }
     case "date": {
@@ -211,12 +355,16 @@ const pushBodyCell = (jsxLines: string[], ind: (n: number) => string, col: Table
         jsxLines.push(`${ind(5)}const m: Record<string, { text: string; color: string }> = { ${mapEntries} };`);
         jsxLines.push(`${ind(5)}const v = String(value ?? '');`);
         jsxLines.push(`${ind(5)}const b = m[v];`);
-        jsxLines.push(`${ind(5)}if (!b) return <span className="text-sm text-slate-600">{v}</span>;`);
+        jsxLines.push(
+          `${ind(5)}if (!b) return <span className=${jsStringLiteral(BADGE_FALLBACK_TEXT_CLS)}>{v}</span>;`
+        );
         jsxLines.push(
           `${ind(5)}return <span className={\`${BADGE_BASE_CLS} ${shapeCls} \${BADGE_CLS[b.color] || BADGE_CLS.slate}\`}>${col.showIcon ? `<span className={\`${BADGE_DOT_BASE_CLS} \${BADGE_DOT[b.color] || BADGE_DOT.slate}\`} />` : ""}{b.text}</span>;`
         );
       } else {
-        jsxLines.push(`${ind(5)}return <span className="text-sm text-slate-600">{String(value ?? '')}</span>;`);
+        jsxLines.push(
+          `${ind(5)}return <span className=${jsStringLiteral(BADGE_FALLBACK_TEXT_CLS)}>{String(value ?? '')}</span>;`
+        );
       }
       break;
     }
@@ -234,12 +382,13 @@ const buildUnhandled = (widget: TableWidget, supportedColumns: TableColumnConfig
     HANDLED_TABLE_WIDGET_KEYS,
     new Set(IGNORED_TABLE_WIDGET_KEYS.keys())
   );
-  const ignoredColumnKeySet = new Set(IGNORED_COLUMN_KEYS.keys());
   const columnUnhandledSet = new Set<string>();
   supportedColumns.forEach((col) => {
-    collectUnhandledKeys(col as unknown as Record<string, unknown>, HANDLED_COLUMN_KEYS, ignoredColumnKeySet).forEach(
-      (k) => columnUnhandledSet.add(k)
-    );
+    collectUnhandledKeys(
+      col as unknown as Record<string, unknown>,
+      HANDLED_COLUMN_KEYS,
+      ignoredColumnKeysFor(col)
+    ).forEach((k) => columnUnhandledSet.add(k));
   });
   return [
     { scope: "widget", keys: widgetUnhandled },
@@ -277,9 +426,20 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     (c) => c.cellType === "text" && !!c.codeGroupCode && c.displayAs !== "value"
   );
   const needsBadge = supportedColumns.some((c) => c.cellType === "badge" && !!c.cellOptions?.length);
-  const needsBoolean = supportedColumns.some((c) => c.cellType === "boolean");
   const sortExprEntries = !isEntity ? columns.filter((c) => c.sortable && !!c.data) : [];
   const needsSortExpr = needsSort && sortExprEntries.length > 0;
+
+  const actionsColumns = supportedColumns.filter((c) => c.cellType === "actions");
+  const buttonColumns = columns
+    .map((c, colIdx) => ({ col: c, colIdx }))
+    .filter(({ col }) => col.cellType === "button" && isColumnSupported(col));
+  const needsEditAction = actionsColumns.some((c) => (c.actions ?? []).includes("edit"));
+  const needsDeleteAction = actionsColumns.some((c) => (c.actions ?? []).includes("delete"));
+  const editRulesColumn = actionsColumns.find((c) => (c.editPageRules ?? []).length > 0);
+  const editRules = editRulesColumn?.editPageRules ?? [];
+  const needsRouter = needsEditAction && editRules.length > 0;
+  const needsParseActionParams =
+    (needsEditAction && editRules.some((r) => !!r.passParam)) || buttonColumns.some(({ col }) => !!col.passParam);
 
   const imports: ImportRequirement[] = [
     { module: "@/lib/api", defaultName: "api" },
@@ -313,17 +473,17 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       named: ["BADGE_CLS", "BADGE_DOT"],
     });
   }
-  if (isPagination) {
-    imports.push({
-      module: "@/app/admin/templates/make/_shared/components/renderer/rendererStyles",
-      named: ["pagerNumberBtnClass"],
-    });
+  if (needsEditAction) imports.push({ module: "lucide-react", named: ["Pencil"] });
+  if (needsDeleteAction) {
+    imports.push({ module: "lucide-react", named: ["Trash2"] });
+    imports.push({ module: "@/lib/api", defaultName: "api", named: ["getApiErrorMessage"] });
   }
-  if (needsBoolean) {
-    imports.push({
-      module: "@/app/admin/templates/make/_shared/components/renderer/rendererStyles",
-      named: ["booleanCellClass"],
-    });
+  if (needsRouter) imports.push({ module: "next/navigation", named: ["useRouter"] });
+  if (needsParseActionParams) {
+    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["parseActionParams"] });
+  }
+  if (buttonColumns.length > 0) {
+    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["normalizeExternalUrl"] });
   }
 
   const searchWidgetIds = new Set(
@@ -356,11 +516,27 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     stateLines.push(`${ind(1)}const [${sortDirVar}, ${setSortDirVar}] = useState<'asc' | 'desc'>('asc');`);
   }
   stateLines.push(`${ind(1)}const ${dataSlugVar} = ${jsStringLiteral(resolvedSlug)};`);
+  if (needsRouter) stateLines.push(`${ind(1)}const router = useRouter();`);
 
   const helperLines = needsDateFormat ? [...FORMAT_CELL_DATE_HELPER] : [];
   if (needsSortExpr) {
     const entries = sortExprEntries.map((c) => `${jsStringLiteral(c.accessor)}: ${jsStringLiteral(c.data as string)}`);
     helperLines.push(`const ${sortExprMapVar}: Record<string, string> = { ${entries.join(", ")} };`);
+  }
+  if (needsRouter && editRules.length > 0) {
+    helperLines.push(GENERATED_PAGE_BASE_CONST);
+    helperLines.push(
+      `const EDIT_PAGE_RULES_${suffix}: { connType?: string; pageSlug?: string; passParam?: string; conditionParam?: string }[] = ${JSON.stringify(
+        editRules.map((r) => ({
+          connType: r.connType,
+          pageSlug: r.pageSlug,
+          passParam: r.passParam,
+          conditionParam: r.conditionParam,
+        })),
+        null,
+        4
+      )};`
+    );
   }
 
   const handlerLines: string[] = [];
@@ -457,41 +633,144 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     handlerLines.push("");
   }
 
+  if (needsEditAction) {
+    handlerLines.push(`${ind(1)}const handleTableEdit${suffix} = (row: Record<string, unknown>) => {`);
+    if (editRules.length === 0) {
+      handlerLines.push(
+        `${ind(2)}/* TODO(파일빌드): 이 컬럼에는 editPageRules가 없어 수정 이동 대상을 확정할 수 없습니다(editPopupSlug 방식은 미지원). 직접 구현해주세요. */`
+      );
+    } else {
+      if (editRules.some((r) => (r.connType ?? "popup") !== "page")) {
+        handlerLines.push(
+          `${ind(2)}/* TODO(파일빌드): connType='popup' 규칙도 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */`
+        );
+      }
+      handlerLines.push(`${ind(2)}const matched =`);
+      handlerLines.push(`${ind(3)}EDIT_PAGE_RULES_${suffix}.find((rule) => {`);
+      handlerLines.push(`${ind(4)}if (!rule.conditionParam) return false;`);
+      handlerLines.push(`${ind(4)}const eqIdx = rule.conditionParam.indexOf('=');`);
+      handlerLines.push(`${ind(4)}if (eqIdx === -1) return false;`);
+      handlerLines.push(
+        `${ind(4)}return String(row[rule.conditionParam.slice(0, eqIdx)] ?? '') === rule.conditionParam.slice(eqIdx + 1);`
+      );
+      handlerLines.push(`${ind(3)}}) ?? EDIT_PAGE_RULES_${suffix}.find((rule) => !rule.conditionParam);`);
+      handlerLines.push(`${ind(2)}if (!matched?.pageSlug) return;`);
+      handlerLines.push(`${ind(2)}const params = new URLSearchParams();`);
+      handlerLines.push(`${ind(2)}if (row._id != null) params.set('id', String(row._id));`);
+      handlerLines.push(`${ind(2)}if (matched.passParam) {`);
+      handlerLines.push(
+        `${ind(3)}Object.entries(parseActionParams(matched.passParam, row)).forEach(([k, v]) => params.set(k, v));`
+      );
+      handlerLines.push(`${ind(2)}}`);
+      handlerLines.push(`${ind(2)}const qs = params.toString() ? \`?\${params.toString()}\` : '';`);
+      handlerLines.push(`${ind(2)}/* TODO(파일빌드): 이동 대상 산출물이 아직 생성되지 않았다면 404가 납니다. */`);
+      handlerLines.push(`${ind(2)}router.push(\`\${GENERATED_PAGE_BASE}/\${matched.pageSlug}\${qs}\`);`);
+    }
+    handlerLines.push(`${ind(1)}};`);
+    handlerLines.push("");
+  }
+
+  if (needsDeleteAction) {
+    handlerLines.push(`${ind(1)}const handleTableDelete${suffix} = async (id: number) => {`);
+    handlerLines.push(`${ind(2)}if (!confirm(t('common.confirm.delete'))) return;`);
+    handlerLines.push(`${ind(2)}try {`);
+    handlerLines.push(`${ind(3)}await api.delete(\`/page-data/\${${dataSlugVar}}/\${id}\`);`);
+    handlerLines.push(`${ind(3)}toast.success(t('common.deleted'));`);
+    handlerLines.push(`${ind(3)}${fetchFn}(${pageVar});`);
+    handlerLines.push(`${ind(2)}} catch (err) {`);
+    handlerLines.push(`${ind(3)}toast.error(getApiErrorMessage(err, t('common.error.delete')));`);
+    handlerLines.push(`${ind(2)}}`);
+    handlerLines.push(`${ind(1)}};`);
+    handlerLines.push("");
+  }
+
+  buttonColumns.forEach(({ col, colIdx }) => {
+    const width = col.windowPopupOption?.width ?? 800;
+    const height = col.windowPopupOption?.height ?? 600;
+    const usesPreviewToken = !!col.usePreviewToken;
+    handlerLines.push(`${ind(1)}const handleTableButton${suffix}_${colIdx} = (row: Record<string, unknown>) => {`);
+    if (usesPreviewToken) {
+      handlerLines.push(`${ind(2)}const popup = window.open('', '_blank', 'width=${width},height=${height}');`);
+      handlerLines.push(`${ind(2)}if (!popup) {`);
+      handlerLines.push(`${ind(3)}toast.error('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');`);
+      handlerLines.push(`${ind(3)}return;`);
+      handlerLines.push(`${ind(2)}}`);
+      handlerLines.push(`${ind(2)}const recordId = String(row._id ?? '');`);
+      handlerLines.push(`${ind(2)}(async () => {`);
+      handlerLines.push(`${ind(3)}try {`);
+      handlerLines.push(
+        `${ind(4)}const res = await api.post<{ token: string }>('/preview-tokens', { slug: ${dataSlugVar}, recordId });`
+      );
+      handlerLines.push(
+        `${ind(4)}const normalizedBase = normalizeExternalUrl(${jsStringLiteral(col.externalUrl ?? "")}).replace(/\\/$/, '');`
+      );
+      handlerLines.push(`${ind(4)}const detailUrl = new URL(\`\${normalizedBase}/\${recordId}\`);`);
+      handlerLines.push(
+        `${ind(4)}popup.location.href = \`\${detailUrl.origin}/preview?token=\${encodeURIComponent(res.data.token)}&redirect=\${encodeURIComponent(detailUrl.pathname)}\`;`
+      );
+      handlerLines.push(`${ind(3)}} catch {`);
+      handlerLines.push(`${ind(4)}popup.close();`);
+      handlerLines.push(`${ind(4)}toast.error('미리보기 토큰 발급에 실패했습니다.');`);
+      handlerLines.push(`${ind(3)}}`);
+      handlerLines.push(`${ind(2)}})();`);
+    } else {
+      handlerLines.push(
+        `${ind(2)}const urlObj = new URL(normalizeExternalUrl(${jsStringLiteral(col.externalUrl ?? "")}));`
+      );
+      if (col.passParam) {
+        handlerLines.push(
+          `${ind(2)}Object.entries(parseActionParams(${jsStringLiteral(col.passParam)}, row)).forEach(([k, v]) => urlObj.searchParams.set(k, v));`
+        );
+      }
+      handlerLines.push(`${ind(2)}const fullUrl = urlObj.toString();`);
+      if ((col.connType ?? "page") === "windowPopup") {
+        handlerLines.push(
+          `${ind(2)}window.open(fullUrl, '_blank', 'width=${width},height=${height},noopener,noreferrer');`
+        );
+      } else {
+        handlerLines.push(`${ind(2)}window.location.href = fullUrl;`);
+      }
+    }
+    handlerLines.push(`${ind(1)}};`);
+    handlerLines.push("");
+  });
+
   const jsxLines: string[] = [];
-  jsxLines.push(emitContainerOpen({ className: "bg-white" }));
+  jsxLines.push(emitContainerOpen({ className: TABLE_CONTAINER_CLS }));
   jsxLines.push(`${ind(1)}<div className=${jsStringLiteral(TABLE_COUNT_BAR_CLS)}>`);
   jsxLines.push(
-    `${ind(2)}<p className="text-xs text-slate-500">{t('common.pagination.total', { count: ${totalVar}.toLocaleString() })}</p>`
+    `${ind(2)}<p className=${jsStringLiteral(TABLE_COUNT_TOTAL_CLS)}>{t('common.pagination.total', { count: ${totalVar}.toLocaleString() })}</p>`
   );
   if (isPagination) {
     jsxLines.push(
-      `${ind(2)}<p className="text-xs text-slate-400">{${totalVar} > 0 ? t('common.pagination.showing', { start: String(${pageVar} * ${widget.pageSize || 10} + 1), end: String(Math.min((${pageVar} + 1) * ${widget.pageSize || 10}, ${totalVar})) }) : ''}</p>`
+      `${ind(2)}<p className=${jsStringLiteral(TABLE_COUNT_RANGE_CLS)}>{${totalVar} > 0 ? t('common.pagination.showing', { start: String(${pageVar} * ${widget.pageSize || 10} + 1), end: String(Math.min((${pageVar} + 1) * ${widget.pageSize || 10}, ${totalVar})) }) : ''}</p>`
     );
   } else {
     jsxLines.push(
-      `${ind(2)}<p className="text-xs text-slate-400">{${totalVar} > 0 ? t('common.pagination.showing', { start: '1', end: String(Math.min((${pageVar} + 1) * ${widget.pageSize || 10}, ${totalVar})) }) : ''}</p>`
+      `${ind(2)}<p className=${jsStringLiteral(TABLE_COUNT_RANGE_CLS)}>{${totalVar} > 0 ? t('common.pagination.showing', { start: '1', end: String(Math.min((${pageVar} + 1) * ${widget.pageSize || 10}, ${totalVar})) }) : ''}</p>`
     );
   }
   jsxLines.push(`${ind(1)}</div>`);
-  jsxLines.push(`${ind(1)}<div className="overflow-x-auto">`);
-  jsxLines.push(`${ind(2)}<table className="w-full text-sm">`);
+  jsxLines.push(`${ind(1)}<div className=${jsStringLiteral(TABLE_SCROLL_WRAP_CLS)}>`);
+  jsxLines.push(`${ind(2)}<table className=${jsStringLiteral(TABLE_CLS)}>`);
   jsxLines.push(
-    `${ind(3)}<thead className=${jsStringLiteral(TABLE_THEAD_CLS)}><tr className="border-b border-slate-200 bg-slate-50/80">`
+    `${ind(3)}<thead className=${jsStringLiteral(TABLE_THEAD_CLS)}><tr className=${jsStringLiteral(TABLE_HEADER_ROW_CLS)}>`
   );
   columns.forEach((col) => pushHeaderCell(jsxLines, ind, col, suffix));
+
   jsxLines.push(`${ind(3)}</tr></thead>`);
   jsxLines.push(`${ind(3)}<tbody>`);
   jsxLines.push(`${ind(4)}{${loadingVar} ? (`);
   jsxLines.push(
-    `${ind(5)}<tr><td colSpan={${columns.length}} className="py-16 text-center text-sm text-slate-400">{t('common.table.loading')}</td></tr>`
+    `${ind(5)}<tr><td colSpan={${columns.length}} className=${jsStringLiteral(TABLE_EMPTY_CELL_CLS)}>{t('common.table.loading')}</td></tr>`
   );
   jsxLines.push(`${ind(4)}) : ${rowsVar}.length === 0 ? (`);
   jsxLines.push(
-    `${ind(5)}<tr><td colSpan={${columns.length}} className="py-16 text-center text-sm text-slate-400">{t('common.table.no_data')}</td></tr>`
+    `${ind(5)}<tr><td colSpan={${columns.length}} className=${jsStringLiteral(TABLE_EMPTY_CELL_CLS)}>{t('common.table.no_data')}</td></tr>`
   );
   jsxLines.push(`${ind(4)}) : ${rowsVar}.map((row, idx) => (`);
   jsxLines.push(`${ind(5)}<tr key={idx} className=${jsStringLiteral(TABLE_TR_CLS)}>`);
-  columns.forEach((col) => pushBodyCell(jsxLines, ind, col));
+  columns.forEach((col, colIdx) => pushBodyCell(jsxLines, ind, col, suffix, colIdx));
   jsxLines.push(`${ind(5)}</tr>`);
   jsxLines.push(`${ind(4)}))}`);
   jsxLines.push(`${ind(3)}</tbody>`);
@@ -505,7 +784,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       `${ind(3)}<button disabled={${pageVar} === 0} onClick={() => ${fetchFn}(${pageVar} - 1)} className=${jsStringLiteral(PAGER_NAV_BTN_CLS)}>{t('common.btn.prev')}</button>`
     );
     jsxLines.push(
-      `${ind(3)}{pageGroupRange(${pageVar}, totalPages${suffix}).map((p) => (<button key={p} onClick={() => ${fetchFn}(p)} className={pagerNumberBtnClass(${pageVar} === p)}>{p + 1}</button>))}`
+      `${ind(3)}{pageGroupRange(${pageVar}, totalPages${suffix}).map((p) => (<button key={p} onClick={() => ${fetchFn}(p)} className={${pageVar} === p ? ${jsStringLiteral(pagerNumberBtnClass(true))} : ${jsStringLiteral(pagerNumberBtnClass(false))}}>{p + 1}</button>))}`
     );
     jsxLines.push(
       `${ind(3)}<button disabled={${pageVar} >= totalPages${suffix} - 1} onClick={() => ${fetchFn}(${pageVar} + 1)} className=${jsStringLiteral(PAGER_NAV_BTN_CLS)}>{t('common.btn.next')}</button>`
@@ -514,7 +793,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     jsxLines.push(`${ind(1)})}`);
   } else {
     jsxLines.push(
-      `${ind(1)}{hasMore${suffix} && <div className="py-4 text-center text-xs text-slate-400">{t('common.table.loading')}</div>}`
+      `${ind(1)}{hasMore${suffix} && <div className=${jsStringLiteral(GENERATED_TABLE_SCROLL_MORE_CLS)}>{t('common.table.loading')}</div>}`
     );
   }
   jsxLines.push(emitContainerClose());

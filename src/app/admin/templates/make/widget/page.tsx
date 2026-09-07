@@ -836,8 +836,11 @@ export default function PageBuilderPage() {
         itemsToBuild as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
         {
           pageTitle: om.pageTitle || undefined,
+          pageTitleMsgKey: om.pageTitleMsgKey || undefined,
           mainConnectedSlug: om.mainConnectedSlug || undefined,
           isEntity: om.connectedType === "data",
+          pageSlug: generateSlug,
+          leaveCheck: om.leaveCheck || false,
         }
       );
 
