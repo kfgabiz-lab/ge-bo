@@ -2541,7 +2541,7 @@ export default function GeneratedPage() {
                                         </div>
                                       );
                                     }
-                                    const displayVal = String(fetched ?? formValuesForm1["fb_41mji4ayp"] ?? "" ?? "");
+                                    const displayVal = String(fetched ?? formValuesForm1["fb_41mji4ayp"] ?? "");
                                     return <div className="text-sm text-slate-700 truncate">{displayVal}</div>;
                                   })()}
                                 </div>
