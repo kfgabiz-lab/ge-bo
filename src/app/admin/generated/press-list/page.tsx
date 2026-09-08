@@ -28,10 +28,10 @@ import { toast } from "sonner";
 const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   {
     colSpan: 1,
-    id: "blog.is_visible",
+    id: "press.is_visible",
     type: "select",
-    fieldKey: "blog.is_visible",
-    label: "공ㄱ",
+    fieldKey: "press.is_visible",
+    label: "",
   },
   {
     colSpan: 1,
@@ -43,14 +43,14 @@ const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   },
   {
     colSpan: 3,
-    id: "blog.title",
+    id: "press.title",
     type: "input",
-    fieldKey: "blog.title",
+    fieldKey: "press.title",
     label: "",
   },
 ];
 const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
-const DETAIL_PAGE_PATH = "/admin/company/blog/detail";
+const GENERATED_PAGE_BASE = "/admin/generated";
 function formatCellDate(rawVal: string, format?: string): string {
   if (!rawVal) return "-";
   if (!format) return rawVal;
@@ -76,8 +76,8 @@ const SORT_EXPRTable1: Record<string, string> = {
 const EDIT_PAGE_RULES_Table1: { connType?: string; pageSlug?: string; passParam?: string; conditionParam?: string }[] =
   [
     {
-      connType: "page",
-      pageSlug: "blog-basicInfo",
+      connType: "popup",
+      pageSlug: "press-basicInfo",
       passParam: "update=1",
       conditionParam: "",
     },
@@ -87,13 +87,13 @@ export default function GeneratedPage() {
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
   const { t } = useI18n();
   useEffect(() => {
-    setPageTitle(t("common.label.blog"));
+    setPageTitle(t("common.label.press"));
   }, [setPageTitle, t]);
   const { groups, fetchGroups } = useCodeStore();
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
-  const initialParamsSearch1: Record<string, string> = { "blog.is_visible": "", status: "", "blog.title": "" };
+  const initialParamsSearch1: Record<string, string> = { "press.is_visible": "", status: "", "press.title": "" };
   const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1);
   const router = useRouter();
   const [rowsTable1, setRowsTable1] = useState<Record<string, unknown>[]>([]);
@@ -103,7 +103,7 @@ export default function GeneratedPage() {
   const [totalPagesTable1, setTotalPagesTable1] = useState(0);
   const [sortKeyTable1, setSortKeyTable1] = useState<string | null>(null);
   const [sortDirTable1, setSortDirTable1] = useState<"asc" | "desc">("asc");
-  const dataSlugTable1 = "blog-data";
+  const dataSlugTable1 = "press-data";
 
   const getSearchParamsSearch1 = (sv: Record<string, string> = paramsSearch1): Record<string, string> =>
     buildSearchQueryParams(SEARCH_FIELDS_Search1, sv);
@@ -188,6 +188,7 @@ export default function GeneratedPage() {
   };
 
   const handleTableEditTable1 = (row: Record<string, unknown>) => {
+    /* TODO(파일빌드): connType='popup' 규칙도 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */
     const matched =
       EDIT_PAGE_RULES_Table1.find((rule) => {
         if (!rule.conditionParam) return false;
@@ -202,7 +203,8 @@ export default function GeneratedPage() {
       Object.entries(parseActionParams(matched.passParam, row)).forEach(([k, v]) => params.set(k, v));
     }
     const qs = params.toString() ? `?${params.toString()}` : "";
-    router.push(`${DETAIL_PAGE_PATH}${qs}`);
+    /* TODO(파일빌드): 이동 대상 산출물이 아직 생성되지 않았다면 404가 납니다. */
+    router.push(`${GENERATED_PAGE_BASE}/${matched.pageSlug}${qs}`);
   };
 
   const handleTableDeleteTable1 = async (id: number) => {
@@ -226,10 +228,9 @@ export default function GeneratedPage() {
     (async () => {
       try {
         const res = await api.post<{ token: string }>("/preview-tokens", { slug: dataSlugTable1, recordId });
-        const normalizedBase = normalizeExternalUrl("https://nahpdev-web.ls-electric.com/company/blog/detail/").replace(
-          /\/$/,
-          ""
-        );
+        const normalizedBase = normalizeExternalUrl(
+          "https://nahpdev-web.ls-electric.com/company/press/detail/"
+        ).replace(/\/$/, "");
         const detailUrl = new URL(`${normalizedBase}/${recordId}`);
         popup.location.href = `${detailUrl.origin}/preview?token=${encodeURIComponent(res.data.token)}&redirect=${encodeURIComponent(detailUrl.pathname)}`;
       } catch {
@@ -242,19 +243,20 @@ export default function GeneratedPage() {
   return (
     <div className="space-y-3">
       <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={12} autoHeight>
+        <GridCell colSpan={12} rowSpan={13} autoHeight>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto auto auto auto auto auto`,
+              gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto auto auto auto auto auto`,
               gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
               gridAutoFlow: "row dense",
               rowGap: `${GAP_SIZE}px`,
               columnGap: 0,
             }}
           >
-            <div style={{ gridColumn: "span 12", gridRow: "span 1", height: `${1 * ROW_HEIGHT - GAP_SIZE}px` }}>
+            <div style={{ gridColumn: "span 12", gridRow: "span 2", height: `${2 * ROW_HEIGHT - GAP_SIZE}px` }}>
+              {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:selectType). 필요 시 직접 구현해주세요. */}
               <div
                 className="h-full w-full rounded border border-slate-200 flex items-center gap-3 bg-white px-4"
                 style={{ overflow: "clip" }}
@@ -268,8 +270,10 @@ export default function GeneratedPage() {
                   <div className="col-span-1">
                     <div className="relative">
                       <select
-                        value={String(paramsSearch1["blog.is_visible"] ?? "")}
-                        onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["blog.is_visible"]: e.target.value }))}
+                        value={String(paramsSearch1["press.is_visible"] ?? "")}
+                        onChange={(e) =>
+                          setParamsSearch1((prev) => ({ ...prev, ["press.is_visible"]: e.target.value }))
+                        }
                         className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                       >
                         <option value="">{t("common.label.isVisible")}</option>
@@ -300,7 +304,7 @@ export default function GeneratedPage() {
                         onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["status"]: e.target.value }))}
                         className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                       >
-                        <option value="">{t("common.label.publishStatus")}</option>
+                        <option value="">{t("common.label.all")}</option>
                         <option value={"{common.label.publish}"}>{t("common.label.publish")}</option>
                         <option value={"{common.label.unPublish}"}>{t("common.label.unPublish")}</option>
                       </select>
@@ -318,8 +322,8 @@ export default function GeneratedPage() {
                   <div className="col-span-3">
                     <input
                       type="text"
-                      value={String(paramsSearch1["blog.title"] ?? "")}
-                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["blog.title"]: e.target.value }))}
+                      value={String(paramsSearch1["press.title"] ?? "")}
+                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["press.title"]: e.target.value }))}
                       placeholder={t("common.placeholder.title")}
                       className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                     />
@@ -359,16 +363,18 @@ export default function GeneratedPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      router.push(DETAIL_PAGE_PATH);
+                      /* TODO(파일빌드): 연결 대상(press-basicInfo)이 빌더에서 레이어 팝업으로 설정돼 있어도 산출물은 페이지 이동으로 동작합니다. 산출물이 아직 생성되지 않았다면 404가 납니다. */
+                      router.push(`${GENERATED_PAGE_BASE}/press-basicInfo`);
                     }}
                     className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
                   >
-                    {t("blog.btn.add")}
+                    {t("press.btn.add")}
                   </button>
                 </div>
               </div>
             </div>
             <div style={{ gridColumn: "span 12", gridRow: "span 10" }}>
+              {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (column:editParams,editFileLayerSlug). 필요 시 직접 구현해주세요. */}
               <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
                   <p className="text-xs text-slate-500">
@@ -632,7 +638,7 @@ export default function GeneratedPage() {
                             >
                               {(() => {
                                 const value = row["updatedAt"];
-                                const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm");
+                                const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm:ss");
                                 return (
                                   <span className="text-sm text-slate-700 truncate block" title={dateVal}>
                                     {dateVal}

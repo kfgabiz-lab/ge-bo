@@ -187,6 +187,19 @@ export const TABLE_ACTION_ICON_CLS = "w-3.5 h-3.5";
 export const TABLE_BUTTON_WRAP_CLS = "flex";
 export const MULTISELECT_TAG_REMOVE_ICON_CLS = "w-3 h-3";
 
+export const TAB_CONTAINER_CLS =
+  "h-full w-full flex flex-col rounded border border-slate-300 bg-white shadow-sm overflow-hidden";
+export const TAB_BAR_CLS = "flex border-b border-slate-200 bg-slate-50 flex-shrink-0";
+export const TAB_PANEL_WRAP_CLS = "flex-1 overflow-auto min-h-0 pt-2";
+export const TAB_PANEL_ACTIVE_CLS = "h-full";
+export const TAB_PANEL_HIDDEN_CLS = "hidden";
+
+export function tabButtonClass(active: boolean): string {
+  return `px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+    active ? "border-slate-800 text-slate-900 bg-white" : "border-transparent text-slate-500 hover:text-slate-700"
+  }`;
+}
+
 export const GENERATED_PAGE_ROOT_CLS = "space-y-3";
 export const GENERATED_TABLE_SCROLL_MORE_CLS = "py-4 text-center text-xs text-slate-400";
 export const GENERATED_TABLE_UNSUPPORTED_CELL_CLS = "text-slate-300";

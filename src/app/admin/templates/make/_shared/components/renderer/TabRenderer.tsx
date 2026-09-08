@@ -27,6 +27,14 @@ import { useI18n } from "@/hooks/use-i18n";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
 import { fetchTemplateConfig } from "../../templateApi";
 import { PageGridRenderer } from "./PageGridRenderer";
+import {
+  TAB_CONTAINER_CLS,
+  TAB_BAR_CLS,
+  TAB_PANEL_WRAP_CLS,
+  TAB_PANEL_ACTIVE_CLS,
+  TAB_PANEL_HIDDEN_CLS,
+  tabButtonClass,
+} from "./rendererStyles";
 import type { PageWidgetItem } from "./PageGridRenderer";
 import type { TabWidget, TabItem, RendererMode } from "./types";
 import type { TableWidget } from "../builder/TableBuilder";
@@ -186,19 +194,15 @@ export function TabRenderer({
   }
 
   return (
-    <div className="h-full w-full flex flex-col rounded border border-slate-300 bg-white shadow-sm overflow-hidden">
+    <div className={TAB_CONTAINER_CLS}>
       {/* 탭 바 */}
-      <div className="flex border-b border-slate-200 bg-slate-50 flex-shrink-0">
+      <div className={TAB_BAR_CLS}>
         {tabs.map((tab, idx) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => handleTabClick(idx)}
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              idx === activeIdx
-                ? "border-slate-800 text-slate-900 bg-white"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
+            className={tabButtonClass(idx === activeIdx)}
           >
             {tab.labelMsgKey ? t(tab.labelMsgKey) : tab.label || t("common.tab.default_label", { n: String(idx + 1) })}
           </button>
@@ -207,9 +211,9 @@ export function TabRenderer({
 
       {/* 탭 패널 — keep-alive: 마운트된 탭은 hidden으로 숨기되 언마운트하지 않음 */}
       {/* pt-2(8px): 그리드 GAP_SIZE와 동일한 간격으로 탭바~콘텐츠 상단 여백 확보 */}
-      <div className="flex-1 overflow-auto min-h-0 pt-2">
+      <div className={TAB_PANEL_WRAP_CLS}>
         {tabs.map((tab, idx) => (
-          <div key={tab.id} className={idx === activeIdx ? "h-full" : "hidden"}>
+          <div key={tab.id} className={idx === activeIdx ? TAB_PANEL_ACTIVE_CLS : TAB_PANEL_HIDDEN_CLS}>
             {mountedTabs.has(idx) &&
               (mode === "live" ? (
                 <LiveTabPanel

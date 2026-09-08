@@ -39,6 +39,7 @@ import {
   imageAddIconCls,
   imageAddTextCls,
   fieldContentHeight,
+  fieldTextValueClass,
   FORM_FIELD_ROW_HEIGHT,
 } from "../../../styles";
 import { FILE_TYPE_PRESETS } from "../../../constants";
@@ -56,6 +57,8 @@ export interface FormFieldNeeds {
   useId: boolean;
   searchFieldConfigType: boolean;
   resolveCodeLabel: boolean;
+  fetchRel: boolean;
+  fetchRelDataExpr: boolean;
   icons: Set<string>;
 }
 
@@ -71,6 +74,8 @@ export const createFormFieldNeeds = (): FormFieldNeeds => ({
   useId: false,
   searchFieldConfigType: false,
   resolveCodeLabel: false,
+  fetchRel: false,
+  fetchRelDataExpr: false,
   icons: new Set<string>(),
 });
 
@@ -93,6 +98,8 @@ export const FORM_SUPPORTED_FIELD_TYPES = new Set<string>([
   "checkbox",
   "editor",
   "textarea",
+  "text",
+  "hidden",
 ]);
 
 const textExprOf = (text: string | undefined, msgKey: string | undefined): string =>
@@ -193,6 +200,40 @@ const emitPlainInput = (o: FormFieldEmitOptions): string[] => {
     `${ind(level + 1)}<span className=${jsStringLiteral(fieldCharCountCls)}>{${value}.length}/{${field.maxLength}}</span>`,
     `${ind(level)}</div>`,
   ];
+};
+
+const emitText = (o: FormFieldEmitOptions): string[] => {
+  const { ind, level, field, names } = o;
+  o.needs.fetchRel = true;
+  const rowExpr = names.rowData;
+  const fetchKeyLiteral = jsStringLiteral(field.fieldKey ?? "");
+  const relationIdExpr = field.relationSlugId === undefined ? "undefined" : String(field.relationSlugId);
+  const dataExpr = field.data ? jsStringLiteral(field.data) : "undefined";
+  const displayMode = field.fetchDisplayMode === "MULTI_LINE" ? "MULTI_LINE" : "ONE_LINE";
+  const lines: string[] = [];
+  const L = (n: number, s: string) => lines.push(`${ind(level + n)}${s}`);
+
+  L(0, "{(() => {");
+  L(1, `const fetched = ${rowExpr}[${fetchKeyLiteral}];`);
+  L(1, `if (Array.isArray(fetched)) {`);
+  L(
+    2,
+    `const formatted = formatFetchedRelValue(fetched, ${rowExpr}, ${relationIdExpr}, ${dataExpr}, '${displayMode}');`
+  );
+  L(
+    2,
+    `return <div className=${jsStringLiteral(fieldTextValueClass(displayMode === "MULTI_LINE"))}>{formatted || '-'}</div>;`
+  );
+  L(1, `}`);
+  if (field.data) {
+    o.needs.fetchRelDataExpr = true;
+    L(1, `const displayVal = resolveEvalExprI18n(evalColumnDataExpr(${dataExpr}, ${rowExpr}), t);`);
+  } else {
+    L(1, `const displayVal = String(fetched ?? ${fieldValueExpr(o)} ?? '');`);
+  }
+  L(1, `return <div className=${jsStringLiteral(fieldTextValueClass(false))}>{displayVal}</div>;`);
+  L(0, `})()}`);
+  return lines;
 };
 
 const emitSelect = (o: FormFieldEmitOptions, selectAllPlaceholder: string, selectAllMsgKey: string): string[] => {
@@ -595,8 +636,12 @@ export const emitFormField = (
   selectAllMsgKey: string
 ): string[] => {
   switch (o.field.type) {
+    case "hidden":
+      return [];
     case "input":
       return emitInput(o);
+    case "text":
+      return emitText(o);
     case "select":
       return emitSelect(o, selectAllPlaceholder, selectAllMsgKey);
     case "date":

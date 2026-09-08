@@ -439,7 +439,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   const editRules = editRulesColumn?.editPageRules ?? [];
   const needsRouter = needsEditAction && editRules.length > 0;
   const needsParseActionParams =
-    (needsEditAction && editRules.some((r) => !!r.passParam)) || buttonColumns.some(({ col }) => !!col.passParam);
+    (needsEditAction && editRules.length > 0) || buttonColumns.some(({ col }) => !!col.passParam);
 
   const imports: ImportRequirement[] = [
     { module: "@/lib/api", defaultName: "api" },

@@ -32,6 +32,10 @@ export const fieldDescCls =
 /** Form 필드 본체 영역 스타일 — 여유가 있으면 세로 중앙, 넘치면 상단 정렬로 자동 폴백 */
 export const fieldBodyCls = "flex-1 min-h-0 flex flex-col justify-center-safe";
 
+export function fieldTextValueClass(multiLine: boolean): string {
+  return `text-sm text-slate-700 ${multiLine ? "whitespace-pre-wrap" : "truncate"}`;
+}
+
 /** radio/checkbox/dateRangeStatus 옵션 그룹 래퍼 — 옵션 줄바꿈 없는 전제 */
 export const fieldOptionGroupCls = "flex items-center gap-4";
 

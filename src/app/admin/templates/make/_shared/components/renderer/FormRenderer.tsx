@@ -32,13 +32,12 @@ import type { CodeGroupDef, SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
 import {
   applyDataGeneration,
-  flattenPageDataItem,
+  buildFormRowData,
   evalConditionExpr,
   buildKeyToId,
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
   splitGenerationKeys,
-  FLATTEN_META_KEYS,
   resolveGenerationBaselineValue,
 } from "../../utils";
 import {
@@ -151,22 +150,7 @@ export function FormRenderer({
   /* fieldKey → fieldId 역매핑 테이블 — hideCondition 평가에 사용 (공통함수로 분리) */
   const keyToId = useMemo(() => buildKeyToId(fields), [fields]);
 
-  /* data 표현식 평가용 — fieldKey → 현재 값 맵 */
-  const rowData = useMemo(() => {
-    const map: Record<string, unknown> = {};
-    fields.forEach((f) => {
-      if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? "";
-    });
-    /* _fetchedRel{id} 데이터를 공통함수(flattenPageDataItem)로 평탄화 — TABLE(TableCellRenderer)과 완전히 동일한 방식
-           (dot-notation 전체 경로 + 유일한 필드명일 때의 짧은 키 승격까지 동일하게 지원) */
-    if (fetchRelData) {
-      const flatRel = flattenPageDataItem({ id: 0, dataJson: fetchRelData });
-      Object.entries(flatRel).forEach(([k, v]) => {
-        if (!FLATTEN_META_KEYS.has(k)) map[k] = v;
-      });
-    }
-    return map;
-  }, [fields, values, fetchRelData]);
+  const rowData = useMemo(() => buildFormRowData(fields, values, fetchRelData), [fields, values, fetchRelData]);
 
   /** hideCondition / disableCondition 공통 평가 함수 — 공용 evalConditionExpr에 위임
    *  resolver 순서: 폼 필드(현재+cross-form) → urlParams → crossTabFormValues

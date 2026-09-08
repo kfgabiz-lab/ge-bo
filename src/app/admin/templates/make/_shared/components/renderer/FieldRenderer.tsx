@@ -41,6 +41,7 @@ import {
   fieldRadioInputCls,
   fieldCheckboxInputCls,
   readonlyFieldCls,
+  fieldTextValueClass,
   textareaFlexCls,
   textareaFullCls,
   textareaCharCountWrapCls,
@@ -1129,9 +1130,7 @@ export function FieldRenderer({
           );
         }
         return (
-          <div
-            className={`text-sm text-slate-700 ${field.fetchDisplayMode === "MULTI_LINE" ? "whitespace-pre-wrap" : "truncate"}`}
-          >
+          <div className={fieldTextValueClass(field.fetchDisplayMode === "MULTI_LINE")}>
             {isPreview ? "" : formatted || "-"}
           </div>
         );
@@ -1144,7 +1143,7 @@ export function FieldRenderer({
       } else {
         displayVal = isPreview ? "" : String(fetched ?? value ?? "");
       }
-      return <div className="text-sm text-slate-700 truncate">{displayVal}</div>;
+      return <div className={fieldTextValueClass(false)}>{displayVal}</div>;
     }
 
     /* ── select ── */

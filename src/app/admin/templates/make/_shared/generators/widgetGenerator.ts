@@ -1,10 +1,11 @@
-import type { AnyWidget } from "../components/renderer/types";
+import type { AnyWidget, TabItem, TabWidget } from "../components/renderer/types";
 import type { PageWidgetItem } from "../components/renderer/PageGridRenderer";
 import { generateSearchBlock } from "./widget/searchBlock";
 import { generateTableBlock } from "./widget/tableBlock";
 import { generateSpaceBlock } from "./widget/spaceBlock";
 import { generateFormBlock } from "./widget/formBlock";
 import { generateMultiSelectBlock } from "./widget/multiselectBlock";
+import { generateTabBlock } from "./widget/tabBlock";
 import { normalizeFormItemRowSpans, packedRowLayout } from "../utils/formGridLayout";
 import { getSpaceGridColumn } from "../utils";
 import {
@@ -39,6 +40,19 @@ export interface WidgetCodeBlock {
   unhandled?: UnhandledConfigKeys[];
 }
 
+export interface TabPageConfig {
+  widgetItems: PageWidgetItem[];
+  mainConnectedSlug?: string;
+  connectedType?: string;
+}
+
+export interface TabPanelPlan {
+  tab: TabItem;
+  items: PageWidgetItem[];
+  autoHeightFlags: boolean[];
+  missing: boolean;
+}
+
 export interface WidgetGenContext {
   suffix: string;
   ind: (n: number) => string;
@@ -51,6 +65,10 @@ export interface WidgetGenContext {
   pageSlug?: string;
   leaveCheck: boolean;
   leaveCheckNames: string[];
+  mergeExistingBeforeSave: boolean;
+  tabPanels?: TabPanelPlan[];
+  blockOf?: (widget: PageWidget) => WidgetCodeBlock | undefined;
+  tabSavedMarker?: string;
 }
 
 export const GENERATED_PAGE_BASE_CONST = "const GENERATED_PAGE_BASE = '/admin/generated';";
@@ -62,6 +80,7 @@ export const formVarNames = (suffix: string) => ({
   fieldIds: `FORM_FIELD_IDS_${suffix}`,
   keyToId: `FORM_KEY_TO_ID_${suffix}`,
   evalCondition: `evalFieldCondition${suffix}`,
+  rowData: `formRowData${suffix}`,
   visibleFields: `visibleFields${suffix}`,
   rowIsAuto: `fieldRowIsAuto${suffix}`,
   imgBlobUrls: "imgBlobUrls",
@@ -83,6 +102,14 @@ export const multiSelectVarNames = (suffix: string) => ({
   setIds: `setMultiSelectIds${suffix}`,
 });
 
+export const tabVarNames = (suffix: string) => ({
+  active: `activeTab${suffix}`,
+  setActive: `setActiveTab${suffix}`,
+  savedTabs: `savedTabs${suffix}`,
+  setSavedTabs: `setSavedTabs${suffix}`,
+  handleClick: `handleTabClick${suffix}`,
+});
+
 export const PAGE_VAR = {
   allFormValues: "allFormValues",
   allFieldKeyToId: "allFieldKeyToId",
@@ -92,6 +119,8 @@ export const PAGE_VAR = {
   urlParams: "urlParams",
   imgBlobUrls: "imgBlobUrls",
   setImgBlobUrls: "setImgBlobUrls",
+  fetchRelData: "fetchRelData",
+  setFetchRelData: "setFetchRelData",
   pendingDeleteFileIds: "pendingDeleteFileIds",
   applyGenerations: "applyFieldGenerations",
 } as const;
@@ -108,6 +137,7 @@ export interface WidgetBuildOptions {
   isEntity?: boolean;
   pageSlug?: string;
   leaveCheck?: boolean;
+  tabPageConfigs?: Record<string, TabPageConfig>;
 }
 
 export interface WidgetUnhandledEntry {
@@ -128,6 +158,7 @@ const WIDGET_BLOCK_GENERATORS: Partial<Record<PageWidgetType, WidgetBlockGenerat
   space: generateSpaceBlock as WidgetBlockGenerator,
   form: generateFormBlock as WidgetBlockGenerator,
   multiselect: generateMultiSelectBlock as WidgetBlockGenerator,
+  tab: generateTabBlock as WidgetBlockGenerator,
 };
 
 const TYPE_LABEL: Record<PageWidgetType, string> = {
@@ -308,10 +339,12 @@ const buildUnsupportedBlock = (widget: PageWidget, suffix: string): WidgetCodeBl
   };
 };
 
-export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuildOptions = {}): WidgetBuildResult => {
-  const componentName = options.componentName || "GeneratedPage";
-  const isEntity = options.isEntity ?? false;
+export interface PreparedGrid {
+  items: PageWidgetItem[];
+  autoHeightFlags: boolean[];
+}
 
+const prepareGridItems = (items: PageWidgetItem[]): PreparedGrid => {
   const normalizedItems: PageWidgetItem[] = items.map((item) => {
     const normalized = normalizeFormItemRowSpans(item.colSpan, item.rowSpan, item.contents);
     return {
@@ -323,35 +356,174 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
     };
   });
 
-  const pageLevelLayout = packedRowLayout(
+  const layout = packedRowLayout(
     normalizedItems.map(({ colSpan, rowSpan }) => ({ colSpan, rowSpan })),
     12,
     false
   );
-  const itemAutoHeightFlags = normalizedItems.map((item, idx) => {
+  const autoHeightFlags = normalizedItems.map((item, idx) => {
     const rowIsAuto = item.rowIsAuto;
     if (!rowIsAuto || rowIsAuto.length === 0) return false;
     if (!rowIsAuto[rowIsAuto.length - 1]) return false;
-    const lastRow = pageLevelLayout.lastRow[idx];
+    const lastRow = layout.lastRow[idx];
     const startRow = lastRow - item.rowSpan + 1;
     for (let r = startRow; r <= lastRow; r++) {
-      const owners = pageLevelLayout.owners[r] ?? [];
+      const owners = layout.owners[r] ?? [];
       if (owners.length !== 1 || owners[0] !== idx) return false;
     }
     return true;
   });
 
-  const allWidgets: PageWidget[] = normalizedItems.flatMap((item) => item.contents.map((c) => c.widget));
+  return { items: normalizedItems, autoHeightFlags };
+};
 
-  const contentColSpanByWidget = new Map<PageWidget, number>();
-  const contentFillHeightByWidget = new Map<PageWidget, boolean>();
-  normalizedItems.forEach((item) => {
-    item.contents.forEach((c, contentIdx) => {
-      contentColSpanByWidget.set(c.widget, c.colSpan);
-      const isAutoTrailing = item.contentAutoTrailing?.[contentIdx] ?? false;
-      contentFillHeightByWidget.set(c.widget, !isAutoTrailing);
+const collectPanelWidgetIds = (items: PageWidgetItem[]): string[] =>
+  items
+    .flatMap((item) => item.contents.map((content) => (content.widget as { widgetId?: string }).widgetId))
+    .filter((id): id is string => !!id);
+
+const remapWidgetIdsDeep = (value: unknown, idMap: Map<string, string>): unknown => {
+  if (typeof value === "string") return idMap.get(value) ?? value;
+  if (Array.isArray(value)) return value.map((entry) => remapWidgetIdsDeep(entry, idMap));
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, entryValue]) => {
+      out[idMap.get(key) ?? key] = remapWidgetIdsDeep(entryValue, idMap);
     });
+    return out;
+  }
+  return value;
+};
+
+export const emitGridItems = (
+  grid: PreparedGrid,
+  blockOf: (widget: PageWidget) => WidgetCodeBlock | undefined,
+  level: number
+): string[] => {
+  const lines: string[] = [];
+  grid.items.forEach((item, itemIdx) => {
+    const autoHeightAttr = grid.autoHeightFlags[itemIdx] ? " autoHeight" : "";
+    lines.push(`${ind(level)}<GridCell colSpan={${item.colSpan}} rowSpan={${item.rowSpan}}${autoHeightAttr}>`);
+
+    const rowIsAuto = item.rowIsAuto ?? [];
+    const styleParts = [`gridTemplateColumns: 'repeat(${item.colSpan}, 1fr)'`];
+    if (rowIsAuto.length > 0) {
+      const rowTracks = rowIsAuto.map((auto) => (auto ? "auto" : "${ROW_HEIGHT - GAP_SIZE}px")).join(" ");
+      styleParts.push("gridTemplateRows: `" + rowTracks + "`");
+    }
+    styleParts.push("gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`");
+    styleParts.push("gridAutoFlow: 'row dense'");
+    styleParts.push("rowGap: `${GAP_SIZE}px`");
+    styleParts.push("columnGap: 0");
+    lines.push(`${ind(level + 1)}<div style={{ display: 'grid', ${styleParts.join(", ")} }}>`);
+
+    item.contents.forEach((content, contentIdx) => {
+      const block = blockOf(content.widget) ?? {
+        imports: [],
+        helperLines: [],
+        stateLines: [],
+        handlerLines: [],
+        jsxLines: [],
+      };
+      const isAutoTrailing = item.contentAutoTrailing?.[contentIdx] ?? false;
+      const colSpanClamped = Math.min(content.colSpan, item.colSpan);
+      const gridColumnValue =
+        content.widget.type === "space"
+          ? getSpaceGridColumn(content.widget.align, colSpanClamped, item.colSpan)
+          : `span ${colSpanClamped}`;
+      const heightExpr = "`${" + content.rowSpan + " * ROW_HEIGHT - GAP_SIZE}px`";
+      const heightPart = isAutoTrailing ? "" : `, height: ${heightExpr}`;
+      lines.push(
+        `${ind(level + 2)}<div style={{ gridColumn: '${gridColumnValue}', gridRow: 'span ${content.rowSpan}'${heightPart} }}>`
+      );
+      block.jsxLines.forEach((l) => lines.push(ind(level + 3) + l));
+      lines.push(`${ind(level + 2)}</div>`);
+    });
+    lines.push(`${ind(level + 1)}</div>`);
+    lines.push(`${ind(level)}</GridCell>`);
   });
+  return lines;
+};
+
+interface WidgetScopeOptions {
+  mainConnectedSlug?: string;
+  isEntity: boolean;
+  mergeExistingBeforeSave: boolean;
+  tabSaveScope?: { tabWidgetId: string; tabIdx: number };
+}
+
+interface WidgetScopeMeta extends WidgetScopeOptions {
+  contentColSpan: number;
+  contentFillHeight: boolean;
+}
+
+export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuildOptions = {}): WidgetBuildResult => {
+  const componentName = options.componentName || "GeneratedPage";
+  const isEntity = options.isEntity ?? false;
+
+  const rootGrid = prepareGridItems(items);
+
+  const allWidgets: PageWidget[] = [];
+  const scopeByWidget = new Map<PageWidget, WidgetScopeMeta>();
+  const tabPlansByWidget = new Map<PageWidget, TabPanelPlan[]>();
+
+  const depthByWidget = new Map<PageWidget, number>();
+
+  const registerGrid = (grid: PreparedGrid, scope: WidgetScopeOptions, depth: number): void => {
+    grid.items.forEach((item) => {
+      item.contents.forEach((content, contentIdx) => {
+        const widget = content.widget;
+        allWidgets.push(widget);
+        depthByWidget.set(widget, depth);
+        scopeByWidget.set(widget, {
+          ...scope,
+          contentColSpan: content.colSpan,
+          contentFillHeight: !(item.contentAutoTrailing?.[contentIdx] ?? false),
+        });
+        if (widget.type === "tab") registerTabPanels(widget as TabWidget, scope, depth);
+      });
+    });
+  };
+
+  const registerTabPanels = (tabWidget: TabWidget, parentScope: WidgetScopeOptions, depth: number): void => {
+    const plans: TabPanelPlan[] = [];
+    const requiredGuardActive = tabWidget.tabs?.[0]?.required === true;
+    (tabWidget.tabs ?? []).forEach((tab, tabIdx) => {
+      const config = tab.pageSlug ? options.tabPageConfigs?.[tab.pageSlug] : undefined;
+      if (!config) {
+        plans.push({ tab, items: [], autoHeightFlags: [], missing: true });
+        return;
+      }
+      const clonedItems = JSON.parse(JSON.stringify(config.widgetItems)) as PageWidgetItem[];
+      const idPrefix = `${tabWidget.widgetId}_t${tabIdx}_`;
+      const idMap = new Map<string, string>();
+      collectPanelWidgetIds(clonedItems).forEach((oldId) => idMap.set(oldId, `${idPrefix}${oldId}`));
+      const remappedItems = remapWidgetIdsDeep(clonedItems, idMap) as PageWidgetItem[];
+      const panelGrid = prepareGridItems(remappedItems);
+      plans.push({ tab, items: panelGrid.items, autoHeightFlags: panelGrid.autoHeightFlags, missing: false });
+      registerGrid(
+        panelGrid,
+        {
+          mainConnectedSlug: parentScope.mainConnectedSlug || config.mainConnectedSlug,
+          isEntity: config.connectedType === "data",
+          mergeExistingBeforeSave: !!tab.contentKey,
+          ...(requiredGuardActive ? { tabSaveScope: { tabWidgetId: tabWidget.widgetId, tabIdx } } : {}),
+        },
+        depth + 1
+      );
+    });
+    tabPlansByWidget.set(tabWidget, plans);
+  };
+
+  registerGrid(
+    rootGrid,
+    {
+      mainConnectedSlug: options.mainConnectedSlug,
+      isEntity,
+      mergeExistingBeforeSave: false,
+    },
+    0
+  );
 
   const typeCounter: Partial<Record<PageWidgetType, number>> = {};
   const suffixMap = new Map<string, string>();
@@ -365,25 +537,34 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
 
   const unsupportedSet = new Set<PageWidgetType>();
   const blockByWidget = new Map<PageWidget, WidgetCodeBlock>();
+  const blockOf = (widget: PageWidget): WidgetCodeBlock | undefined => blockByWidget.get(widget);
 
   const leaveCheckNames = collectLeaveCheckNames(allWidgets);
 
-  allWidgets.forEach((widget) => {
+  const generateBlock = (widget: PageWidget): void => {
     const wid = widgetIdOf(widget);
     const suffix = suffixOf(wid);
     const generator = WIDGET_BLOCK_GENERATORS[widget.type];
+    const scope = scopeByWidget.get(widget);
+    const tabSavedMarker = scope?.tabSaveScope
+      ? `${tabVarNames(suffixOf(scope.tabSaveScope.tabWidgetId)).setSavedTabs}((prev) => new Set([...prev, ${scope.tabSaveScope.tabIdx}]));`
+      : undefined;
     const ctx: WidgetGenContext = {
       suffix,
       ind,
       allWidgets,
       suffixOf,
-      mainConnectedSlug: options.mainConnectedSlug,
-      isEntity,
-      contentColSpan: contentColSpanByWidget.get(widget) ?? 12,
-      contentFillHeight: contentFillHeightByWidget.get(widget) ?? true,
+      mainConnectedSlug: scope?.mainConnectedSlug,
+      isEntity: scope?.isEntity ?? isEntity,
+      contentColSpan: scope?.contentColSpan ?? 12,
+      contentFillHeight: scope?.contentFillHeight ?? true,
       pageSlug: options.pageSlug,
       leaveCheck: options.leaveCheck ?? false,
       leaveCheckNames,
+      mergeExistingBeforeSave: scope?.mergeExistingBeforeSave ?? false,
+      tabPanels: tabPlansByWidget.get(widget),
+      blockOf,
+      tabSavedMarker,
     };
     if (!generator) {
       unsupportedSet.add(widget.type);
@@ -391,7 +572,14 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
       return;
     }
     blockByWidget.set(widget, generator(widget, ctx));
-  });
+  };
+
+  allWidgets.filter((widget) => widget.type !== "tab").forEach(generateBlock);
+  allWidgets
+    .filter((widget) => widget.type === "tab")
+    .slice()
+    .sort((a, b) => (depthByWidget.get(b) ?? 0) - (depthByWidget.get(a) ?? 0))
+    .forEach(generateBlock);
 
   const unhandledEntries: WidgetUnhandledEntry[] = [];
   blockByWidget.forEach((block, widget) => {
@@ -479,47 +667,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   lines.push(`${ind(1)}return (`);
   lines.push(`${ind(2)}<div className=${jsStringLiteral(GENERATED_PAGE_ROOT_CLS)}>`);
   lines.push(`${ind(3)}<PageGridContainer>`);
-  normalizedItems.forEach((item, itemIdx) => {
-    const autoHeightAttr = itemAutoHeightFlags[itemIdx] ? " autoHeight" : "";
-    lines.push(`${ind(4)}<GridCell colSpan={${item.colSpan}} rowSpan={${item.rowSpan}}${autoHeightAttr}>`);
-
-    const rowIsAuto = item.rowIsAuto ?? [];
-    const styleParts = [`gridTemplateColumns: 'repeat(${item.colSpan}, 1fr)'`];
-    if (rowIsAuto.length > 0) {
-      const rowTracks = rowIsAuto.map((auto) => (auto ? "auto" : "${ROW_HEIGHT - GAP_SIZE}px")).join(" ");
-      styleParts.push("gridTemplateRows: `" + rowTracks + "`");
-    }
-    styleParts.push("gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`");
-    styleParts.push("gridAutoFlow: 'row dense'");
-    styleParts.push("rowGap: `${GAP_SIZE}px`");
-    styleParts.push("columnGap: 0");
-    lines.push(`${ind(5)}<div style={{ display: 'grid', ${styleParts.join(", ")} }}>`);
-
-    item.contents.forEach((content, contentIdx) => {
-      const block = blockByWidget.get(content.widget) ?? {
-        imports: [],
-        helperLines: [],
-        stateLines: [],
-        handlerLines: [],
-        jsxLines: [],
-      };
-      const isAutoTrailing = item.contentAutoTrailing?.[contentIdx] ?? false;
-      const colSpanClamped = Math.min(content.colSpan, item.colSpan);
-      const gridColumnValue =
-        content.widget.type === "space"
-          ? getSpaceGridColumn(content.widget.align, colSpanClamped, item.colSpan)
-          : `span ${colSpanClamped}`;
-      const heightExpr = "`${" + content.rowSpan + " * ROW_HEIGHT - GAP_SIZE}px`";
-      const heightPart = isAutoTrailing ? "" : `, height: ${heightExpr}`;
-      lines.push(
-        `${ind(6)}<div style={{ gridColumn: '${gridColumnValue}', gridRow: 'span ${content.rowSpan}'${heightPart} }}>`
-      );
-      block.jsxLines.forEach((l) => lines.push(ind(7) + l));
-      lines.push(`${ind(6)}</div>`);
-    });
-    lines.push(`${ind(5)}</div>`);
-    lines.push(`${ind(4)}</GridCell>`);
-  });
+  emitGridItems(rootGrid, blockOf, 4).forEach((l) => lines.push(l));
   lines.push(`${ind(3)}</PageGridContainer>`);
   lines.push(`${ind(2)}</div>`);
   lines.push(`${ind(1)});`);

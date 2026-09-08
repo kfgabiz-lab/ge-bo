@@ -74,6 +74,12 @@ const buildUnhandled = (widget: MultiSelectWidget): UnhandledConfigKeys[] => [
   },
 ];
 
+const sanitizeWidgetForEmit = (widget: MultiSelectWidget): MultiSelectWidget => {
+  const clone = { ...widget } as Record<string, unknown>;
+  IGNORED_WIDGET_KEYS.forEach((_, key) => delete clone[key]);
+  return clone as unknown as MultiSelectWidget;
+};
+
 const textExprOf = (text: string | undefined, msgKey: string | undefined): string =>
   msgKey ? `t(${jsStringLiteral(msgKey)})` : jsStringLiteral(text ?? "");
 
@@ -107,7 +113,9 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
     { module: "react", named: ["useMemo", "useCallback", "useRef"] },
   ];
 
-  const helperLines: string[] = [`const ${names.widget}: MultiSelectWidget = ${JSON.stringify(widget, null, 4)};`];
+  const helperLines: string[] = [
+    `const ${names.widget}: MultiSelectWidget = ${JSON.stringify(sanitizeWidgetForEmit(widget), null, 4)};`,
+  ];
 
   const stateLines: string[] = [];
   stateLines.push(`${ind(1)}const { t } = useI18n();`);

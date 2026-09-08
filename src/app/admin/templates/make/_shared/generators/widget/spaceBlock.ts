@@ -52,6 +52,18 @@ const IGNORED_ITEM_KEYS = new Map<string, string>([
     "fieldKey",
     "SpaceBuilder가 필드 타입 전환 시 남기는 잔여 값 — SpaceRenderer.tsx:108-176 handleButtonClick과 FieldRenderer.tsx action-button 분기 어디서도 item.fieldKey를 읽지 않음",
   ],
+  [
+    "label",
+    "textarea 아이템에 남는 잔여 값 — SpaceRenderer는 textarea를 content/contentMsgKey로만 렌더링하고 label은 읽지 않음 (action-button은 HANDLED에서 처리)",
+  ],
+  [
+    "labelMsgKey",
+    "textarea 아이템에 남는 잔여 값 — SpaceRenderer는 textarea를 content/contentMsgKey로만 렌더링하고 labelMsgKey는 읽지 않음 (action-button은 HANDLED에서 처리)",
+  ],
+  [
+    "required",
+    "SpaceBuilder가 필드 타입 전환 시 남기는 잔여 값 — 공간영역 아이템에는 검증 개념이 없어 SpaceRenderer/FieldRenderer 어디서도 읽지 않음",
+  ],
 ]);
 
 const justifyClassOf = (align: SpaceWidget["align"]): string => spaceJustifyClass(align);

@@ -1208,6 +1208,32 @@ export const FLATTEN_META_KEYS = new Set([
   "updatedBy",
 ]);
 
+export function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  Object.entries(dataJson).forEach(([key, val]) => {
+    if (key.startsWith("_fetchedRel")) result[key] = val;
+  });
+  return result;
+}
+
+export function buildFormRowData(
+  fields: import("./components/builder/FormBuilder").FormFieldItem[],
+  values: Record<string, string>,
+  fetchRelData?: Record<string, unknown>
+): Record<string, unknown> {
+  const map: Record<string, unknown> = {};
+  fields.forEach((f) => {
+    if (f.fieldKey) map[f.fieldKey] = values[f.id] ?? "";
+  });
+  if (fetchRelData) {
+    const flatRel = flattenPageDataItem({ id: 0, dataJson: fetchRelData });
+    Object.entries(flatRel).forEach(([k, v]) => {
+      if (!FLATTEN_META_KEYS.has(k)) map[k] = v;
+    });
+  }
+  return map;
+}
+
 export function buildGenerationBaselineValues(dataJson: Record<string, unknown>): Record<string, string> {
   const flat = flattenPageDataItem({ id: 0, dataJson });
   const baseline: Record<string, string> = {};

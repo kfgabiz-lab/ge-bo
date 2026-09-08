@@ -58,6 +58,8 @@ import { buildFormFromEntity } from "../_shared/utils/entityBuild";
 import { normalizeFormItemRowSpans } from "../_shared/utils/formGridLayout";
 import { stampConnectedSlug } from "../_shared/hooks/useWidgetPageState";
 import { buildWidgetTsxFile } from "../_shared/generators/widgetGenerator";
+import type { TabPageConfig } from "../_shared/generators/widgetGenerator";
+import { fetchTemplateConfig } from "../_shared/templateApi";
 import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
 import type { SlugOption } from "../_shared/components/builder/fields/SlugSelectField";
 import PageLayout from "@/components/layout/page-layout";
@@ -264,6 +266,40 @@ const WidgetTypePicker = ({
     </div>
   </div>
 );
+
+const collectTabPageSlugs = (items: PageWidgetItem[]): string[] =>
+  items.flatMap((item) =>
+    item.contents.flatMap((content) => {
+      const widget = content.widget as { type?: string; tabs?: { pageSlug?: string }[] };
+      if (widget.type !== "tab") return [];
+      return (widget.tabs ?? []).map((tab) => tab.pageSlug).filter((slug): slug is string => !!slug);
+    })
+  );
+
+const loadTabPageConfigs = async (
+  rootItems: PageWidgetItem[],
+  onLoadFail: (slug: string) => void
+): Promise<Record<string, TabPageConfig>> => {
+  const configs: Record<string, TabPageConfig> = {};
+  const pending = collectTabPageSlugs(rootItems);
+  while (pending.length > 0) {
+    const slug = pending.shift() as string;
+    if (configs[slug]) continue;
+    try {
+      const config = await fetchTemplateConfig(slug);
+      configs[slug] = {
+        widgetItems:
+          config.widgetItems as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
+        mainConnectedSlug: config.mainConnectedSlug,
+        connectedType: config.connectedType,
+      };
+      pending.push(...collectTabPageSlugs(config.widgetItems as unknown as PageWidgetItem[]));
+    } catch {
+      onLoadFail(slug);
+    }
+  }
+  return configs;
+};
 
 /* ══════════════════════════════════════════ */
 /*  메인 컴포넌트                               */
@@ -832,6 +868,10 @@ export default function PageBuilderPage() {
     });
 
     try {
+      const tabPageConfigs = await loadTabPageConfigs(itemsToBuild as PageWidgetItem[], (slug) =>
+        toast.warning(`탭 연결 페이지(${slug}) 템플릿을 불러오지 못했습니다. 해당 탭은 산출물에 TODO로 남습니다.`)
+      );
+
       const { tsxCode, unsupported, unhandled } = buildWidgetTsxFile(
         itemsToBuild as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
         {
@@ -841,6 +881,7 @@ export default function PageBuilderPage() {
           isEntity: om.connectedType === "data",
           pageSlug: generateSlug,
           leaveCheck: om.leaveCheck || false,
+          tabPageConfigs,
         }
       );
 

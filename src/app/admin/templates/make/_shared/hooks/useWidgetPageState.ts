@@ -33,6 +33,7 @@ import {
   extractMultiSelectSelection,
   resolveFetchSortKey,
   buildGenerationBaselineValues,
+  extractFetchRelData,
   findSection,
   buildFormValuesFromDataJson,
   buildFieldKeyIdAndLabelMaps,
@@ -191,16 +192,6 @@ async function restoreFormDataFromJson(
       });
     }
   } catch {}
-}
-
-function extractFetchRelData(dataJson: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  Object.entries(dataJson).forEach(([key, val]) => {
-    if (key.startsWith("_fetchedRel")) {
-      result[key] = val;
-    }
-  });
-  return result;
 }
 
 function parseContentDispositionFilename(disposition?: string): string | null {

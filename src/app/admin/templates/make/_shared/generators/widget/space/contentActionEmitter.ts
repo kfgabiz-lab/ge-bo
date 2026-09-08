@@ -190,7 +190,7 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
   handlerLines.push(`${ind(4)}isEntity: ${isEntity},`);
   handlerLines.push(`${ind(4)}entityDateFields: ${entityDateFieldsExpr},`);
   handlerLines.push(`${ind(4)}newFileIdsByFieldId,`);
-  handlerLines.push(`${ind(4)}mergeExistingBeforeSave: false,`);
+  handlerLines.push(`${ind(4)}mergeExistingBeforeSave: ${ctx.mergeExistingBeforeSave},`);
   if (hasFileFields) {
     const resetLines = forms
       .filter((fw) => (fw.fields ?? []).some((f) => (FILE_FIELD_TYPES as readonly string[]).includes(f.type)))
@@ -246,6 +246,7 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
     handlerLines.push(`${ind(3)}}`);
   }
   handlerLines.push(`${ind(3)}toast.success(isUpdate ? t('common.updated') : t('common.saved'));`);
+  if (ctx.tabSavedMarker) handlerLines.push(`${ind(3)}${ctx.tabSavedMarker}`);
   if (ctx.leaveCheckNames.includes("markClean")) handlerLines.push(`${ind(3)}markClean();`);
   if (goBackAfterAction) handlerLines.push(`${ind(3)}router.back();`);
   handlerLines.push(`${ind(2)}} catch (err: unknown) {`);

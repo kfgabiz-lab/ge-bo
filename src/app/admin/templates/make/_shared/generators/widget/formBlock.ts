@@ -8,6 +8,7 @@ import {
   emitContainerClose,
   formVarNames,
   multiSelectVarNames,
+  pageVar,
 } from "../widgetGenerator";
 import {
   fieldLabelCls,
@@ -100,9 +101,26 @@ const HANDLED_FIELD_KEYS = new Set([
   "isPk",
   "readonly",
   "optionFilterExpr",
+  "relationSlugId",
+  "fetchDisplayMode",
+  "data",
 ]);
 
-const IGNORED_FIELD_KEYS = new Map<string, string>();
+const IGNORED_FIELD_KEYS = new Map<string, string>([
+  [
+    "rows",
+    "FormBuilder 필드 편집기가 textarea에 남기는 잔여 값 — FieldRenderer.tsx textarea 분기와 formGridLayout 어디서도 field.rows를 읽지 않고 높이는 rowSpan으로만 계산됨",
+  ],
+]);
+
+const sanitizeWidgetForEmit = (widget: FormWidget): FormWidget => ({
+  ...widget,
+  fields: (widget.fields ?? []).map((field) => {
+    const clone = { ...field } as Record<string, unknown>;
+    IGNORED_FIELD_KEYS.forEach((_, key) => delete clone[key]);
+    return clone as unknown as FormFieldItem;
+  }),
+});
 
 const fileTypeSetLiteral = (): string =>
   `new Set<string>([${FILE_FIELD_TYPES.map((tp) => jsStringLiteral(tp)).join(", ")}])`;
@@ -143,6 +161,7 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     (fw.fields ?? []).some((f) => (FILE_FIELD_TYPES as readonly string[]).includes(f.type))
   );
   const hasInputField = fields.some((f) => f.type === "input");
+  const pageHasTextFields = allForms.some((fw) => (fw.fields ?? []).some((f) => f.type === "text"));
   const hasTitleBlock = !!(widget.titleMsgKey || widget.title);
   const bgColor = widget.bgColor && widget.bgColor !== "none" ? widget.bgColor : undefined;
   const mainSlug = widget.connectedSlug || ctx.mainConnectedSlug || "";
@@ -154,7 +173,7 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   const handlerLines: string[] = [];
   const jsxLines: string[] = [];
 
-  helperLines.push(`const ${names.widget}: FormWidget = ${JSON.stringify(widget, null, 4)};`);
+  helperLines.push(`const ${names.widget}: FormWidget = ${JSON.stringify(sanitizeWidgetForEmit(widget), null, 4)};`);
   helperLines.push(`const ${names.fields}: FormFieldItem[] = ${names.widget}.fields;`);
   helperLines.push(
     `const ${names.fieldById}: Record<string, FormFieldItem> = Object.fromEntries(${names.fields}.map((f) => [f.id, f]));`
@@ -196,6 +215,11 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
       stateLines.push(`${ind(1)}const [imgBlobUrls, setImgBlobUrls] = useState<Record<number, string>>({});`);
       stateLines.push(`${ind(1)}const pendingDeleteFileIds = useRef<Set<number>>(new Set());`);
     }
+    if (pageHasTextFields) {
+      stateLines.push(
+        `${ind(1)}const [${pageVar("fetchRelData")}, ${pageVar("setFetchRelData")}] = useState<Record<string, unknown>>({});`
+      );
+    }
   }
 
   stateLines.push(`${ind(1)}const [${names.values}, ${names.setValues}] = useState<Record<string, string>>({});`);
@@ -229,6 +253,16 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   if (needs.useId) {
     stateLines.push(`${ind(1)}const uid = useId();`);
     imports.push({ module: "react", named: ["useId"] });
+  }
+  if (needs.fetchRel) {
+    imports.push({ module: UTILS_MODULE, named: ["buildFormRowData", "formatFetchedRelValue"] });
+    handlerLines.push(
+      `${ind(1)}const ${names.rowData} = useMemo(() => buildFormRowData(${names.fields}, ${names.values}, ${pageVar("fetchRelData")}), [${names.values}, ${pageVar("fetchRelData")}]);`
+    );
+    handlerLines.push("");
+  }
+  if (needs.fetchRelDataExpr) {
+    imports.push({ module: UTILS_MODULE, named: ["evalColumnDataExpr", "resolveEvalExprI18n"] });
   }
   if (needs.parseOpt) imports.push({ module: UTILS_MODULE, named: ["parseOpt"] });
   if (needs.resolveCodeLabel) imports.push({ module: UTILS_MODULE, named: ["resolveCodeLabel"] });
@@ -427,6 +461,9 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
       handlerLines.push(
         `${ind(4)}const valuesByWidgetId = buildFormValuesFromDataJson(dataJson, ALL_FORM_WIDGETS, t);`
       );
+      if (pageHasTextFields) {
+        handlerLines.push(`${ind(4)}${pageVar("setFetchRelData")}(extractFetchRelData(dataJson));`);
+      }
       allForms.forEach((fw) => {
         const n = formVarNames(suffixOf(fw.widgetId));
         handlerLines.push(
@@ -486,6 +523,7 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
         module: UTILS_MODULE,
         named: ["initFormDefaultValues", "buildFormValuesFromDataJson"],
       });
+      if (pageHasTextFields) imports.push({ module: UTILS_MODULE, named: ["extractFetchRelData"] });
       imports.push({ module: "@/lib/api", defaultName: "api" });
       imports.push({ module: "sonner", named: ["toast"] });
       if (allMultiSelects.length > 0) {
