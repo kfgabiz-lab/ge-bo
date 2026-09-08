@@ -18,55 +18,55 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
-
-const LEAVE_MESSAGE = "저장되지 않은 변경사항이 있습니다. 페이지를 나가시겠습니까?";
+import { useI18n } from "@/hooks/use-i18n";
 
 export function useLeaveCheck(enabled: boolean) {
-    const [isDirty, setIsDirty] = useState(false);
-    /* ref: markClean() 직후 confirmLeave() 를 동기적으로 호출할 때 정확한 값 보장 */
-    const isDirtyRef = useRef(false);
+  const { t } = useI18n();
+  const [isDirty, setIsDirty] = useState(false);
+  /* ref: markClean() 직후 confirmLeave() 를 동기적으로 호출할 때 정확한 값 보장 */
+  const isDirtyRef = useRef(false);
 
-    const { register, unregister } = useLeaveCheckStore();
+  const { register, unregister } = useLeaveCheckStore();
 
-    /* 브라우저 새로고침·탭 닫기 감지 */
-    useEffect(() => {
-        if (!enabled || !isDirty) return;
-        const handler = (e: BeforeUnloadEvent) => {
-            e.preventDefault();
-            e.returnValue = "";
-        };
-        window.addEventListener("beforeunload", handler);
-        return () => window.removeEventListener("beforeunload", handler);
-    }, [enabled, isDirty]);
+  /* 브라우저 새로고침·탭 닫기 감지 */
+  useEffect(() => {
+    if (!enabled || !isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [enabled, isDirty]);
 
-    /**
-     * 프로그래밍 방식 이탈 전 확인
-     * @returns true — 이탈 허용 / false — 이탈 취소
-     */
-    const confirmLeave = useCallback((): boolean => {
-        if (!enabled || !isDirtyRef.current) return true;
-        return window.confirm(LEAVE_MESSAGE);
-    }, [enabled]);
+  /**
+   * 프로그래밍 방식 이탈 전 확인
+   * @returns true — 이탈 허용 / false — 이탈 취소
+   */
+  const confirmLeave = useCallback((): boolean => {
+    if (!enabled || !isDirtyRef.current) return true;
+    return window.confirm(t("common.message.leaveConfirm"));
+  }, [enabled, t]);
 
-    /* 사이드바·헤더 네비게이션 가드용 — 전역 스토어에 등록/해제 */
-    useEffect(() => {
-        if (enabled && isDirty) {
-            register(confirmLeave);
-        } else {
-            unregister();
-        }
-        return () => unregister();
-    }, [enabled, isDirty, confirmLeave, register, unregister]);
+  /* 사이드바·헤더 네비게이션 가드용 — 전역 스토어에 등록/해제 */
+  useEffect(() => {
+    if (enabled && isDirty) {
+      register(confirmLeave);
+    } else {
+      unregister();
+    }
+    return () => unregister();
+  }, [enabled, isDirty, confirmLeave, register, unregister]);
 
-    const markDirty = useCallback(() => {
-        isDirtyRef.current = true;
-        setIsDirty(true);
-    }, []);
+  const markDirty = useCallback(() => {
+    isDirtyRef.current = true;
+    setIsDirty(true);
+  }, []);
 
-    const markClean = useCallback(() => {
-        isDirtyRef.current = false;
-        setIsDirty(false);
-    }, []);
+  const markClean = useCallback(() => {
+    isDirtyRef.current = false;
+    setIsDirty(false);
+  }, []);
 
-    return { isDirty, markDirty, markClean, confirmLeave };
+  return { isDirty, markDirty, markClean, confirmLeave };
 }
