@@ -480,7 +480,8 @@ export function SubListBuilder({
     const newCol: SubListColumn = {
       id: uid(),
       key: type === "action" ? "action" : "",
-      label: type === "action" ? "관리" : "",
+      label: type === "action" ? "" : "",
+      labelMsgKey: type === "action" ? "common.label.manage" : undefined,
       type,
       required: false,
     };

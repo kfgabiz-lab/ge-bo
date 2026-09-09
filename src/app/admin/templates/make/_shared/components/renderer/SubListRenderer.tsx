@@ -74,6 +74,7 @@ function toFieldConfig(col: SubListColumn): SearchFieldConfig {
     /* 공통 */
     placeholder: col.placeholder,
     placeholderMsgKey: col.placeholderMsgKey,
+    noDefaultPlaceholder: true,
     description: col.description,
     descriptionMsgKey: col.descriptionMsgKey,
     required: col.required,

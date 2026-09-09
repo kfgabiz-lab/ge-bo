@@ -1090,7 +1090,9 @@ export function FieldRenderer({
           disabled={isDisabled}
           readOnly={isReadOnly}
           placeholder={
-            field.placeholderMsgKey ? t(field.placeholderMsgKey) : field.placeholder || t("common.input.placeholder")
+            field.placeholderMsgKey
+              ? t(field.placeholderMsgKey)
+              : field.placeholder || (field.noDefaultPlaceholder ? "" : t("common.input.placeholder"))
           }
           maxLength={hasCharCount ? field.maxLength : undefined}
           className={`${inputCls}${readonlyCls}${hasCharCount ? ` ${fieldCharCountPadCls}` : ""}`}
@@ -1514,7 +1516,7 @@ export function FieldRenderer({
                   ? ""
                   : field.placeholderMsgKey
                     ? t(field.placeholderMsgKey)
-                    : field.placeholder || t("common.input.textarea_placeholder")
+                    : field.placeholder || (field.noDefaultPlaceholder ? "" : t("common.input.textarea_placeholder"))
               }
               onChange={isReadOnly ? undefined : (e) => onChange(e.target.value)}
             />
@@ -1535,7 +1537,7 @@ export function FieldRenderer({
               ? ""
               : field.placeholderMsgKey
                 ? t(field.placeholderMsgKey)
-                : field.placeholder || t("common.input.textarea_placeholder")
+                : field.placeholder || (field.noDefaultPlaceholder ? "" : t("common.input.textarea_placeholder"))
           }
           onChange={isReadOnly ? undefined : (e) => onChange(e.target.value)}
         />

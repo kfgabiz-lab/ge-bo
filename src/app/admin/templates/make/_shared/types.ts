@@ -64,6 +64,7 @@ export interface SearchFieldConfig {
   fetchDisplayMode?: "ONE_LINE" | "MULTI_LINE";
   placeholder?: string;
   placeholderMsgKey?: string; // placeholder 다국어 키 (있으면 t(key), 없으면 placeholder 표시)
+  noDefaultPlaceholder?: boolean;
   /** 라벨 하단 설명 텍스트 (예: "팝업 관리를 위해 입력하는 제목입니다.") */
   description?: string;
   descriptionMsgKey?: string; // 설명 다국어 키 (있으면 t(key), 없으면 description 표시)
