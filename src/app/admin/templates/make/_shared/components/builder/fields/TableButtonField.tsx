@@ -145,7 +145,7 @@ export function TableButtonField({ values, onChange, layerTemplates, onRequestLa
                 <input
                   type="text"
                   value={values.externalUrl ?? ""}
-                  onChange={(e) => onChange({ externalUrl: e.target.value || undefined })}
+                  onChange={(e) => onChange({ externalUrl: e.target.value.trim() || undefined })}
                   placeholder={
                     values.usePreviewToken ? "예: http://localhost:3002/company/blog/detail" : "예: www.naver.com"
                   }

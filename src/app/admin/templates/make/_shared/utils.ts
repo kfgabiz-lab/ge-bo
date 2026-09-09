@@ -3080,5 +3080,6 @@ export function filterByAccept(files: File[], acceptStr: string): { valid: File[
 }
 
 export function normalizeExternalUrl(url: string): string {
-  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  const trimmed = url.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
