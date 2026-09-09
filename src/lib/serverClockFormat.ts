@@ -1,5 +1,6 @@
 import { useSiteStore } from "@/store/use-site-store";
 import { serverNowMs } from "@/store/use-server-clock-store";
+import { formatTzOffsetLabel, getTimezoneCity } from "@/lib/timezoneOptions";
 
 /** getDateParts가 반환하는 시각의 연/월/일/시/분/초 문자열 조각 */
 export interface NowParts {
@@ -72,4 +73,16 @@ export function getNowParts(): NowParts {
 export function formatServerClockTime(): string {
   const { hh, mm, ss } = getNowParts();
   return `${hh}:${mm}:${ss}`;
+}
+
+/**
+ * 활성 사이트 timezone의 현재(서버시각 기준) 오프셋+도시명 표기 — 예: "UTC-5 Chicago"
+ * - formatTzOffsetLabel이 Intl longOffset을 쓰므로 서머타임(DST) 자동 반영 (겨울엔 "UTC-6 Chicago")
+ * - 활성 사이트가 없거나 timezone 미설정이면 빈 문자열 반환 (호출부에서 미표시)
+ */
+export function formatServerClockOffset(): string {
+  const zone = getActiveSiteTimezone();
+  if (!zone) return "";
+  const now = serverNowMs();
+  return `${formatTzOffsetLabel(zone, now)} ${getTimezoneCity(zone)}`;
 }

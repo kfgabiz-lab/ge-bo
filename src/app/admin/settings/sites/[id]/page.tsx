@@ -11,7 +11,13 @@ import type { FormWidget } from "@/app/admin/templates/make/_shared/components/b
 import { useSiteManagementStore } from "@/store/use-site-management-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { usePageTitleStore } from "@/store/use-page-title-store";
-import { TIMEZONE_OPTIONS } from "@/lib/timezoneOptions";
+import { getTimezoneEntries, formatTzOffsetLabel } from "@/lib/timezoneOptions";
+
+/* 시간대 select 옵션 — "UTC±N 도시명:IANA" 형식. 오프셋은 formatTzOffsetLabel이 서머타임(DST) 반영해 계산 (예: "UTC-5 Chicago:America/Chicago") */
+const TIMEZONE_OPTIONS = getTimezoneEntries().map(({ city, tz }) => {
+  const label = formatTzOffsetLabel(tz);
+  return label === city ? `${label}:${tz}` : `${label} ${city}:${tz}`;
+});
 
 /* ── 상수 ── */
 /* 로케일(locale) select 옵션 — "라벨:값(BCP47)" 형식, TIMEZONE_OPTIONS와 동일한 도시/국가 기준으로 큐레이션 */
