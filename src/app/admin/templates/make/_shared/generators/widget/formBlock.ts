@@ -111,6 +111,14 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
     "rows",
     "FormBuilder 필드 편집기가 textarea에 남기는 잔여 값 — FieldRenderer.tsx textarea 분기와 formGridLayout 어디서도 field.rows를 읽지 않고 높이는 rowSpan으로만 계산됨",
   ],
+  [
+    "disablePastDates",
+    "date 필드 과거일 차단은 FieldRenderer.tsx:1282 dateMin 계산이 field.disablePast만 읽어서 처리한다 — field.disablePastDates는 SearchFieldConfig(types.ts)에 없고 DateField.tsx 빌더 편집기에도 대응 입력이 없어 런타임에서 읽는 지점이 전혀 없는 사문화 값",
+  ],
+  [
+    "minDate",
+    "date 필드 최소값(dateMin)은 FieldRenderer.tsx:1282가 disablePast+defaultToday/defaultDateOffset/defaultDate 조합으로만 계산한다 — field.minDate는 SearchFieldConfig(types.ts)에 없고 DateField.tsx 빌더 편집기에도 대응 입력이 없어 런타임에서 읽는 지점이 전혀 없는 사문화 값",
+  ],
 ]);
 
 const sanitizeWidgetForEmit = (widget: FormWidget): FormWidget => ({

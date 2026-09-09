@@ -37,6 +37,7 @@ const PHASE1_SEARCH_TYPES = new Set<SearchFieldType>([
   "select",
   "date",
   "dateRange",
+  "yearMonth",
   "checkbox",
   "radio",
   "hidden",
@@ -92,11 +93,11 @@ const TYPE_SCOPED_FIELD_KEY_POLICIES = new Map<string, TypeScopedFieldKeyPolicy>
     "data",
     {
       handledTypes: new Set<SearchFieldType>(["select"]),
-      ignoredTypes: new Set<SearchFieldType>(["date", "dateRange", "checkbox", "radio", "hidden"]),
+      ignoredTypes: new Set<SearchFieldType>(["date", "dateRange", "yearMonth", "checkbox", "radio", "hidden"]),
       handledReason:
         "select 전용 — utils.ts:2843 buildSearchQueryParams가 f.type==='select' && f.data?.includes('?') 조건에서 condexpr_/condval_ 파라미터로 조립하고, 산출물은 SEARCH_FIELDS 리터럴(SEARCH_QUERY_PARAM_FIELD_KEYS에 'data' 포함)을 그대로 넘겨 동일 동작을 재현한다. 마크업에는 select 옵션만 방출되며 런타임 FieldRenderer.tsx case 'select'(1151)도 field.data를 읽지 않아 표시 파리티 차이가 없다",
       ignoredReason:
-        "FieldRenderer.tsx의 field.data 참조는 :1030 :1032 :1040 :1057 :1058(case 'input' 1026~1114 내부)과 :1127 :1142 :1143(case 'text' 1115~1150 내부) 8곳뿐이다. 'text'는 PHASE1_SEARCH_TYPES에 없어 supportedFields 진입 자체가 불가하고, utils.ts:2843 조회 파라미터 분기도 f.type==='select' 가드라 date/dateRange/checkbox/radio/hidden 타입에서는 런타임이 f.data를 읽는 지점이 없다",
+        "FieldRenderer.tsx의 field.data 참조는 :1030 :1032 :1040 :1057 :1058(case 'input' 1026~1114 내부)과 :1127 :1142 :1143(case 'text' 1115~1150 내부) 8곳뿐이다. 'text'는 PHASE1_SEARCH_TYPES에 없어 supportedFields 진입 자체가 불가하고, utils.ts:2843 조회 파라미터 분기도 f.type==='select' 가드라 date/dateRange/yearMonth/checkbox/radio/hidden 타입에서는 런타임이 f.data를 읽는 지점이 없다(case 'yearMonth'는 :1258에서 case 'date'로 fall-through하며 field.data를 읽지 않는다)",
     },
   ],
 ]);
@@ -379,10 +380,13 @@ const pushFieldMarkup = (
       jsxLines.push(`${ind(3)}</div>`);
       break;
     case "date":
+    case "yearMonth": {
+      const inputTypeAttr = f.type === "yearMonth" ? "month" : "date";
       jsxLines.push(
-        `${ind(3)}<input type="date" value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${jsStringLiteral(inputCls)} />`
+        `${ind(3)}<input type="${inputTypeAttr}" value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${jsStringLiteral(inputCls)} />`
       );
       break;
+    }
     case "dateRange": {
       const startKey = `${id}_from`;
       const endKey = `${id}_to`;

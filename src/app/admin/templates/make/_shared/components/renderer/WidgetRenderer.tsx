@@ -1374,7 +1374,9 @@ export function WidgetRenderer({
           popupMultiSelectMap,
           popupMultiSelectExtraFieldMap,
           popupCfg?.mainConnectedSlug,
-          popupAllFormValues
+          popupAllFormValues,
+          undefined,
+          popupAllKeyToId
         );
 
         const popupValidationRuleIds = contentValidationRuleIds

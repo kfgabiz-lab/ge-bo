@@ -1693,6 +1693,7 @@ export function buildDataJson(
     contentKey?: string;
     connectedSlug?: string;
     extraFields?: import("./components/renderer/types").MultiSelectExtraField[];
+    hideCondition?: string;
   }>,
   formValuesMap: Record<string, Record<string, string>>,
   formFileIdsMap: Record<string, Record<string, number[]>>,
@@ -1703,7 +1704,8 @@ export function buildDataJson(
   /** hideCondition 평가용 전체 폼 값 — 미전달 시 위젯 자체 rawValues로 평가 */
   allFormValues?: Record<string, string>,
   /** entity 저장 경로 여부 — true면 contentKey가 있어도 flat(Object.assign)으로 저장 */
-  isEntity?: boolean
+  isEntity?: boolean,
+  allFieldKeyToId?: Record<string, string>
 ): { dataJson: Record<string, unknown>; pkKeys: string[] } {
   const dataJson: Record<string, unknown> = {};
   const pkKeys: string[] = [];
@@ -1829,8 +1831,13 @@ export function buildDataJson(
 
       applyDateRangeGenerationToDataJson(w.fields ?? [], rawValues, dataJson, generationTargetKeyToId, isCrossTabKey);
     } else if (w.type === "multiselect") {
+      const hideEvalValues = allFormValues;
+      const msHidden =
+        !!w.hideCondition &&
+        !!hideEvalValues &&
+        evalWidgetHideCondition(w.hideCondition, allFieldKeyToId ?? generationTargetKeyToId, hideEvalValues);
       if (w.contentKey) {
-        const selectedIds = multiSelectMap[w.widgetId ?? ""] ?? [];
+        const selectedIds = msHidden ? [] : (multiSelectMap[w.widgetId ?? ""] ?? []);
         const extraFields = w.extraFields ?? [];
         /* mainConnectedSlug와 다른 connectedSlug → _rel.{connectedSlug}에 저장 */
         const isRel = mainConnectedSlug && w.connectedSlug && w.connectedSlug !== mainConnectedSlug;

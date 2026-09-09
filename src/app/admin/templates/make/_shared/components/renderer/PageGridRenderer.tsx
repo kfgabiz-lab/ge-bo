@@ -492,15 +492,16 @@ export function PageGridRenderer({
   }, [normalizedWidgetItems]);
 
   const multiSelectHideCondWidgets = useMemo(() => {
-    return normalizedWidgetItems
+    return widgetItems
       .flatMap((item) => item.contents.map((c) => c.widget))
       .filter((w): w is MultiSelectWidget => w.type === "multiselect" && !!w.hideCondition);
-  }, [normalizedWidgetItems]);
+  }, [widgetItems]);
 
   const prevMultiSelectHiddenRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     if (mode === "preview") return;
+    if (recordLoaded === false) return;
 
     multiSelectHideCondWidgets.forEach((w) => {
       const wid = w.widgetId;
@@ -531,6 +532,7 @@ export function PageGridRenderer({
     });
   }, [
     mode,
+    recordLoaded,
     multiSelectHideCondWidgets,
     allFieldKeyToId,
     allFormValues,

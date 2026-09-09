@@ -41,7 +41,14 @@ import {
   fieldContentHeight,
   fieldTextValueClass,
   FORM_FIELD_ROW_HEIGHT,
+  fieldDateRangeInputPadCls,
 } from "../../../styles";
+import {
+  SEARCH_DATE_ICON_CLS,
+  SEARCH_DATE_RANGE_SEP_CLS,
+  SEARCH_DATE_RANGE_WRAP_CLS,
+  SEARCH_DATE_RANGE_INPUT_WRAP_CLS,
+} from "../../../components/renderer/rendererStyles";
 import { FILE_TYPE_PRESETS } from "../../../constants";
 import { jsStringLiteral, emitSelectArrow, type formVarNames } from "../../widgetGenerator";
 
@@ -100,6 +107,7 @@ export const FORM_SUPPORTED_FIELD_TYPES = new Set<string>([
   "textarea",
   "text",
   "hidden",
+  "dateRange",
 ]);
 
 const textExprOf = (text: string | undefined, msgKey: string | undefined): string =>
@@ -144,6 +152,12 @@ export const fieldValueExpr = (o: FormFieldEmitOptions): string =>
 
 const changeCall = (o: FormFieldEmitOptions, valueExpr: string): string =>
   `${o.names.change}(${jsStringLiteral(o.field.id)}, ${valueExpr})`;
+
+const dateRangeValueExpr = (o: FormFieldEmitOptions, suffix: "_from" | "_to"): string =>
+  `(${o.names.values}[${jsStringLiteral(o.field.id + suffix)}] ?? '')`;
+
+const dateRangeChangeCall = (o: FormFieldEmitOptions, suffix: "_from" | "_to", valueExpr: string): string =>
+  `${o.names.change}(${jsStringLiteral(o.field.id + suffix)}, ${valueExpr})`;
 
 const emitCodeLabelInput = (o: FormFieldEmitOptions): string[] => {
   const { ind, level, field } = o;
@@ -283,6 +297,47 @@ const emitDate = (o: FormFieldEmitOptions): string[] => {
     attrs.push(`onClick={(e) => e.currentTarget.showPicker?.()}`);
   }
   return [`${ind(level)}<input ${attrs.join(" ")} />`];
+};
+
+const emitDateRangeSide = (o: FormFieldEmitOptions, suffix: "_from" | "_to", inputType: string): string[] => {
+  const { ind, level } = o;
+  const field = o.field;
+  const subType = field.rangeSubType ?? "date";
+  const isReadOnly = !!field.readonly;
+  const cls = `${inputCls} ${fieldDateRangeInputPadCls}${isReadOnly ? readonlyFieldCls : ""}`;
+  const attrs = [
+    `type="${inputType}"`,
+    ...(subType === "timeSec" ? ["step={1}"] : []),
+    `disabled={${o.disabledExpr}}`,
+    ...(isReadOnly ? ["readOnly"] : []),
+    `className=${jsStringLiteral(cls)}`,
+    `value={${dateRangeValueExpr(o, suffix)}}`,
+    ...(isReadOnly
+      ? []
+      : [
+          `onChange={(e) => ${dateRangeChangeCall(o, suffix, "e.target.value")}}`,
+          `onClick={(e) => e.currentTarget.showPicker?.()}`,
+        ]),
+  ];
+  return [
+    `${ind(level)}<div className=${jsStringLiteral(SEARCH_DATE_RANGE_INPUT_WRAP_CLS)}>`,
+    `${ind(level + 1)}<Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} />`,
+    `${ind(level + 1)}<input ${attrs.join(" ")} />`,
+    `${ind(level)}</div>`,
+  ];
+};
+
+const emitDateRange = (o: FormFieldEmitOptions): string[] => {
+  const { ind, level, field } = o;
+  o.needs.icons.add("Calendar");
+  const inputType = dateInputType(field.rangeSubType ?? "date");
+  return [
+    `${ind(level)}<div className=${jsStringLiteral(SEARCH_DATE_RANGE_WRAP_CLS)}>`,
+    ...emitDateRangeSide({ ...o, level: level + 1 }, "_from", inputType),
+    `${ind(level + 1)}<span className=${jsStringLiteral(SEARCH_DATE_RANGE_SEP_CLS)}>~</span>`,
+    ...emitDateRangeSide({ ...o, level: level + 1 }, "_to", inputType),
+    `${ind(level)}</div>`,
+  ];
 };
 
 const emitRadio = (o: FormFieldEmitOptions): string[] => {
@@ -646,6 +701,8 @@ export const emitFormField = (
       return emitSelect(o, selectAllPlaceholder, selectAllMsgKey);
     case "date":
       return emitDate(o);
+    case "dateRange":
+      return emitDateRange(o);
     case "radio":
       return emitRadio(o);
     case "checkbox":

@@ -994,7 +994,8 @@ export function useWidgetPageState(
             multiSelectExtraFieldValuesMap,
             options?.mainConnectedSlug,
             allFormValues,
-            pageIsEntity
+            pageIsEntity,
+            allFieldKeyToId
           );
 
           if (Object.keys(urlParamSaveExtras).length > 0) {
