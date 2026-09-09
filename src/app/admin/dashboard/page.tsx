@@ -16,6 +16,7 @@ import type { TableWidget } from "@/app/admin/templates/make/_shared/components/
 import type { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
 import { validateSearchDateRange } from "@/app/admin/templates/make/_shared/utils";
 import { useI18n } from "@/hooks/use-i18n";
+import { useLanguageStore } from "@/store/use-language-store";
 import api from "@/lib/api";
 import { useCodeStore } from "@/store/use-code-store";
 import { useAuthStore } from "@/store/auth-store";
@@ -183,7 +184,14 @@ function TrainingSummarySection({
 export default function DashboardPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const locale = useLanguageStore((s) => s.locale);
   const { groups: codeGroups, fetchGroups } = useCodeStore();
+
+  /** BO 언어 선택(ko/en)에 맞춰 Looker Studio 리포트 UI 언어를 hl 파라미터로 분기 */
+  const reportSrc = useMemo(() => {
+    const sep = DASHBOARD_REPORT_URL.includes("?") ? "&" : "?";
+    return `${DASHBOARD_REPORT_URL}${sep}hl=${locale}`;
+  }, [locale]);
 
   const adminInfo = useAuthStore((s) => s.adminInfo);
   const navMenus = useMenuStore((s) => s.navMenus);
@@ -439,7 +447,7 @@ export default function DashboardPage() {
             <div className="flex-1 min-h-0">
               <iframe
                 title="Google Looker Studio Report"
-                src={DASHBOARD_REPORT_URL}
+                src={reportSrc}
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
