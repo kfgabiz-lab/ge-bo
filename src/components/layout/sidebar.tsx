@@ -181,15 +181,18 @@ export function Sidebar() {
               {!isSidebarCollapsed && (
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full flex items-center justify-between mb-2 px-3 group"
+                  className="w-full flex items-center justify-between gap-2 mb-2 px-3 group"
                 >
-                  <span className="text-sm font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-400 transition-colors">
+                  <span
+                    className="text-sm font-semibold text-slate-500 uppercase tracking-widest group-hover:text-slate-400 transition-colors truncate min-w-0"
+                    title={category.nameMsgKey ? t(category.nameMsgKey) : category.name}
+                  >
                     {category.nameMsgKey ? t(category.nameMsgKey) : category.name}
                   </span>
                   {collapsedCategories.has(category.id) ? (
-                    <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-slate-400 transition-colors" />
+                    <ChevronRight className="w-3 h-3 flex-shrink-0 text-slate-500 group-hover:text-slate-400 transition-colors" />
                   ) : (
-                    <ChevronDown className="w-3 h-3 text-slate-500 group-hover:text-slate-400 transition-colors" />
+                    <ChevronDown className="w-3 h-3 flex-shrink-0 text-slate-500 group-hover:text-slate-400 transition-colors" />
                   )}
                 </button>
               )}
