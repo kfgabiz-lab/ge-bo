@@ -2026,10 +2026,10 @@ export function applyDataGeneration(
     }
   }
 
-  /* 1단계: 데이터변경 — 공백·특수문자 → '-', 연속 '-' 정리, 마지막 '-' 제거 */
+  /* 1단계: 데이터변경 — 공백·특수문자(밑줄 포함) → '-', 연속 '-' 정리, 마지막 '-' 제거 */
   if (dataReplacement === "hyphen") {
     result = result
-      .replace(/[\s\W]+/g, "-")
+      .replace(/[_\s\W]+/g, "-")
       .replace(/-+/g, "-")
       .replace(/-$/g, "");
   }
