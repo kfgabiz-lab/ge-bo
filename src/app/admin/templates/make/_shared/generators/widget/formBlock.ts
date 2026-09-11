@@ -6,6 +6,7 @@ import {
   collectUnhandledKeys,
   emitContainerOpen,
   emitContainerClose,
+  emitSlugOptionSelectComponent,
   formVarNames,
   multiSelectVarNames,
   pageVar,
@@ -104,6 +105,15 @@ const HANDLED_FIELD_KEYS = new Set([
   "relationSlugId",
   "fetchDisplayMode",
   "data",
+  "optionSlug",
+  "optionValueKey",
+  "optionTextKey",
+  "optionFilter",
+  "optionOrderKey",
+  "optionOrderDir",
+  "mediaImageMaxSizeMB",
+  "mediaVideoMaxSizeMB",
+  "mediaImageMaxSizeUnit",
 ]);
 
 const IGNORED_FIELD_KEYS = new Map<string, string>([
@@ -168,6 +178,7 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   const pageHasFileFields = allForms.some((fw) =>
     (fw.fields ?? []).some((f) => (FILE_FIELD_TYPES as readonly string[]).includes(f.type))
   );
+  const pageHasMediaFields = allForms.some((fw) => (fw.fields ?? []).some((f) => f.type === "media"));
   const hasInputField = fields.some((f) => f.type === "input");
   const pageHasTextFields = allForms.some((fw) => (fw.fields ?? []).some((f) => f.type === "text"));
   const hasTitleBlock = !!(widget.titleMsgKey || widget.title);
@@ -202,9 +213,10 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     if (pageHasFileFields) helperLines.push(`const FILE_FIELD_TYPE_SET = ${fileTypeSetLiteral()};`);
     if (pageHasFileFields) {
       helperLines.push("");
-      emitFileLocalComponents(isEntity).forEach((l) => helperLines.push(l));
+      emitFileLocalComponents(isEntity, pageHasMediaFields).forEach((l) => helperLines.push(l));
       imports.push({ module: "@/lib/api", defaultName: "api" });
       imports.push({ module: "sonner", named: ["toast"] });
+      if (pageHasMediaFields) imports.push({ module: "react", named: ["useEffect"] });
     }
   }
 
@@ -264,8 +276,10 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   }
   if (needs.fetchRel) {
     imports.push({ module: UTILS_MODULE, named: ["buildFormRowData", "formatFetchedRelValue"] });
+    const fetchRelDataArg = pageHasTextFields ? `, ${pageVar("fetchRelData")}` : "";
+    const fetchRelDataDep = pageHasTextFields ? `, ${pageVar("fetchRelData")}` : "";
     handlerLines.push(
-      `${ind(1)}const ${names.rowData} = useMemo(() => buildFormRowData(${names.fields}, ${names.values}, ${pageVar("fetchRelData")}), [${names.values}, ${pageVar("fetchRelData")}]);`
+      `${ind(1)}const ${names.rowData} = useMemo(() => buildFormRowData(${names.fields}, ${names.values}${fetchRelDataArg}), [${names.values}${fetchRelDataDep}]);`
     );
     handlerLines.push("");
   }
@@ -302,6 +316,13 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     helperLines.unshift(
       `const WysiwygEditor = dynamic(() => import('@/components/common/wysiwyg-editor'), { ssr: false });`
     );
+  }
+  if (needs.slugOptionSelect) {
+    imports.push({ module: "react", named: ["useMemo"] });
+    imports.push({ module: "@/lib/api", defaultName: "api" });
+    imports.push({ module: UTILS_MODULE, named: ["flattenPageDataItem", "buildSlugOptRows"] });
+    helperLines.push("");
+    emitSlugOptionSelectComponent().forEach((l) => helperLines.push(l));
   }
 
   if (isPrimary) {

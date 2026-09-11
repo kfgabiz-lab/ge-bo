@@ -325,7 +325,7 @@ export interface RowConfig {
 export interface CodeGroupDef {
   groupCode: string;
   groupName: string;
-  details: { code: string; name: string; nameMsgKey?: string; active: boolean }[];
+  details: { code: string; name: string; nameMsgKey?: string; active: boolean; extra1?: string }[];
 }
 
 /* ── 테이블 컬럼 관련 타입 ── */
@@ -454,6 +454,9 @@ export interface TableColumnConfig {
   targetType?: "slug" | "url";
   /** 연결대상 방식='url' 전용 — 이동/오픈할 외부 URL (예: 'www.naver.com', 프로토콜 미입력 시 https:// 자동 보정) */
   externalUrl?: string;
+  externalUrlSourceType?: "direct" | "code";
+  externalUrlCodeGroup?: string;
+  externalUrlCode?: string;
   /** (미사용) 과거 노출조건 필드 — 버튼은 항상 노출하는 정책으로 변경되어 현재 렌더링에 영향 없음 */
   conditionParam?: string;
   /** 이동/오픈 시 전달할 파라미터 (예: id,title=abc — =없으면 row 필드값, =있으면 고정값) */

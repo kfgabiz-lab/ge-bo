@@ -49,8 +49,8 @@ import {
   SEARCH_DATE_RANGE_WRAP_CLS,
   SEARCH_DATE_RANGE_INPUT_WRAP_CLS,
 } from "../../../components/renderer/rendererStyles";
-import { FILE_TYPE_PRESETS } from "../../../constants";
-import { jsStringLiteral, emitSelectArrow, type formVarNames } from "../../widgetGenerator";
+import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS } from "../../../constants";
+import { jsStringLiteral, emitSelectArrow, slugOptionFieldLiteral, type formVarNames } from "../../widgetGenerator";
 
 export interface FormFieldNeeds {
   codeGroups: boolean;
@@ -66,6 +66,7 @@ export interface FormFieldNeeds {
   resolveCodeLabel: boolean;
   fetchRel: boolean;
   fetchRelDataExpr: boolean;
+  slugOptionSelect: boolean;
   icons: Set<string>;
 }
 
@@ -83,6 +84,7 @@ export const createFormFieldNeeds = (): FormFieldNeeds => ({
   resolveCodeLabel: false,
   fetchRel: false,
   fetchRelDataExpr: false,
+  slugOptionSelect: false,
   icons: new Set<string>(),
 });
 
@@ -99,6 +101,7 @@ export interface FormFieldEmitOptions {
 export const FORM_SUPPORTED_FIELD_TYPES = new Set<string>([
   "input",
   "image",
+  "media",
   "select",
   "date",
   "radio",
@@ -250,8 +253,24 @@ const emitText = (o: FormFieldEmitOptions): string[] => {
   return lines;
 };
 
-const emitSelect = (o: FormFieldEmitOptions, selectAllPlaceholder: string, selectAllMsgKey: string): string[] => {
+const emitSlugSelect = (o: FormFieldEmitOptions, selectAllPlaceholder: string, selectAllMsgKey: string): string[] => {
   const { ind, level, field } = o;
+  o.needs.slugOptionSelect = true;
+  o.needs.fetchRel = true;
+  const isReadOnly = !!field.readonly;
+  const readonlySuffix = isReadOnly ? readonlyFieldCls : "";
+  const disabledExpr = isReadOnly ? "true" : o.disabledExpr;
+  return [
+    `${ind(level)}<SlugOptionSelect field={${JSON.stringify(slugOptionFieldLiteral(field))}} value={${fieldValueExpr(o)}} onChange={(v) => ${changeCall(o, "v")}} disabled={${disabledExpr}} placeholder={${selectPlaceholderExpr(field, selectAllPlaceholder, selectAllMsgKey)}} className=${jsStringLiteral(`${selectCls}${readonlySuffix}`)} rowData={${o.names.rowData}} />`,
+  ];
+};
+
+const emitSelect = (o: FormFieldEmitOptions, selectAllPlaceholder: string, selectAllMsgKey: string): string[] => {
+  const { field } = o;
+  if (field.optionSlug && field.selectType !== "autocomplete") {
+    return emitSlugSelect(o, selectAllPlaceholder, selectAllMsgKey);
+  }
+  const { ind, level } = o;
   const isReadOnly = !!field.readonly;
   const readonlySuffix = isReadOnly ? readonlyFieldCls : "";
   const disabledExpr = isReadOnly ? "true" : o.disabledExpr;
@@ -622,68 +641,266 @@ const emitImage = (o: FormFieldEmitOptions): string[] => {
   return lines;
 };
 
-export const emitFileLocalComponents = (isEntity: boolean): string[] => [
-  `function FileInput({ accept, multiple, onChange, renderTrigger }: { accept?: string; multiple?: boolean; onChange: (files: File[]) => void; renderTrigger: (inputRef: React.RefObject<HTMLInputElement | null>) => React.ReactNode }) {`,
-  `    const inputRef = useRef<HTMLInputElement>(null);`,
-  `    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {`,
-  `        onChange(Array.from(e.target.files ?? []));`,
-  `        e.target.value = '';`,
-  `    };`,
-  `    return (`,
-  `        <>`,
-  `            <input ref={inputRef} type="file" accept={accept} multiple={multiple} style={{ display: 'none' }} onChange={handleChange} />`,
-  `            {renderTrigger(inputRef)}`,
-  `        </>`,
-  `    );`,
-  `}`,
-  ``,
-  `function FileImagePreview({ file, className }: { file: File; className?: string }) {`,
-  `    const [src, setSrc] = React.useState('');`,
-  `    React.useEffect(() => {`,
-  `        const url = URL.createObjectURL(file);`,
-  `        setSrc(url);`,
-  `        return () => URL.revokeObjectURL(url);`,
-  `    }, [file]);`,
-  `    return src ? <img src={src} alt={file.name} className={className} /> : null;`,
-  `}`,
-  ``,
-  "const fmtFileSize = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`);",
-  ``,
-  `function FileInfoBar({ name, size, onDownload }: { name: string; size: number; onDownload: () => void }) {`,
-  `    const { t } = useI18n();`,
-  `    return (`,
-  `        <div className=${jsStringLiteral(fileInfoBarCls)}>`,
-  `            <button type="button" title={t('common.field.download_hint')} onClick={onDownload} className=${jsStringLiteral(fileInfoBarBtnCls)}>`,
-  `                {name}`,
-  `                <span className=${jsStringLiteral(fileInfoBarSizeCls)}>({fmtFileSize(size)})</span>`,
-  `            </button>`,
-  `        </div>`,
-  `    );`,
-  `}`,
-  ``,
-  `async function downloadStoredFile(fileId: number, origName: string, errorMessage: string) {`,
-  `    try {`,
-  `        const res = await api.get(${isEntity ? "`/file-meta/${fileId}/download`" : "`/page-files/${fileId}`"}, { responseType: 'blob' });`,
-  `        const url = URL.createObjectURL(res.data);`,
-  `        const a = document.createElement('a');`,
-  `        a.href = url;`,
-  `        a.download = origName;`,
-  `        a.click();`,
-  `        URL.revokeObjectURL(url);`,
-  `    } catch {`,
-  `        toast.error(errorMessage);`,
-  `    }`,
-  `}`,
-  ``,
-  `function downloadLocalFile(file: File) {`,
-  `    const url = URL.createObjectURL(file);`,
-  `    const a = document.createElement('a');`,
-  `    a.href = url;`,
-  `    a.download = file.name;`,
-  `    a.click();`,
-  `    URL.revokeObjectURL(url);`,
-  `}`,
-];
+const emitMedia = (o: FormFieldEmitOptions): string[] => {
+  const { ind, level, field, names } = o;
+  o.needs.image = true;
+  o.needs.icons.add("Image as ImageIcon");
+  o.needs.icons.add("Film");
+  o.needs.icons.add("X");
+
+  const rowSpan = field.rowSpan ?? 2;
+  const containerH = fieldContentHeight(
+    field as unknown as SearchFieldConfig,
+    rowSpan,
+    undefined,
+    FORM_FIELD_ROW_HEIGHT
+  );
+  const isReadOnly = !!field.readonly;
+  const id = jsStringLiteral(field.id);
+  const imgMaxMB = field.mediaImageMaxSizeMB ?? 5;
+  const vidMaxMB = field.mediaVideoMaxSizeMB ?? 20;
+  const imgSizeUnit = field.mediaImageMaxSizeUnit ?? "MB";
+  const hasPixelLimit = !!(field.imageMaxWidthPx || field.imageMaxHeightPx);
+  if (hasPixelLimit) o.needs.imagePixelCheck = true;
+
+  const mediaAccept = `${FILE_TYPE_PRESETS.image},${FILE_TYPE_PRESETS.video}`;
+
+  const filesExpr = `(${names.files}[${id}] ?? [])`;
+  const metaExpr = `(${names.existingMeta}[${id}] ?? [])`;
+  const lines: string[] = [];
+  const L = (n: number, s: string) => lines.push(`${ind(level + n)}${s}`);
+
+  L(0, "{(() => {");
+  L(1, `const imgExts = ${jsStringLiteral(FILE_TYPE_PRESETS.image)}.split(',');`);
+  L(
+    1,
+    `const isImageFile = (name: string) => { const ext = '.' + (name.split('.').pop() ?? '').toLowerCase(); return imgExts.includes(ext); };`
+  );
+  L(1, `const existingList = ${metaExpr};`);
+  L(1, `const newList = ${filesExpr};`);
+  L(1, `const existingMedia = existingList[0] ?? null;`);
+  L(1, `const hasFile = newList.length > 0 || !!existingMedia;`);
+  L(1, `const canAdd = ${isReadOnly ? "false" : "!hasFile"};`);
+  L(1, `const mediaPlaceholder = (`);
+  L(2, `<div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">`);
+  L(3, `<span className="text-xs font-medium">{t('common.field.media_upload')}</span>`);
+  L(3, `<div className="text-[10px] text-center leading-relaxed">`);
+  L(
+    4,
+    `<p>{t('common.field.media_image_info', { label: ${jsStringLiteral(FILE_TYPE_LABELS.image)}, size: ${jsStringLiteral(`${imgMaxMB}${imgSizeUnit}`)} })}</p>`
+  );
+  L(
+    4,
+    `<p>{t('common.field.media_video_info', { label: ${jsStringLiteral(FILE_TYPE_LABELS.video)}, mb: ${jsStringLiteral(String(vidMaxMB))} })}</p>`
+  );
+  L(3, `</div>`);
+  L(2, `</div>`);
+  L(1, `);`);
+  L(1, `const handleMediaSelect = async (selected: File[]) => {`);
+  L(2, `const { valid, rejected } = filterByAccept(selected, ${jsStringLiteral(mediaAccept)});`);
+  L(2, "if (rejected.length > 0) alert(`${t('common.field.invalid_file_type')}\\n${rejected.join('\\n')}`);");
+  L(2, `if (valid.length === 0) return;`);
+  L(2, `const file = valid[0];`);
+  L(2, `const isImg = isImageFile(file.name);`);
+  L(2, `const maxMB = isImg ? ${imgMaxMB} : ${vidMaxMB};`);
+  L(2, `const unit = isImg ? ${jsStringLiteral(imgSizeUnit)} : 'MB';`);
+  L(2, `if (file.size > maxMB * unitToBytes(unit)) {`);
+  L(
+    3,
+    `toast.warning(t('common.field.file_size_limit', { type: isImg ? t('common.label.image') : t('common.label.video'), mb: \`\${maxMB}\${unit}\` }));`
+  );
+  L(3, `return;`);
+  L(2, `}`);
+  if (hasPixelLimit) {
+    L(2, `if (isImg) {`);
+    L(3, `const naturalSize = await getImageNaturalSize(file);`);
+    L(
+      3,
+      `const violation = checkImagePixelLimit(naturalSize, ${field.imageMaxWidthPx ?? "undefined"}, ${field.imageMaxHeightPx ?? "undefined"});`
+    );
+    if (field.imageMaxWidthPx) {
+      L(
+        3,
+        `if (violation === 'width') { toast.warning(t('common.field.image_width_limit', { label: file.name, px: ${jsStringLiteral(String(field.imageMaxWidthPx))} })); return; }`
+      );
+    }
+    if (field.imageMaxHeightPx) {
+      L(
+        3,
+        `if (violation === 'height') { toast.warning(t('common.field.image_height_limit', { label: file.name, px: ${jsStringLiteral(String(field.imageMaxHeightPx))} })); return; }`
+      );
+    }
+    L(2, `}`);
+  }
+  L(2, `${names.fileChange}(${id}, [file]);`);
+  L(1, `};`);
+  L(1, `return (`);
+  L(
+    2,
+    `<div style={{ height: '${containerH}px', isolation: 'isolate' }} className=${jsStringLiteral(`flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden${isReadOnly ? " opacity-75" : ""}`)} onDragOver={canAdd ? (e) => e.preventDefault() : undefined} onDrop={canAdd ? (e) => { e.preventDefault(); const files = Array.from(e.dataTransfer.files); if (files.length > 0) handleMediaSelect(files); } : undefined}>`
+  );
+  L(3, `{!hasFile ? (`);
+  L(4, `canAdd ? (`);
+  L(
+    5,
+    `<FileInput accept=${jsStringLiteral(mediaAccept)} multiple={false} onChange={handleMediaSelect} renderTrigger={(inputRef) => (`
+  );
+  L(
+    6,
+    `<div role="button" tabIndex={0} onClick={() => inputRef.current?.click()} onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all">{mediaPlaceholder}</div>`
+  );
+  L(5, `)} />`);
+  L(4, `) : (`);
+  L(
+    5,
+    `<div className="flex-1 flex flex-col items-center justify-center pointer-events-none">{mediaPlaceholder}</div>`
+  );
+  L(4, `)`);
+  L(3, `) : existingMedia ? (`);
+  L(4, `<>`);
+  L(4, `<div className="flex-1 min-h-0 relative overflow-hidden">`);
+  L(5, `{isImageFile(existingMedia.origName) ? (`);
+  L(
+    6,
+    `${names.imgBlobUrls}[existingMedia.id] ? (<img src={${names.imgBlobUrls}[existingMedia.id]} alt={existingMedia.origName} className="w-full h-full object-contain" />) : (<div className="w-full h-full flex items-center justify-center bg-slate-50"><ImageIcon className="w-6 h-6 text-slate-300" /></div>)`
+  );
+  L(5, `) : ${names.imgBlobUrls}[existingMedia.id] ? (`);
+  L(
+    6,
+    `<video src={${names.imgBlobUrls}[existingMedia.id]} controls playsInline preload="auto" style={{ width: '100%', height: '100%', display: 'block' }} />`
+  );
+  L(5, `) : (`);
+  L(
+    6,
+    `<div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500"><Film className="w-6 h-6 text-slate-300" /><span className="text-[10px] text-slate-400">{t('common.loading')}</span></div>`
+  );
+  L(5, `)}`);
+  if (!isReadOnly) {
+    L(
+      5,
+      `<button type="button" onClick={() => ${names.removeExisting}(${id}, existingMedia.id)} className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3 h-3 text-white" /></button>`
+    );
+  }
+  L(4, `</div>`);
+  L(
+    4,
+    `<FileInfoBar name={existingMedia.origName} size={existingMedia.fileSize} onDownload={() => downloadStoredFile(existingMedia.id, existingMedia.origName, t('common.error.file_download'))} />`
+  );
+  L(4, `</>`);
+  L(3, `) : (`);
+  L(4, `<>`);
+  L(4, `<div className="flex-1 min-h-0 relative overflow-hidden">`);
+  L(5, `{isImageFile(newList[0].name) ? (`);
+  L(6, `<FileImagePreview file={newList[0]} className="w-full h-full object-contain" />`);
+  L(5, `) : (`);
+  L(6, `<FileVideoPreview file={newList[0]} cellHeight={${containerH} - 26} />`);
+  L(5, `)}`);
+  if (!isReadOnly) {
+    L(
+      5,
+      `<button type="button" onClick={() => ${names.fileChange}(${id}, [])} className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3 h-3 text-white" /></button>`
+    );
+  }
+  L(4, `</div>`);
+  L(
+    4,
+    `<FileInfoBar name={newList[0].name} size={newList[0].size} onDownload={() => downloadLocalFile(newList[0])} />`
+  );
+  L(4, `</>`);
+  L(3, `)}`);
+  L(2, `</div>`);
+  L(1, `);`);
+  L(0, `})()}`);
+  return lines;
+};
+
+export const emitFileLocalComponents = (isEntity: boolean, includeVideoPreview = false): string[] => {
+  const lines: string[] = [
+    `function FileInput({ accept, multiple, onChange, renderTrigger }: { accept?: string; multiple?: boolean; onChange: (files: File[]) => void; renderTrigger: (inputRef: React.RefObject<HTMLInputElement | null>) => React.ReactNode }) {`,
+    `    const inputRef = useRef<HTMLInputElement>(null);`,
+    `    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {`,
+    `        onChange(Array.from(e.target.files ?? []));`,
+    `        e.target.value = '';`,
+    `    };`,
+    `    return (`,
+    `        <>`,
+    `            <input ref={inputRef} type="file" accept={accept} multiple={multiple} style={{ display: 'none' }} onChange={handleChange} />`,
+    `            {renderTrigger(inputRef)}`,
+    `        </>`,
+    `    );`,
+    `}`,
+    ``,
+    `function FileImagePreview({ file, className }: { file: File; className?: string }) {`,
+    `    const [src, setSrc] = React.useState('');`,
+    `    React.useEffect(() => {`,
+    `        const url = URL.createObjectURL(file);`,
+    `        setSrc(url);`,
+    `        return () => URL.revokeObjectURL(url);`,
+    `    }, [file]);`,
+    `    return src ? <img src={src} alt={file.name} className={className} /> : null;`,
+    `}`,
+    ``,
+    "const fmtFileSize = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.round(bytes / 1024)}KB`);",
+    ``,
+    `function FileInfoBar({ name, size, onDownload }: { name: string; size: number; onDownload: () => void }) {`,
+    `    const { t } = useI18n();`,
+    `    return (`,
+    `        <div className=${jsStringLiteral(fileInfoBarCls)}>`,
+    `            <button type="button" title={t('common.field.download_hint')} onClick={onDownload} className=${jsStringLiteral(fileInfoBarBtnCls)}>`,
+    `                {name}`,
+    `                <span className=${jsStringLiteral(fileInfoBarSizeCls)}>({fmtFileSize(size)})</span>`,
+    `            </button>`,
+    `        </div>`,
+    `    );`,
+    `}`,
+    ``,
+    `async function downloadStoredFile(fileId: number, origName: string, errorMessage: string) {`,
+    `    try {`,
+    `        const res = await api.get(${isEntity ? "`/file-meta/${fileId}/download`" : "`/page-files/${fileId}`"}, { responseType: 'blob' });`,
+    `        const url = URL.createObjectURL(res.data);`,
+    `        const a = document.createElement('a');`,
+    `        a.href = url;`,
+    `        a.download = origName;`,
+    `        a.click();`,
+    `        URL.revokeObjectURL(url);`,
+    `    } catch {`,
+    `        toast.error(errorMessage);`,
+    `    }`,
+    `}`,
+    ``,
+    `function downloadLocalFile(file: File) {`,
+    `    const url = URL.createObjectURL(file);`,
+    `    const a = document.createElement('a');`,
+    `    a.href = url;`,
+    `    a.download = file.name;`,
+    `    a.click();`,
+    `    URL.revokeObjectURL(url);`,
+    `}`,
+  ];
+  if (includeVideoPreview) {
+    lines.push(
+      ``,
+      `function FileVideoPreview({ file, cellHeight }: { file: File; cellHeight: number }) {`,
+      `    const videoRef = useRef<HTMLVideoElement>(null);`,
+      `    useEffect(() => {`,
+      `        const el = videoRef.current;`,
+      `        if (!el) return;`,
+      `        const url = URL.createObjectURL(file);`,
+      `        el.src = url;`,
+      `        const handleLoadedData = () => { el.currentTime = 0.001; };`,
+      `        el.addEventListener('loadeddata', handleLoadedData);`,
+      `        return () => {`,
+      `            el.removeEventListener('loadeddata', handleLoadedData);`,
+      `            el.src = '';`,
+      `            URL.revokeObjectURL(url);`,
+      `        };`,
+      `    }, [file]);`,
+      `    return <video ref={videoRef} controls playsInline preload="auto" style={{ width: '100%', height: \`\${cellHeight}px\`, display: 'block' }} />;`,
+      `}`
+    );
+  }
+  return lines;
+};
 
 export const emitFormField = (
   o: FormFieldEmitOptions,
@@ -713,6 +930,8 @@ export const emitFormField = (
       return emitEditor(o);
     case "image":
       return emitImage(o);
+    case "media":
+      return emitMedia(o);
     default:
       return [
         `${o.ind(o.level)}{/* TODO(파일빌드): '${o.field.fieldKey || o.field.id}' 필드 타입(${o.field.type})은 아직 코드 생성이 지원되지 않습니다. 직접 구현해주세요. */}`,

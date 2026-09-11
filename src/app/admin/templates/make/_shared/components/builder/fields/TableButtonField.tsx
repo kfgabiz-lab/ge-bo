@@ -14,10 +14,11 @@
  */
 
 import React from "react";
-import { TemplateItem } from "../../../types";
+import { CodeGroupDef, TemplateItem } from "../../../types";
 import { ColEditProps, CUSTOM_ACTION_COLORS } from "./col-types";
 import { INPUT_CLS, LABEL_CLS } from "./_FieldBase";
 import { SlugSelectField } from "./SlugSelectField";
+import { CodeGroupSelector } from "../../CodeGroupSelector";
 import { MessageKeySelector } from "@/components/i18n/message-key-selector";
 import { useBuilderI18nMode } from "../../../contexts/BuilderI18nModeContext";
 
@@ -26,6 +27,8 @@ interface TableButtonFieldProps extends ColEditProps {
   layerTemplates: TemplateItem[];
   /** 템플릿 목록 lazy 로딩 트리거 */
   onRequestLayerTemplates: () => void;
+  codeGroups: CodeGroupDef[];
+  codeGroupsLoading: boolean;
 }
 
 /** 연결 방식 옵션 */
@@ -35,11 +38,34 @@ const CONN_TYPE_OPTIONS: { value: "page" | "popup" | "windowPopup"; label: strin
   { value: "windowPopup", label: "윈도우 팝업" },
 ];
 
-export function TableButtonField({ values, onChange, layerTemplates, onRequestLayerTemplates }: TableButtonFieldProps) {
+export function TableButtonField({
+  values,
+  onChange,
+  layerTemplates,
+  onRequestLayerTemplates,
+  codeGroups,
+  codeGroupsLoading,
+}: TableButtonFieldProps) {
   const { i18nMode } = useBuilderI18nMode();
   const connType = values.connType ?? "page";
   /** 연결대상 방식 — page/windowPopup에서만 의미 있음. popup은 항상 slug 고정 */
   const targetType = values.targetType ?? "slug";
+  const urlSourceMode = values.externalUrlSourceType === "code" ? "code" : "direct";
+
+  const handleUrlSourceModeChange = (next: "direct" | "code") => {
+    if (next === "direct") {
+      onChange({
+        externalUrlSourceType: undefined,
+        externalUrlCodeGroup: undefined,
+        externalUrlCode: undefined,
+      });
+    } else {
+      onChange({
+        externalUrlSourceType: "code",
+        externalUrl: undefined,
+      });
+    }
+  };
 
   return (
     <div className="space-y-1.5 pt-1 border-t border-slate-100" onClick={onRequestLayerTemplates}>
@@ -98,6 +124,9 @@ export function TableButtonField({ values, onChange, layerTemplates, onRequestLa
               windowPopupOption: undefined,
               targetType: undefined,
               externalUrl: undefined,
+              externalUrlSourceType: undefined,
+              externalUrlCodeGroup: undefined,
+              externalUrlCode: undefined,
             })
           }
           className={INPUT_CLS}
@@ -122,6 +151,9 @@ export function TableButtonField({ values, onChange, layerTemplates, onRequestLa
                   targetType: e.target.value as "slug" | "url",
                   targetSlug: undefined,
                   externalUrl: undefined,
+                  externalUrlSourceType: undefined,
+                  externalUrlCodeGroup: undefined,
+                  externalUrlCode: undefined,
                 })
               }
               className={INPUT_CLS}
@@ -142,15 +174,71 @@ export function TableButtonField({ values, onChange, layerTemplates, onRequestLa
             ) : (
               <div>
                 <label className={LABEL_CLS}>외부 URL</label>
-                <input
-                  type="text"
-                  value={values.externalUrl ?? ""}
-                  onChange={(e) => onChange({ externalUrl: e.target.value.trim() || undefined })}
-                  placeholder={
-                    values.usePreviewToken ? "예: http://localhost:3002/company/blog/detail" : "예: www.naver.com"
-                  }
-                  className={INPUT_CLS}
-                />
+
+                <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-md mb-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleUrlSourceModeChange("direct")}
+                    className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${
+                      urlSourceMode === "direct"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    직접입력
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleUrlSourceModeChange("code")}
+                    className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${
+                      urlSourceMode === "code"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    공통코드
+                  </button>
+                </div>
+
+                {urlSourceMode === "direct" ? (
+                  <input
+                    type="text"
+                    value={values.externalUrl ?? ""}
+                    onChange={(e) => onChange({ externalUrl: e.target.value.trim() || undefined })}
+                    placeholder={
+                      values.usePreviewToken ? "예: http://localhost:3002/company/blog/detail" : "예: www.naver.com"
+                    }
+                    className={INPUT_CLS}
+                  />
+                ) : (
+                  <div className="space-y-1.5">
+                    <CodeGroupSelector
+                      codeGroups={codeGroups}
+                      codeGroupsLoading={codeGroupsLoading}
+                      value={values.externalUrlCodeGroup ?? ""}
+                      onChange={(code) =>
+                        onChange({ externalUrlCodeGroup: code || undefined, externalUrlCode: undefined })
+                      }
+                    />
+                    {values.externalUrlCodeGroup && (
+                      <select
+                        value={values.externalUrlCode ?? ""}
+                        onChange={(e) => onChange({ externalUrlCode: e.target.value || undefined })}
+                        className={INPUT_CLS}
+                      >
+                        <option value="">— 코드 선택 —</option>
+                        {(codeGroups.find((g) => g.groupCode === values.externalUrlCodeGroup)?.details ?? [])
+                          .filter((d) => d.active)
+                          .map((d) => (
+                            <option key={d.code} value={d.code}>
+                              {d.name} ({d.code})
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-1.5 mt-1">
                   <input
                     type="checkbox"

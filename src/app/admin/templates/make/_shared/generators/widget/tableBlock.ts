@@ -9,6 +9,7 @@ import {
   emitContainerClose,
   GENERATED_PAGE_BASE_CONST,
 } from "../widgetGenerator";
+import { getColumnRelationIds } from "../../utils";
 import { CUSTOM_ACTION_COLORS } from "../../components/builder/fields/col-types";
 import {
   TABLE_ACTIONS_WRAP_CLS,
@@ -46,7 +47,15 @@ import {
   pagerNumberBtnClass,
 } from "../../components/renderer/rendererStyles";
 
-const PHASE1_CELL_TYPES = new Set<CellType>(["text", "badge", "boolean", "date", "button", "actions"]);
+const PHASE1_CELL_TYPES = new Set<CellType>([
+  "text",
+  "badge",
+  "boolean",
+  "date",
+  "button",
+  "actions",
+  "dateRangeStatus",
+]);
 
 const SUPPORTED_ACTIONS = new Set(["edit", "delete"]);
 
@@ -107,6 +116,7 @@ const HANDLED_COLUMN_KEYS = new Set([
   "dateFormat",
   "relationSlugId",
   "relationSlugIds",
+  "fetchDisplayMode",
   "actions",
   "editPageRules",
   "connType",
@@ -118,13 +128,16 @@ const HANDLED_COLUMN_KEYS = new Set([
   "usePreviewToken",
   "windowPopupOption",
   "passParam",
+  "linkedDateRangeKey",
+  "linkedRangeSubType",
+  "beforeText",
+  "beforeTextMsgKey",
+  "inRangeText",
+  "inRangeTextMsgKey",
+  "afterText",
+  "afterTextMsgKey",
 ]);
-const IGNORED_COLUMN_KEYS = new Map<string, string>([
-  [
-    "fetchDisplayMode",
-    "relationSlugId 연동 컬럼 전용 — 해당 컬럼은 hasUnsupportedRelation()으로 이미 unsupported 처리되어 supportedColumns에 들어오지 않음",
-  ],
-]);
+const IGNORED_COLUMN_KEYS = new Map<string, string>();
 
 const hasUnconditionalEditPageRule = (col: TableColumnConfig): boolean => {
   const rules = col.editPageRules ?? [];
@@ -155,8 +168,10 @@ const ignoredColumnKeysFor = (col: TableColumnConfig): Set<string> => {
   return keys;
 };
 
-const hasUnsupportedRelation = (col: TableColumnConfig): boolean =>
+const hasRelation = (col: TableColumnConfig): boolean =>
   !!col.relationSlugId || !!(col.relationSlugIds && col.relationSlugIds.length > 0);
+
+const hasUnsupportedRelation = (col: TableColumnConfig): boolean => hasRelation(col) && col.cellType !== "text";
 
 const isButtonColumnSupported = (col: TableColumnConfig): boolean =>
   (col.targetType ?? "slug") === "url" && !!col.externalUrl;
@@ -209,7 +224,7 @@ const pushHeaderCell = (
 
 const unsupportedColumnReason = (col: TableColumnConfig): string => {
   if (hasUnsupportedRelation(col)) {
-    return `relationSlugId 연동 컬럼은 formatFetchedRelMulti 런타임 경로라 파일빌드에서 지원하지 않습니다.`;
+    return `relationSlugId 연동 컬럼은 cellType='text'만 코드 생성이 지원됩니다.`;
   }
   if (col.cellType === "button") {
     return `button 셀은 targetType='url' + externalUrl 조합만 코드 생성이 지원됩니다. 내부 slug 이동/레이어 팝업은 직접 구현해주세요.`;
@@ -288,9 +303,29 @@ const pushBodyCell = (
     return;
   }
 
+  const relIds = getColumnRelationIds(col);
+  const fetchMode = col.fetchDisplayMode ?? "ONE_LINE";
+  const dataExprArg = col.data ? jsStringLiteral(col.data) : "undefined";
+  const relSpanExpr = (formattedVar: string): string =>
+    fetchMode === "MULTI_LINE"
+      ? `<span className="text-sm text-slate-700 whitespace-pre-wrap block" title={${formattedVar}}>{${formattedVar}}</span>`
+      : `<span className=${jsStringLiteral(TEXT_CELL_CLS)} title={${formattedVar}}>{${formattedVar}}</span>`;
+
+  if (col.cellType === "text" && relIds.length > 1) {
+    jsxLines.push(`${ind(4)}{(() => {`);
+    jsxLines.push(
+      `${ind(5)}const multiFormatted = formatFetchedRelMulti(row, [${relIds.join(", ")}], ${dataExprArg}, ${jsStringLiteral(fetchMode)});`
+    );
+    jsxLines.push(`${ind(5)}if (!multiFormatted) return <span className="text-sm text-slate-400">-</span>;`);
+    jsxLines.push(`${ind(5)}return ${relSpanExpr("multiFormatted")};`);
+    jsxLines.push(`${ind(4)}})()}`);
+    jsxLines.push(`${ind(3)}</td>`);
+    return;
+  }
+
   const rawExpr = `row['${col.accessor}']`;
   const valueExpr = col.data
-    ? `resolveEvalExprI18n(evalColumnDataExpr(${jsStringLiteral(col.data)}, row), t)`
+    ? `!Array.isArray(${rawExpr}) ? resolveEvalExprI18n(evalColumnDataExpr(${jsStringLiteral(col.data)}, row), t) : ${rawExpr}`
     : rawExpr;
 
   jsxLines.push(`${ind(4)}{(() => {`);
@@ -298,6 +333,15 @@ const pushBodyCell = (
 
   switch (col.cellType) {
     case "text": {
+      if (relIds.length === 1) {
+        jsxLines.push(`${ind(5)}if (Array.isArray(value)) {`);
+        jsxLines.push(
+          `${ind(6)}const relFormatted = formatFetchedRelValue(value as unknown[], row, ${relIds[0]}, ${dataExprArg}, ${jsStringLiteral(fetchMode)});`
+        );
+        jsxLines.push(`${ind(6)}if (!relFormatted) return <span className="text-sm text-slate-400">-</span>;`);
+        jsxLines.push(`${ind(6)}return ${relSpanExpr("relFormatted")};`);
+        jsxLines.push(`${ind(5)}}`);
+      }
       jsxLines.push(`${ind(5)}const strVal = value == null || typeof value === 'object' ? '' : String(value);`);
       if (col.codeGroupCode && col.displayAs !== "value") {
         const displayAsArg = col.displayAs ? jsStringLiteral(col.displayAs) : "undefined";
@@ -368,6 +412,50 @@ const pushBodyCell = (
       }
       break;
     }
+    case "dateRangeStatus": {
+      const beforeExpr = col.beforeTextMsgKey
+        ? `t(${jsStringLiteral(col.beforeTextMsgKey)})`
+        : col.beforeText
+          ? jsStringLiteral(col.beforeText)
+          : `t('common.status.before')`;
+      const inRangeExpr = col.inRangeTextMsgKey
+        ? `t(${jsStringLiteral(col.inRangeTextMsgKey)})`
+        : col.inRangeText
+          ? jsStringLiteral(col.inRangeText)
+          : `t('common.status.inrange')`;
+      const afterExpr = col.afterTextMsgKey
+        ? `t(${jsStringLiteral(col.afterTextMsgKey)})`
+        : col.afterText
+          ? jsStringLiteral(col.afterText)
+          : `t('common.status.after')`;
+      const rangeKey = col.linkedDateRangeKey ?? "";
+      jsxLines.push(`${ind(5)}const beforeLabel = ${beforeExpr};`);
+      jsxLines.push(`${ind(5)}const inRangeLabel = ${inRangeExpr};`);
+      jsxLines.push(`${ind(5)}const afterLabel = ${afterExpr};`);
+      jsxLines.push(`${ind(5)}const beStatus = row[${jsStringLiteral(`_drs_${rangeKey}`)}];`);
+      jsxLines.push(`${ind(5)}let statusText = '-';`);
+      jsxLines.push(`${ind(5)}if (beStatus === 'before') statusText = beforeLabel;`);
+      jsxLines.push(`${ind(5)}else if (beStatus === 'in_range') statusText = inRangeLabel;`);
+      jsxLines.push(`${ind(5)}else if (beStatus === 'after') statusText = afterLabel;`);
+      jsxLines.push(`${ind(5)}else {`);
+      jsxLines.push(`${ind(6)}const fromStr = String(row[${jsStringLiteral(`${rangeKey}_from`)}] ?? '');`);
+      jsxLines.push(`${ind(6)}const toStr = String(row[${jsStringLiteral(`${rangeKey}_to`)}] ?? '');`);
+      jsxLines.push(`${ind(6)}if (fromStr || toStr) {`);
+      jsxLines.push(
+        `${ind(7)}const nowStr = formatNowBySubType(${jsStringLiteral(col.linkedRangeSubType ?? "date")});`
+      );
+      jsxLines.push(`${ind(7)}if (fromStr && nowStr < fromStr) statusText = beforeLabel;`);
+      jsxLines.push(
+        `${ind(7)}else if (fromStr && toStr && nowStr >= fromStr && nowStr <= toStr) statusText = inRangeLabel;`
+      );
+      jsxLines.push(`${ind(7)}else if (toStr && nowStr > toStr) statusText = afterLabel;`);
+      jsxLines.push(`${ind(6)}}`);
+      jsxLines.push(`${ind(5)}}`);
+      jsxLines.push(
+        `${ind(5)}return <span className=${jsStringLiteral(TEXT_CELL_CLS)} title={statusText}>{statusText}</span>;`
+      );
+      break;
+    }
     default:
       jsxLines.push(`${ind(5)}return null;`);
       break;
@@ -426,8 +514,17 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     (c) => c.cellType === "text" && !!c.codeGroupCode && c.displayAs !== "value"
   );
   const needsBadge = supportedColumns.some((c) => c.cellType === "badge" && !!c.cellOptions?.length);
+  const needsRelationFormat = supportedColumns.some((c) => c.cellType === "text" && hasRelation(c));
   const sortExprEntries = !isEntity ? columns.filter((c) => c.sortable && !!c.data) : [];
   const needsSortExpr = needsSort && sortExprEntries.length > 0;
+  const drsKeys = Array.from(
+    new Set(
+      supportedColumns
+        .filter((c) => c.cellType === "dateRangeStatus" && !!c.linkedDateRangeKey)
+        .map((c) => c.linkedDateRangeKey as string)
+    )
+  );
+  const needsDrsKeys = drsKeys.length > 0;
 
   const actionsColumns = supportedColumns.filter((c) => c.cellType === "actions");
   const buttonColumns = columns
@@ -466,6 +563,15 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   if (needsCodeGroup) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveCodeLabel"] });
     imports.push({ module: "@/store/use-code-store", named: ["useCodeStore"] });
+  }
+  if (needsDrsKeys) {
+    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["formatNowBySubType"] });
+  }
+  if (needsRelationFormat) {
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/utils",
+      named: ["formatFetchedRelValue", "formatFetchedRelMulti"],
+    });
   }
   if (needsBadge) {
     imports.push({
@@ -570,6 +676,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     handlerLines.push(`${ind(5)}...(${resolvedSortKeyVar} ? { sort: ${resolvedSortKeyVar} + ',' + sd } : {}),`);
   if (needsSortExpr)
     handlerLines.push(`${ind(5)}...(sk && ${sortExprMapVar}[sk] ? { sortExpr: ${sortExprMapVar}[sk] } : {}),`);
+  if (needsDrsKeys) handlerLines.push(`${ind(5)}drsKeys: ${jsStringLiteral(drsKeys.join(","))},`);
   linkedSearchSuffixes.forEach((searchSuffix) => {
     handlerLines.push(
       `${ind(5)}...getSearchParams${searchSuffix}(searchOverrides?.[${jsStringLiteral(searchSuffix)}]),`

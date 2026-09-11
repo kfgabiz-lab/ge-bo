@@ -3073,6 +3073,45 @@ export const resolveFieldOptions = (
   return field.options ?? [];
 };
 
+export type SlugOptionFieldConfig = Pick<
+  import("./types").SearchFieldConfig,
+  "optionValueKey" | "optionTextKey" | "optionFilter" | "optionOrderKey" | "optionOrderDir"
+>;
+
+export const resolveOptionFilterField = (
+  key: string,
+  row: Record<string, unknown>,
+  rowData?: Record<string, unknown>
+): string | undefined => {
+  if (key.startsWith("$")) {
+    const v = rowData?.[key.slice(1)];
+    return v !== undefined ? String(v) : undefined;
+  }
+  return key in row ? String(row[key] ?? "") : undefined;
+};
+
+export const buildSlugOptRows = (
+  rawRows: Record<string, unknown>[],
+  field: SlugOptionFieldConfig,
+  rowData: Record<string, unknown> | undefined
+): { value: string; text: string }[] => {
+  const filteredRows = field.optionFilter
+    ? rawRows.filter((row) =>
+        evalConditionExpr(field.optionFilter!, (key) => resolveOptionFilterField(key, row, rowData))
+      )
+    : rawRows;
+  let opts = filteredRows.map((row) => ({
+    value: String(row[field.optionValueKey ?? ""] ?? ""),
+    text: String(row[field.optionTextKey ?? ""] ?? ""),
+    _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? "") : "",
+  }));
+  if (field.optionOrderKey) {
+    const dir = field.optionOrderDir === "DESC" ? -1 : 1;
+    opts = opts.sort((a, b) => a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir);
+  }
+  return opts.map(({ value, text }) => ({ value, text }));
+};
+
 export function filterByAccept(files: File[], acceptStr: string): { valid: File[]; rejected: string[] } {
   if (!acceptStr) return { valid: files, rejected: [] };
   const exts = new Set(acceptStr.split(",").map((e) => e.trim().toLowerCase()));
@@ -3089,4 +3128,21 @@ export function filterByAccept(files: File[], acceptStr: string): { valid: File[
 export function normalizeExternalUrl(url: string): string {
   const trimmed = url.trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+export function resolveButtonExternalUrl(
+  col: {
+    externalUrlSourceType?: "direct" | "code";
+    externalUrlCodeGroup?: string;
+    externalUrlCode?: string;
+    externalUrl?: string;
+  },
+  codeGroups: CodeGroupDef[]
+): string | undefined {
+  if (col.externalUrlSourceType === "code") {
+    const group = codeGroups.find((g) => g.groupCode === col.externalUrlCodeGroup);
+    /* active 필터 미적용 — 비활성화로 링크가 조용히 사라지는 것을 방지(resolveFieldOptions와 의도적으로 다름) */
+    return group?.details.find((d) => d.code === col.externalUrlCode)?.extra1;
+  }
+  return col.externalUrl;
 }

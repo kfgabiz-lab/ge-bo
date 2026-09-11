@@ -357,6 +357,13 @@ export function TableBuilder({
     if (p.cellType === "inlineEdit" && !p.inlineEditFieldKey?.trim()) return false;
     /* button: 버튼 라벨 필수 */
     if (p.cellType === "button" && !p.buttonLabel?.trim()) return false;
+    if (
+      p.cellType === "button" &&
+      p.targetType === "url" &&
+      p.externalUrlSourceType === "code" &&
+      (!p.externalUrlCodeGroup || !p.externalUrlCode)
+    )
+      return false;
     return true;
   };
 
@@ -415,7 +422,22 @@ export function TableBuilder({
           connType: p.cellType === "button" ? (p.connType ?? "page") : undefined,
           targetSlug: p.cellType === "button" ? p.targetSlug : undefined,
           targetType: p.cellType === "button" ? p.targetType : undefined,
-          externalUrl: p.cellType === "button" && p.targetType === "url" ? p.externalUrl : undefined,
+          externalUrl:
+            p.cellType === "button" && p.targetType === "url" && (p.externalUrlSourceType ?? "direct") === "direct"
+              ? p.externalUrl
+              : undefined,
+          externalUrlSourceType:
+            p.cellType === "button" && p.targetType === "url" && p.externalUrlSourceType === "code"
+              ? "code"
+              : undefined,
+          externalUrlCodeGroup:
+            p.cellType === "button" && p.targetType === "url" && p.externalUrlSourceType === "code"
+              ? p.externalUrlCodeGroup
+              : undefined,
+          externalUrlCode:
+            p.cellType === "button" && p.targetType === "url" && p.externalUrlSourceType === "code"
+              ? p.externalUrlCode
+              : undefined,
           conditionParam: p.cellType === "button" ? p.conditionParam : undefined,
           passParam: p.cellType === "button" ? p.passParam : undefined,
           windowPopupOption: p.cellType === "button" && p.connType === "windowPopup" ? p.windowPopupOption : undefined,
@@ -473,6 +495,8 @@ export function TableBuilder({
             onChange={patch}
             layerTemplates={layerTemplates}
             onRequestLayerTemplates={loadLayerTemplates}
+            codeGroups={codeGroups}
+            codeGroupsLoading={false}
           />
         )}
       </div>
@@ -771,6 +795,8 @@ export function TableBuilder({
                     onChange={(patch) => setPendingCol((prev) => ({ ...prev!, ...patch }))}
                     layerTemplates={layerTemplates}
                     onRequestLayerTemplates={loadLayerTemplates}
+                    codeGroups={codeGroups}
+                    codeGroupsLoading={false}
                   />
                 )}
 

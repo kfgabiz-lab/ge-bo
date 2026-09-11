@@ -101,6 +101,8 @@ import {
   checkImagePixelLimit,
   resolveFieldOptions,
   filterByAccept,
+  resolveOptionFilterField,
+  buildSlugOptRows,
 } from "../../utils";
 import { searchAddressPredictions, getAddressDetail, type AddressPrediction } from "../../utils/googlePlaces";
 import type { RendererMode } from "./types";
@@ -675,59 +677,6 @@ function AddressAutocompleteInput({
       </PortalDropdown>
     </div>
   );
-}
-
-/**
- * optionFilter 조건식의 필드 리졸버 — SlugOptionSelect / SlugAutocompleteInput 공용
- *
- * - "$fieldKey" 형식: 같은 Form/Search 위젯 내 **다른 필드의 현재 선택값**(rowData)만 참조한다.
- *   rowData에 없으면 undefined를 반환한다 — SLUG row(같은 이름의 필드일 수 있음)로 대신 찾지 않는다.
- *   (두 네임스페이스가 섞이면 어떤 값을 참조했는지 알 수 없게 되므로 의도적으로 분리)
- * - 그 외(접두어 없음): 기존 동작 그대로 SLUG 데이터의 flat row 자체 필드 값을 참조한다.
- * @param key     조건식에 등장한 토큰 (예: "trainingCourse", "$trnCourse")
- * @param row     SLUG API에서 받아온 한 행(flatten 결과)
- * @param rowData 현재 Form/Search 위젯의 fieldKey → 현재 값 맵
- */
-function resolveOptionFilterField(
-  key: string,
-  row: Record<string, unknown>,
-  rowData?: Record<string, unknown>
-): string | undefined {
-  if (key.startsWith("$")) {
-    const v = rowData?.[key.slice(1)];
-    return v !== undefined ? String(v) : undefined;
-  }
-  return key in row ? String(row[key] ?? "") : undefined;
-}
-
-/**
- * SLUG 옵션 필터(optionFilter) 적용 + Value/Text 키 추출 + 정렬까지 한 번에 처리 — 공용 계산 로직
- * SlugOptionSelect / SlugAutocompleteInput이 각각 다른 최종 포맷으로 감싸 사용한다.
- */
-function buildSlugOptRows(
-  rawRows: Record<string, unknown>[],
-  field: SearchFieldConfig,
-  rowData: Record<string, unknown> | undefined
-): { value: string; text: string }[] {
-  /* optionFilter 지정 시 조건에 맞는 행만 남김 — evalConditionExpr 공통함수 재사용
-       "$fieldKey" 토큰은 resolveOptionFilterField로 rowData만 조회 */
-  const filteredRows = field.optionFilter
-    ? rawRows.filter((row) =>
-        evalConditionExpr(field.optionFilter!, (key) => resolveOptionFilterField(key, row, rowData))
-      )
-    : rawRows;
-  /* 필터 통과한 행만 옵션 생성 */
-  let opts = filteredRows.map((row) => ({
-    value: String(row[field.optionValueKey ?? ""] ?? ""),
-    text: String(row[field.optionTextKey ?? ""] ?? ""),
-    _sortVal: field.optionOrderKey ? String(row[field.optionOrderKey] ?? "") : "",
-  }));
-  /* optionOrderKey 지정 시 FE에서 정렬 — Value/Text 키와 동일한 flat key 기준 */
-  if (field.optionOrderKey) {
-    const dir = field.optionOrderDir === "DESC" ? -1 : 1;
-    opts = opts.sort((a, b) => a._sortVal.localeCompare(b._sortVal, undefined, { numeric: true }) * dir);
-  }
-  return opts.map(({ value, text }) => ({ value, text }));
 }
 
 function findSlugFallbackDisplayText(

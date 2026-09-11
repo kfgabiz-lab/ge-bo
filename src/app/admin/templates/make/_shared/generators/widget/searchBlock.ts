@@ -30,7 +30,14 @@ import {
   searchSimpleColSpanClass,
 } from "../../components/renderer/rendererStyles";
 import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
-import { jsStringLiteral, collectUnhandledKeys, emitContainerOpen, emitContainerClose } from "../widgetGenerator";
+import {
+  jsStringLiteral,
+  collectUnhandledKeys,
+  emitContainerOpen,
+  emitContainerClose,
+  slugOptionFieldLiteral,
+  emitSlugOptionSelectComponent,
+} from "../widgetGenerator";
 
 const PHASE1_SEARCH_TYPES = new Set<SearchFieldType>([
   "input",
@@ -41,6 +48,7 @@ const PHASE1_SEARCH_TYPES = new Set<SearchFieldType>([
   "checkbox",
   "radio",
   "hidden",
+  "dateRangeStatus",
 ]);
 
 const HANDLED_WIDGET_KEYS = new Set(["type", "widgetId", "rows", "displayStyle"]);
@@ -79,7 +87,24 @@ const HANDLED_FIELD_KEYS = new Set([
   "maxLength",
   "showCharCount",
   "displayAs",
+  "linkedDateRangeKey",
+  "beforeText",
+  "beforeTextMsgKey",
+  "inRangeText",
+  "inRangeTextMsgKey",
+  "afterText",
+  "afterTextMsgKey",
+  "statusDisplayStyle",
 ]);
+
+const SLUG_OPTION_FIELD_KEYS = [
+  "optionSlug",
+  "optionValueKey",
+  "optionTextKey",
+  "optionFilter",
+  "optionOrderKey",
+  "optionOrderDir",
+] as const;
 
 interface TypeScopedFieldKeyPolicy {
   handledTypes: ReadonlySet<SearchFieldType>;
@@ -101,6 +126,17 @@ const TYPE_SCOPED_FIELD_KEY_POLICIES = new Map<string, TypeScopedFieldKeyPolicy>
     },
   ],
 ]);
+
+SLUG_OPTION_FIELD_KEYS.forEach((key) => {
+  TYPE_SCOPED_FIELD_KEY_POLICIES.set(key, {
+    handledTypes: new Set<SearchFieldType>(["select"]),
+    ignoredTypes: new Set<SearchFieldType>(["input", "date", "dateRange", "yearMonth", "checkbox", "radio", "hidden"]),
+    handledReason:
+      "select 전용 — FieldRenderer.tsx:1218 field.optionSlug && !isPreview 체크가 case 'select'(1152~1255) 내부에서만 실행된다. searchBlock.ts는 SlugOptionSelect 컴포넌트를 산출물에 이식해 동일 SLUG fetch·필터·정렬 로직(utils.ts buildSlugOptRows)을 재현한다",
+    ignoredReason:
+      "FieldRenderer.tsx 전문에서 optionSlug 계열 필드는 case 'select'(1152~1255) 내부(1161 SlugAutocompleteInput / 1218 SlugOptionSelect)에서만 읽힌다 — select 이외 타입(input/date/dateRange/yearMonth/checkbox/radio/hidden)에서는 런타임이 이 키를 읽는 지점이 없다",
+  });
+});
 
 const handledFieldKeysFor = (f: SearchFieldConfig): ReadonlySet<string> => {
   const keys = new Set(HANDLED_FIELD_KEYS);
@@ -154,6 +190,10 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
   [
     "multiSelect",
     "FieldRenderer.tsx:1430이 case 'button' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
+  ],
+  [
+    "optionDerivedKeys",
+    "SlugOptionSelect의 useOptionDerivedValues가 onDerivedChange를 호출해야 값이 방출되는데, SearchRenderer.tsx는 FieldRenderer에 onDerivedChange prop 자체를 전달하지 않는다(전문 검색 결과 0건) — Search 위젯에서는 런타임에서도 파생값이 발생하지 않는 무동작 필드",
   ],
   [
     "fetchDisplayMode",
@@ -236,20 +276,6 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
     ]
   ),
   ...typeScopedIgnored("time", "FieldRenderer.tsx:2611 case 'time' (:2619 timeStep)", ["defaultTime", "timeStep"]),
-  ...typeScopedIgnored(
-    "dateRangeStatus",
-    "FieldRenderer.tsx:2640 case 'dateRangeStatus' / utils.ts:2852 f.type==='dateRangeStatus'",
-    [
-      "linkedDateRangeKey",
-      "beforeText",
-      "beforeTextMsgKey",
-      "inRangeText",
-      "inRangeTextMsgKey",
-      "afterText",
-      "afterTextMsgKey",
-      "statusDisplayStyle",
-    ]
-  ),
   ...typeScopedIgnored("editor", "FieldRenderer.tsx:2571 case 'editor' (:2576 editorType)", ["editorType"]),
   ...typeScopedIgnored("address", "FieldRenderer.tsx:2700 case 'address' (:2742 addressLanguage)", ["addressLanguage"]),
 ]);
@@ -295,8 +321,14 @@ const defaultValueExprOf = (f: SearchFieldConfig): string =>
 const isCodeLabelInput = (f: SearchFieldConfig): boolean => f.type === "input" && !!f.codeGroupCode;
 
 const needsI18nOf = (fields: SearchFieldConfig[]): boolean =>
-  fields.some((f) => f.type === "select" || f.type === "radio" || f.type === "checkbox" || isCodeLabelInput(f)) ||
-  fields.some((f) => !!f.labelMsgKey || !!f.label2MsgKey || !!f.placeholderMsgKey || !!f.defaultValueMsgKey);
+  fields.some(
+    (f) =>
+      f.type === "select" ||
+      f.type === "radio" ||
+      f.type === "checkbox" ||
+      f.type === "dateRangeStatus" ||
+      isCodeLabelInput(f)
+  ) || fields.some((f) => !!f.labelMsgKey || !!f.label2MsgKey || !!f.placeholderMsgKey || !!f.defaultValueMsgKey);
 
 const selectArrowSvg = (ind: (n: number) => string, level: number): string =>
   `${ind(level)}<svg className=${jsStringLiteral(SELECT_ARROW_CLS)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>`;
@@ -325,7 +357,8 @@ const pushFieldMarkup = (
   f: SearchFieldConfig,
   id: string,
   paramsVar: string,
-  setParamsVar: string
+  setParamsVar: string,
+  slugRowDataVar: string
 ): void => {
   const readExpr = `String(${paramsVar}['${id}'] ?? '')`;
 
@@ -361,6 +394,12 @@ const pushFieldMarkup = (
       break;
     }
     case "select":
+      if (f.optionSlug && f.selectType !== "autocomplete") {
+        jsxLines.push(
+          `${ind(3)}<SlugOptionSelect field={${JSON.stringify(slugOptionFieldLiteral(f))}} value={${readExpr}} onChange={(v) => ${setParamsVar}(prev => ({ ...prev, ['${id}']: v }))} disabled={false} placeholder={${selectAllOptionExprOf(f)}} className=${jsStringLiteral(selectCls)} rowData={${slugRowDataVar}} />`
+        );
+        break;
+      }
       jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(fieldRelativeWrapCls)}>`);
       jsxLines.push(
         `${ind(4)}<select value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} className=${jsStringLiteral(selectCls)}>`
@@ -439,6 +478,55 @@ const pushFieldMarkup = (
         () =>
           `{groups.find(g => g.groupCode === '${f.codeGroupCode}')?.details.filter(d => d.active).map(d => <label key={d.code} className=${optionLabelCls}><input type="checkbox" value={d.code} checked={${selectedExpr}.includes(d.code)} onChange={() => { const cur = ${selectedExpr}; const next = cur.includes(d.code) ? cur.filter(v => v !== d.code) : [...cur, d.code]; ${setParamsVar}(prev => ({ ...prev, ['${id}']: next.join(',') })); }} className=${checkboxInput} /><span className=${optionTextCls}>{t(d.nameMsgKey || d.name)}</span></label>)}`
       );
+      jsxLines.push(`${ind(3)}</div>`);
+      break;
+    }
+    case "dateRangeStatus": {
+      const beforeExpr = f.beforeTextMsgKey
+        ? `t(${jsStringLiteral(f.beforeTextMsgKey)})`
+        : f.beforeText
+          ? jsStringLiteral(f.beforeText)
+          : `t('common.status.before')`;
+      const inRangeExpr = f.inRangeTextMsgKey
+        ? `t(${jsStringLiteral(f.inRangeTextMsgKey)})`
+        : f.inRangeText
+          ? jsStringLiteral(f.inRangeText)
+          : `t('common.status.inrange')`;
+      const afterExpr = f.afterTextMsgKey
+        ? `t(${jsStringLiteral(f.afterTextMsgKey)})`
+        : f.afterText
+          ? jsStringLiteral(f.afterText)
+          : `t('common.status.after')`;
+      if (f.statusDisplayStyle === "radio") {
+        const optionLabelCls = jsStringLiteral(fieldOptionItemClass(false));
+        const radioInput = jsStringLiteral(fieldRadioInputCls);
+        const optionTextCls = jsStringLiteral(fieldOptionTextCls);
+        jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(fieldOptionGroupCls)}>`);
+        jsxLines.push(
+          `${ind(4)}<label className=${optionLabelCls}><input type="radio" name="${id}" value="" checked={${readExpr} === ''} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: '' }))} className=${radioInput} /><span className=${optionTextCls}>{t('common.label.all')}</span></label>`
+        );
+        jsxLines.push(
+          `${ind(4)}<label className=${optionLabelCls}><input type="radio" name="${id}" value="before" checked={${readExpr} === 'before'} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: 'before' }))} className=${radioInput} /><span className=${optionTextCls}>{${beforeExpr}}</span></label>`
+        );
+        jsxLines.push(
+          `${ind(4)}<label className=${optionLabelCls}><input type="radio" name="${id}" value="in_range" checked={${readExpr} === 'in_range'} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: 'in_range' }))} className=${radioInput} /><span className=${optionTextCls}>{${inRangeExpr}}</span></label>`
+        );
+        jsxLines.push(
+          `${ind(4)}<label className=${optionLabelCls}><input type="radio" name="${id}" value="after" checked={${readExpr} === 'after'} onChange={() => ${setParamsVar}(prev => ({ ...prev, ['${id}']: 'after' }))} className=${radioInput} /><span className=${optionTextCls}>{${afterExpr}}</span></label>`
+        );
+        jsxLines.push(`${ind(3)}</div>`);
+        break;
+      }
+      jsxLines.push(`${ind(3)}<div className=${jsStringLiteral(fieldRelativeWrapCls)}>`);
+      jsxLines.push(
+        `${ind(4)}<select value={${readExpr}} onChange={e => ${setParamsVar}(prev => ({ ...prev, ['${id}']: e.target.value }))} className=${jsStringLiteral(selectCls)}>`
+      );
+      jsxLines.push(`${ind(5)}<option value="">{t('common.label.all')}</option>`);
+      jsxLines.push(`${ind(5)}<option value="before">{${beforeExpr}}</option>`);
+      jsxLines.push(`${ind(5)}<option value="in_range">{${inRangeExpr}}</option>`);
+      jsxLines.push(`${ind(5)}<option value="after">{${afterExpr}}</option>`);
+      jsxLines.push(`${ind(4)}</select>`);
+      jsxLines.push(selectArrowSvg(ind, 4));
       jsxLines.push(`${ind(3)}</div>`);
       break;
     }
@@ -531,6 +619,10 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   const needsHideCondition = supportedFields.some((f) => f.hideCondition);
   const needsCodeLabel = supportedFields.some(isCodeLabelInput);
   const needsI18n = isSimple || needsI18nOf(supportedFields);
+  const hasSlugOptionSelect = supportedFields.some(
+    (f) => f.type === "select" && !!f.optionSlug && f.selectType !== "autocomplete"
+  );
+  const slugRowDataVar = `slugOptRowData${suffix}`;
 
   const idCandidates = supportedFields.map((f) => fieldVar(f));
   const hasIdCollision = new Set(idCandidates).size !== idCandidates.length;
@@ -565,6 +657,14 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   if (needsCodeLabel) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveCodeLabel"] });
   }
+  if (hasSlugOptionSelect) {
+    imports.push({ module: "react", named: ["useMemo"] });
+    imports.push({ module: "@/lib/api", defaultName: "api" });
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/utils",
+      named: ["flattenPageDataItem", "buildSlugOptRows"],
+    });
+  }
 
   const helperLines: string[] = [];
   if (!pruneSafe) {
@@ -579,6 +679,10 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   }
   helperLines.push(`const ${fieldsLiteralVar}: SearchFieldConfig[] = ${JSON.stringify(emittedFields, null, 4)};`);
   helperLines.push(`const ${keyToIdVar} = buildKeyToId(${fieldsLiteralVar});`);
+  if (hasSlugOptionSelect) {
+    helperLines.push("");
+    emitSlugOptionSelectComponent().forEach((l) => helperLines.push(l));
+  }
 
   const stateLines: string[] = [];
   if (needsI18n) stateLines.push(`${ind(1)}const { t } = useI18n();`);
@@ -608,6 +712,13 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
     `${ind(1)}const ${searchParamsFn} = (sv: Record<string, string> = ${paramsVar}): Record<string, string> => buildSearchQueryParams(${fieldsLiteralVar}, sv);`
   );
   handlerLines.push("");
+
+  if (hasSlugOptionSelect) {
+    handlerLines.push(
+      `${ind(1)}const ${slugRowDataVar} = useMemo(() => { const map: Record<string, unknown> = {}; ${fieldsLiteralVar}.forEach((f) => { if (f.fieldKey) map[f.fieldKey] = ${paramsVar}[f.id] ?? ''; }); return map; }, [${paramsVar}]);`
+    );
+    handlerLines.push("");
+  }
 
   const connectedTableSuffixes = (allWidgets.filter((w) => w.type === "table") as TableWidget[])
     .filter((t) => (t.connectedSearchIds || []).includes(widget.widgetId))
@@ -660,7 +771,7 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
       const colSpanCls = searchSimpleColSpanClass(f.colSpan ?? 1, cols);
       const fieldLines: string[] = [];
       fieldLines.push(`${ind(2)}<div className=${jsStringLiteral(colSpanCls)}>`);
-      pushFieldMarkup(fieldLines, ind, f, id, paramsVar, setParamsVar);
+      pushFieldMarkup(fieldLines, ind, f, id, paramsVar, setParamsVar, slugRowDataVar);
       fieldLines.push(`${ind(2)}</div>`);
       wrapHideCondition(f, ind, 2, keyToIdVar, paramsVar, fieldLines).forEach((l) => jsxLines.push(l));
     });
@@ -702,7 +813,7 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
         const reqProp = f.required ? " required" : "";
         const fieldLines: string[] = [];
         fieldLines.push(`${ind(2)}<SearchField label={${searchLabelExprOf(f)}}${colProp}${reqProp}>`);
-        pushFieldMarkup(fieldLines, ind, f, id, paramsVar, setParamsVar);
+        pushFieldMarkup(fieldLines, ind, f, id, paramsVar, setParamsVar, slugRowDataVar);
         fieldLines.push(`${ind(2)}</SearchField>`);
         wrapHideCondition(f, ind, 2, keyToIdVar, paramsVar, fieldLines).forEach((l) => jsxLines.push(l));
       });

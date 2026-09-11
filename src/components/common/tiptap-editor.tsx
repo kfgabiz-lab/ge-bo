@@ -478,6 +478,10 @@ function getTableDimensions(editor: NonNullable<ReturnType<typeof useEditor>>) {
   return null;
 }
 
+function normalizeEmptyParagraphs(html: string): string {
+  return html.replace(/<p([^>]*)>\s*<\/p>/gi, "<p$1><br></p>");
+}
+
 /* ─────────────────────────────────────────────
    에디터 툴바 컴포넌트
 ───────────────────────────────────────────── */
@@ -939,7 +943,7 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
       /* 마운트 직후 또는 프로그래매틱 setContent 호출 중이면 무시 */
       if (!isReadyRef.current || isProgrammaticSetRef.current) return;
       hasUserEditedRef.current = true;
-      const html = updatedEditor.getHTML();
+      const html = normalizeEmptyParagraphs(updatedEditor.getHTML());
       lastCommittedValueRef.current = html;
       onChange?.(html);
     },
@@ -1075,8 +1079,9 @@ export default function TiptapEditor({ initialValue = "", onChange, height = "40
 
     /* 사용자가 명시적으로 적용한 변경이므로 외부 onChange 직접 호출 및 편집 플래그 갱신 */
     hasUserEditedRef.current = true;
-    lastCommittedValueRef.current = sourceValue;
-    onChange?.(sourceValue);
+    const normalizedSourceValue = normalizeEmptyParagraphs(sourceValue);
+    lastCommittedValueRef.current = normalizedSourceValue;
+    onChange?.(normalizedSourceValue);
 
     setShowSourceView(false);
   }, [editor, sourceValue, onChange, t]);

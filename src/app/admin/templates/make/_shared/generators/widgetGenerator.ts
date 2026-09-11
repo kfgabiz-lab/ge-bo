@@ -235,6 +235,58 @@ export const emitContainerClose = (): string => "</div>";
 export const emitSelectArrow = (ind: (n: number) => string, level: number): string =>
   `${ind(level)}<svg className=${jsStringLiteral(SELECT_ARROW_CLS)} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>`;
 
+export interface SlugOptionSourceField {
+  optionSlug?: string;
+  optionValueKey?: string;
+  optionTextKey?: string;
+  optionFilter?: string;
+  optionOrderKey?: string;
+  optionOrderDir?: "ASC" | "DESC";
+}
+
+export const slugOptionFieldLiteral = (f: SlugOptionSourceField): Record<string, unknown> => {
+  const obj: Record<string, unknown> = {};
+  if (f.optionSlug !== undefined) obj.optionSlug = f.optionSlug;
+  if (f.optionValueKey !== undefined) obj.optionValueKey = f.optionValueKey;
+  if (f.optionTextKey !== undefined) obj.optionTextKey = f.optionTextKey;
+  if (f.optionFilter !== undefined) obj.optionFilter = f.optionFilter;
+  if (f.optionOrderKey !== undefined) obj.optionOrderKey = f.optionOrderKey;
+  if (f.optionOrderDir !== undefined) obj.optionOrderDir = f.optionOrderDir;
+  return obj;
+};
+
+export const emitSlugOptionSelectComponent = (): string[] => [
+  `function SlugOptionSelect({ field, value, onChange, disabled, placeholder, className, rowData }: { field: { optionSlug?: string; optionValueKey?: string; optionTextKey?: string; optionFilter?: string; optionOrderKey?: string; optionOrderDir?: 'ASC' | 'DESC' }; value: string; onChange: (v: string) => void; disabled?: boolean; placeholder: string; className: string; rowData?: Record<string, unknown> }) {`,
+  `    const [rawRows, setRawRows] = useState<Record<string, unknown>[]>([]);`,
+  `    useEffect(() => {`,
+  `        if (!field.optionSlug) {`,
+  `            setRawRows([]);`,
+  `            return;`,
+  `        }`,
+  `        setRawRows([]);`,
+  `        api`,
+  "            .get(`/page-data/${field.optionSlug}`, { params: { size: '9999' } })",
+  `            .then((res) => {`,
+  `                const rows = (res.data?.content ?? []) as { dataJson: Record<string, unknown> }[];`,
+  `                setRawRows(rows.map((item) => flattenPageDataItem(item as unknown as Parameters<typeof flattenPageDataItem>[0])));`,
+  `            })`,
+  `            .catch(() => setRawRows([]));`,
+  `    }, [field.optionSlug]);`,
+  `    const opts = useMemo(() => buildSlugOptRows(rawRows, field, rowData), [rawRows, field, rowData]);`,
+  `    return (`,
+  `        <div className="relative">`,
+  `            <select disabled={disabled} className={className} value={value} onChange={(e) => onChange(e.target.value)}>`,
+  `                <option value="">{placeholder}</option>`,
+  `                {opts.map((opt) => (`,
+  `                    <option key={opt.value} value={opt.value}>{opt.text}</option>`,
+  `                ))}`,
+  `            </select>`,
+  emitSelectArrow(ind, 3),
+  `        </div>`,
+  `    );`,
+  `}`,
+];
+
 const dedupeLines = (lines: string[]): string[] => {
   const seen = new Set<string>();
   const out: string[] = [];

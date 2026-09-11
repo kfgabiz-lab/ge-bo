@@ -100,6 +100,7 @@ import {
   computeFieldDefaultValue,
   findMissingRequiredMultiSelect,
   normalizeExternalUrl,
+  resolveButtonExternalUrl,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -1984,11 +1985,17 @@ export function WidgetRenderer({
           return;
         }
 
+        const resolvedExternalUrl = resolveButtonExternalUrl(col, codeGroups);
+        if (col.externalUrlSourceType === "code" && !resolvedExternalUrl) {
+          toast.error("연결된 공통코드 값을 찾을 수 없습니다.");
+          return;
+        }
+
         /* 미리보기 토큰 버튼 — 비공개 컨텐츠를 FO에서 담당자만 미리보기(신규).
          * 팝업 차단 회피: 클릭 즉시(동기) 빈 창을 선점(popup) → 토큰 발급(비동기) 완료 후 popup.location 이동.
          * noopener를 안 쓰는 이유: 선점 단계에서 popup 핸들이 필요해서다(noopener면 open()이 null 반환).
          * 대신 FO 응답 헤더의 Cross-Origin-Opener-Policy: same-origin 이 페이지 로드 시점에 opener 관계를 끊어준다. */
-        if (col.usePreviewToken && (col.targetType ?? "slug") === "url" && col.externalUrl) {
+        if (col.usePreviewToken && (col.targetType ?? "slug") === "url" && resolvedExternalUrl) {
           const width = col.windowPopupOption?.width ?? 800;
           const height = col.windowPopupOption?.height ?? 600;
           const popup = window.open("", "_blank", `width=${width},height=${height}`);
@@ -2003,7 +2010,7 @@ export function WidgetRenderer({
                 slug: connectedSlug,
                 recordId,
               });
-              const normalizedBase = normalizeExternalUrl(col.externalUrl as string).replace(/\/$/, "");
+              const normalizedBase = normalizeExternalUrl(resolvedExternalUrl).replace(/\/$/, "");
               const detailUrl = new URL(`${normalizedBase}/${recordId}`);
               const finalUrl = `${detailUrl.origin}/preview?token=${encodeURIComponent(res.data.token)}&redirect=${encodeURIComponent(detailUrl.pathname)}`;
               popup.location.href = finalUrl;
@@ -2016,8 +2023,8 @@ export function WidgetRenderer({
         }
 
         /* 외부 URL 이동 — page/windowPopup 공통, targetType='url'일 때만 동작 */
-        if ((col.targetType ?? "slug") === "url" && col.externalUrl) {
-          const normalizedUrl = normalizeExternalUrl(col.externalUrl);
+        if ((col.targetType ?? "slug") === "url" && resolvedExternalUrl) {
+          const normalizedUrl = normalizeExternalUrl(resolvedExternalUrl);
           /* URL 객체로 파싱해 기존 쿼리스트링과 병합 (문자열 결합 시 '?' 중복 방지) */
           const urlObj = new URL(normalizedUrl);
           if (col.passParam) {
