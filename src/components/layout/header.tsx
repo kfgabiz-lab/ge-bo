@@ -14,8 +14,7 @@ import { usePageTitleStore } from "@/store/use-page-title-store";
 import { LanguageSelector } from "@/components/layout/language-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
-import { getTimezoneLabel } from "@/lib/timezoneOptions";
-import { formatServerClockTime } from "@/lib/serverClockFormat";
+import { formatServerClockTime, formatServerClockOffset } from "@/lib/serverClockFormat";
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
 function findMenuBreadcrumb(
@@ -65,7 +64,7 @@ function ActiveSiteTimezone() {
     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
       <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
       {activeSite?.timezone && (
-        <span className="text-xs font-semibold text-slate-700">{getTimezoneLabel(activeSite.timezone)}</span>
+        <span className="text-xs font-semibold text-slate-700">{formatServerClockOffset()}</span>
       )}
       <span className="text-xs font-semibold text-slate-700 tabular-nums">{clock}</span>
     </div>
