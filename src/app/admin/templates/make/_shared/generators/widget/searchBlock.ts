@@ -280,10 +280,31 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
   ...typeScopedIgnored("address", "FieldRenderer.tsx:2700 case 'address' (:2742 addressLanguage)", ["addressLanguage"]),
 ]);
 
-const ignoredFieldKeysFor = (f: SearchFieldConfig): ReadonlySet<string> => {
+interface ConditionalIgnoredFieldKey {
+  isIgnorable: (widget: SearchWidget) => boolean;
+  reason: string;
+}
+
+const isSimpleSearch = (widget: SearchWidget): boolean => widget.displayStyle === "simple";
+
+const CONDITIONAL_IGNORED_FIELD_KEYS = new Map<string, ConditionalIgnoredFieldKey>([
+  [
+    "descriptionMsgKey",
+    {
+      isIgnorable: isSimpleSearch,
+      reason:
+        "displayStyle='simple'인 검색 위젯에서만 IGNORED — SearchRenderer.tsx:127-203 심플 분기는 필드를 searchSimpleColSpanClass div로만 감싸 FieldRenderer에 직접 넘기고 SearchField를 거치지 않아 설명 문구를 렌더링하는 지점이 없다. standard 분기는 :219-225에서 SearchField의 description prop으로 field.descriptionMsgKey ? t(...) : field.description을 실제로 출력하므로 IGNORED 대상이 아니며 unhandled로 노출해 코드 생성 미지원임을 알린다",
+    },
+  ],
+]);
+
+const ignoredFieldKeysFor = (f: SearchFieldConfig, widget: SearchWidget): ReadonlySet<string> => {
   const keys = new Set(IGNORED_FIELD_KEYS.keys());
   TYPE_SCOPED_FIELD_KEY_POLICIES.forEach((policy, key) => {
     if (policy.ignoredTypes.has(f.type)) keys.add(key);
+  });
+  CONDITIONAL_IGNORED_FIELD_KEYS.forEach((policy, key) => {
+    if (policy.isIgnorable(widget)) keys.add(key);
   });
   return keys;
 };
@@ -593,7 +614,7 @@ const buildUnhandled = (widget: SearchWidget, supportedFields: SearchFieldConfig
     collectUnhandledKeys(
       f as unknown as Record<string, unknown>,
       handledFieldKeysFor(f),
-      ignoredFieldKeysFor(f)
+      ignoredFieldKeysFor(f, widget)
     ).forEach((k) => fieldUnhandledSet.add(k));
   });
   return [

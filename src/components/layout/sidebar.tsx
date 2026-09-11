@@ -226,7 +226,6 @@ export function Sidebar() {
                     : adminInfo?.roleDisplayName || "-"}
                 </p>
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
             </>
           )}
         </div>
