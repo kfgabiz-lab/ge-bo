@@ -220,9 +220,6 @@ export const generateSpaceBlock = (widget: SpaceWidget, ctx: WidgetGenContext): 
       helperLines.push(GENERATED_PAGE_BASE_CONST);
       const params = parseActionParams(item.params, {});
       const qs = new URLSearchParams(params).toString();
-      body.push(
-        `/* TODO(파일빌드): 연결 대상(${item.popupSlug})이 빌더에서 레이어 팝업으로 설정돼 있어도 산출물은 페이지 이동으로 동작합니다. 산출물이 아직 생성되지 않았다면 404가 납니다. */`
-      );
       body.push(`router.push(\`\${GENERATED_PAGE_BASE}/${item.popupSlug}${qs ? `?${qs}` : ""}\`);`);
     } else if (UNSUPPORTED_CONN_TYPE_NOTE[connType]) {
       body.push(`/* TODO(파일빌드): ${UNSUPPORTED_CONN_TYPE_NOTE[connType]} */`);

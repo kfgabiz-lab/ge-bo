@@ -144,6 +144,8 @@ const hasUnconditionalEditPageRule = (col: TableColumnConfig): boolean => {
   return rules.every((rule) => !!rule.pageSlug) && rules.some((rule) => !rule.conditionParam && !!rule.pageSlug);
 };
 
+const isNoOpCustomMask = (col: TableColumnConfig): boolean => col.maskType === "custom" && !col.maskCustomRegex;
+
 interface ConditionalIgnoredColumnKey {
   isIgnorable: (col: TableColumnConfig) => boolean;
   reason: string;
@@ -156,6 +158,37 @@ const CONDITIONAL_IGNORED_COLUMN_KEYS = new Map<string, ConditionalIgnoredColumn
       isIgnorable: hasUnconditionalEditPageRule,
       reason:
         "모든 editPageRule이 pageSlug를 가지고 그중 conditionParam이 빈 폴백 룰이 하나 이상 있는 컬럼에서만 IGNORED — WidgetRenderer.tsx:1825-1833의 matched는 find(conditionParam 매칭) ?? find(!conditionParam)이라 conditionParam이 매칭된 룰이 있으면 그 룰이 그대로 matched가 되고(pageSlug가 빈 문자열이어도 객체는 truthy라 ?? 폴백이 발동하지 않음) 폴백 룰은 쓰이지 않는다. 따라서 전 룰이 pageSlug를 가져야만 :1834 if (matched?.pageSlug)가 항상 성립해 :1855 return으로 끝나고 :1860의 editPopupSlug 분기에 도달할 수 없다. 룰 중 하나라도 pageSlug가 비었거나 폴백 룰이 없으면 런타임이 :1860에서 editPopupSlug를 읽으므로 IGNORED에서 제외하고 unhandled로 노출한다",
+    },
+  ],
+  [
+    "maskType",
+    {
+      isIgnorable: isNoOpCustomMask,
+      reason:
+        "maskType='custom'인데 maskCustomRegex가 없는 컬럼에서만 IGNORED — utils.ts:1548-1557 maskCustom(value, regexStr, replacement)가 `if (!regexStr) return value;`로 즉시 원본을 반환해 TableCellRenderer.tsx:499-500의 applyMask 호출 결과가 항상 원본 값과 동일하다. maskType이 'email'/'phone'/'name'이거나 'custom'+정규식이 실제로 있는 컬럼은 applyMask가 표시값을 바꾸므로 IGNORED 대상이 아니며 unhandled로 노출해 코드 생성 미지원임을 알린다(파일빌드는 아직 마스킹 코드 생성을 지원하지 않는다)",
+    },
+  ],
+  [
+    "maskCustomRegex",
+    {
+      isIgnorable: isNoOpCustomMask,
+      reason: "maskType과 동일 조건 — regexStr이 없으면 maskCustom이 이 값을 아예 읽지 않는다(utils.ts:1548-1557)",
+    },
+  ],
+  [
+    "maskCustomReplacement",
+    {
+      isIgnorable: isNoOpCustomMask,
+      reason:
+        "maskType과 동일 조건 — maskCustom이 `if (!regexStr) return value;`로 replacement를 참조하기 전에 반환하므로 regexStr이 없으면 이 값은 어떤 값이어도 결과에 영향을 주지 않는다(utils.ts:1548-1557)",
+    },
+  ],
+  [
+    "maskPattern",
+    {
+      isIgnorable: isNoOpCustomMask,
+      reason:
+        "maskType='custom'일 때 maskPattern은 애초에 사용되지 않는다 — utils.ts:1573-1593 applyMask가 maskType='email'/'phone'/'name'에서만 maskPattern을 읽고 'custom' 분기는 maskCustomRegex/maskCustomReplacement만 사용한다. MaskField.tsx:66-71 빌더 UI도 타입 전환 시 custom이면 maskPattern을 항상 undefined로 비운다",
     },
   ],
 ]);
