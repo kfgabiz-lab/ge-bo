@@ -61,12 +61,12 @@ const FORM_WIDGET_Form1: FormWidget = {
       colSpan: 8,
       rowSpan: 1,
       labelMsgKey: "productManager.label.email",
-      required: true,
+      required: false,
       maxLength: 50,
       showCharCount: true,
       pattern: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
       patternDesc: "이메일 형식으로 작성",
-      readonly: true,
+      readonly: false,
     },
     {
       id: "fb_taumf8ea1",
@@ -447,18 +447,18 @@ export default function GeneratedPage() {
                 <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
                   <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
                     {t("productManager.label.email")}
-                    <span className="text-red-500 ml-0.5">*</span>
                   </label>
                   <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
                     <div className="relative">
                       <input
                         type="text"
                         disabled={false}
-                        readOnly
                         placeholder={t("common.input.placeholder")}
                         maxLength={50}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 bg-slate-50 text-slate-500 cursor-default pr-20"
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
                         value={formValuesForm1["fb_gijkvpkpx"] ?? ""}
+                        onChange={(e) => handleFieldChangeForm1("fb_gijkvpkpx", e.target.value)}
+                        onBlur={() => handleFieldBlurForm1("fb_gijkvpkpx")}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
                         {(formValuesForm1["fb_gijkvpkpx"] ?? "").length}/{50}

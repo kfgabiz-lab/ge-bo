@@ -11,16 +11,12 @@ import {
   flattenPageDataItem,
   nextSortDir,
   pageGroupRange,
-  evalColumnDataExpr,
-  resolveEvalExprI18n,
-  resolveCodeLabel,
+  formatNowBySubType,
   parseActionParams,
-  normalizeExternalUrl,
 } from "@/app/admin/templates/make/_shared/utils";
 import { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
 import { isEnterSearchTrigger } from "@/components/search";
 import { RotateCcw, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
-import { useCodeStore } from "@/store/use-code-store";
 import { useRouter } from "next/navigation";
 import api, { getApiErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
@@ -28,29 +24,22 @@ import { toast } from "sonner";
 const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   {
     colSpan: 1,
-    id: "press.is_visible",
-    type: "select",
-    fieldKey: "press.is_visible",
-    label: "",
-  },
-  {
-    colSpan: 1,
     id: "status",
-    type: "select",
+    type: "dateRangeStatus",
     fieldKey: "status",
     label: "",
-    data: "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
+    linkedDateRangeKey: "post_period",
   },
   {
-    colSpan: 3,
-    id: "press.title",
+    colSpan: 4,
+    id: "title",
     type: "input",
-    fieldKey: "press.title",
-    label: "",
+    fieldKey: "title",
+    label: "제목",
   },
 ];
 const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
-const GENERATED_PAGE_BASE = "/admin/generated";
+const DETAIL_PAGE_PATH = "/admin/main/popup/detail";
 function formatCellDate(rawVal: string, format?: string): string {
   if (!rawVal) return "-";
   if (!format) return rawVal;
@@ -70,15 +59,12 @@ function formatCellDate(rawVal: string, format?: string): string {
     .replace("mm", mm)
     .replace("ss", ss);
 }
-const SORT_EXPRTable1: Record<string, string> = {
-  publishStatus: "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
-};
 const EDIT_PAGE_RULES_Table1: { connType?: string; pageSlug?: string; passParam?: string; conditionParam?: string }[] =
   [
     {
       connType: "popup",
-      pageSlug: "press-basicInfo",
-      passParam: "update=1",
+      pageSlug: "popup-detail",
+      passParam: "",
       conditionParam: "",
     },
   ];
@@ -87,13 +73,9 @@ export default function GeneratedPage() {
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
   const { t } = useI18n();
   useEffect(() => {
-    setPageTitle(t("common.label.press"));
+    setPageTitle(t("common.label.popupmanage"));
   }, [setPageTitle, t]);
-  const { groups, fetchGroups } = useCodeStore();
-  useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
-  const initialParamsSearch1: Record<string, string> = { "press.is_visible": "", status: "", "press.title": "" };
+  const initialParamsSearch1: Record<string, string> = { status: "", title: "" };
   const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1);
   const router = useRouter();
   const [rowsTable1, setRowsTable1] = useState<Record<string, unknown>[]>([]);
@@ -103,7 +85,7 @@ export default function GeneratedPage() {
   const [totalPagesTable1, setTotalPagesTable1] = useState(0);
   const [sortKeyTable1, setSortKeyTable1] = useState<string | null>(null);
   const [sortDirTable1, setSortDirTable1] = useState<"asc" | "desc">("asc");
-  const dataSlugTable1 = "press-data";
+  const dataSlugTable1 = "popup-data";
 
   const getSearchParamsSearch1 = (sv: Record<string, string> = paramsSearch1): Record<string, string> =>
     buildSearchQueryParams(SEARCH_FIELDS_Search1, sv);
@@ -146,7 +128,7 @@ export default function GeneratedPage() {
           page,
           size: 10,
           ...(resolvedSortKeyTable1 ? { sort: resolvedSortKeyTable1 + "," + sd } : {}),
-          ...(sk && SORT_EXPRTable1[sk] ? { sortExpr: SORT_EXPRTable1[sk] } : {}),
+          drsKeys: "post_period",
           ...getSearchParamsSearch1(searchOverrides?.["Search1"]),
         },
       });
@@ -204,7 +186,7 @@ export default function GeneratedPage() {
     }
     const qs = params.toString() ? `?${params.toString()}` : "";
     /* TODO(파일빌드): 이동 대상 산출물이 아직 생성되지 않았다면 404가 납니다. */
-    router.push(`${GENERATED_PAGE_BASE}/${matched.pageSlug}${qs}`);
+    router.push(`${DETAIL_PAGE_PATH}${qs}`);
   };
 
   const handleTableDeleteTable1 = async (id: number) => {
@@ -218,45 +200,22 @@ export default function GeneratedPage() {
     }
   };
 
-  const handleTableButtonTable1_7 = (row: Record<string, unknown>) => {
-    const popup = window.open("", "_blank", "width=800,height=600");
-    if (!popup) {
-      toast.error("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.");
-      return;
-    }
-    const recordId = String(row._id ?? "");
-    (async () => {
-      try {
-        const res = await api.post<{ token: string }>("/preview-tokens", { slug: dataSlugTable1, recordId });
-        const normalizedBase = normalizeExternalUrl(
-          "https://nahpdev-web.ls-electric.com/company/press/detail/"
-        ).replace(/\/$/, "");
-        const detailUrl = new URL(`${normalizedBase}/${recordId}`);
-        popup.location.href = `${detailUrl.origin}/preview?token=${encodeURIComponent(res.data.token)}&redirect=${encodeURIComponent(detailUrl.pathname)}`;
-      } catch {
-        popup.close();
-        toast.error("미리보기 토큰 발급에 실패했습니다.");
-      }
-    })();
-  };
-
   return (
     <div className="space-y-3">
       <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={13} autoHeight>
+        <GridCell colSpan={12} rowSpan={12} autoHeight>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto auto auto auto auto auto`,
+              gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto auto auto auto auto auto`,
               gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
               gridAutoFlow: "row dense",
               rowGap: `${GAP_SIZE}px`,
               columnGap: 0,
             }}
           >
-            <div style={{ gridColumn: "span 12", gridRow: "span 2", height: `${2 * ROW_HEIGHT - GAP_SIZE}px` }}>
-              {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:selectType). 필요 시 직접 구현해주세요. */}
+            <div style={{ gridColumn: "span 12", gridRow: "span 1", height: `${1 * ROW_HEIGHT - GAP_SIZE}px` }}>
               <div
                 className="h-full w-full rounded border border-slate-200 flex items-center gap-3 bg-white px-4"
                 style={{ overflow: "clip" }}
@@ -270,43 +229,14 @@ export default function GeneratedPage() {
                   <div className="col-span-1">
                     <div className="relative">
                       <select
-                        value={String(paramsSearch1["press.is_visible"] ?? "")}
-                        onChange={(e) =>
-                          setParamsSearch1((prev) => ({ ...prev, ["press.is_visible"]: e.target.value }))
-                        }
-                        className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      >
-                        <option value="">{t("common.label.isVisible")}</option>
-                        {groups
-                          .find((g) => g.groupCode === "VISIBILITY")
-                          ?.details.filter((d) => d.active)
-                          .map((d) => (
-                            <option key={d.code} value={d.code}>
-                              {t(d.nameMsgKey || d.name)}
-                            </option>
-                          ))}
-                      </select>
-                      <svg
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </div>
-                  </div>
-                  <div className="col-span-1">
-                    <div className="relative">
-                      <select
                         value={String(paramsSearch1["status"] ?? "")}
                         onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["status"]: e.target.value }))}
                         className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                       >
                         <option value="">{t("common.label.all")}</option>
-                        <option value={"{common.label.publish}"}>{t("common.label.publish")}</option>
-                        <option value={"{common.label.unPublish}"}>{t("common.label.unPublish")}</option>
+                        <option value="before">{t("code.status.scheduled")}</option>
+                        <option value="in_range">{t("code.status.posting")}</option>
+                        <option value="after">{t("code.status.end")}</option>
                       </select>
                       <svg
                         className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
@@ -319,11 +249,11 @@ export default function GeneratedPage() {
                       </svg>
                     </div>
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-4">
                     <input
                       type="text"
-                      value={String(paramsSearch1["press.title"] ?? "")}
-                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["press.title"]: e.target.value }))}
+                      value={String(paramsSearch1["title"] ?? "")}
+                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["title"]: e.target.value }))}
                       placeholder={t("common.placeholder.title")}
                       className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                     />
@@ -363,18 +293,16 @@ export default function GeneratedPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      /* TODO(파일빌드): 연결 대상(press-basicInfo)이 빌더에서 레이어 팝업으로 설정돼 있어도 산출물은 페이지 이동으로 동작합니다. 산출물이 아직 생성되지 않았다면 404가 납니다. */
-                      router.push(`${GENERATED_PAGE_BASE}/press-basicInfo`);
+                      router.push(DETAIL_PAGE_PATH);
                     }}
                     className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
                   >
-                    {t("press.btn.add")}
+                    {t("popUp.btn.add")}
                   </button>
                 </div>
               </div>
             </div>
             <div style={{ gridColumn: "span 12", gridRow: "span 10" }}>
-              {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (column:editParams,editFileLayerSlug). 필요 시 직접 구현해주세요. */}
               <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
                 <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
                   <p className="text-xs text-slate-500">
@@ -416,13 +344,13 @@ export default function GeneratedPage() {
                           style={{ textAlign: "center", width: "150px" }}
                         >
                           <button
-                            onClick={() => handleSortTable1("count")}
+                            onClick={() => handleSortTable1("post_period_from")}
                             className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                           >
-                            {t("common.label.views")}
-                            {(sortKeyTable1 === "count" ? sortDirTable1 : false) === "asc" ? (
+                            {t("common.label.startDt")}
+                            {(sortKeyTable1 === "post_period_from" ? sortDirTable1 : false) === "asc" ? (
                               <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "count" ? sortDirTable1 : false) === "desc" ? (
+                            ) : (sortKeyTable1 === "post_period_from" ? sortDirTable1 : false) === "desc" ? (
                               <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                             ) : (
                               <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -434,13 +362,13 @@ export default function GeneratedPage() {
                           style={{ textAlign: "center", width: "150px" }}
                         >
                           <button
-                            onClick={() => handleSortTable1("is_visible")}
+                            onClick={() => handleSortTable1("post_period_to")}
                             className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                           >
-                            {t("common.label.isVisible")}
-                            {(sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "asc" ? (
+                            {t("common.labe.endDt")}
+                            {(sortKeyTable1 === "post_period_to" ? sortDirTable1 : false) === "asc" ? (
                               <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "desc" ? (
+                            ) : (sortKeyTable1 === "post_period_to" ? sortDirTable1 : false) === "desc" ? (
                               <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                             ) : (
                               <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -452,31 +380,13 @@ export default function GeneratedPage() {
                           style={{ textAlign: "center", width: "150px" }}
                         >
                           <button
-                            onClick={() => handleSortTable1("publishStatus")}
+                            onClick={() => handleSortTable1("status")}
                             className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                           >
-                            {t("common.label.publishStatus")}
-                            {(sortKeyTable1 === "publishStatus" ? sortDirTable1 : false) === "asc" ? (
+                            {t("common.label.status")}
+                            {(sortKeyTable1 === "status" ? sortDirTable1 : false) === "asc" ? (
                               <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "publishStatus" ? sortDirTable1 : false) === "desc" ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (
-                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                            )}
-                          </button>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "150px" }}
-                        >
-                          <button
-                            onClick={() => handleSortTable1("publish_dttm")}
-                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                          >
-                            {t("common.label.publishDttm")}
-                            {(sortKeyTable1 === "publish_dttm" ? sortDirTable1 : false) === "asc" ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "publish_dttm" ? sortDirTable1 : false) === "desc" ? (
+                            ) : (sortKeyTable1 === "status" ? sortDirTable1 : false) === "desc" ? (
                               <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                             ) : (
                               <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -521,12 +431,6 @@ export default function GeneratedPage() {
                         </th>
                         <th
                           className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "150px" }}
-                        >
-                          <span className="flex items-center justify-center gap-1">{t("common.label.preview")}</span>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
                           style={{ textAlign: "center", width: "120px" }}
                         >
                           <span className="flex items-center justify-center gap-1">{t("common.label.action")}</span>
@@ -536,13 +440,13 @@ export default function GeneratedPage() {
                     <tbody>
                       {loadingTable1 ? (
                         <tr>
-                          <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
+                          <td colSpan={7} className="py-16 text-center text-sm text-slate-400">
                             {t("common.table.loading")}
                           </td>
                         </tr>
                       ) : rowsTable1.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
+                          <td colSpan={7} className="py-16 text-center text-sm text-slate-400">
                             {t("common.table.no_data")}
                           </td>
                         </tr>
@@ -554,7 +458,7 @@ export default function GeneratedPage() {
                           >
                             <td
                               className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "150px" }}
+                              style={{ textAlign: "left", width: "150px" }}
                             >
                               {(() => {
                                 const value = row["title"];
@@ -572,62 +476,57 @@ export default function GeneratedPage() {
                               style={{ textAlign: "center", width: "150px" }}
                             >
                               {(() => {
-                                const value = row["count"];
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = strVal;
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "150px" }}
-                            >
-                              {(() => {
-                                const value = row["is_visible"];
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = resolveCodeLabel(strVal, "VISIBILITY", "text", groups, t);
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "150px" }}
-                            >
-                              {(() => {
-                                const value = resolveEvalExprI18n(
-                                  evalColumnDataExpr(
-                                    "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
-                                    row
-                                  ),
-                                  t
-                                );
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = strVal;
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "150px" }}
-                            >
-                              {(() => {
-                                const value = row["publish_dttm"];
+                                const value = row["post_period_from"];
                                 const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm");
                                 return (
                                   <span className="text-sm text-slate-700 truncate block" title={dateVal}>
                                     {dateVal}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td
+                              className="px-4 py-3 max-w-[200px] overflow-hidden"
+                              style={{ textAlign: "center", width: "150px" }}
+                            >
+                              {(() => {
+                                const value = row["post_period_to"];
+                                const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm");
+                                return (
+                                  <span className="text-sm text-slate-700 truncate block" title={dateVal}>
+                                    {dateVal}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td
+                              className="px-4 py-3 max-w-[200px] overflow-hidden"
+                              style={{ textAlign: "center", width: "150px" }}
+                            >
+                              {(() => {
+                                const value = row["status"];
+                                const beforeLabel = t("code.status.scheduled");
+                                const inRangeLabel = t("code.status.posting");
+                                const afterLabel = t("code.status.end");
+                                const beStatus = row["_drs_post_period"];
+                                let statusText = "-";
+                                if (beStatus === "before") statusText = beforeLabel;
+                                else if (beStatus === "in_range") statusText = inRangeLabel;
+                                else if (beStatus === "after") statusText = afterLabel;
+                                else {
+                                  const fromStr = String(row["post_period_from"] ?? "");
+                                  const toStr = String(row["post_period_to"] ?? "");
+                                  if (fromStr || toStr) {
+                                    const nowStr = formatNowBySubType("datetime");
+                                    if (fromStr && nowStr < fromStr) statusText = beforeLabel;
+                                    else if (fromStr && toStr && nowStr >= fromStr && nowStr <= toStr)
+                                      statusText = inRangeLabel;
+                                    else if (toStr && nowStr > toStr) statusText = afterLabel;
+                                  }
+                                }
+                                return (
+                                  <span className="text-sm text-slate-700 truncate block" title={statusText}>
+                                    {statusText}
                                   </span>
                                 );
                               })()}
@@ -660,20 +559,6 @@ export default function GeneratedPage() {
                                   </span>
                                 );
                               })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "150px" }}
-                            >
-                              <div className="flex justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleTableButtonTable1_7(row)}
-                                  className="px-2.5 py-1 rounded text-[11px] font-medium transition-all bg-slate-500 hover:bg-slate-600 text-white"
-                                >
-                                  {t("common.label.preview")}
-                                </button>
-                              </div>
                             </td>
                             <td
                               className="px-4 py-3 max-w-[200px] overflow-hidden"

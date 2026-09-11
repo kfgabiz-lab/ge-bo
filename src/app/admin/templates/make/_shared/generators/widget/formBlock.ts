@@ -83,6 +83,7 @@ const HANDLED_FIELD_KEYS = new Set([
   "defaultDateOffset",
   "disablePast",
   "dateSubType",
+  "rangeSubType",
   "disableCondition",
   "hideCondition",
   "dataGenerations",
@@ -117,6 +118,10 @@ const HANDLED_FIELD_KEYS = new Set([
 ]);
 
 const IGNORED_FIELD_KEYS = new Map<string, string>([
+  [
+    "label2MsgKey",
+    "dateRange 종료일 라벨 다국어 키 — Form 경로의 라벨 출력은 FormRenderer.tsx:410-412가 f.labelMsgKey ? t(f.labelMsgKey) : f.label 하나만 읽고, FieldRenderer.tsx 전문에 label2 계열 참조가 0건이라 런타임에서 읽는 지점이 없다(dateRange는 시작/종료 입력을 단일 라벨 아래 묶어 렌더링한다). _FieldBase.tsx:207와 FormBuilder.tsx:168은 빌더 편집기·목록 요약 표시 전용이라 산출물 동작과 무관하다",
+  ],
   [
     "rows",
     "FormBuilder 필드 편집기가 textarea에 남기는 잔여 값 — FieldRenderer.tsx textarea 분기와 formGridLayout 어디서도 field.rows를 읽지 않고 높이는 rowSpan으로만 계산됨",
