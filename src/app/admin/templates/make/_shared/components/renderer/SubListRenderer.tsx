@@ -15,7 +15,7 @@
  * - preview: 빈 샘플 행 1개(disabled) 표시 — 빌더 미리보기
  * - live   : 실제 입력 동작
  *
- * 사용법:
+ * 사용법: 
  *   <SubListRenderer mode="preview" widget={subListWidget} />
  *   <SubListRenderer mode="live" widget={subListWidget} rows={rows} onChange={setRows} />
  */
