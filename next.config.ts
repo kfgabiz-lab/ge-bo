@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
           // { key: "Content-Security-Policy", value: "frame-ancestors 'self'" }, // IIS에 설정
           // COEP(Cross-Origin-Embedder-Policy) 미적용:
           // require-corp, credentialless 둘 다 구글 루커 스튜디오/유튜브·Vimeo/구글 지도 임베드가 깨짐.
-          // 2026-07-27, 2026-08-14 재검증 완료(둘 다 실패). 보안점검 예외 등록 필요.
+          // 2026-07-27, 2026-08-14 재검증 완료(둘 다 실패). 보안점검 예외 등록 필요 .
           // { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
         ],
       },
