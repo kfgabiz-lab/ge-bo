@@ -18,7 +18,7 @@ interface Props {
   value: string;
   onChange?: (key: string) => void;
   disabled?: boolean;
-  /** 조회할 리소스 타입. 기본값 'WORD'. undefined 이면 WORD+SENTENCE 전체 조회 */
+  /** 조회할 리소스 타입. 기본값 'WORD'. undefined 이면 WORD+SENTENCE 전체 조회  */
   resourceType?: "WORD" | "SENTENCE";
   /**
    * 버튼 크기
