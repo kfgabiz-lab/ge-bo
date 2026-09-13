@@ -26,9 +26,8 @@ import { ChevronDown, X, Search } from "lucide-react";
 import { RendererContainer } from "./RendererContainer";
 import { FieldRenderer } from "./FieldRenderer";
 import type { MultiSelectWidget, MultiSelectExtraField, RendererMode } from "./types";
-import type { SearchFieldConfig } from "../../types";
 import { useI18n } from "@/hooks/use-i18n";
-import { flattenPageDataItem, evalConditionExpr } from "../../utils";
+import { flattenPageDataItem, evalConditionExpr, multiSelectExtraFieldToConfig } from "../../utils";
 import {
   fetchMultiSelectSourceRows,
   buildLabelPathEntries,
@@ -61,6 +60,9 @@ import {
   multiSelectToggleTextClass,
   multiSelectChevronClass,
   multiSelectOptionItemClass,
+  MULTISELECT_EXTRA_FIELD_SEP_CLS,
+  MULTISELECT_TAG_GROUP_SEP_CLS,
+  multiSelectExtraFieldWrapClass,
 } from "./rendererStyles";
 
 /* ── 샘플 데이터 (preview 모드 전용) ── */
@@ -93,22 +95,6 @@ export interface MultiSelectRendererProps {
 }
 
 /**
- * MultiSelectExtraField → SearchFieldConfig 변환
- * FieldRenderer 재사용을 위해 최소 필드만 매핑
- */
-function toFieldConfig(f: MultiSelectExtraField): SearchFieldConfig {
-  return {
-    id: f.key, // 저장 키는 key 사용 (id는 DnD 내부 식별자)
-    type: f.type,
-    label: f.label,
-    colSpan: 1,
-    options: f.options,
-    required: f.required,
-    placeholder: f.placeholder,
-  };
-}
-
-/**
  * 추가 입력 필드 그룹(좌/우 한쪽) 렌더링
  * 그룹 내부에서만 idx>0일 때 필드 사이 구분선을 표시한다.
  */
@@ -122,21 +108,12 @@ function renderExtraFieldGroup(
   return fields.map((ef, idx) => (
     <React.Fragment key={ef.id}>
       {/* 필드 사이 구분선 */}
-      {idx > 0 && <div className="w-px h-4 bg-slate-200 shrink-0" />}
-      <div
-        className={`shrink-0 ${
-          /* radio/checkbox는 auto, input/select/date는 고정 폭 */
-          ef.type === "radio" || ef.type === "checkbox" ? "min-w-fit" : "w-[120px]"
-        }`}
-      >
+      {idx > 0 && <div className={MULTISELECT_EXTRA_FIELD_SEP_CLS} />}
+      <div className={multiSelectExtraFieldWrapClass(ef.type)}>
         {/* FieldRenderer — placeholder에 label 대체 */}
         <FieldRenderer
           mode={isPreview ? "preview" : "live"}
-          field={{
-            ...toFieldConfig(ef),
-            /* input/select/date는 placeholder로 label 표시 */
-            placeholder: ef.placeholder ?? ef.label,
-          }}
+          field={multiSelectExtraFieldToConfig(ef)}
           value={isPreview ? "" : (itemVals[ef.key] ?? "")}
           onChange={(v) => onExtraFieldChange?.(optId, ef.key, v)}
         />
@@ -421,13 +398,13 @@ export function MultiSelectRenderer({
                         renderExtraFieldGroup(leftFields, itemVals, opt.id, isPreview, onExtraFieldChange)}
 
                       {/* 좌측 필드 ↔ 항목명 구분선 */}
-                      {leftFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
+                      {leftFields.length > 0 && <div className={MULTISELECT_TAG_GROUP_SEP_CLS} />}
 
                       {/* 항목명 — 고정 너비로 잘림 방지 */}
                       <span className={MULTISELECT_TAG_TEXT_CLS}>{entry.path}</span>
 
                       {/* 항목명 ↔ 우측 필드 구분선 */}
-                      {rightFields.length > 0 && <div className="w-px h-4 bg-slate-300 shrink-0" />}
+                      {rightFields.length > 0 && <div className={MULTISELECT_TAG_GROUP_SEP_CLS} />}
 
                       {/* 우측 추가 입력 필드 */}
                       {rightFields.length > 0 &&

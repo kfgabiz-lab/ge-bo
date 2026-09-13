@@ -167,7 +167,7 @@ const UNSUPPORTED_CONN_TYPE_NOTE: Record<string, string> = {
 };
 
 export const generateSpaceBlock = (widget: SpaceWidget, ctx: WidgetGenContext): WidgetCodeBlock => {
-  const { ind, contentColSpan, contentFillHeight, suffix, leaveCheckNames } = ctx;
+  const { ind, contentColSpan, contentFillHeight, suffix, leaveCheckNames, insideTab } = ctx;
   const showBorder = widget.showBorder !== false;
   const bgColor = widget.bgColor && widget.bgColor !== "none" ? widget.bgColor : undefined;
   const justifyClass = justifyClassOf(widget.align);
@@ -208,7 +208,7 @@ export const generateSpaceBlock = (widget: SpaceWidget, ctx: WidgetGenContext): 
         result.helperLines.forEach((l) => helperLines.push(l));
         result.handlerLines.forEach((l) => handlerLines.push(l));
         result.imports.forEach((i) => imports.push(i));
-        if (item.goBackAfterAction) needsRouter = true;
+        if (item.goBackAfterAction && !insideTab) needsRouter = true;
         body.push(`${fnName}();`);
       }
     } else if (connType === "close") {

@@ -1947,6 +1947,20 @@ export function extractMultiSelectSelection(
   return { kind: "ids", ids: (raw as unknown[]).filter((x) => typeof x === "number") as number[] };
 }
 
+export function multiSelectExtraFieldToConfig(
+  ef: import("./components/renderer/types").MultiSelectExtraField
+): import("./types").SearchFieldConfig {
+  return {
+    id: ef.key,
+    type: ef.type,
+    label: ef.label,
+    colSpan: 1,
+    options: ef.options,
+    required: ef.required,
+    placeholder: ef.placeholder ?? ef.label,
+  };
+}
+
 /**
  * 생성KEY dot notation 경로에 값을 기록 — buildDataJson / FormRenderer 공용
  * 1단계: "fieldKey"       → dataJson.fieldKey

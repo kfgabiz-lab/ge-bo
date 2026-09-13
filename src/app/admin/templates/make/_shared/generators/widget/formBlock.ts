@@ -10,6 +10,7 @@ import {
   formVarNames,
   multiSelectVarNames,
   pageVar,
+  hasMultiSelectExtraFields,
 } from "../widgetGenerator";
 import {
   fieldLabelCls,
@@ -512,6 +513,11 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
         handlerLines.push(
           `${ind(4)}if (selection${suffixOf(mw.widgetId)}.kind !== 'none') ${mn.setIds}(selection${suffixOf(mw.widgetId)}.ids);`
         );
+        if (hasMultiSelectExtraFields(mw)) {
+          handlerLines.push(
+            `${ind(4)}if (selection${suffixOf(mw.widgetId)}.kind === 'objects') ${mn.setExtraFieldValues}(selection${suffixOf(mw.widgetId)}.extraFieldValues);`
+          );
+        }
       });
       if (pageHasFileFields) {
         handlerLines.push(`${ind(4)}const fileIds = collectFileIdsDeep(dataJson);`);

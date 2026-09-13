@@ -1,4 +1,4 @@
-import type { AnyWidget, TabItem, TabWidget } from "../components/renderer/types";
+import type { AnyWidget, TabItem, TabWidget, MultiSelectWidget } from "../components/renderer/types";
 import type { PageWidgetItem } from "../components/renderer/PageGridRenderer";
 import { generateSearchBlock } from "./widget/searchBlock";
 import { generateTableBlock } from "./widget/tableBlock";
@@ -12,7 +12,6 @@ import {
   rendererContainerClassName,
   rendererContainerOverflow,
   SELECT_ARROW_CLS,
-  GENERATED_PAGE_ROOT_CLS,
   GENERATED_UNSUPPORTED_WIDGET_CLS,
 } from "../components/renderer/rendererStyles";
 
@@ -69,6 +68,7 @@ export interface WidgetGenContext {
   tabPanels?: TabPanelPlan[];
   blockOf?: (widget: PageWidget) => WidgetCodeBlock | undefined;
   tabSavedMarker?: string;
+  insideTab: boolean;
 }
 
 export const GENERATED_PAGE_BASE_CONST = "const GENERATED_PAGE_BASE = '/admin/generated';";
@@ -100,7 +100,13 @@ export const multiSelectVarNames = (suffix: string) => ({
   widget: `MULTISELECT_WIDGET_${suffix}`,
   ids: `multiSelectIds${suffix}`,
   setIds: `setMultiSelectIds${suffix}`,
+  extraFieldValues: `multiSelectExtraFieldValues${suffix}`,
+  setExtraFieldValues: `setMultiSelectExtraFieldValues${suffix}`,
+  updateExtraField: `updateMultiSelectExtraField${suffix}`,
 });
+
+export const hasMultiSelectExtraFields = (widget: Pick<MultiSelectWidget, "extraFields">): boolean =>
+  (widget.extraFields ?? []).length > 0;
 
 export const tabVarNames = (suffix: string) => ({
   active: `activeTab${suffix}`,
@@ -500,6 +506,7 @@ interface WidgetScopeOptions {
   isEntity: boolean;
   mergeExistingBeforeSave: boolean;
   tabSaveScope?: { tabWidgetId: string; tabIdx: number };
+  insideTab?: boolean;
 }
 
 interface WidgetScopeMeta extends WidgetScopeOptions {
@@ -557,6 +564,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
           mainConnectedSlug: parentScope.mainConnectedSlug || config.mainConnectedSlug,
           isEntity: config.connectedType === "data",
           mergeExistingBeforeSave: !!tab.contentKey,
+          insideTab: true,
           ...(requiredGuardActive ? { tabSaveScope: { tabWidgetId: tabWidget.widgetId, tabIdx } } : {}),
         },
         depth + 1
@@ -615,6 +623,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
       tabPanels: tabPlansByWidget.get(widget),
       blockOf,
       tabSavedMarker,
+      insideTab: scope?.insideTab ?? false,
     };
     if (!generator) {
       unsupportedSet.add(widget.type);
@@ -703,6 +712,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   lines.push(`import React, { ${reactNamedOrdered.join(", ")} } from 'react';`);
   lines.push("import { GridCell, ROW_HEIGHT, GAP_SIZE } from '@/components/layout/grid-cell';");
   lines.push("import { PageGridContainer } from '@/components/layout/page-grid-container';");
+  lines.push("import PageLayout from '@/components/layout/page-layout';");
   buildImportLines(mergedImports).forEach((l) => lines.push(l));
   lines.push("");
   if (helperLines.length > 0) {
@@ -715,11 +725,9 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   handlerLines.forEach((l) => lines.push(l));
   if (handlerLines.length > 0) lines.push("");
   lines.push(`${ind(1)}return (`);
-  lines.push(`${ind(2)}<div className=${jsStringLiteral(GENERATED_PAGE_ROOT_CLS)}>`);
-  lines.push(`${ind(3)}<PageGridContainer>`);
-  emitGridItems(rootGrid, blockOf, 4).forEach((l) => lines.push(l));
-  lines.push(`${ind(3)}</PageGridContainer>`);
-  lines.push(`${ind(2)}</div>`);
+  lines.push(`${ind(2)}<PageLayout mode="live">`);
+  emitGridItems(rootGrid, blockOf, 3).forEach((l) => lines.push(l));
+  lines.push(`${ind(2)}</PageLayout>`);
   lines.push(`${ind(1)});`);
   lines.push("}");
 

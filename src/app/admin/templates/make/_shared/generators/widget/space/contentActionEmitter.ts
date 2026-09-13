@@ -1,7 +1,13 @@
 import type { FormWidget } from "../../../components/builder/FormBuilder";
 import type { MultiSelectWidget, SubListWidget } from "../../../components/renderer/types";
 import type { ImportRequirement, WidgetGenContext } from "../../widgetGenerator";
-import { jsStringLiteral, formVarNames, multiSelectVarNames, pageVar } from "../../widgetGenerator";
+import {
+  jsStringLiteral,
+  formVarNames,
+  multiSelectVarNames,
+  pageVar,
+  hasMultiSelectExtraFields,
+} from "../../widgetGenerator";
 import { FILE_FIELD_TYPES } from "../../../constants";
 
 const UTILS_MODULE = "@/app/admin/templates/make/_shared/utils";
@@ -28,7 +34,8 @@ type ContentWidget = FormWidget | SubListWidget | MultiSelectWidget;
 
 export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentActionEmitResult => {
   const { ctx, fnName, widgetsConstName, connectedContentWidgetIds, action, goBackAfterAction } = o;
-  const { ind, allWidgets, suffixOf, isEntity, mainConnectedSlug, pageSlug } = ctx;
+  const { ind, allWidgets, suffixOf, isEntity, mainConnectedSlug, pageSlug, insideTab } = ctx;
+  const emitGoBack = goBackAfterAction && !insideTab;
 
   const targetWidgets = connectedContentWidgetIds
     .map((wid) => allWidgets.find((w) => w.widgetId === wid))
@@ -103,7 +110,7 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
     );
     handlerLines.push(`${ind(3)}toast.success(t('common.deleted'));`);
     if (ctx.leaveCheckNames.includes("markClean")) handlerLines.push(`${ind(3)}markClean();`);
-    if (goBackAfterAction) handlerLines.push(`${ind(3)}router.back();`);
+    if (emitGoBack) handlerLines.push(`${ind(3)}router.back();`);
     handlerLines.push(`${ind(2)}} catch {`);
     handlerLines.push(`${ind(3)}toast.error(t('common.error.delete'));`);
     handlerLines.push(`${ind(2)}}`);
@@ -134,6 +141,10 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
     .join(", ")} }`;
   const multiSelectMapLiteral = `{ ${multiSelects
     .map((mw) => `${jsStringLiteral(mw.widgetId)}: ${multiSelectVarNames(suffixOf(mw.widgetId)).ids}`)
+    .join(", ")} }`;
+  const multiSelectExtraFieldMapLiteral = `{ ${multiSelects
+    .filter((mw) => hasMultiSelectExtraFields(mw))
+    .map((mw) => `${jsStringLiteral(mw.widgetId)}: ${multiSelectVarNames(suffixOf(mw.widgetId)).extraFieldValues}`)
     .join(", ")} }`;
   const entityDateFieldsExpr =
     forms.length > 0 ? `[${forms.map((fw) => `...${formVarNames(suffixOf(fw.widgetId)).fields}`).join(", ")}]` : "[]";
@@ -173,7 +184,7 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
   handlerLines.push(`${ind(4)}formFileIdsMap,`);
   handlerLines.push(`${ind(4)}{},`);
   handlerLines.push(`${ind(4)}${multiSelectMapLiteral},`);
-  handlerLines.push(`${ind(4)}{},`);
+  handlerLines.push(`${ind(4)}${multiSelectExtraFieldMapLiteral},`);
   handlerLines.push(`${ind(4)}${mainConnectedSlug ? jsStringLiteral(mainConnectedSlug) : "undefined"},`);
   handlerLines.push(`${ind(4)}allFormValues,`);
   handlerLines.push(`${ind(4)}${isEntity}`);
@@ -248,7 +259,7 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
   handlerLines.push(`${ind(3)}toast.success(isUpdate ? t('common.updated') : t('common.saved'));`);
   if (ctx.tabSavedMarker) handlerLines.push(`${ind(3)}${ctx.tabSavedMarker}`);
   if (ctx.leaveCheckNames.includes("markClean")) handlerLines.push(`${ind(3)}markClean();`);
-  if (goBackAfterAction) handlerLines.push(`${ind(3)}router.back();`);
+  if (emitGoBack) handlerLines.push(`${ind(3)}router.back();`);
   handlerLines.push(`${ind(2)}} catch (err: unknown) {`);
   handlerLines.push(
     `${ind(3)}const response = (err as { response?: { status?: number; data?: { message?: string } } })?.response;`

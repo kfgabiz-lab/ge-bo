@@ -1,3 +1,5 @@
+import type { MultiSelectExtraFieldType } from "./types";
+
 export function rendererContainerClassName(fillHeight: boolean, showBorder: boolean, extraClassName: string): string {
   const borderCls = showBorder ? "border border-slate-200" : "";
   return [fillHeight ? "h-full w-full rounded" : "w-full rounded", borderCls, extraClassName].filter(Boolean).join(" ");
@@ -187,6 +189,13 @@ export const TABLE_ACTION_ICON_CLS = "w-3.5 h-3.5";
 export const TABLE_BUTTON_WRAP_CLS = "flex";
 export const MULTISELECT_TAG_REMOVE_ICON_CLS = "w-3 h-3";
 
+export const MULTISELECT_EXTRA_FIELD_SEP_CLS = "w-px h-4 bg-slate-200 shrink-0";
+export const MULTISELECT_TAG_GROUP_SEP_CLS = "w-px h-4 bg-slate-300 shrink-0";
+
+export function multiSelectExtraFieldWrapClass(type: MultiSelectExtraFieldType): string {
+  return `shrink-0 ${type === "radio" || type === "checkbox" ? "min-w-fit" : "w-[120px]"}`;
+}
+
 export const TAB_CONTAINER_CLS =
   "h-full w-full flex flex-col rounded border border-slate-300 bg-white shadow-sm overflow-hidden";
 export const TAB_BAR_CLS = "flex border-b border-slate-200 bg-slate-50 flex-shrink-0";
@@ -200,7 +209,6 @@ export function tabButtonClass(active: boolean): string {
   }`;
 }
 
-export const GENERATED_PAGE_ROOT_CLS = "space-y-3";
 export const GENERATED_TABLE_SCROLL_MORE_CLS = "py-4 text-center text-xs text-slate-400";
 export const GENERATED_TABLE_UNSUPPORTED_CELL_CLS = "text-slate-300";
 export const GENERATED_UNSUPPORTED_WIDGET_CLS =

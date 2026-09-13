@@ -1,4 +1,4 @@
-import type { MultiSelectWidget } from "../../components/renderer/types";
+import type { MultiSelectWidget, MultiSelectExtraField } from "../../components/renderer/types";
 import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
 import {
   jsStringLiteral,
@@ -6,7 +6,10 @@ import {
   emitContainerOpen,
   emitContainerClose,
   multiSelectVarNames,
+  hasMultiSelectExtraFields,
 } from "../widgetGenerator";
+import { pushFieldMarkup } from "./shared/fieldMarkupEmitter";
+import { multiSelectExtraFieldToConfig } from "../../utils";
 import { fieldRequiredMarkCls, fieldOptionTextCls } from "../../styles";
 import {
   MULTISELECT_BODY_CLS,
@@ -28,10 +31,13 @@ import {
   MULTISELECT_TAG_TEXT_CLS,
   MULTISELECT_TAG_REMOVE_BTN_CLS,
   MULTISELECT_TAG_REMOVE_ICON_CLS,
+  MULTISELECT_EXTRA_FIELD_SEP_CLS,
+  MULTISELECT_TAG_GROUP_SEP_CLS,
   multiSelectFieldWrapClass,
   multiSelectToggleTextClass,
   multiSelectChevronClass,
   multiSelectOptionItemClass,
+  multiSelectExtraFieldWrapClass,
 } from "../../components/renderer/rendererStyles";
 
 const UTILS_MODULE = "@/app/admin/templates/make/_shared/utils";
@@ -59,6 +65,7 @@ const HANDLED_WIDGET_KEYS = new Set([
   "fieldColSpan",
   "fieldAlign",
   "dedupeByText",
+  "extraFields",
 ]);
 
 const IGNORED_WIDGET_KEYS = new Map<string, string>();
@@ -124,6 +131,12 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
   stateLines.push(`${ind(1)}const [${searchVar}, ${setSearchVar}] = useState('');`);
   stateLines.push(`${ind(1)}const [${openVar}, ${setOpenVar}] = useState(false);`);
   stateLines.push(`${ind(1)}const ${buttonRefVar} = useRef<HTMLButtonElement>(null);`);
+  const widgetHasExtraFields = hasMultiSelectExtraFields(widget);
+  if (widgetHasExtraFields) {
+    stateLines.push(
+      `${ind(1)}const [${names.extraFieldValues}, ${names.setExtraFieldValues}] = useState<Record<number, Record<string, string>>>({});`
+    );
+  }
 
   const handlerLines: string[] = [];
   const unsupportedNotes: string[] = [];
@@ -142,9 +155,6 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
     unsupportedNotes.push(
       `contentRelation(inner/outer)은 파일빌드에서 조회 파라미터로 방출하지 않습니다. 라벨 경로가 런타임과 달라질 수 있습니다.`
     );
-  }
-  if (widget.extraFields && widget.extraFields.length > 0) {
-    unsupportedNotes.push(`extraFields(선택 항목별 추가 입력 필드)는 아직 코드 생성이 지원되지 않습니다.`);
   }
   if (widget.hideCondition) {
     unsupportedNotes.push(`hideCondition(위젯 단위 숨김)은 아직 코드 생성이 지원되지 않습니다. 항상 표시됩니다.`);
@@ -218,6 +228,16 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
   handlerLines.push(`${ind(2)}${names.setIds}((prev) => prev.filter((x) => x !== id));`);
   if (canMarkDirty) handlerLines.push(`${ind(2)}markDirty();`);
   handlerLines.push(`${ind(1)}}, [${canMarkDirty ? "markDirty" : ""}]);`);
+  if (widgetHasExtraFields) {
+    handlerLines.push(
+      `${ind(1)}const ${names.updateExtraField} = useCallback((itemId: number) => (upd: (prev: Record<string, string>) => Record<string, string>) => {`
+    );
+    handlerLines.push(
+      `${ind(2)}${names.setExtraFieldValues}((prev) => ({ ...prev, [itemId]: upd(prev[itemId] ?? {}) }));`
+    );
+    if (canMarkDirty) handlerLines.push(`${ind(2)}markDirty();`);
+    handlerLines.push(`${ind(1)}}, [${canMarkDirty ? "markDirty" : ""}]);`);
+  }
   handlerLines.push("");
 
   const fieldColSpan = widget.fieldColSpan;
@@ -311,7 +331,39 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
   jsxLines.push(
     `${ind(7)}<div key={\`\${opt.id}-\${pathIdx}\`} className=${jsStringLiteral(MULTISELECT_TAG_ROW_CLS)}>`
   );
+
+  const extraFields = widget.extraFields ?? [];
+  const leftFields = extraFields.filter((ef) => ef.position === "left");
+  const rightFields = extraFields.filter((ef) => ef.position !== "left");
+  const pushExtraFieldGroup = (fields: MultiSelectExtraField[]): void => {
+    fields.forEach((ef, idx) => {
+      if (idx > 0) jsxLines.push(`${ind(8)}<div className=${jsStringLiteral(MULTISELECT_EXTRA_FIELD_SEP_CLS)} />`);
+      jsxLines.push(`${ind(8)}<div className=${jsStringLiteral(multiSelectExtraFieldWrapClass(ef.type))}>`);
+      pushFieldMarkup({
+        jsxLines,
+        ind,
+        level: 9,
+        field: multiSelectExtraFieldToConfig(ef),
+        id: ef.key,
+        paramsVar: `(${names.extraFieldValues}[opt.id] ?? {})`,
+        setParamsVar: `${names.updateExtraField}(opt.id)`,
+        slugRowDataVar: "undefined",
+        radioNameExpr: `\`${suffix}-ef-\${opt.id}-\${pathIdx}-\` + ${jsStringLiteral(ef.key)}`,
+      });
+      jsxLines.push(`${ind(8)}</div>`);
+    });
+  };
+
+  pushExtraFieldGroup(leftFields);
+  if (leftFields.length > 0) {
+    jsxLines.push(`${ind(8)}<div className=${jsStringLiteral(MULTISELECT_TAG_GROUP_SEP_CLS)} />`);
+  }
   jsxLines.push(`${ind(8)}<span className=${jsStringLiteral(MULTISELECT_TAG_TEXT_CLS)}>{entry.path}</span>`);
+  if (rightFields.length > 0) {
+    jsxLines.push(`${ind(8)}<div className=${jsStringLiteral(MULTISELECT_TAG_GROUP_SEP_CLS)} />`);
+  }
+  pushExtraFieldGroup(rightFields);
+
   jsxLines.push(
     `${ind(8)}<button type="button" onClick={() => ${removeFn}(entry.selectionId)} className=${jsStringLiteral(MULTISELECT_TAG_REMOVE_BTN_CLS)}>`
   );
