@@ -29,18 +29,18 @@ const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
     id: "is_visible",
     type: "select",
     fieldKey: "is_visible",
-    label: "",
+    label: "그룹공개설정",
   },
   {
     colSpan: 4,
-    id: "product_name",
+    id: "group_name",
     type: "input",
-    fieldKey: "product_name",
-    label: "제품명",
+    fieldKey: "group_name",
+    label: "제품그룹명",
   },
 ];
 const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
-const GENERATED_PAGE_BASE = "/admin/product";
+const DETAIL_PAGE_PATH = "/admin/main/prdGrp/detail";
 function formatCellDate(rawVal: string, format?: string): string {
   if (!rawVal) return "-";
   if (!format) return rawVal;
@@ -64,7 +64,7 @@ const EDIT_PAGE_RULES_Table1: { connType?: string; pageSlug?: string; passParam?
   [
     {
       connType: "popup",
-      pageSlug: "product-detail",
+      pageSlug: "prdGrp-detail",
       passParam: "",
       conditionParam: "",
     },
@@ -74,13 +74,13 @@ export default function GeneratedPage() {
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
   const { t } = useI18n();
   useEffect(() => {
-    setPageTitle(t("common.label.productmanage"));
+    setPageTitle(t("common.label.productgroup"));
   }, [setPageTitle, t]);
   const { groups, fetchGroups } = useCodeStore();
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
-  const initialParamsSearch1: Record<string, string> = { is_visible: "", product_name: "" };
+  const initialParamsSearch1: Record<string, string> = { is_visible: "", group_name: "" };
   const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1);
   const router = useRouter();
   const [rowsTable1, setRowsTable1] = useState<Record<string, unknown>[]>([]);
@@ -90,7 +90,7 @@ export default function GeneratedPage() {
   const [totalPagesTable1, setTotalPagesTable1] = useState(0);
   const [sortKeyTable1, setSortKeyTable1] = useState<string | null>(null);
   const [sortDirTable1, setSortDirTable1] = useState<"asc" | "desc">("asc");
-  const dataSlugTable1 = "product-data";
+  const dataSlugTable1 = "prdGrp-data";
 
   const getSearchParamsSearch1 = (sv: Record<string, string> = paramsSearch1): Record<string, string> =>
     buildSearchQueryParams(SEARCH_FIELDS_Search1, sv);
@@ -189,8 +189,7 @@ export default function GeneratedPage() {
       Object.entries(parseActionParams(matched.passParam, row)).forEach(([k, v]) => params.set(k, v));
     }
     const qs = params.toString() ? `?${params.toString()}` : "";
-    /* TODO(파일빌드): 이동 대상 산출물이 아직 생성되지 않았다면 404가 납니다. */
-    router.push(`${GENERATED_PAGE_BASE}/${matched.pageSlug}${qs}`);
+    router.push(`${DETAIL_PAGE_PATH}${qs}`);
   };
 
   const handleTableDeleteTable1 = async (id: number) => {
@@ -219,7 +218,6 @@ export default function GeneratedPage() {
           }}
         >
           <div style={{ gridColumn: "span 12", gridRow: "span 1", height: `${1 * ROW_HEIGHT - GAP_SIZE}px` }}>
-            {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:generationKey). 필요 시 직접 구현해주세요. */}
             <div
               className="h-full w-full rounded border border-slate-200 flex items-center gap-3 bg-white px-4"
               style={{ overflow: "clip" }}
@@ -261,9 +259,9 @@ export default function GeneratedPage() {
                 <div className="col-span-4">
                   <input
                     type="text"
-                    value={String(paramsSearch1["product_name"] ?? "")}
-                    onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["product_name"]: e.target.value }))}
-                    placeholder={t("common.placeholder.productName")}
+                    value={String(paramsSearch1["group_name"] ?? "")}
+                    onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["group_name"]: e.target.value }))}
+                    placeholder={t("validation.code.groupName.required")}
                     className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                   />
                 </div>
@@ -283,6 +281,7 @@ export default function GeneratedPage() {
             </div>
           </div>
           <div style={{ gridColumn: "12 / span 1", gridRow: "span 1" }}>
+            {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:description). 필요 시 직접 구현해주세요. */}
             <div
               className="w-full rounded"
               style={{
@@ -302,18 +301,16 @@ export default function GeneratedPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    /* TODO(파일빌드): 연결 대상(product-detail)이 빌더에서 레이어 팝업으로 설정돼 있어도 산출물은 페이지 이동으로 동작합니다. 산출물이 아직 생성되지 않았다면 404가 납니다. */
-                    router.push(`${GENERATED_PAGE_BASE}/product-detail`);
+                    router.push(DETAIL_PAGE_PATH);
                   }}
                   className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
                 >
-                  {t("product.button.add")}
+                  {t("productGrp.btn.add")}
                 </button>
               </div>
             </div>
           </div>
           <div style={{ gridColumn: "span 12", gridRow: "span 10" }}>
-            {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (widget:enableRowSelection). 필요 시 직접 구현해주세요. */}
             <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
               <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
                 <p className="text-xs text-slate-500">
@@ -334,16 +331,16 @@ export default function GeneratedPage() {
                     <tr className="border-b border-slate-200 bg-slate-50/80">
                       <th
                         className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "40%" }}
+                        style={{ textAlign: "center", width: "50px" }}
                       >
                         <button
-                          onClick={() => handleSortTable1("product.product_name")}
+                          onClick={() => handleSortTable1("group_order")}
                           className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                         >
-                          {t("common.label.productName")}
-                          {(sortKeyTable1 === "product.product_name" ? sortDirTable1 : false) === "asc" ? (
+                          {t("common.label.sortOrder")}
+                          {(sortKeyTable1 === "group_order" ? sortDirTable1 : false) === "asc" ? (
                             <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "product.product_name" ? sortDirTable1 : false) === "desc" ? (
+                          ) : (sortKeyTable1 === "group_order" ? sortDirTable1 : false) === "desc" ? (
                             <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                           ) : (
                             <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -352,16 +349,34 @@ export default function GeneratedPage() {
                       </th>
                       <th
                         className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "10%" }}
+                        style={{ textAlign: "center", width: "150px" }}
                       >
                         <button
-                          onClick={() => handleSortTable1("product.is_visible")}
+                          onClick={() => handleSortTable1("group_name")}
+                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                        >
+                          {t("common.label.groupName")}
+                          {(sortKeyTable1 === "group_name" ? sortDirTable1 : false) === "asc" ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (sortKeyTable1 === "group_name" ? sortDirTable1 : false) === "desc" ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </button>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "150px" }}
+                      >
+                        <button
+                          onClick={() => handleSortTable1("is_visible")}
                           className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                         >
                           {t("common.label.isVisible")}
-                          {(sortKeyTable1 === "product.is_visible" ? sortDirTable1 : false) === "asc" ? (
+                          {(sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "asc" ? (
                             <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "product.is_visible" ? sortDirTable1 : false) === "desc" ? (
+                          ) : (sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "desc" ? (
                             <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                           ) : (
                             <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -370,7 +385,7 @@ export default function GeneratedPage() {
                       </th>
                       <th
                         className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "20%" }}
+                        style={{ textAlign: "center", width: "150px" }}
                       >
                         <button
                           onClick={() => handleSortTable1("updatedAt")}
@@ -388,7 +403,7 @@ export default function GeneratedPage() {
                       </th>
                       <th
                         className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "20%" }}
+                        style={{ textAlign: "center", width: "150px" }}
                       >
                         <button
                           onClick={() => handleSortTable1("updatedBy")}
@@ -406,7 +421,7 @@ export default function GeneratedPage() {
                       </th>
                       <th
                         className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "10%" }}
+                        style={{ textAlign: "center", width: "50px" }}
                       >
                         <span className="flex items-center justify-center gap-1">{t("common.label.action")}</span>
                       </th>
@@ -415,13 +430,13 @@ export default function GeneratedPage() {
                   <tbody>
                     {loadingTable1 ? (
                       <tr>
-                        <td colSpan={5} className="py-16 text-center text-sm text-slate-400">
+                        <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
                           {t("common.table.loading")}
                         </td>
                       </tr>
                     ) : rowsTable1.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-16 text-center text-sm text-slate-400">
+                        <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
                           {t("common.table.no_data")}
                         </td>
                       </tr>
@@ -433,10 +448,10 @@ export default function GeneratedPage() {
                         >
                           <td
                             className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "left", width: "40%" }}
+                            style={{ textAlign: "center", width: "50px" }}
                           >
                             {(() => {
-                              const value = row["product.product_name"];
+                              const value = row["group_order"];
                               const strVal = value == null || typeof value === "object" ? "" : String(value);
                               const displayVal = strVal;
                               return (
@@ -448,10 +463,25 @@ export default function GeneratedPage() {
                           </td>
                           <td
                             className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "10%" }}
+                            style={{ textAlign: "left", width: "150px" }}
                           >
                             {(() => {
-                              const value = row["product.is_visible"];
+                              const value = row["group_name"];
+                              const strVal = value == null || typeof value === "object" ? "" : String(value);
+                              const displayVal = strVal;
+                              return (
+                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                  {displayVal}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "center", width: "150px" }}
+                          >
+                            {(() => {
+                              const value = row["is_visible"];
                               const strVal = value == null || typeof value === "object" ? "" : String(value);
                               const displayVal = resolveCodeLabel(strVal, "VISIBILITY", "text", groups, t);
                               return (
@@ -463,7 +493,7 @@ export default function GeneratedPage() {
                           </td>
                           <td
                             className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "20%" }}
+                            style={{ textAlign: "center", width: "150px" }}
                           >
                             {(() => {
                               const value = row["updatedAt"];
@@ -477,7 +507,7 @@ export default function GeneratedPage() {
                           </td>
                           <td
                             className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "20%" }}
+                            style={{ textAlign: "center", width: "150px" }}
                           >
                             {(() => {
                               const value = row["updatedBy"];
@@ -492,7 +522,7 @@ export default function GeneratedPage() {
                           </td>
                           <td
                             className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "10%" }}
+                            style={{ textAlign: "center", width: "50px" }}
                           >
                             <div className="flex items-center gap-1 flex-nowrap justify-center">
                               <button

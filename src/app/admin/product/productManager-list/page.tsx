@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
+import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
 import {
@@ -287,364 +288,362 @@ export default function GeneratedPage() {
   };
 
   return (
-    <div className="space-y-3">
-      <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={11} autoHeight>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto auto auto auto auto`,
-              gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-              gridAutoFlow: "row dense",
-              rowGap: `${GAP_SIZE}px`,
-              columnGap: 0,
-            }}
-          >
-            <div style={{ gridColumn: "span 12", gridRow: "span 1", height: `${1 * ROW_HEIGHT - GAP_SIZE}px` }}>
+    <PageLayout mode="live">
+      <GridCell colSpan={12} rowSpan={11} autoHeight>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(12, 1fr)",
+            gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto auto auto auto auto`,
+            gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+            gridAutoFlow: "row dense",
+            rowGap: `${GAP_SIZE}px`,
+            columnGap: 0,
+          }}
+        >
+          <div style={{ gridColumn: "span 12", gridRow: "span 1", height: `${1 * ROW_HEIGHT - GAP_SIZE}px` }}>
+            <div
+              className="h-full w-full rounded border border-slate-200 flex items-center gap-3 bg-white px-4"
+              style={{ overflow: "clip" }}
+            >
               <div
-                className="h-full w-full rounded border border-slate-200 flex items-center gap-3 bg-white px-4"
-                style={{ overflow: "clip" }}
+                className="flex-1 grid grid-cols-5 gap-4"
+                onKeyDown={(e) => {
+                  if (isEnterSearchTrigger(e)) handleSearchSearch1();
+                }}
               >
-                <div
-                  className="flex-1 grid grid-cols-5 gap-4"
-                  onKeyDown={(e) => {
-                    if (isEnterSearchTrigger(e)) handleSearchSearch1();
-                  }}
-                >
-                  <div className="col-span-1">
-                    <SlugOptionSelect
-                      field={{
-                        optionSlug: "product-data",
-                        optionValueKey: "id",
-                        optionTextKey: "product_name",
-                        optionOrderKey: "product_name",
-                        optionOrderDir: "ASC",
-                      }}
-                      value={String(paramsSearch1["product_name"] ?? "")}
-                      onChange={(v) => setParamsSearch1((prev) => ({ ...prev, ["product_name"]: v }))}
-                      disabled={false}
-                      placeholder={t("common.label.Lv3")}
-                      className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      rowData={slugOptRowDataSearch1}
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <input
-                      type="text"
-                      value={String(paramsSearch1["email"] ?? "")}
-                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["email"]: e.target.value }))}
-                      placeholder={t("productManager.email.placeholder")}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                    />
-                  </div>
+                <div className="col-span-1">
+                  <SlugOptionSelect
+                    field={{
+                      optionSlug: "product-data",
+                      optionValueKey: "id",
+                      optionTextKey: "product_name",
+                      optionOrderKey: "product_name",
+                      optionOrderDir: "ASC",
+                    }}
+                    value={String(paramsSearch1["product_name"] ?? "")}
+                    onChange={(v) => setParamsSearch1((prev) => ({ ...prev, ["product_name"]: v }))}
+                    disabled={false}
+                    placeholder={t("common.label.Lv3")}
+                    className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    rowData={slugOptRowDataSearch1}
+                  />
                 </div>
-                <button
-                  onClick={handleResetSearch1}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"
-                >
-                  <RotateCcw className="w-3 h-3" /> {t("common.btn.reset")}
-                </button>
-                <button
-                  onClick={handleSearchSearch1}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"
-                >
-                  <Search className="w-3 h-3" /> {t("common.btn.search")}
-                </button>
+                <div className="col-span-4">
+                  <input
+                    type="text"
+                    value={String(paramsSearch1["email"] ?? "")}
+                    onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["email"]: e.target.value }))}
+                    placeholder={t("productManager.email.placeholder")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                  />
+                </div>
               </div>
-            </div>
-            <div style={{ gridColumn: "span 12", gridRow: "span 10" }}>
-              <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
-                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
-                  <p className="text-xs text-slate-500">
-                    {t("common.pagination.total", { count: totalTable1.toLocaleString() })}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {totalTable1 > 0
-                      ? t("common.pagination.showing", {
-                          start: String(pageTable1 * 10 + 1),
-                          end: String(Math.min((pageTable1 + 1) * 10, totalTable1)),
-                        })
-                      : ""}
-                  </p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="border-b border-slate-200 bg-slate-50/80">
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "150px" }}
-                        >
-                          <button
-                            onClick={() => handleSortTable1("email")}
-                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                          >
-                            {t("productManager.label.email")}
-                            {(sortKeyTable1 === "email" ? sortDirTable1 : false) === "asc" ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "email" ? sortDirTable1 : false) === "desc" ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (
-                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                            )}
-                          </button>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "150px" }}
-                        >
-                          <button
-                            onClick={() => handleSortTable1("_fetchedRel10")}
-                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                          >
-                            {t("common.label.productName")}
-                            {(sortKeyTable1 === "_fetchedRel10" ? sortDirTable1 : false) === "asc" ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "_fetchedRel10" ? sortDirTable1 : false) === "desc" ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (
-                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                            )}
-                          </button>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "50px" }}
-                        >
-                          <button
-                            onClick={() => handleSortTable1("is_visible")}
-                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                          >
-                            {t("common.label.isVisible")}
-                            {(sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "asc" ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "desc" ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (
-                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                            )}
-                          </button>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "50px" }}
-                        >
-                          <button
-                            onClick={() => handleSortTable1("updatedAt")}
-                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                          >
-                            {t("common.label.updatedAt")}
-                            {(sortKeyTable1 === "updatedAt" ? sortDirTable1 : false) === "asc" ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "updatedAt" ? sortDirTable1 : false) === "desc" ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (
-                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                            )}
-                          </button>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "150px" }}
-                        >
-                          <button
-                            onClick={() => handleSortTable1("updatedBy")}
-                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                          >
-                            {t("common.label.updateBy")}
-                            {(sortKeyTable1 === "updatedBy" ? sortDirTable1 : false) === "asc" ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (sortKeyTable1 === "updatedBy" ? sortDirTable1 : false) === "desc" ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                            ) : (
-                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                            )}
-                          </button>
-                        </th>
-                        <th
-                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                          style={{ textAlign: "center", width: "100px" }}
-                        >
-                          <span className="flex items-center justify-center gap-1">{t("common.label.action")}</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingTable1 ? (
-                        <tr>
-                          <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
-                            {t("common.table.loading")}
-                          </td>
-                        </tr>
-                      ) : rowsTable1.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
-                            {t("common.table.no_data")}
-                          </td>
-                        </tr>
-                      ) : (
-                        rowsTable1.map((row, idx) => (
-                          <tr
-                            key={idx}
-                            className="border-b border-slate-100 last:border-0 transition-all hover:bg-slate-50/50"
-                          >
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "left", width: "150px" }}
-                            >
-                              {(() => {
-                                const value = row["email"];
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = strVal;
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "left", width: "150px" }}
-                            >
-                              {(() => {
-                                const value = !Array.isArray(row["_fetchedRel10"])
-                                  ? resolveEvalExprI18n(evalColumnDataExpr("product_name", row), t)
-                                  : row["_fetchedRel10"];
-                                if (Array.isArray(value)) {
-                                  const relFormatted = formatFetchedRelValue(
-                                    value as unknown[],
-                                    row,
-                                    10,
-                                    "product_name",
-                                    "ONE_LINE"
-                                  );
-                                  if (!relFormatted) return <span className="text-sm text-slate-400">-</span>;
-                                  return (
-                                    <span className="text-sm text-slate-700 truncate block" title={relFormatted}>
-                                      {relFormatted}
-                                    </span>
-                                  );
-                                }
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = strVal;
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "50px" }}
-                            >
-                              {(() => {
-                                const value = row["is_visible"];
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = resolveCodeLabel(strVal, "VISIBILITY", "text", groups, t);
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "50px" }}
-                            >
-                              {(() => {
-                                const value = row["updatedAt"];
-                                const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm:ss");
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={dateVal}>
-                                    {dateVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "150px" }}
-                            >
-                              {(() => {
-                                const value = row["updatedBy"];
-                                const strVal = value == null || typeof value === "object" ? "" : String(value);
-                                const displayVal = strVal;
-                                return (
-                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                    {displayVal}
-                                  </span>
-                                );
-                              })()}
-                            </td>
-                            <td
-                              className="px-4 py-3 max-w-[200px] overflow-hidden"
-                              style={{ textAlign: "center", width: "100px" }}
-                            >
-                              <div className="flex items-center gap-1 flex-nowrap justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleTableEditTable1(row)}
-                                  className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                  title={t("common.btn.edit")}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleTableDeleteTable1(row._id as number)}
-                                  className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                  title={t("common.btn.delete")}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {totalPagesTable1 >= 1 && (
-                  <div className="flex-shrink-0 flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
-                    <button
-                      disabled={pageTable1 === 0}
-                      onClick={() => fetchDataTable1(pageTable1 - 1)}
-                      className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                    >
-                      {t("common.btn.prev")}
-                    </button>
-                    {pageGroupRange(pageTable1, totalPagesTable1).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => fetchDataTable1(p)}
-                        className={
-                          pageTable1 === p
-                            ? "px-2.5 py-1.5 text-xs rounded border transition-all bg-slate-900 text-white border-slate-900"
-                            : "px-2.5 py-1.5 text-xs rounded border transition-all border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }
-                      >
-                        {p + 1}
-                      </button>
-                    ))}
-                    <button
-                      disabled={pageTable1 >= totalPagesTable1 - 1}
-                      onClick={() => fetchDataTable1(pageTable1 + 1)}
-                      className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                    >
-                      {t("common.btn.next")}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={handleResetSearch1}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"
+              >
+                <RotateCcw className="w-3 h-3" /> {t("common.btn.reset")}
+              </button>
+              <button
+                onClick={handleSearchSearch1}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"
+              >
+                <Search className="w-3 h-3" /> {t("common.btn.search")}
+              </button>
             </div>
           </div>
-        </GridCell>
-      </PageGridContainer>
-    </div>
+          <div style={{ gridColumn: "span 12", gridRow: "span 10" }}>
+            <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
+              <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+                <p className="text-xs text-slate-500">
+                  {t("common.pagination.total", { count: totalTable1.toLocaleString() })}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {totalTable1 > 0
+                    ? t("common.pagination.showing", {
+                        start: String(pageTable1 * 10 + 1),
+                        end: String(Math.min((pageTable1 + 1) * 10, totalTable1)),
+                      })
+                    : ""}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-slate-200 bg-slate-50/80">
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "150px" }}
+                      >
+                        <button
+                          onClick={() => handleSortTable1("email")}
+                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                        >
+                          {t("productManager.label.email")}
+                          {(sortKeyTable1 === "email" ? sortDirTable1 : false) === "asc" ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (sortKeyTable1 === "email" ? sortDirTable1 : false) === "desc" ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </button>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "150px" }}
+                      >
+                        <button
+                          onClick={() => handleSortTable1("_fetchedRel10")}
+                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                        >
+                          {t("common.label.productName")}
+                          {(sortKeyTable1 === "_fetchedRel10" ? sortDirTable1 : false) === "asc" ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (sortKeyTable1 === "_fetchedRel10" ? sortDirTable1 : false) === "desc" ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </button>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "50px" }}
+                      >
+                        <button
+                          onClick={() => handleSortTable1("is_visible")}
+                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                        >
+                          {t("common.label.isVisible")}
+                          {(sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "asc" ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "desc" ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </button>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "50px" }}
+                      >
+                        <button
+                          onClick={() => handleSortTable1("updatedAt")}
+                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                        >
+                          {t("common.label.updatedAt")}
+                          {(sortKeyTable1 === "updatedAt" ? sortDirTable1 : false) === "asc" ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (sortKeyTable1 === "updatedAt" ? sortDirTable1 : false) === "desc" ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </button>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "150px" }}
+                      >
+                        <button
+                          onClick={() => handleSortTable1("updatedBy")}
+                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                        >
+                          {t("common.label.updateBy")}
+                          {(sortKeyTable1 === "updatedBy" ? sortDirTable1 : false) === "asc" ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (sortKeyTable1 === "updatedBy" ? sortDirTable1 : false) === "desc" ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                          ) : (
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                          )}
+                        </button>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                        style={{ textAlign: "center", width: "100px" }}
+                      >
+                        <span className="flex items-center justify-center gap-1">{t("common.label.action")}</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingTable1 ? (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
+                          {t("common.table.loading")}
+                        </td>
+                      </tr>
+                    ) : rowsTable1.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center text-sm text-slate-400">
+                          {t("common.table.no_data")}
+                        </td>
+                      </tr>
+                    ) : (
+                      rowsTable1.map((row, idx) => (
+                        <tr
+                          key={idx}
+                          className="border-b border-slate-100 last:border-0 transition-all hover:bg-slate-50/50"
+                        >
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "left", width: "150px" }}
+                          >
+                            {(() => {
+                              const value = row["email"];
+                              const strVal = value == null || typeof value === "object" ? "" : String(value);
+                              const displayVal = strVal;
+                              return (
+                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                  {displayVal}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "left", width: "150px" }}
+                          >
+                            {(() => {
+                              const value = !Array.isArray(row["_fetchedRel10"])
+                                ? resolveEvalExprI18n(evalColumnDataExpr("product_name", row), t)
+                                : row["_fetchedRel10"];
+                              if (Array.isArray(value)) {
+                                const relFormatted = formatFetchedRelValue(
+                                  value as unknown[],
+                                  row,
+                                  10,
+                                  "product_name",
+                                  "ONE_LINE"
+                                );
+                                if (!relFormatted) return <span className="text-sm text-slate-400">-</span>;
+                                return (
+                                  <span className="text-sm text-slate-700 truncate block" title={relFormatted}>
+                                    {relFormatted}
+                                  </span>
+                                );
+                              }
+                              const strVal = value == null || typeof value === "object" ? "" : String(value);
+                              const displayVal = strVal;
+                              return (
+                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                  {displayVal}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "center", width: "50px" }}
+                          >
+                            {(() => {
+                              const value = row["is_visible"];
+                              const strVal = value == null || typeof value === "object" ? "" : String(value);
+                              const displayVal = resolveCodeLabel(strVal, "VISIBILITY", "text", groups, t);
+                              return (
+                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                  {displayVal}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "center", width: "50px" }}
+                          >
+                            {(() => {
+                              const value = row["updatedAt"];
+                              const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm:ss");
+                              return (
+                                <span className="text-sm text-slate-700 truncate block" title={dateVal}>
+                                  {dateVal}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "center", width: "150px" }}
+                          >
+                            {(() => {
+                              const value = row["updatedBy"];
+                              const strVal = value == null || typeof value === "object" ? "" : String(value);
+                              const displayVal = strVal;
+                              return (
+                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                  {displayVal}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td
+                            className="px-4 py-3 max-w-[200px] overflow-hidden"
+                            style={{ textAlign: "center", width: "100px" }}
+                          >
+                            <div className="flex items-center gap-1 flex-nowrap justify-center">
+                              <button
+                                type="button"
+                                onClick={() => handleTableEditTable1(row)}
+                                className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                title={t("common.btn.edit")}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleTableDeleteTable1(row._id as number)}
+                                className="p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                title={t("common.btn.delete")}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {totalPagesTable1 >= 1 && (
+                <div className="flex-shrink-0 flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
+                  <button
+                    disabled={pageTable1 === 0}
+                    onClick={() => fetchDataTable1(pageTable1 - 1)}
+                    className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {t("common.btn.prev")}
+                  </button>
+                  {pageGroupRange(pageTable1, totalPagesTable1).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => fetchDataTable1(p)}
+                      className={
+                        pageTable1 === p
+                          ? "px-2.5 py-1.5 text-xs rounded border transition-all bg-slate-900 text-white border-slate-900"
+                          : "px-2.5 py-1.5 text-xs rounded border transition-all border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }
+                    >
+                      {p + 1}
+                    </button>
+                  ))}
+                  <button
+                    disabled={pageTable1 >= totalPagesTable1 - 1}
+                    onClick={() => fetchDataTable1(pageTable1 + 1)}
+                    className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {t("common.btn.next")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </GridCell>
+    </PageLayout>
   );
 }

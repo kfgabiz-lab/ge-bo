@@ -51,40 +51,59 @@ import {
 
 const FORM_WIDGET_Form1: FormWidget = {
   type: "form",
-  widgetId: "w_j4cltai3j",
-  contentKey: "product_manager",
+  widgetId: "w_1d3q60j83",
+  contentKey: "product_group",
   fields: [
     {
-      id: "fb_gijkvpkpx",
+      id: "fb_6dj1dv5g8",
       type: "input",
-      label: "",
-      fieldKey: "email",
+      label: "그룹명",
+      fieldKey: "group_name",
       colSpan: 8,
       rowSpan: 1,
-      labelMsgKey: "productManager.label.email",
-      required: false,
-      maxLength: 50,
+      description: "30자 이하 그룹명을 입력하세요. 메인 제품 영역에 출려됩니다.",
+      required: true,
+      placeholder: "New America",
+      minLength: 2,
+      maxLength: 30,
+      labelMsgKey: "common.label.groupName",
+      placeholderMsgKey: "common.placeholder.groupNm",
+      descriptionMsgKey: "productGrp.groupNm.desc",
       showCharCount: true,
-      pattern: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
-      patternDesc: "이메일 형식으로 작성",
-      readonly: false,
     },
     {
-      id: "fb_taumf8ea1",
+      id: "fb_y8ddc02fj",
+      type: "input",
+      label: "그룹 출력순서",
+      fieldKey: "group_order",
+      colSpan: 8,
+      rowSpan: 1,
+      description:
+        "1~99 사이의 숫자만 입력 할 수 있습니다. 숫자가 중복될 경우 수정일시가 최신인 콘텐츠부터 표시됩니다.",
+      required: true,
+      labelMsgKey: "productGrp.label.orderNo",
+      descriptionMsgKey: "hero.sortOrder.desc",
+      placeholderMsgKey: "",
+      pattern: "^[0-9]+$",
+      patternDesc: "숫자만 입력",
+    },
+    {
+      id: "fb_snq7qru4f",
       type: "radio",
       label: "",
       fieldKey: "is_visible",
       colSpan: 8,
       rowSpan: 1,
       labelMsgKey: "common.label.isVisible",
-      required: true,
       options: ["공개:001", "비공개:002"],
       codeGroupCode: "VISIBILITY",
       defaultOptionValue: "001",
+      required: true,
     },
   ],
-  connectedSlug: "productManager-data",
+  showBorder: true,
   bgColor: "#ffffff",
+  connectedSlug: "prdGrp-data",
 };
 const FORM_FIELDS_Form1: FormFieldItem[] = FORM_WIDGET_Form1.fields;
 const FORM_FIELD_BY_ID_Form1: Record<string, FormFieldItem> = Object.fromEntries(
@@ -94,16 +113,30 @@ const FORM_KEY_TO_ID_Form1 = buildKeyToId(FORM_FIELDS_Form1);
 const ALL_FORM_WIDGETS: FormWidget[] = [FORM_WIDGET_Form1];
 const MULTISELECT_WIDGET_MultiSelect1: MultiSelectWidget = {
   type: "multiselect",
-  widgetId: "w_9uizbc69n",
+  widgetId: "w_keho1en58",
   contentKey: "ms",
   sourceSlug: "product-data",
-  connectedSlug: "productManager-data",
+  connectedSlug: "prdGrp-data",
   labelFields: "product.product_name",
-  bgColor: "#ffffff",
-  titleMsgKey: "common.label.product",
-  required: true,
-  sourceFilter: "is_visible=001,order_status=01",
   showBorder: true,
+  titleMsgKey: "productGrp.label.prd",
+  descriptionMsgKey: "productGrp.prdSel.desc",
+  placeholderMsgKey: "common.placeholder.productSelect",
+  bgColor: "#ffffff",
+  required: true,
+  extraFields: [
+    {
+      id: "ef_pd9eci93h",
+      key: "sort_order",
+      type: "input",
+      label: "",
+      required: false,
+      labelMsgKey: "common.label.sortOrder",
+      placeholderMsgKey: "common.label.sortOrder",
+      position: "left",
+    },
+  ],
+  sourceFilter: "is_visible=001,order_status=01",
   fieldColSpan: 8,
 };
 const CONTENT_WIDGETS_Space1_1: ContentSaveWidget[] = [FORM_WIDGET_Form1, MULTISELECT_WIDGET_MultiSelect1];
@@ -112,7 +145,7 @@ export default function GeneratedPage() {
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
   const { t } = useI18n();
   useEffect(() => {
-    setPageTitle(t("productManager.label.detailTitle"));
+    setPageTitle(t("productGrp.label.title"));
   }, [setPageTitle, t]);
   const { markDirty, markClean, confirmLeave } = useLeaveCheck(true);
   const searchParams = useSearchParams();
@@ -130,6 +163,9 @@ export default function GeneratedPage() {
   const [multiSelectSearchMultiSelect1, setMultiSelectSearchMultiSelect1] = useState("");
   const [multiSelectOpenMultiSelect1, setMultiSelectOpenMultiSelect1] = useState(false);
   const multiSelectButtonRefMultiSelect1 = useRef<HTMLButtonElement>(null);
+  const [multiSelectExtraFieldValuesMultiSelect1, setMultiSelectExtraFieldValuesMultiSelect1] = useState<
+    Record<number, Record<string, string>>
+  >({});
   const router = useRouter();
 
   const urlParams = useMemo(() => {
@@ -266,19 +302,21 @@ export default function GeneratedPage() {
     if (storedId === null) {
       if (!sitesLoaded || !clockReady) return;
       const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);
-      setFormValuesForm1(defaults["w_j4cltai3j"] ?? {});
+      setFormValuesForm1(defaults["w_1d3q60j83"] ?? {});
       return;
     }
     let cancelled = false;
     api
-      .get(`/page-data/productManager-data/${storedId}`)
+      .get(`/page-data/prdGrp-data/${storedId}`)
       .then(async (res) => {
         if (cancelled) return;
         const dataJson = (res.data.dataJson || {}) as Record<string, unknown>;
         const valuesByWidgetId = buildFormValuesFromDataJson(dataJson, ALL_FORM_WIDGETS, t);
-        setFormValuesForm1((prev) => ({ ...prev, ...(valuesByWidgetId["w_j4cltai3j"] ?? {}) }));
-        const selectionMultiSelect1 = extractMultiSelectSelection(dataJson, "ms", "productManager-data");
+        setFormValuesForm1((prev) => ({ ...prev, ...(valuesByWidgetId["w_1d3q60j83"] ?? {}) }));
+        const selectionMultiSelect1 = extractMultiSelectSelection(dataJson, "ms", "prdGrp-data");
         if (selectionMultiSelect1.kind !== "none") setMultiSelectIdsMultiSelect1(selectionMultiSelect1.ids);
+        if (selectionMultiSelect1.kind === "objects")
+          setMultiSelectExtraFieldValuesMultiSelect1(selectionMultiSelect1.extraFieldValues);
       })
       .catch(() => toast.error(t("common.error.load_existing_data")));
     return () => {
@@ -350,13 +388,20 @@ export default function GeneratedPage() {
     },
     [markDirty]
   );
+  const updateMultiSelectExtraFieldMultiSelect1 = useCallback(
+    (itemId: number) => (upd: (prev: Record<string, string>) => Record<string, string>) => {
+      setMultiSelectExtraFieldValuesMultiSelect1((prev) => ({ ...prev, [itemId]: upd(prev[itemId] ?? {}) }));
+      markDirty();
+    },
+    [markDirty]
+  );
 
   const handleContentActionSpace1_1 = async () => {
     const isUpdate = storedId !== null;
     if (!validateFormFields(FORM_FIELDS_Form1, formValuesForm1, {}, {}, allFormValues, allFieldKeyToId, t)) return;
     const missingMultiSelectTitle = findMissingRequiredMultiSelect(
       CONTENT_WIDGETS_Space1_1,
-      { w_9uizbc69n: multiSelectIdsMultiSelect1 },
+      { w_keho1en58: multiSelectIdsMultiSelect1 },
       allFieldKeyToId,
       allFormValues,
       t
@@ -366,29 +411,24 @@ export default function GeneratedPage() {
       return;
     }
     try {
-      const newFileIdsByFieldId = await uploadContentFormFiles(
-        CONTENT_WIDGETS_Space1_1,
-        {},
-        "productManager-data",
-        false
-      );
+      const newFileIdsByFieldId = await uploadContentFormFiles(CONTENT_WIDGETS_Space1_1, {}, "prdGrp-data", false);
       const formFileIdsMap = buildFormFileIdsMap(CONTENT_WIDGETS_Space1_1, {}, newFileIdsByFieldId);
       const { dataJson, pkKeys } = buildDataJson(
         CONTENT_WIDGETS_Space1_1 as Parameters<typeof buildDataJson>[0],
-        { w_j4cltai3j: formValuesForm1 },
+        { w_1d3q60j83: formValuesForm1 },
         formFileIdsMap,
         {},
-        { w_9uizbc69n: multiSelectIdsMultiSelect1 },
-        {},
-        "productManager-data",
+        { w_keho1en58: multiSelectIdsMultiSelect1 },
+        { w_keho1en58: multiSelectExtraFieldValuesMultiSelect1 },
+        undefined,
         allFormValues,
         false
       );
       await persistContentDataJson({
-        connectedSlug: "productManager-data",
+        connectedSlug: "prdGrp-data",
         dataJson,
         pkKeys,
-        templateSlug: "productManager-detail",
+        templateSlug: "prdGrp-detail",
         groupId: undefined,
         storedId,
         storedGroupId: null,
@@ -413,19 +453,19 @@ export default function GeneratedPage() {
 
   return (
     <PageLayout mode="live">
-      <GridCell colSpan={12} rowSpan={8} autoHeight>
+      <GridCell colSpan={12} rowSpan={10} autoHeight>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(12, 1fr)",
-            gridTemplateRows: `auto auto ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px auto`,
+            gridTemplateRows: `auto auto auto auto ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px ${ROW_HEIGHT - GAP_SIZE}px auto`,
             gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
             gridAutoFlow: "row dense",
             rowGap: `${GAP_SIZE}px`,
             columnGap: 0,
           }}
         >
-          <div style={{ gridColumn: "span 12", gridRow: "span 2" }}>
+          <div style={{ gridColumn: "span 12", gridRow: "span 4" }}>
             <div
               className="w-full rounded border border-slate-200"
               style={{
@@ -446,24 +486,48 @@ export default function GeneratedPage() {
             >
               <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
                 <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                  {t("productManager.label.email")}
+                  {t("common.label.groupName")}
+                  <span className="text-red-500 ml-0.5">*</span>
                 </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("productGrp.groupNm.desc")}
+                </p>
                 <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
                   <div className="relative">
                     <input
                       type="text"
                       disabled={false}
-                      placeholder={t("common.input.placeholder")}
-                      maxLength={50}
+                      placeholder={t("common.placeholder.groupNm")}
+                      maxLength={30}
                       className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                      value={formValuesForm1["fb_gijkvpkpx"] ?? ""}
-                      onChange={(e) => handleFieldChangeForm1("fb_gijkvpkpx", e.target.value)}
-                      onBlur={() => handleFieldBlurForm1("fb_gijkvpkpx")}
+                      value={formValuesForm1["fb_6dj1dv5g8"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_6dj1dv5g8", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_6dj1dv5g8")}
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                      {(formValuesForm1["fb_gijkvpkpx"] ?? "").length}/{50}
+                      {(formValuesForm1["fb_6dj1dv5g8"] ?? "").length}/{30}
                     </span>
                   </div>
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("productGrp.label.orderNo")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("hero.sortOrder.desc")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <input
+                    type="text"
+                    disabled={false}
+                    placeholder={t("common.input.placeholder")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    value={formValuesForm1["fb_y8ddc02fj"] ?? ""}
+                    onChange={(e) => handleFieldChangeForm1("fb_y8ddc02fj", e.target.value)}
+                    onBlur={() => handleFieldBlurForm1("fb_y8ddc02fj")}
+                  />
                 </div>
               </div>
               <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
@@ -474,7 +538,7 @@ export default function GeneratedPage() {
                 <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
                   <div className="flex items-center gap-4">
                     {resolveFieldOptions(
-                      FORM_FIELD_BY_ID_Form1["fb_taumf8ea1"] as unknown as SearchFieldConfig,
+                      FORM_FIELD_BY_ID_Form1["fb_snq7qru4f"] as unknown as SearchFieldConfig,
                       groups
                     ).map((opt) => {
                       const parsed = parseOpt(opt);
@@ -482,11 +546,11 @@ export default function GeneratedPage() {
                         <label key={opt} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="radio"
-                            name={`${uid}-field-fb_taumf8ea1`}
+                            name={`${uid}-field-fb_snq7qru4f`}
                             disabled={false}
                             value={parsed.value}
-                            checked={(formValuesForm1["fb_taumf8ea1"] ?? "") === parsed.value}
-                            onChange={() => handleFieldChangeForm1("fb_taumf8ea1", parsed.value)}
+                            checked={(formValuesForm1["fb_snq7qru4f"] ?? "") === parsed.value}
+                            onChange={() => handleFieldChangeForm1("fb_snq7qru4f", parsed.value)}
                             className="w-4 h-4 cursor-pointer"
                           />
                           <span className="text-sm text-slate-700">{t(parsed.text)}</span>
@@ -505,9 +569,10 @@ export default function GeneratedPage() {
             >
               <div className="p-3 flex flex-col gap-3 h-full">
                 <p className="text-sm font-medium text-slate-700">
-                  {t("common.label.product")}
+                  {t("productGrp.label.prd")}
                   <span className="text-red-500 ml-0.5">*</span>
                 </p>
+                <p className="text-xs text-slate-500">{t("productGrp.prdSel.desc")}</p>
                 <div className="flex flex-col gap-3" style={{ width: "66.66666666666666%" }}>
                   <div className="relative">
                     <button
@@ -525,7 +590,7 @@ export default function GeneratedPage() {
                           ? t("common.multiselect.selected_count", {
                               count: String(multiSelectSelectedEntriesMultiSelect1.length),
                             })
-                          : t("common.multiselect.placeholder")}
+                          : t("common.placeholder.productSelect")}
                       </span>
                       <ChevronDown
                         className={
@@ -582,6 +647,23 @@ export default function GeneratedPage() {
                             key={`${opt.id}-${pathIdx}`}
                             className="bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 flex items-center gap-2 overflow-x-auto"
                           >
+                            <div className="shrink-0 w-[120px]">
+                              <input
+                                type="text"
+                                value={String(
+                                  (multiSelectExtraFieldValuesMultiSelect1[opt.id] ?? {})["sort_order"] ?? ""
+                                )}
+                                onChange={(e) =>
+                                  updateMultiSelectExtraFieldMultiSelect1(opt.id)((prev) => ({
+                                    ...prev,
+                                    ["sort_order"]: e.target.value,
+                                  }))
+                                }
+                                placeholder={t("common.input.placeholder")}
+                                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                              />
+                            </div>
+                            <div className="w-px h-4 bg-slate-300 shrink-0" />
                             <span className="text-xs font-medium text-slate-700 shrink-0 whitespace-nowrap">
                               {entry.path}
                             </span>
@@ -601,13 +683,14 @@ export default function GeneratedPage() {
               </div>
             </div>
           </div>
-          <div style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+          <div style={{ gridColumn: "span 12", gridRow: "span 1" }}>
+            {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:description). 필요 시 직접 구현해주세요. */}
             <div
               className="w-full rounded"
               style={{
                 overflow: "visible",
                 display: "grid",
-                gridTemplateColumns: "repeat(8, 1fr)",
+                gridTemplateColumns: "repeat(12, 1fr)",
                 gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
                 gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
                 rowGap: `${GAP_SIZE}px`,
