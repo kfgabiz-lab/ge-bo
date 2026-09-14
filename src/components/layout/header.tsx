@@ -14,7 +14,7 @@ import { usePageTitleStore } from "@/store/use-page-title-store";
 import { LanguageSelector } from "@/components/layout/language-selector";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheckStore } from "@/store/use-leave-check-store";
-import { formatServerClockTime, formatServerClockOffset } from "@/lib/serverClockFormat";
+import { formatServerClockDateTime, formatServerClockOffset } from "@/lib/serverClockFormat";
 
 /** 메뉴 트리를 재귀 탐색해 현재 URL 경로(부모명 → 메뉴명) 반환 */
 function findMenuBreadcrumb(
@@ -49,7 +49,7 @@ function ActiveSiteTimezone() {
   useEffect(() => {
     const tick = () => {
       setClock((prev) => {
-        const next = formatServerClockTime();
+        const next = formatServerClockDateTime();
         return next === prev ? prev : next;
       });
     };

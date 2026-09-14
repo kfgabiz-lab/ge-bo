@@ -75,6 +75,12 @@ export function formatServerClockTime(): string {
   return `${hh}:${mm}:${ss}`;
 }
 
+/** 현재 시각을 "활성 사이트의 timezone" 기준 "YYYY-MM-DD HH:mm:ss" 문자열로 표기 */
+export function formatServerClockDateTime(): string {
+  const { YYYY, MM, DD, hh, mm, ss } = getNowParts();
+  return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
+}
+
 /**
  * 활성 사이트 timezone의 현재(서버시각 기준) 오프셋+도시명 표기 — 예: "UTC-5 Chicago"
  * - formatTzOffsetLabel이 Intl longOffset을 쓰므로 서머타임(DST) 자동 반영 (겨울엔 "UTC-6 Chicago")
