@@ -377,6 +377,59 @@ const SAMPLE_TABLE: TableWidget = {
   ],
 };
 
+const SAMPLE_TABLE_SELECTION: TableWidget = {
+  type: "table",
+  widgetId: "guide-table-selection",
+  contentKey: "",
+  connectedSearchIds: [],
+  pageSize: 5,
+  displayMode: "pagination",
+  enableRowSelection: true,
+  columns: [
+    {
+      id: "sc1",
+      header: "상품코드",
+      accessor: "productCode",
+      align: "center",
+      sortable: true,
+      cellType: "text",
+      width: 100,
+    },
+    {
+      id: "sc2",
+      header: "상품명",
+      accessor: "productName",
+      align: "left",
+      sortable: true,
+      cellType: "text",
+    },
+    {
+      id: "sc3",
+      header: "카테고리",
+      accessor: "category",
+      align: "center",
+      sortable: false,
+      cellType: "badge",
+      showIcon: false,
+      badgeShape: "round",
+      cellOptions: [
+        { text: "의류", value: "의류", color: "blue" },
+        { text: "가전", value: "가전", color: "green" },
+        { text: "식품", value: "식품", color: "amber" },
+      ],
+    },
+    {
+      id: "sc4",
+      header: "가격",
+      accessor: "price",
+      align: "right",
+      sortable: true,
+      cellType: "text",
+      isNumber: true,
+    },
+  ],
+};
+
 /** 폼 — input / select / date / dateRange / yearMonth / yearMonthRange / radio / checkbox / button / file / image 필드 포함 */
 const SAMPLE_FORM: FormWidget = {
   type: "form",
@@ -726,7 +779,10 @@ const TAB_CONFIG: Record<TabKey, { widget: AnyWidget; colSpan: number; rowSpan: 
     { widget: SAMPLE_SEARCH_SIMPLE, colSpan: 12, rowSpan: 1 },
     { widget: SAMPLE_SEARCH_CATEGORY, colSpan: 12, rowSpan: 3 },
   ],
-  table: [{ widget: SAMPLE_TABLE, colSpan: 12, rowSpan: 6 }],
+  table: [
+    { widget: SAMPLE_TABLE, colSpan: 12, rowSpan: 6 },
+    { widget: SAMPLE_TABLE_SELECTION, colSpan: 12, rowSpan: 4 },
+  ],
   form: [{ widget: SAMPLE_FORM, colSpan: 12, rowSpan: SAMPLE_FORM_ROW_SPAN }],
   space: [
     { widget: SAMPLE_SPACE, colSpan: 12, rowSpan: 2 },

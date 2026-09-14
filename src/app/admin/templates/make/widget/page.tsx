@@ -58,7 +58,7 @@ import { buildFormFromEntity } from "../_shared/utils/entityBuild";
 import { normalizeFormItemRowSpans } from "../_shared/utils/formGridLayout";
 import { stampConnectedSlug } from "../_shared/hooks/useWidgetPageState";
 import { buildWidgetTsxFile } from "../_shared/generators/widgetGenerator";
-import type { TabPageConfig } from "../_shared/generators/widgetGenerator";
+import type { NestedPageConfig } from "../_shared/generators/widgetGenerator";
 import { fetchTemplateConfig } from "../_shared/templateApi";
 import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
 import type { SlugOption } from "../_shared/components/builder/fields/SlugSelectField";
@@ -267,6 +267,12 @@ const WidgetTypePicker = ({
   </div>
 );
 
+const LAYERPOPUP_ROOT_BUILD_BLOCK_MESSAGE =
+  "LayerPopup 출력 모드 템플릿은 파일빌드 대상이 아닙니다. 출력 모드를 '상세페이지'로 변경한 뒤 다시 시도해주세요.";
+
+const layerPopupTabBuildBlockMessage = (pageSlug?: string): string =>
+  `탭 연결 페이지(${pageSlug ?? ""})가 LayerPopup 모드입니다. 파일빌드 산출물은 레이어 팝업을 렌더링하지 않으므로 해당 탭을 page 모드 템플릿으로 교체한 뒤 다시 시도해주세요.`;
+
 const collectTabPageSlugs = (items: PageWidgetItem[]): string[] =>
   items.flatMap((item) =>
     item.contents.flatMap((content) => {
@@ -276,28 +282,90 @@ const collectTabPageSlugs = (items: PageWidgetItem[]): string[] =>
     })
   );
 
-const loadTabPageConfigs = async (
+type NestedPageRole = "tab" | "reference";
+
+const REFERENCED_PAGE_SLUG_KEYS = [
+  "pageSlug",
+  "popupSlug",
+  "createPopupSlug",
+  "editPopupSlug",
+  "detailPopupSlug",
+  "targetSlug",
+] as const;
+
+const collectReferencedPageSlugs = (value: unknown, acc: Set<string> = new Set()): Set<string> => {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectReferencedPageSlugs(entry, acc));
+    return acc;
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (obj.type === "tab") return acc;
+    REFERENCED_PAGE_SLUG_KEYS.forEach((key) => {
+      const slug = obj[key];
+      if (typeof slug === "string" && slug) acc.add(slug);
+    });
+    Object.values(obj).forEach((child) => collectReferencedPageSlugs(child, acc));
+    return acc;
+  }
+  return acc;
+};
+
+const collectNestedPageTargets = (items: PageWidgetItem[]): { slug: string; role: NestedPageRole }[] => {
+  const tabSlugs = new Set(collectTabPageSlugs(items));
+  const referencedSlugs = collectReferencedPageSlugs(items);
+  const targets: { slug: string; role: NestedPageRole }[] = [];
+  tabSlugs.forEach((slug) => targets.push({ slug, role: "tab" }));
+  referencedSlugs.forEach((slug) => {
+    if (!tabSlugs.has(slug)) targets.push({ slug, role: "reference" });
+  });
+  return targets;
+};
+
+const loadNestedPageConfigs = async (
   rootItems: PageWidgetItem[],
-  onLoadFail: (slug: string) => void
-): Promise<Record<string, TabPageConfig>> => {
-  const configs: Record<string, TabPageConfig> = {};
-  const pending = collectTabPageSlugs(rootItems);
+  onLoadFail: (slug: string, role: NestedPageRole) => void
+): Promise<Record<string, NestedPageConfig>> => {
+  const loaded = new Map<string, NestedPageConfig>();
+  const failed = new Set<string>();
+  const expanded = new Set<string>();
+  const pending = collectNestedPageTargets(rootItems);
+
   while (pending.length > 0) {
-    const slug = pending.shift() as string;
-    if (configs[slug]) continue;
-    try {
-      const config = await fetchTemplateConfig(slug);
-      configs[slug] = {
-        widgetItems:
-          config.widgetItems as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
-        mainConnectedSlug: config.mainConnectedSlug,
-        connectedType: config.connectedType,
-      };
-      pending.push(...collectTabPageSlugs(config.widgetItems as unknown as PageWidgetItem[]));
-    } catch {
-      onLoadFail(slug);
+    const { slug, role } = pending.shift() as { slug: string; role: NestedPageRole };
+    if (failed.has(slug) || (loaded.has(slug) && (role !== "tab" || expanded.has(slug)))) continue;
+
+    let config = loaded.get(slug);
+    if (!config) {
+      try {
+        const fetched = await fetchTemplateConfig(slug);
+        config = {
+          widgetItems:
+            fetched.widgetItems as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
+          mainConnectedSlug: fetched.mainConnectedSlug,
+          connectedType: fetched.connectedType,
+          outputMode: fetched.outputMode,
+          layerType: fetched.layerType,
+          layerWidth: fetched.layerWidth,
+        };
+        loaded.set(slug, config);
+      } catch {
+        failed.add(slug);
+        onLoadFail(slug, role);
+        continue;
+      }
+    }
+
+    if (role === "tab" && !expanded.has(slug)) {
+      expanded.add(slug);
+      pending.push(...collectNestedPageTargets(config.widgetItems as unknown as PageWidgetItem[]));
     }
   }
+
+  const configs: Record<string, NestedPageConfig> = {};
+  loaded.forEach((config, slug) => {
+    configs[slug] = config;
+  });
   return configs;
 };
 
@@ -835,6 +903,10 @@ export default function PageBuilderPage() {
 
   const handleGenerateOpen = () => {
     if (!validateBeforeSave()) return;
+    if (om.outputMode !== "page") {
+      toast.error(LAYERPOPUP_ROOT_BUILD_BLOCK_MESSAGE);
+      return;
+    }
     setGenerateName(tm.saveModalName || tm.currentTemplateName || "");
     setGenerateSlug(tm.saveModalSlug || "");
     setGenerateFileName("page");
@@ -843,6 +915,10 @@ export default function PageBuilderPage() {
 
   const handleGenerateConfirm = async () => {
     if (!generateName.trim() || !generateSlug.trim() || !generateFileName.trim()) return;
+    if (om.outputMode !== "page") {
+      toast.error(LAYERPOPUP_ROOT_BUILD_BLOCK_MESSAGE);
+      return;
+    }
     setIsGenerating(true);
 
     const slugStamped = stampConnectedSlug(widgetItems, om.mainConnectedSlug || undefined);
@@ -868,22 +944,34 @@ export default function PageBuilderPage() {
     });
 
     try {
-      const tabPageConfigs = await loadTabPageConfigs(itemsToBuild as PageWidgetItem[], (slug) =>
-        toast.warning(`탭 연결 페이지(${slug}) 템플릿을 불러오지 못했습니다. 해당 탭은 산출물에 TODO로 남습니다.`)
-      );
+      const nestedPageConfigs = await loadNestedPageConfigs(itemsToBuild as PageWidgetItem[], (slug, role) => {
+        if (role !== "tab") return;
+        toast.warning(`탭 연결 페이지(${slug}) 템플릿을 불러오지 못했습니다. 해당 탭은 산출물에 TODO로 남습니다.`);
+      });
 
-      const { tsxCode, unsupported, unhandled } = buildWidgetTsxFile(
+      const { tsxCode, unsupported, unhandled, blocked } = buildWidgetTsxFile(
         itemsToBuild as unknown as import("../_shared/components/renderer/PageGridRenderer").PageWidgetItem[],
         {
           pageTitle: om.pageTitle || undefined,
           pageTitleMsgKey: om.pageTitleMsgKey || undefined,
           mainConnectedSlug: om.mainConnectedSlug || undefined,
           isEntity: om.connectedType === "data",
+          outputMode: om.outputMode,
           pageSlug: generateSlug,
           leaveCheck: om.leaveCheck || false,
-          tabPageConfigs,
+          nestedPageConfigs,
         }
       );
+
+      if (blocked.length > 0) {
+        const messages = new Set(
+          blocked.map((b) =>
+            b.scope === "root" ? LAYERPOPUP_ROOT_BUILD_BLOCK_MESSAGE : layerPopupTabBuildBlockMessage(b.pageSlug)
+          )
+        );
+        messages.forEach((message) => toast.error(message));
+        return;
+      }
 
       const fileRes = await api.post("/page-templates/generate", {
         slug: generateSlug,

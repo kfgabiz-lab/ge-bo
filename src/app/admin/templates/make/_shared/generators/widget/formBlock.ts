@@ -480,7 +480,9 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
       handlerLines.push(`${ind(1)}useEffect(() => {`);
       handlerLines.push(`${ind(2)}if (storedId === null) {`);
       handlerLines.push(`${ind(3)}if (!sitesLoaded || !clockReady) return;`);
-      handlerLines.push(`${ind(3)}const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);`);
+      handlerLines.push(
+        `${ind(3)}const defaults = applyUrlParamFormOverrides(initFormDefaultValues(ALL_FORM_WIDGETS, t), ALL_FORM_WIDGETS, searchParams);`
+      );
       allForms.forEach((fw) => {
         const n = formVarNames(suffixOf(fw.widgetId));
         handlerLines.push(`${ind(3)}${n.setValues}(defaults[${jsStringLiteral(fw.widgetId)}] ?? {});`);
@@ -561,7 +563,7 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
       handlerLines.push("");
       imports.push({
         module: UTILS_MODULE,
-        named: ["initFormDefaultValues", "buildFormValuesFromDataJson"],
+        named: ["initFormDefaultValues", "applyUrlParamFormOverrides", "buildFormValuesFromDataJson"],
       });
       if (pageHasTextFields) imports.push({ module: UTILS_MODULE, named: ["extractFetchRelData"] });
       imports.push({ module: "@/lib/api", defaultName: "api" });

@@ -37,7 +37,7 @@
  *   />
  */
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo, useCallback } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from "lucide-react";
 import { useI18n } from "@/hooks/use-i18n";
 import { TableColumnConfig, CodeGroupDef } from "../../types";
@@ -58,6 +58,13 @@ import {
   TABLE_HEADER_CELL_CLS,
   TABLE_HEADER_STATIC_TEXT_CLS,
   TABLE_TD_CLS,
+  TABLE_SELECT_HEADER_CELL_CLS,
+  TABLE_SELECT_HEADER_CHECKBOX_CLS,
+  TABLE_SELECT_PREVIEW_CELL_CLS,
+  TABLE_SELECT_PREVIEW_CHECKBOX_CLS,
+  TABLE_SELECT_BODY_CELL_CLS,
+  TABLE_SELECT_CHECKBOX_CLS,
+  tableSelectableRowClass,
   tableSortButtonClass,
   sortIconClass,
   PAGER_WRAP_CLS,
@@ -136,6 +143,7 @@ export function TableRenderer({
 }: TableRendererProps) {
   const isPreview = mode === "preview";
   const isScroll = (displayMode ?? "pagination") === "scroll";
+  const stateCellColSpan = columns.length + (enableRowSelection ? 1 : 0);
   const { t } = useI18n();
 
   /* 무한스크롤 sentinel — scroll+live 모드 스크롤 컨테이너 내부에 배치 */
@@ -209,6 +217,21 @@ export function TableRenderer({
     return () => clearTimeout(timer);
   }, [isLoading, appendLoading, isPreview, isScroll, hasMore]);
 
+  const pageRowIds = useMemo(() => data.map((row) => row._id as number).filter(Boolean), [data]);
+  const isAllPageRowsSelected =
+    !isPreview && pageRowIds.length > 0 && pageRowIds.every((id) => selectedRowIds.includes(id));
+
+  const handleSelectAllChange = useCallback(
+    (checked: boolean) => {
+      if (isPreview) return;
+      const next = checked
+        ? [...selectedRowIds, ...pageRowIds.filter((id) => !selectedRowIds.includes(id))]
+        : selectedRowIds.filter((id) => !pageRowIds.includes(id));
+      onRowsSelect?.(next);
+    },
+    [isPreview, selectedRowIds, pageRowIds, onRowsSelect]
+  );
+
   /* 컬럼 없음 */
   if (!columns.length) {
     return (
@@ -259,19 +282,13 @@ export function TableRenderer({
             <tr className={TABLE_HEADER_ROW_CLS}>
               {/* 전체선택 체크박스 — enableRowSelection=true 일 때만 표시 */}
               {enableRowSelection && (
-                <th className="w-10 px-2 py-3 text-center flex-shrink-0 sticky left-0 z-20 bg-slate-50/80">
+                <th className={TABLE_SELECT_HEADER_CELL_CLS}>
                   <input
                     type="checkbox"
                     disabled={isPreview}
-                    checked={
-                      !isPreview && data.length > 0 && data.every((row) => selectedRowIds.includes(row._id as number))
-                    }
-                    onChange={(e) => {
-                      if (isPreview) return;
-                      const allIds = data.map((row) => row._id as number).filter(Boolean);
-                      onRowsSelect?.(e.target.checked ? allIds : []);
-                    }}
-                    className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer disabled:cursor-default"
+                    checked={isAllPageRowsSelected}
+                    onChange={(e) => handleSelectAllChange(e.target.checked)}
+                    className={TABLE_SELECT_HEADER_CHECKBOX_CLS}
                   />
                 </th>
               )}
@@ -323,8 +340,8 @@ export function TableRenderer({
                 <tr key={rowIdx} className="border-b border-slate-100 hover:bg-slate-50/50">
                   {/* preview 체크박스 — disabled 샘플 표시 */}
                   {enableRowSelection && (
-                    <td className="w-10 px-2 py-3 text-center sticky left-0 bg-white">
-                      <input type="checkbox" disabled className="w-3.5 h-3.5 rounded border-slate-300 cursor-default" />
+                    <td className={TABLE_SELECT_PREVIEW_CELL_CLS}>
+                      <input type="checkbox" disabled className={TABLE_SELECT_PREVIEW_CHECKBOX_CLS} />
                     </td>
                   )}
                   {columns.map((col) => (
@@ -344,7 +361,7 @@ export function TableRenderer({
             ) : isLoading ? (
               /* live: 초기/검색 로딩 중 */
               <tr>
-                <td colSpan={columns.length} className={TABLE_STATE_CELL_CLS}>
+                <td colSpan={stateCellColSpan} className={TABLE_STATE_CELL_CLS}>
                   <span className="inline-flex items-center gap-2 text-sm text-slate-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     {t("common.table.loading")}
@@ -354,7 +371,7 @@ export function TableRenderer({
             ) : !data.length ? (
               /* live: 데이터 없음 */
               <tr>
-                <td colSpan={columns.length} className={TABLE_EMPTY_CELL_CLS}>
+                <td colSpan={stateCellColSpan} className={TABLE_EMPTY_CELL_CLS}>
                   {t("common.table.no_data")}
                 </td>
               </tr>
@@ -367,11 +384,11 @@ export function TableRenderer({
                   <tr
                     key={rowId || rowIdx}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    className={`border-b border-slate-100 last:border-0 transition-all ${isSelected ? "bg-slate-50" : "hover:bg-slate-50/50"}${onRowClick ? " cursor-pointer" : ""}`}
+                    className={tableSelectableRowClass(isSelected, !!onRowClick)}
                   >
                     {/* live 체크박스 — 개별 행 선택 */}
                     {enableRowSelection && (
-                      <td className="w-10 px-2 py-3 text-center sticky left-0 bg-inherit">
+                      <td className={TABLE_SELECT_BODY_CELL_CLS}>
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -381,7 +398,7 @@ export function TableRenderer({
                               : selectedRowIds.filter((id) => id !== rowId);
                             onRowsSelect?.(next);
                           }}
-                          className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                          className={TABLE_SELECT_CHECKBOX_CLS}
                         />
                       </td>
                     )}

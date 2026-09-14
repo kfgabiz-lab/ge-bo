@@ -101,6 +101,8 @@ import {
   findMissingRequiredMultiSelect,
   normalizeExternalUrl,
   resolveButtonExternalUrl,
+  mergeTableSelectedRowCache,
+  extractTableSelectedRows,
 } from "../../utils";
 import { entityApiPath } from "../../utils/entityApi";
 import { useSlugRelations } from "../../hooks/useSlugRelations";
@@ -520,6 +522,9 @@ export function WidgetRenderer({
   const [popupSortExprMap, setPopupSortExprMap] = useState<Record<string, string | undefined>>({});
   /* 팝업 내 테이블 행 선택 — widgetId → 선택된 행 ID 배열 */
   const [popupTableSelectedRowsMap, setPopupTableSelectedRowsMap] = useState<Record<string, number[]>>({});
+  const [popupTableSelectedRowDataMap, setPopupTableSelectedRowDataMap] = useState<
+    Record<string, Record<number, Record<string, unknown>>>
+  >({});
   /* paramSave extras — 폼에 없는 파라미터 임시 보관 (저장 버튼 클릭 시 dataJson에 병합) */
   const [popupParamSaveExtras, setPopupParamSaveExtras] = useState<Record<string, unknown>>({});
 
@@ -721,6 +726,7 @@ export function WidgetRenderer({
     setPopupMultiSelectValuesMap({});
     setPopupMultiSelectExtraFieldMap({});
     setPopupTableSelectedRowsMap({});
+    setPopupTableSelectedRowDataMap({});
     setPopupParamSaveExtras({});
     setPopupSearchValuesMap({});
   }, []);
@@ -758,6 +764,7 @@ export function WidgetRenderer({
       setPopupMultiSelectValuesMap({});
       setPopupMultiSelectExtraFieldMap({});
       setPopupTableSelectedRowsMap({});
+      setPopupTableSelectedRowDataMap({});
       setPopupTableDataMap({});
       setPopupSortKeyMap({});
       setPopupSortDirMap({});
@@ -1075,6 +1082,19 @@ export function WidgetRenderer({
     [popupCfg, popupSortKeyMap, popupSortDirMap, popupSortExprMap, popupSearchValuesMap]
   );
 
+  const clearPopupTableSelectionSlot = useCallback((widgetId: string) => {
+    setPopupTableSelectedRowsMap((prev) => {
+      const next = { ...prev };
+      delete next[widgetId];
+      return next;
+    });
+    setPopupTableSelectedRowDataMap((prev) => {
+      const next = { ...prev };
+      delete next[widgetId];
+      return next;
+    });
+  }, []);
+
   /**
    * 팝업 내 검색 실행 핸들러 — searchWidgetId에 연결된(connectedSearchIds) 테이블들을 0페이지부터 재조회
    * (page 레벨 useWidgetPageState.handleSearch와 동일 패턴 — dateRange 최대 조회기간 검증도 동일하게 적용)
@@ -1094,9 +1114,13 @@ export function WidgetRenderer({
         .flatMap((item) => item.contents)
         .map((c) => c.widget)
         .filter((w) => w.type === "table" && (w as unknown as TableWidget).connectedSearchIds.includes(searchWidgetId))
-        .forEach((w) => handlePopupPageChange((w as unknown as TableWidget).widgetId, 0));
+        .forEach((w) => {
+          const tableWidgetId = (w as unknown as TableWidget).widgetId;
+          clearPopupTableSelectionSlot(tableWidgetId);
+          handlePopupPageChange(tableWidgetId, 0);
+        });
     },
-    [popupCfg, handlePopupPageChange, popupSearchValuesMap, t]
+    [popupCfg, handlePopupPageChange, clearPopupTableSelectionSlot, popupSearchValuesMap, t]
   );
 
   /**
@@ -1113,15 +1137,20 @@ export function WidgetRenderer({
         .flatMap((item) => item.contents)
         .map((c) => c.widget)
         .filter((w) => w.type === "table" && (w as unknown as TableWidget).connectedSearchIds.includes(searchWidgetId))
-        .forEach((w) => handlePopupPageChange((w as unknown as TableWidget).widgetId, 0, overrideSv));
+        .forEach((w) => {
+          const tableWidgetId = (w as unknown as TableWidget).widgetId;
+          clearPopupTableSelectionSlot(tableWidgetId);
+          handlePopupPageChange(tableWidgetId, 0, overrideSv);
+        });
     },
-    [popupSearchValuesMap, popupCfg, handlePopupPageChange]
+    [popupSearchValuesMap, popupCfg, handlePopupPageChange, clearPopupTableSelectionSlot]
   );
 
   /* 팝업 내 테이블 정렬 변경 핸들러 */
   const handlePopupSortChange = useCallback(
     async (widgetId: string, accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => {
       setPopupSortKeyMap((prev) => ({ ...prev, [widgetId]: dir === null ? null : accessor }));
+      clearPopupTableSelectionSlot(widgetId);
       if (dir) setPopupSortDirMap((prev) => ({ ...prev, [widgetId]: dir }));
       setPopupSortExprMap((prev) => ({ ...prev, [widgetId]: dir ? dataExpr : undefined }));
       const tw = popupCfg?.widgetItems
@@ -1192,7 +1221,17 @@ export function WidgetRenderer({
         }));
       }
     },
-    [popupCfg, popupSearchValuesMap]
+    [popupCfg, popupSearchValuesMap, clearPopupTableSelectionSlot]
+  );
+
+  const handlePopupTableRowsSelect = useCallback(
+    (wId: string, ids: number[]) => {
+      setPopupTableSelectedRowsMap((prev) => ({ ...prev, [wId]: ids }));
+      setPopupTableSelectedRowDataMap((prev) =>
+        mergeTableSelectedRowCache(prev, wId, ids, popupTableDataMap[wId]?.rows ?? [])
+      );
+    },
+    [popupTableDataMap]
   );
 
   const handlePopupContentAction = useCallback(
@@ -1588,7 +1627,7 @@ export function WidgetRenderer({
           const selectedIds = popupTableSelectedRowsMap[tableW.widgetId] ?? [];
           /* enableRowSelection=true → 선택된 행만, false → 전체 행 */
           const rowsToSave = tableW.enableRowSelection
-            ? allRows.filter((r) => selectedIds.includes(Number(r["_id"])))
+            ? extractTableSelectedRows(popupTableSelectedRowDataMap, tableW.widgetId, selectedIds, allRows)
             : allRows;
 
           if (rowsToSave.length === 0) {
@@ -1614,6 +1653,7 @@ export function WidgetRenderer({
         if (anySaved) {
           toast.success(t("common.saved"));
           onRefresh?.();
+          setCategoryRefreshTick((prev) => prev + 1);
           handlePopupClose();
         }
       } catch (err) {
@@ -1632,6 +1672,7 @@ export function WidgetRenderer({
       popupMultiSelectValuesMap,
       popupMultiSelectExtraFieldMap,
       popupTableSelectedRowsMap,
+      popupTableSelectedRowDataMap,
       popupTableDataMap,
       popupParamSaveExtras,
       pageSlug,
@@ -1748,7 +1789,7 @@ export function WidgetRenderer({
             onSort={handlePopupSortChange}
             onPageChange={handlePopupPageChange}
             tableSelectedRowsMap={popupTableSelectedRowsMap}
-            onTableRowsSelect={(wId, ids) => setPopupTableSelectedRowsMap((prev) => ({ ...prev, [wId]: ids }))}
+            onTableRowsSelect={handlePopupTableRowsSelect}
           />
         </PageGridContainer>
         {/* 저장 중 표시 */}

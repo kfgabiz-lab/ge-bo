@@ -18,6 +18,7 @@ import {
   flattenPageDataItem,
   applySortChange,
   initFormDefaultValues,
+  applyUrlParamFormOverrides,
   buildSearchFieldDefaultValues,
   buildDateRangeGenerationPatch,
   validateDataSaveWidgets,
@@ -38,6 +39,8 @@ import {
   buildFormValuesFromDataJson,
   buildFieldKeyIdAndLabelMaps,
   findMissingRequiredMultiSelect,
+  mergeTableSelectedRowCache,
+  extractTableSelectedRows,
 } from "../utils";
 import {
   uploadContentFormFiles,
@@ -232,6 +235,9 @@ export function useWidgetPageState(
   const [sortDirMap, setSortDirMap] = useState<Record<string, "asc" | "desc">>({});
   const [sortExprMap, setSortExprMap] = useState<Record<string, string | undefined>>({});
   const [tableSelectedRowsMap, setTableSelectedRowsMap] = useState<Record<string, number[]>>({});
+  const [tableSelectedRowDataMap, setTableSelectedRowDataMap] = useState<
+    Record<string, Record<number, Record<string, unknown>>>
+  >({});
 
   const [formValuesMap, setFormValuesMap] = useState<Record<string, Record<string, string>>>({});
 
@@ -435,19 +441,7 @@ export function useWidgetPageState(
 
     const formWidgets = flatWidgets(widgetItems).filter((w) => w.type === "form") as FormWidget[];
 
-    const patch = initFormDefaultValues(formWidgets, t);
-
-    formWidgets.forEach((fw) => {
-      (fw.fields ?? []).forEach((f) => {
-        const fieldKey = f.fieldKey || f.label;
-        if (!fieldKey) return;
-        const urlVal = searchParams.get(fieldKey);
-        if (urlVal !== null) {
-          if (!patch[fw.widgetId]) patch[fw.widgetId] = {};
-          patch[fw.widgetId][f.id] = urlVal;
-        }
-      });
-    });
+    const patch = applyUrlParamFormOverrides(initFormDefaultValues(formWidgets, t), formWidgets, searchParams);
 
     if (Object.values(patch).every((v) => Object.keys(v).length === 0)) return;
 
@@ -468,6 +462,7 @@ export function useWidgetPageState(
     const formWidgets = allWidgets.filter((w) => w.type === "form") as FormWidget[];
     const sublistWidgets = allWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
     const multiSelWidgets = allWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
+    const urlTableWidgets = allWidgets.filter((w) => w.type === "table") as TableWidget[];
 
     const queryGroupId = searchParams.get("group_id");
     const queryId = searchParams.get("id");
@@ -484,7 +479,13 @@ export function useWidgetPageState(
           const ck = key.slice(0, dotIdx);
           const fk = key.slice(dotIdx + 1);
           const fw = formWidgets.find((f) => f.contentKey === ck);
-          if (!fw) return;
+          if (!fw) {
+            if (isParamSave && urlTableWidgets.some((tw) => tw.contentKey === ck)) {
+              if (!extras[ck]) extras[ck] = {};
+              (extras[ck] as Record<string, string>)[fk] = value;
+            }
+            return;
+          }
           const field = fw.fields.find((f) => (f.fieldKey || f.label) === fk);
           if (field) {
             if (!urlOverrides[fw.widgetId]) urlOverrides[fw.widgetId] = {};
@@ -669,6 +670,19 @@ export function useWidgetPageState(
     });
   }, []);
 
+  const clearTableSelectionSlot = useCallback((tableWidgetId: string) => {
+    setTableSelectedRowsMap((prev) => {
+      const next = { ...prev };
+      delete next[tableWidgetId];
+      return next;
+    });
+    setTableSelectedRowDataMap((prev) => {
+      const next = { ...prev };
+      delete next[tableWidgetId];
+      return next;
+    });
+  }, []);
+
   const handleSearch = useCallback(
     (searchWidgetId: string) => {
       const fieldsMap = buildSearchFieldsMap(widgetItems);
@@ -682,6 +696,7 @@ export function useWidgetPageState(
         if (!(w as TableWidget).connectedSearchIds.includes(searchWidgetId)) return;
         const connectedSlug = (w as TableWidget).connectedSlug;
         if (!connectedSlug) return;
+        clearTableSelectionSlot((w as TableWidget).widgetId);
         const searchFields = (w as TableWidget).connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
         fetchTableData({
           tableWidget: w as TableWidget,
@@ -695,7 +710,7 @@ export function useWidgetPageState(
         });
       });
     },
-    [widgetItems, sortKeyMap, sortDirMap, sortExprMap, fetchTableData, t]
+    [widgetItems, sortKeyMap, sortDirMap, sortExprMap, fetchTableData, clearTableSelectionSlot, t]
   );
 
   const handleReset = useCallback(
@@ -712,11 +727,12 @@ export function useWidgetPageState(
         setSortKeyMap((prev) => ({ ...prev, [tableWidgetId]: null }));
         setSortDirMap((prev) => ({ ...prev, [tableWidgetId]: "asc" }));
         setSortExprMap((prev) => ({ ...prev, [tableWidgetId]: undefined }));
+        clearTableSelectionSlot(tableWidgetId);
         const searchFields = (w as TableWidget).connectedSearchIds.flatMap((sid: string) => fieldsMap[sid] ?? []);
         fetchTableData({ tableWidget: w as TableWidget, connectedSlug, searchFields, sv: {}, page: 0 });
       });
     },
-    [widgetItems, fetchTableData]
+    [widgetItems, fetchTableData, clearTableSelectionSlot]
   );
 
   const handlePageChange = useCallback(
@@ -744,6 +760,7 @@ export function useWidgetPageState(
   const handleSortChange = useCallback(
     (tableWidgetId: string, accessor: string, dir: "asc" | "desc" | null, dataExpr?: string) => {
       const { sk, sd } = applySortChange(tableWidgetId, accessor, dir, setSortKeyMap, setSortDirMap);
+      clearTableSelectionSlot(tableWidgetId);
       const fieldsMap = buildSearchFieldsMap(widgetItems);
       const tableWidget = flatWidgets(widgetItems).find(
         (w) => w.type === "table" && (w as TableWidget).widgetId === tableWidgetId
@@ -778,8 +795,15 @@ export function useWidgetPageState(
         sortExpr,
       });
     },
-    [widgetItems, fetchTableData, tableDataMap]
+    [widgetItems, fetchTableData, tableDataMap, clearTableSelectionSlot]
   );
+
+  const handleTableRowsSelect = useCallback((wId: string, ids: number[]) => {
+    setTableSelectedRowsMap((prev) => ({ ...prev, [wId]: ids }));
+    setTableSelectedRowDataMap((prev) =>
+      mergeTableSelectedRowCache(prev, wId, ids, tableDataMapRef.current[wId]?.rows ?? [])
+    );
+  }, []);
 
   const updateFormValue = useCallback(
     (widgetId: string, fieldId: string, value: string) => {
@@ -1213,7 +1237,7 @@ export function useWidgetPageState(
           const allRows = tableDataMapRef.current[tw.widgetId]?.rows ?? [];
           const selectedIds = tableSelectedRowsMap[tw.widgetId] ?? [];
           const rowsToSave = tw.enableRowSelection
-            ? allRows.filter((r) => selectedIds.includes(Number(r["_id"])))
+            ? extractTableSelectedRows(tableSelectedRowDataMap, tw.widgetId, selectedIds, allRows)
             : allRows;
 
           if (rowsToSave.length === 0) {
@@ -1221,7 +1245,7 @@ export function useWidgetPageState(
             return;
           }
 
-          const tableExtras = paramSave ? {} : ((urlParamSaveExtras[tw.contentKey] ?? {}) as Record<string, unknown>);
+          const tableExtras = (urlParamSaveExtras[tw.contentKey] ?? {}) as Record<string, unknown>;
           const saved = await saveTableRows({
             contentKey: tw.contentKey,
             columns: tw.columns,
@@ -1254,6 +1278,7 @@ export function useWidgetPageState(
       existingFileMetaMap,
       multiSelectValuesMap,
       tableSelectedRowsMap,
+      tableSelectedRowDataMap,
       urlParamSaveExtras,
       pageSlug,
       options,
@@ -1655,7 +1680,7 @@ export function useWidgetPageState(
     onPageChange: handlePageChange,
     onLoadMore: handleLoadMore,
     tableSelectedRowsMap,
-    onTableRowsSelect: (wId: string, ids: number[]) => setTableSelectedRowsMap((prev) => ({ ...prev, [wId]: ids })),
+    onTableRowsSelect: handleTableRowsSelect,
     categorySelections,
     onCategorySelect: handleCategorySelect,
     onRefresh: handleRefresh,

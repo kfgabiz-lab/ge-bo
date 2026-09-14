@@ -13,6 +13,7 @@ import {
   GENERATED_PAGE_BASE_CONST,
 } from "../widgetGenerator";
 import { emitContentActionHandler } from "./space/contentActionEmitter";
+import { emitDataSaveHandler } from "./space/dataSaveEmitter";
 
 const HANDLED_WIDGET_KEYS = new Set(["type", "widgetId", "items", "align", "showBorder", "bgColor"]);
 const IGNORED_WIDGET_KEYS = new Map<string, string>();
@@ -45,6 +46,8 @@ const HANDLED_ACTION_BUTTON_KEYS = new Set([
   "contentValidationRuleIds",
   "popupSlug",
   "params",
+  "dataSaveSlug",
+  "validationRuleIds",
 ]);
 
 const IGNORED_ITEM_KEYS = new Map<string, string>([
@@ -162,7 +165,6 @@ const buildGroups = (items: SearchFieldConfig[]): RenderGroup[] => {
 const UNSUPPORTED_CONN_TYPE_NOTE: Record<string, string> = {
   path: "connType='path'(파일 레이어 연결) 동작은 아직 코드 생성이 지원되지 않습니다.",
   excel: "connType='excel'(엑셀 다운로드) 동작은 아직 코드 생성이 지원되지 않습니다.",
-  datasave: "connType='datasave'(데이터 저장) 동작은 아직 코드 생성이 지원되지 않습니다.",
   api: "connType='api'(API 연동) 동작은 아직 코드 생성이 지원되지 않습니다.",
 };
 
@@ -184,6 +186,7 @@ export const generateSpaceBlock = (widget: SpaceWidget, ctx: WidgetGenContext): 
 
   const onClickBodyByItem = new Map<SearchFieldConfig, string[]>();
   let needsRouter = false;
+  let needsRuntimeT = false;
   widget.items.forEach((item, itemIdx) => {
     if (item.type !== "action-button") return;
     const body: string[] = [];
@@ -211,6 +214,27 @@ export const generateSpaceBlock = (widget: SpaceWidget, ctx: WidgetGenContext): 
         if (item.goBackAfterAction && !insideTab) needsRouter = true;
         body.push(`${fnName}();`);
       }
+    } else if (connType === "datasave" && item.dataSaveSlug) {
+      const fnName = `handleDataSave${suffix}_${itemIdx}`;
+      const result = emitDataSaveHandler({
+        ctx,
+        fnName,
+        connectedContentWidgetIds: item.connectedContentWidgetIds ?? [],
+        dataSaveSlug: item.dataSaveSlug,
+        goBackAfterAction: !!item.goBackAfterAction,
+        paramSave: item.params,
+        validationRuleIds: item.validationRuleIds,
+      });
+      if (result.todo) {
+        body.push(`/* TODO(파일빌드): ${result.todo} */`);
+      } else {
+        result.helperLines.forEach((l) => helperLines.push(l));
+        result.handlerLines.forEach((l) => handlerLines.push(l));
+        result.imports.forEach((i) => imports.push(i));
+        needsRuntimeT = true;
+        if (item.goBackAfterAction && !insideTab) needsRouter = true;
+        body.push(`${fnName}();`);
+      }
     } else if (connType === "close") {
       needsRouter = true;
       if (leaveCheckNames.includes("confirmLeave")) body.push(`if (!confirmLeave()) return;`);
@@ -228,6 +252,10 @@ export const generateSpaceBlock = (widget: SpaceWidget, ctx: WidgetGenContext): 
     }
     onClickBodyByItem.set(item, body);
   });
+
+  if (needsRuntimeT && !needsI18n) {
+    stateLines.push(`${ind(1)}const { t } = useI18n();`);
+  }
 
   if (needsRouter) {
     imports.push({ module: "next/navigation", named: ["useRouter"] });

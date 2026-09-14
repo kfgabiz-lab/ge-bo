@@ -2294,6 +2294,24 @@ export function initFormDefaultValues(
   return result;
 }
 
+export function applyUrlParamFormOverrides(
+  patch: Record<string, Record<string, string>>,
+  formWidgets: import("./components/builder/FormBuilder").FormWidget[],
+  searchParams: URLSearchParams
+): Record<string, Record<string, string>> {
+  formWidgets.forEach((fw) => {
+    (fw.fields ?? []).forEach((f) => {
+      const fieldKey = f.fieldKey || f.label;
+      if (!fieldKey) return;
+      const urlVal = searchParams.get(fieldKey);
+      if (urlVal === null) return;
+      if (!patch[fw.widgetId]) patch[fw.widgetId] = {};
+      patch[fw.widgetId][f.id] = urlVal;
+    });
+  });
+  return patch;
+}
+
 /**
  * 파라미터 문자열 파싱 — 쉼표 구분 + row 동적 주입 + 작은따옴표 강제 고정 텍스트 지원
  *
@@ -2350,6 +2368,19 @@ export function parseActionParams(
     }
   });
   return result;
+}
+
+export function buildRowActionQuery(
+  rowId: number | string,
+  paramStr: string | undefined,
+  row: Record<string, unknown> = {},
+  paramSave?: boolean
+): string {
+  const params = new URLSearchParams();
+  params.set("id", String(rowId));
+  Object.entries(parseActionParams(paramStr, row)).forEach(([k, v]) => params.set(k, v));
+  if (paramSave) params.set("_paramSave", "true");
+  return `?${params.toString()}`;
 }
 
 /**
@@ -2613,6 +2644,51 @@ export async function saveTableRows(opts: {
     savedCount++;
   }
   return savedCount;
+}
+
+export function mergeTableSelectedRowCache(
+  prevCache: Record<string, Record<number, Record<string, unknown>>>,
+  widgetId: string,
+  selectedIds: number[],
+  currentPageRows: Record<string, unknown>[]
+): Record<string, Record<number, Record<string, unknown>>> {
+  if (selectedIds.length === 0) {
+    const next = { ...prevCache };
+    delete next[widgetId];
+    return next;
+  }
+  const prevSlot = prevCache[widgetId] ?? {};
+  const nextSlot: Record<number, Record<string, unknown>> = {};
+  for (const id of selectedIds) {
+    const cachedRow = prevSlot[id];
+    if (cachedRow) {
+      nextSlot[id] = cachedRow;
+      continue;
+    }
+    const pageRow = currentPageRows.find((row) => Number(row["_id"]) === id);
+    if (pageRow) nextSlot[id] = pageRow;
+  }
+  return { ...prevCache, [widgetId]: nextSlot };
+}
+
+export function extractTableSelectedRows(
+  cache: Record<string, Record<number, Record<string, unknown>>>,
+  widgetId: string,
+  selectedIds: number[],
+  currentPageRows: Record<string, unknown>[]
+): Record<string, unknown>[] {
+  const slot = cache[widgetId];
+  const rows: Record<string, unknown>[] = [];
+  for (const id of selectedIds) {
+    const cachedRow = slot?.[id];
+    if (cachedRow) {
+      rows.push(cachedRow);
+      continue;
+    }
+    const pageRow = currentPageRows.find((row) => Number(row["_id"]) === id);
+    if (pageRow) rows.push(pageRow);
+  }
+  return rows;
 }
 
 export function isDateRangeWithinMaxLimit(

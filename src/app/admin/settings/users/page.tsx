@@ -10,6 +10,7 @@ import type { SearchWidget } from "@/app/admin/templates/make/_shared/components
 import type { TableWidget } from "@/app/admin/templates/make/_shared/components/builder/TableBuilder";
 import type { TableActionHandlers } from "@/app/admin/templates/make/_shared/components/renderer/types";
 import { useI18n } from "@/hooks/use-i18n";
+import { formatIsoDateTime } from "@/app/admin/templates/make/_shared/utils";
 
 /* ── 상수 ── */
 
@@ -304,7 +305,7 @@ export default function AdminAccountsPage() {
                 deptName: a.deptName ?? "-",
                 isActive: String(a.isActive),
                 remark: a.remark ?? "-",
-                createdAt: a.createdAt ? a.createdAt.slice(0, 10) : "-",
+                createdAt: a.createdAt ? formatIsoDateTime(a.createdAt).slice(0, 10) : "-",
               })) as unknown as Record<string, unknown>[]
             }
             tableLoading={loading}

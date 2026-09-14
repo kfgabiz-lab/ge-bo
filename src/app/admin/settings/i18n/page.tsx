@@ -11,6 +11,7 @@ import { useMessageResourceStore, MessageResource } from "@/store/use-message-re
 import { MessageResourceDrawer } from "@/components/i18n/message-resource-drawer";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/hooks/use-i18n";
+import { formatIsoDateTime } from "@/app/admin/templates/make/_shared/utils";
 
 /* ── 상수 ── */
 
@@ -303,7 +304,7 @@ export default function I18nPage() {
         en: item.en ?? "",
         resourceType: item.resourceType ?? "WORD",
         active: String(item.active),
-        createdAt: item.createdAt ? item.createdAt.replace("T", " ").substring(0, 16) : "",
+        createdAt: item.createdAt ? formatIsoDateTime(item.createdAt).slice(0, 16) : "",
       })) as unknown as Record<string, unknown>[],
     [items]
   );

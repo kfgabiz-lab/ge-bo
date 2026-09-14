@@ -25,6 +25,19 @@ export const TABLE_HEADER_STATIC_TEXT_CLS = "flex items-center justify-center ga
 export const TABLE_TD_CLS = "px-4 py-3 max-w-[200px] overflow-hidden";
 export const TABLE_TR_CLS = "border-b border-slate-100 last:border-0 transition-all hover:bg-slate-50/50";
 
+export const TABLE_SELECT_HEADER_CELL_CLS =
+  "w-10 px-2 py-3 text-center flex-shrink-0 sticky left-0 z-20 bg-slate-50/80";
+export const TABLE_SELECT_HEADER_CHECKBOX_CLS =
+  "w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer disabled:cursor-default";
+export const TABLE_SELECT_PREVIEW_CELL_CLS = "w-10 px-2 py-3 text-center sticky left-0 bg-white";
+export const TABLE_SELECT_PREVIEW_CHECKBOX_CLS = "w-3.5 h-3.5 rounded border-slate-300 cursor-default";
+export const TABLE_SELECT_BODY_CELL_CLS = "w-10 px-2 py-3 text-center sticky left-0 bg-inherit";
+export const TABLE_SELECT_CHECKBOX_CLS = "w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer";
+
+export function tableSelectableRowClass(isSelected: boolean, hasRowClick: boolean): string {
+  return `border-b border-slate-100 last:border-0 transition-all ${isSelected ? "bg-slate-50" : "hover:bg-slate-50/50"}${hasRowClick ? " cursor-pointer" : ""}`;
+}
+
 export function tableSortButtonClass(isPreview: boolean): string {
   return `flex items-center justify-center gap-1 w-full transition-colors ${isPreview ? "cursor-default" : "hover:text-slate-900"}`;
 }
@@ -207,6 +220,87 @@ export function tabButtonClass(active: boolean): string {
   return `px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
     active ? "border-slate-800 text-slate-900 bg-white" : "border-transparent text-slate-500 hover:text-slate-700"
   }`;
+}
+
+export const CATEGORY_OUTER_WRAP_CLS = "h-full w-full pr-2";
+export const CATEGORY_CONTAINER_CLS = "flex flex-col bg-white";
+export const CATEGORY_HEADER_CLS =
+  "flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200 flex-shrink-0";
+export const CATEGORY_HEADER_LABEL_CLS = "text-xs font-semibold text-slate-700";
+export const CATEGORY_HEADER_ICON_CLS = "w-3.5 h-3.5";
+export const CATEGORY_INPUT_ROW_CLS =
+  "flex items-center gap-1.5 px-3 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0";
+export const CATEGORY_INPUT_CLS =
+  "flex-1 border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400";
+export const CATEGORY_INPUT_CONFIRM_BTN_CLS = "p-1 text-emerald-600 hover:text-emerald-700";
+export const CATEGORY_INPUT_CANCEL_BTN_CLS = "p-1 text-slate-400 hover:text-slate-600";
+export const CATEGORY_INPUT_ICON_CLS = "w-3.5 h-3.5";
+export const CATEGORY_LIST_WRAP_CLS = "flex-1 min-h-0 overflow-y-auto";
+export const CATEGORY_STATE_WRAP_CLS = "h-full flex items-center justify-center";
+export const CATEGORY_STATE_TEXT_ITALIC_CLS = "text-[11px] text-slate-300 italic";
+export const CATEGORY_STATE_TEXT_CLS = "text-[11px] text-slate-300";
+export const CATEGORY_LIST_CLS = "p-2 space-y-1.5";
+export const CATEGORY_ITEM_WRAP_CLS = "relative";
+export const CATEGORY_DROP_LINE_CLS =
+  "absolute top-0 left-1 right-1 h-0.5 bg-blue-400 rounded z-10 pointer-events-none";
+export const CATEGORY_DROP_LINE_LAST_CLS = "h-0.5 bg-blue-400 rounded mx-1";
+export const CATEGORY_ACCENT_BAR_CLS = "absolute left-0 top-2 bottom-2 w-0.5 bg-emerald-400 rounded-r";
+export const CATEGORY_CARD_BODY_CLS = "flex items-center gap-1 px-2 py-2.5";
+export const CATEGORY_CARD_MAIN_CLS = "flex-1 min-w-0 pl-1";
+export const CATEGORY_CARD_ROW1_CLS = "flex items-center gap-2 mb-1";
+export const CATEGORY_ACTIONS_WRAP_CLS =
+  "flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0";
+export const CATEGORY_ACTION_ICON_CLS = "w-3 h-3";
+
+export function categoryAddButtonClass(isPreview: boolean): string {
+  return `flex items-center gap-1 text-[11px] transition-colors ${
+    isPreview ? "pointer-events-none opacity-40 text-slate-500" : "text-slate-500 hover:text-slate-900"
+  }`;
+}
+
+export function categoryCardClass(isSelected: boolean): string {
+  return `group relative rounded-lg border cursor-pointer transition-all
+                                    ${
+                                      isSelected
+                                        ? "bg-slate-900 border-slate-700 shadow-md"
+                                        : "bg-white border-slate-200 hover:border-slate-400 hover:shadow-sm"
+                                    }`;
+}
+
+export function categoryDragHandleClass(isPreview: boolean): string {
+  return `flex items-center gap-0.5 flex-shrink-0 cursor-grab active:cursor-grabbing select-none ${
+    isPreview ? "pointer-events-none" : ""
+  }`;
+}
+
+export function categoryGripIconClass(isSelected: boolean): string {
+  return `w-3.5 h-3.5 ${isSelected ? "text-white/40" : "text-slate-300"}`;
+}
+
+export function categoryOrderNumClass(isSelected: boolean): string {
+  return `text-[10px] font-mono w-4 text-center ${isSelected ? "text-white/50" : "text-slate-300"}`;
+}
+
+export function categoryCodeBadgeClass(isSelected: boolean): string {
+  return `flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+    isSelected ? "bg-white/20 text-white/80" : "bg-slate-100 text-slate-500"
+  }`;
+}
+
+export function categoryTitleClass(isSelected: boolean): string {
+  return `flex-1 text-xs font-semibold truncate ${isSelected ? "text-white" : "text-slate-800"}`;
+}
+
+export function categoryActionButtonClass(isPreview: boolean, isSelected: boolean): string {
+  return `p-0.5 transition-colors ${isPreview ? "pointer-events-none" : ""} ${isSelected ? "text-slate-300 hover:text-white" : "text-slate-400 hover:text-slate-700"}`;
+}
+
+export function categoryDeleteButtonClass(isPreview: boolean, isSelected: boolean): string {
+  return `p-0.5 transition-colors ${isPreview ? "pointer-events-none" : ""} ${isSelected ? "text-slate-300 hover:text-red-300" : "text-slate-400 hover:text-red-500"}`;
+}
+
+export function categoryDescClass(isSelected: boolean): string {
+  return `text-[10px] line-clamp-1 ${isSelected ? "text-white/60" : "text-slate-400"}`;
 }
 
 export const GENERATED_TABLE_SCROLL_MORE_CLS = "py-4 text-center text-xs text-slate-400";

@@ -24,6 +24,11 @@ import {
   TABLE_HEADER_STATIC_TEXT_CLS,
   TABLE_TD_CLS,
   TABLE_TR_CLS,
+  TABLE_SELECT_HEADER_CELL_CLS,
+  TABLE_SELECT_HEADER_CHECKBOX_CLS,
+  TABLE_SELECT_BODY_CELL_CLS,
+  TABLE_SELECT_CHECKBOX_CLS,
+  tableSelectableRowClass,
   tableSortButtonClass,
   sortIconClass,
   PAGER_WRAP_CLS,
@@ -84,6 +89,7 @@ const HANDLED_TABLE_WIDGET_KEYS = new Set([
   "pageSize",
   "displayMode",
   "sourceFilter",
+  "enableRowSelection",
 ]);
 const IGNORED_TABLE_WIDGET_KEYS = new Map<string, string>([
   [
@@ -224,6 +230,33 @@ const headerExprOf = (col: TableColumnConfig): string => {
   if (col.header) return jsStringLiteral(col.header);
   if (col.cellType === "actions") return `t('common.label.action')`;
   return jsStringLiteral("—");
+};
+
+const pushSelectHeaderCell = (
+  jsxLines: string[],
+  ind: (n: number) => string,
+  rowsVar: string,
+  selectedRowIdsVar: string,
+  setSelectedRowIdsVar: string
+): void => {
+  jsxLines.push(`${ind(2)}<th className=${jsStringLiteral(TABLE_SELECT_HEADER_CELL_CLS)}>`);
+  jsxLines.push(
+    `${ind(3)}<input type="checkbox" checked={${rowsVar}.length > 0 && ${rowsVar}.every((row) => ${selectedRowIdsVar}.includes(row._id as number))} onChange={(e) => ${setSelectedRowIdsVar}(e.target.checked ? ${rowsVar}.map((row) => row._id as number).filter(Boolean) : [])} className=${jsStringLiteral(TABLE_SELECT_HEADER_CHECKBOX_CLS)} />`
+  );
+  jsxLines.push(`${ind(2)}</th>`);
+};
+
+const pushSelectBodyCell = (
+  jsxLines: string[],
+  ind: (n: number) => string,
+  selectedRowIdsVar: string,
+  setSelectedRowIdsVar: string
+): void => {
+  jsxLines.push(`${ind(3)}<td className=${jsStringLiteral(TABLE_SELECT_BODY_CELL_CLS)}>`);
+  jsxLines.push(
+    `${ind(4)}<input type="checkbox" checked={${selectedRowIdsVar}.includes(row._id as number)} onChange={(e) => ${setSelectedRowIdsVar}(e.target.checked ? [...${selectedRowIdsVar}, row._id as number] : ${selectedRowIdsVar}.filter((id) => id !== (row._id as number)))} className=${jsStringLiteral(TABLE_SELECT_CHECKBOX_CLS)} />`
+  );
+  jsxLines.push(`${ind(3)}</td>`);
 };
 
 const pushHeaderCell = (
@@ -518,7 +551,7 @@ const buildUnhandled = (widget: TableWidget, supportedColumns: TableColumnConfig
 };
 
 export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): WidgetCodeBlock => {
-  const { suffix, ind, allWidgets, suffixOf, mainConnectedSlug, isEntity } = ctx;
+  const { suffix, ind, allWidgets, suffixOf, mainConnectedSlug, isEntity, outputModeOf } = ctx;
   const rowsVar = `rows${suffix}`;
   const setRowsVar = `setRows${suffix}`;
   const totalVar = `total${suffix}`;
@@ -535,11 +568,15 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   const resolvedSortKeyVar = `resolvedSortKey${suffix}`;
   const sortExprMapVar = `SORT_EXPR${suffix}`;
   const fetchFn = `fetchData${suffix}`;
+  const selectedRowIdsVar = `selectedRowIds${suffix}`;
+  const setSelectedRowIdsVar = `setSelectedRowIds${suffix}`;
 
   const resolvedSlug = widget.connectedSlug || mainConnectedSlug || "";
   const columns = widget.columns || [];
   const supportedColumns = columns.filter(isColumnSupported);
   const isPagination = widget.displayMode !== "scroll";
+  const hasRowSelection = widget.enableRowSelection === true;
+  const stateCellColSpan = columns.length + (hasRowSelection ? 1 : 0);
   const needsSort = columns.some((c) => c.sortable);
   const needsDateFormat = columns.some((c) => c.cellType === "date");
   const needsDataExpr = supportedColumns.some((c) => !!c.data);
@@ -653,6 +690,9 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   if (needsSort) {
     stateLines.push(`${ind(1)}const [${sortKeyVar}, ${setSortKeyVar}] = useState<string | null>(null);`);
     stateLines.push(`${ind(1)}const [${sortDirVar}, ${setSortDirVar}] = useState<'asc' | 'desc'>('asc');`);
+  }
+  if (hasRowSelection) {
+    stateLines.push(`${ind(1)}const [${selectedRowIdsVar}, ${setSelectedRowIdsVar}] = useState<number[]>([]);`);
   }
   stateLines.push(`${ind(1)}const ${dataSlugVar} = ${jsStringLiteral(resolvedSlug)};`);
   if (needsRouter) stateLines.push(`${ind(1)}const router = useRouter();`);
@@ -780,9 +820,23 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
         `${ind(2)}/* TODO(파일빌드): 이 컬럼에는 editPageRules가 없어 수정 이동 대상을 확정할 수 없습니다(editPopupSlug 방식은 미지원). 직접 구현해주세요. */`
       );
     } else {
-      if (editRules.some((r) => (r.connType ?? "popup") !== "page")) {
+      const popupRules = editRules.filter((r) => (r.connType ?? "popup") !== "page");
+      const layerPopupTargets = [
+        ...new Set(popupRules.filter((r) => outputModeOf(r.pageSlug) === "layerpopup").map((r) => r.pageSlug)),
+      ];
+      const unresolvedTargets = [
+        ...new Set(
+          popupRules.filter((r) => outputModeOf(r.pageSlug) === undefined).map((r) => r.pageSlug || "slug 미지정")
+        ),
+      ];
+      if (layerPopupTargets.length > 0) {
         handlerLines.push(
-          `${ind(2)}/* TODO(파일빌드): connType='popup' 규칙도 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */`
+          `${ind(2)}/* TODO(파일빌드): connType='popup' 규칙의 이동 대상(${layerPopupTargets.join(", ")})이 LayerPopup 모드입니다. 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */`
+        );
+      }
+      if (unresolvedTargets.length > 0) {
+        handlerLines.push(
+          `${ind(2)}/* TODO(파일빌드): connType='popup' 규칙의 이동 대상(${unresolvedTargets.join(", ")}) 출력 모드를 확인하지 못했습니다. 대상이 LayerPopup이면 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */`
         );
       }
       handlerLines.push(`${ind(2)}const matched =`);
@@ -896,20 +950,26 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   jsxLines.push(
     `${ind(3)}<thead className=${jsStringLiteral(TABLE_THEAD_CLS)}><tr className=${jsStringLiteral(TABLE_HEADER_ROW_CLS)}>`
   );
+  if (hasRowSelection) pushSelectHeaderCell(jsxLines, ind, rowsVar, selectedRowIdsVar, setSelectedRowIdsVar);
   columns.forEach((col) => pushHeaderCell(jsxLines, ind, col, suffix));
 
   jsxLines.push(`${ind(3)}</tr></thead>`);
   jsxLines.push(`${ind(3)}<tbody>`);
   jsxLines.push(`${ind(4)}{${loadingVar} ? (`);
   jsxLines.push(
-    `${ind(5)}<tr><td colSpan={${columns.length}} className=${jsStringLiteral(TABLE_EMPTY_CELL_CLS)}>{t('common.table.loading')}</td></tr>`
+    `${ind(5)}<tr><td colSpan={${stateCellColSpan}} className=${jsStringLiteral(TABLE_EMPTY_CELL_CLS)}>{t('common.table.loading')}</td></tr>`
   );
   jsxLines.push(`${ind(4)}) : ${rowsVar}.length === 0 ? (`);
   jsxLines.push(
-    `${ind(5)}<tr><td colSpan={${columns.length}} className=${jsStringLiteral(TABLE_EMPTY_CELL_CLS)}>{t('common.table.no_data')}</td></tr>`
+    `${ind(5)}<tr><td colSpan={${stateCellColSpan}} className=${jsStringLiteral(TABLE_EMPTY_CELL_CLS)}>{t('common.table.no_data')}</td></tr>`
   );
   jsxLines.push(`${ind(4)}) : ${rowsVar}.map((row, idx) => (`);
-  jsxLines.push(`${ind(5)}<tr key={idx} className=${jsStringLiteral(TABLE_TR_CLS)}>`);
+  jsxLines.push(
+    hasRowSelection
+      ? `${ind(5)}<tr key={idx} className={${selectedRowIdsVar}.includes(row._id as number) ? ${jsStringLiteral(tableSelectableRowClass(true, false))} : ${jsStringLiteral(tableSelectableRowClass(false, false))}}>`
+      : `${ind(5)}<tr key={idx} className=${jsStringLiteral(TABLE_TR_CLS)}>`
+  );
+  if (hasRowSelection) pushSelectBodyCell(jsxLines, ind, selectedRowIdsVar, setSelectedRowIdsVar);
   columns.forEach((col, colIdx) => pushBodyCell(jsxLines, ind, col, suffix, colIdx));
   jsxLines.push(`${ind(5)}</tr>`);
   jsxLines.push(`${ind(4)}))}`);

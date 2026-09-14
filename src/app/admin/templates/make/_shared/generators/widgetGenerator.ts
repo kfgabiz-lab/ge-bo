@@ -1,11 +1,15 @@
 import type { AnyWidget, TabItem, TabWidget, MultiSelectWidget } from "../components/renderer/types";
 import type { PageWidgetItem } from "../components/renderer/PageGridRenderer";
+import type { OutputMode } from "../hooks/useOutputMode";
+import type { LayerType, LayerWidth } from "../types";
 import { generateSearchBlock } from "./widget/searchBlock";
 import { generateTableBlock } from "./widget/tableBlock";
 import { generateSpaceBlock } from "./widget/spaceBlock";
+import { canEmitDataSave } from "./widget/space/dataSaveEmitter";
 import { generateFormBlock } from "./widget/formBlock";
 import { generateMultiSelectBlock } from "./widget/multiselectBlock";
 import { generateTabBlock } from "./widget/tabBlock";
+import { generateCategoryBlock } from "./widget/categoryBlock";
 import { normalizeFormItemRowSpans, packedRowLayout } from "../utils/formGridLayout";
 import { getSpaceGridColumn } from "../utils";
 import {
@@ -39,10 +43,13 @@ export interface WidgetCodeBlock {
   unhandled?: UnhandledConfigKeys[];
 }
 
-export interface TabPageConfig {
+export interface NestedPageConfig {
   widgetItems: PageWidgetItem[];
   mainConnectedSlug?: string;
   connectedType?: string;
+  outputMode?: OutputMode;
+  layerType?: LayerType;
+  layerWidth?: LayerWidth;
 }
 
 export interface TabPanelPlan {
@@ -59,6 +66,7 @@ export interface WidgetGenContext {
   suffixOf: (widgetId: string) => string;
   mainConnectedSlug?: string;
   isEntity: boolean;
+  outputMode: OutputMode;
   contentColSpan: number;
   contentFillHeight: boolean;
   pageSlug?: string;
@@ -69,6 +77,7 @@ export interface WidgetGenContext {
   blockOf?: (widget: PageWidget) => WidgetCodeBlock | undefined;
   tabSavedMarker?: string;
   insideTab: boolean;
+  outputModeOf: (slug?: string) => OutputMode | undefined;
 }
 
 export const GENERATED_PAGE_BASE_CONST = "const GENERATED_PAGE_BASE = '/admin/generated';";
@@ -141,9 +150,10 @@ export interface WidgetBuildOptions {
   mainConnectedSlug?: string;
   componentName?: string;
   isEntity?: boolean;
+  outputMode?: OutputMode;
   pageSlug?: string;
   leaveCheck?: boolean;
-  tabPageConfigs?: Record<string, TabPageConfig>;
+  nestedPageConfigs?: Record<string, NestedPageConfig>;
 }
 
 export interface WidgetUnhandledEntry {
@@ -152,10 +162,17 @@ export interface WidgetUnhandledEntry {
   keys: string[];
 }
 
+export interface WidgetBuildBlock {
+  scope: "root" | "tab";
+  outputMode: OutputMode;
+  pageSlug?: string;
+}
+
 export interface WidgetBuildResult {
   tsxCode: string;
   unsupported: PageWidgetType[];
   unhandled: WidgetUnhandledEntry[];
+  blocked: WidgetBuildBlock[];
 }
 
 const WIDGET_BLOCK_GENERATORS: Partial<Record<PageWidgetType, WidgetBlockGenerator>> = {
@@ -165,6 +182,7 @@ const WIDGET_BLOCK_GENERATORS: Partial<Record<PageWidgetType, WidgetBlockGenerat
   form: generateFormBlock as WidgetBlockGenerator,
   multiselect: generateMultiSelectBlock as WidgetBlockGenerator,
   tab: generateTabBlock as WidgetBlockGenerator,
+  category: generateCategoryBlock as WidgetBlockGenerator,
 };
 
 const TYPE_LABEL: Record<PageWidgetType, string> = {
@@ -370,11 +388,25 @@ const collectLeaveCheckNames = (allWidgets: PageWidget[]): string[] => {
   const hasDirtySource = allWidgets.some((w) => w.type === "form" || w.type === "multiselect");
   const spaceItems = allWidgets
     .filter((w) => w.type === "space")
-    .flatMap((w) => (w as { items?: { type?: string; connType?: string }[] }).items ?? []);
+    .flatMap(
+      (w) =>
+        (
+          w as {
+            items?: { type?: string; connType?: string; dataSaveSlug?: string; connectedContentWidgetIds?: string[] }[];
+          }
+        ).items ?? []
+    );
   const hasContentAction = spaceItems.some((it) => it.type === "action-button" && it.connType === "content");
+  const hasDataSaveAction = spaceItems.some(
+    (it) =>
+      it.type === "action-button" &&
+      it.connType === "datasave" &&
+      !!it.dataSaveSlug &&
+      canEmitDataSave(allWidgets, it.connectedContentWidgetIds ?? [])
+  );
   const hasCloseAction = spaceItems.some((it) => it.type === "action-button" && it.connType === "close");
   if (hasDirtySource) names.push("markDirty");
-  if (hasContentAction) names.push("markClean");
+  if (hasContentAction || (hasDataSaveAction && hasDirtySource)) names.push("markClean");
   if (hasCloseAction) names.push("confirmLeave");
   return names;
 };
@@ -504,6 +536,7 @@ export const emitGridItems = (
 interface WidgetScopeOptions {
   mainConnectedSlug?: string;
   isEntity: boolean;
+  outputMode: OutputMode;
   mergeExistingBeforeSave: boolean;
   tabSaveScope?: { tabWidgetId: string; tabIdx: number };
   insideTab?: boolean;
@@ -517,6 +550,14 @@ interface WidgetScopeMeta extends WidgetScopeOptions {
 export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuildOptions = {}): WidgetBuildResult => {
   const componentName = options.componentName || "GeneratedPage";
   const isEntity = options.isEntity ?? false;
+  const rootOutputMode = options.outputMode ?? "page";
+
+  const blocked: WidgetBuildBlock[] = [];
+  if (rootOutputMode !== "page") blocked.push({ scope: "root", outputMode: rootOutputMode });
+
+  const nestedPageConfigs = options.nestedPageConfigs ?? {};
+  const outputModeOf = (slug?: string): OutputMode | undefined =>
+    slug ? nestedPageConfigs[slug]?.outputMode : undefined;
 
   const rootGrid = prepareGridItems(items);
 
@@ -546,10 +587,14 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
     const plans: TabPanelPlan[] = [];
     const requiredGuardActive = tabWidget.tabs?.[0]?.required === true;
     (tabWidget.tabs ?? []).forEach((tab, tabIdx) => {
-      const config = tab.pageSlug ? options.tabPageConfigs?.[tab.pageSlug] : undefined;
+      const config = tab.pageSlug ? options.nestedPageConfigs?.[tab.pageSlug] : undefined;
       if (!config) {
         plans.push({ tab, items: [], autoHeightFlags: [], missing: true });
         return;
+      }
+      const tabOutputMode = config.outputMode ?? "page";
+      if (tabOutputMode !== "page") {
+        blocked.push({ scope: "tab", outputMode: tabOutputMode, pageSlug: tab.pageSlug });
       }
       const clonedItems = JSON.parse(JSON.stringify(config.widgetItems)) as PageWidgetItem[];
       const idPrefix = `${tabWidget.widgetId}_t${tabIdx}_`;
@@ -563,6 +608,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
         {
           mainConnectedSlug: parentScope.mainConnectedSlug || config.mainConnectedSlug,
           isEntity: config.connectedType === "data",
+          outputMode: parentScope.outputMode,
           mergeExistingBeforeSave: !!tab.contentKey,
           insideTab: true,
           ...(requiredGuardActive ? { tabSaveScope: { tabWidgetId: tabWidget.widgetId, tabIdx } } : {}),
@@ -578,6 +624,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
     {
       mainConnectedSlug: options.mainConnectedSlug,
       isEntity,
+      outputMode: rootOutputMode,
       mergeExistingBeforeSave: false,
     },
     0
@@ -614,6 +661,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
       suffixOf,
       mainConnectedSlug: scope?.mainConnectedSlug,
       isEntity: scope?.isEntity ?? isEntity,
+      outputMode: scope?.outputMode ?? rootOutputMode,
       contentColSpan: scope?.contentColSpan ?? 12,
       contentFillHeight: scope?.contentFillHeight ?? true,
       pageSlug: options.pageSlug,
@@ -624,6 +672,7 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
       blockOf,
       tabSavedMarker,
       insideTab: scope?.insideTab ?? false,
+      outputModeOf,
     };
     if (!generator) {
       unsupportedSet.add(widget.type);
@@ -731,5 +780,5 @@ export const buildWidgetTsxFile = (items: PageWidgetItem[], options: WidgetBuild
   lines.push(`${ind(1)});`);
   lines.push("}");
 
-  return { tsxCode: lines.join("\n"), unsupported: [...unsupportedSet], unhandled: unhandledEntries };
+  return { tsxCode: lines.join("\n"), unsupported: [...unsupportedSet], unhandled: unhandledEntries, blocked };
 };
