@@ -75,10 +75,34 @@ export function formatServerClockTime(): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-/** 현재 시각을 "활성 사이트의 timezone" 기준 "YYYY-MM-DD HH:mm:ss" 문자열로 표기 */
+/**
+ * 임의의 시각(Date)을 "활성 사이트의 timezone" 기준 "Sep 9, 2026" 형태의 영문 축약 날짜로 표기
+ * - fo(lse-na-fo)의 날짜 표기 방식(toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }))과 동일
+ * - getDateParts와 동일하게 zone 변환 실패 시 브라우저 로컬 타임존으로 폴백
+ */
+function formatShortDate(date: Date): string {
+  const zone = getActiveSiteTimezone();
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(date);
+  }
+}
+
+/** 현재 시각을 "활성 사이트의 timezone" 기준 "Sep 9, 2026 HH:mm:ss" 문자열로 표기 */
 export function formatServerClockDateTime(): string {
-  const { YYYY, MM, DD, hh, mm, ss } = getNowParts();
-  return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
+  const now = new Date(serverNowMs());
+  const { hh, mm, ss } = getDateParts(now);
+  return `${formatShortDate(now)} ${hh}:${mm}:${ss}`;
 }
 
 /**
