@@ -35,10 +35,18 @@ interface PageLayoutProps {
   description?: string;
   mode?: "preview" | "live";
   noGrid?: boolean;
+  className?: string;
   children: React.ReactNode;
 }
 
-export default function PageLayout({ title, description, mode = "live", noGrid = false, children }: PageLayoutProps) {
+export default function PageLayout({
+  title,
+  description,
+  mode = "live",
+  noGrid = false,
+  className,
+  children,
+}: PageLayoutProps) {
   const pathname = usePathname();
   const navMenus = useMenuStore((state) => state.navMenus);
   const { t } = useI18n();
@@ -80,7 +88,7 @@ export default function PageLayout({ title, description, mode = "live", noGrid =
   const wrapCls = showGrid ? "border border-slate-200 rounded-lg bg-slate-50" : "";
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3${className ? ` ${className}` : ""}`}>
       {displayTitle && (
         <div>
           <h1 className="text-lg font-bold text-slate-900">{displayTitle}</h1>

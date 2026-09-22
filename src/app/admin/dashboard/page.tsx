@@ -438,7 +438,7 @@ export default function DashboardPage() {
   }, [appliedSearch]);
 
   return (
-    <PageLayout mode="live">
+    <PageLayout mode="live" className="max-w-[1280px]">
       {/* 통계 리포트 — Google Looker Studio 임베드 */}
       <GridCell colSpan={12} rowSpan={14}>
         <RendererContainer bgColor="#ffffff">
