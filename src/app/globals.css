@@ -238,10 +238,6 @@ body .ProseMirror p {
   line-height: 24px;
 }
 
-body .ProseMirror p:after {
-  content: "↵";
-}
-
 body .ProseMirror p + p {
   margin-top: 8px;
 }
