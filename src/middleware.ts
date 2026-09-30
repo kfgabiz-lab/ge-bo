@@ -58,25 +58,23 @@ function badRequest(): NextResponse {
  * 막지 않도록 루트 경로로 한정한다.
  */
 /*
- * 요청 경로: 사용자 → Azure Front Door → App Service → Next.js → API
- * X-Forwarded-For는 "사용자IP, FrontDoorIP:port" 형태라 마지막 값은 Front Door IP가 된다.
- * 실제 접속 IP는 Front Door가 덮어써서 넣어주는 X-Azure-ClientIP를 우선 사용하고,
- * 없을 때(Front Door 미경유)만 XFF 마지막 값(App Service가 붙인 직전 홉)으로 폴백한다.
- * 이 값으로 XFF를 덮어써서 /api/v1 rewrite 대상(API 서버)에는 단일 IP만 전달한다.
+ * Azure App Service 앞단(플랫폼 프론트엔드)이 실제 접속 IP를 X-Forwarded-For의
+ * 마지막 값으로 붙여준다 — 클라이언트가 헤더에 값을 미리 넣어 보내도 앞쪽에 이어붙여질
+ * 뿐이므로, 마지막 값만 취하면 위조 불가능한 실제 접속 IP를 얻을 수 있다.
+ * 이 값으로 헤더 전체를 덮어써서 /api/v1 rewrite 대상(API 서버)에는 검증된 단일 IP만 전달한다.
  */
 function withTrustedForwardedFor(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
-  const azureClientIp = request.headers.get("x-azure-clientip")?.trim();
-  const realIp =
-    azureClientIp ||
-    request.headers
-      .get("x-forwarded-for")
-      ?.split(",")
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const realIp = forwardedFor
+      .split(",")
       .map((v) => v.trim())
       .filter(Boolean)
       .pop();
-  if (realIp) {
-    headers.set("x-forwarded-for", realIp);
+    if (realIp) {
+      headers.set("x-forwarded-for", realIp);
+    }
   }
   return headers;
 }
