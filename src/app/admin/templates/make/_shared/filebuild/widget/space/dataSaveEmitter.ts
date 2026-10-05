@@ -2,7 +2,14 @@ import type { FormWidget } from "../../../components/builder/FormBuilder";
 import type { TableWidget } from "../../../components/builder/TableBuilder";
 import type { MultiSelectWidget, SubListWidget } from "../../../components/renderer/types";
 import type { ImportRequirement, PageWidget, WidgetGenContext } from "../../widgetGenerator";
-import { jsStringLiteral, formVarNames, multiSelectVarNames, hasMultiSelectExtraFields } from "../../widgetGenerator";
+import {
+  jsStringLiteral,
+  formVarNames,
+  multiSelectVarNames,
+  sublistVarNames,
+  hasMultiSelectExtraFields,
+} from "../../widgetGenerator";
+import { hasSubListFileColumns } from "../sublistBlock";
 import { FILE_FIELD_TYPES } from "../../../constants";
 
 const UTILS_MODULE = "@/app/admin/templates/make/_shared/utils";
@@ -39,13 +46,24 @@ export const resolveDataSaveTargets = (
 
 export const canEmitDataSave = (allWidgets: PageWidget[], connectedContentWidgetIds: string[]): boolean => {
   const targets = resolveDataSaveTargets(allWidgets, connectedContentWidgetIds);
-  return targets.length > 0 && !targets.some((w) => w.type === "sublist");
+  return targets.length > 0;
 };
 
 export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult => {
   const { ctx, fnName, connectedContentWidgetIds, dataSaveSlug, goBackAfterAction, paramSave, validationRuleIds } = o;
-  const { ind, allWidgets, suffixOf, mainConnectedSlug, pageSlug, insideTab, leaveCheckNames } = ctx;
-  const emitGoBack = goBackAfterAction && !insideTab;
+  const {
+    ind,
+    allWidgets,
+    suffixOf,
+    mainConnectedSlug,
+    pageSlug,
+    insideTab,
+    leaveCheckNames,
+    insidePopup,
+    popupExtrasVar,
+    popupOnSavedFn,
+  } = ctx;
+  const emitGoBack = goBackAfterAction && !insideTab && !insidePopup;
 
   const targetWidgets = resolveDataSaveTargets(allWidgets, connectedContentWidgetIds);
 
@@ -58,17 +76,9 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
     };
   }
 
-  if (targetWidgets.some((w) => w.type === "sublist")) {
-    return {
-      handlerLines: [],
-      helperLines: [],
-      imports: [],
-      todo: `SubList 위젯이 연결된 데이터저장은 아직 코드 생성이 지원되지 않습니다. 직접 구현해주세요.`,
-    };
-  }
-
   const forms = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
   const multiSelects = targetWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
+  const subLists = targetWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
   const tables = targetWidgets.filter((w) => w.type === "table") as TableWidget[];
   const nonTableTargets = targetWidgets.filter((w) => w.type !== "table");
   const pageFormValueVars = allWidgets
@@ -79,6 +89,7 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
   const targetEntryOf = (w: DataSaveTargetWidget): string => {
     if (w.type === "form") return formVarNames(suffixOf(w.widgetId)).widget;
     if (w.type === "multiselect") return multiSelectVarNames(suffixOf(w.widgetId)).widget;
+    if (w.type === "sublist") return sublistVarNames(suffixOf(w.widgetId)).widget;
     const tw = w as TableWidget;
     return `{ type: 'table', widgetId: ${jsStringLiteral(tw.widgetId)}, contentKey: ${jsStringLiteral(tw.contentKey)}, enableRowSelection: ${tw.enableRowSelection === true} }`;
   };
@@ -113,6 +124,14 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
       .filter((tw) => tw.enableRowSelection === true)
       .map((tw) => `${jsStringLiteral(tw.widgetId)}: selectedRowIds${suffixOf(tw.widgetId)}`)
   );
+  const subListRowsMapLiteral = literalOf(
+    subLists.map((sw) => `${jsStringLiteral(sw.widgetId)}: ${sublistVarNames(suffixOf(sw.widgetId)).rows}`)
+  );
+  const subListsWithFiles = subLists.filter((sw) => hasSubListFileColumns(sw));
+  const subListFileMapLiteral = literalOf(
+    subListsWithFiles.map((sw) => `${jsStringLiteral(sw.widgetId)}: ${sublistVarNames(suffixOf(sw.widgetId)).fileMap}`)
+  );
+  const hasAnyFileUpload = hasFileFields || subListsWithFiles.length > 0;
 
   const imports: ImportRequirement[] = [
     { module: UTILS_MODULE, named: ["validateDataSaveWidgets"] },
@@ -124,8 +143,12 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
     imports.push({ module: UTILS_MODULE, named: ["buildDataJson", "buildDataSavePayload"] });
     imports.push({ module: "@/lib/api", defaultName: "api" });
   }
-  if (forms.length > 0) imports.push({ module: UTILS_MODULE, named: ["processFormFilesAndSubList"] });
+  if (forms.length > 0 || subLists.length > 0)
+    imports.push({ module: UTILS_MODULE, named: ["processFormFilesAndSubList"] });
   if (tables.length > 0) imports.push({ module: UTILS_MODULE, named: ["saveTableRows"] });
+  if (insidePopup && tables.some((tw) => tw.enableRowSelection === true)) {
+    imports.push({ module: UTILS_MODULE, named: ["extractTableSelectedRows"] });
+  }
   if (emitGoBack) imports.push({ module: "next/navigation", named: ["useRouter"] });
 
   const validationRuleIdsArr = validationRuleIds ?? [];
@@ -147,8 +170,8 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
   handlerLines.push(`${ind(3)}formValuesMap: ${formValuesMapLiteral},`);
   handlerLines.push(`${ind(3)}fileValuesMap: ${fileValuesMapLiteral},`);
   handlerLines.push(`${ind(3)}existingFileMetaMap: ${existingMetaMapLiteral},`);
-  handlerLines.push(`${ind(3)}subListRowsMap: {},`);
-  handlerLines.push(`${ind(3)}subListFileMap: {},`);
+  handlerLines.push(`${ind(3)}subListRowsMap: ${subListRowsMapLiteral},`);
+  handlerLines.push(`${ind(3)}subListFileMap: ${subListFileMapLiteral},`);
   handlerLines.push(`${ind(3)}multiSelectValuesMap: ${multiSelectMapLiteral},`);
   handlerLines.push(`${ind(3)}tableSelectedRowsMap: ${tableSelectedRowsMapLiteral},`);
   handlerLines.push(`${ind(3)}t,`);
@@ -156,38 +179,41 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
   handlerLines.push(`${ind(2)}try {`);
   if (tables.length > 0) handlerLines.push(`${ind(3)}let anySaved = false;`);
 
-  if (forms.length > 0) {
-    const destructure = hasFileFields ? "{ formFileIdsMap, allNewIds }" : "{ formFileIdsMap }";
+  if (forms.length > 0 || subLists.length > 0) {
+    const destructure = hasAnyFileUpload
+      ? "{ formFileIdsMap, processedSubListRowsMap, allNewIds }"
+      : "{ formFileIdsMap, processedSubListRowsMap }";
     handlerLines.push(`${ind(3)}const ${destructure} = await processFormFilesAndSubList({`);
     handlerLines.push(`${ind(4)}targetWidgets: ${nonTableExpr},`);
     handlerLines.push(`${ind(4)}fileValuesMap: ${fileValuesMapLiteral},`);
     handlerLines.push(`${ind(4)}existingFileMetaMap: ${existingMetaMapLiteral},`);
-    handlerLines.push(`${ind(4)}subListRowsMap: {},`);
-    handlerLines.push(`${ind(4)}subListFileMap: {},`);
+    handlerLines.push(`${ind(4)}subListRowsMap: ${subListRowsMapLiteral},`);
+    handlerLines.push(`${ind(4)}subListFileMap: ${subListFileMapLiteral},`);
     handlerLines.push(`${ind(4)}dataSaveSlug: ${jsStringLiteral(dataSaveSlug)},`);
     handlerLines.push(`${ind(3)}});`);
   }
 
   if (nonTableTargets.length > 0) {
+    const hasFormFileIdsMap = forms.length > 0 || subLists.length > 0;
     handlerLines.push(`${ind(3)}const { dataJson, pkKeys } = buildDataJson(`);
     handlerLines.push(`${ind(4)}${nonTableExpr} as Parameters<typeof buildDataJson>[0],`);
     handlerLines.push(`${ind(4)}${formValuesMapLiteral},`);
-    handlerLines.push(`${ind(4)}${forms.length > 0 ? "formFileIdsMap" : "{}"},`);
-    handlerLines.push(`${ind(4)}{},`);
+    handlerLines.push(`${ind(4)}${hasFormFileIdsMap ? "formFileIdsMap" : "{}"},`);
+    handlerLines.push(`${ind(4)}${subLists.length > 0 ? "processedSubListRowsMap" : "{}"},`);
     handlerLines.push(`${ind(4)}${multiSelectMapLiteral},`);
     handlerLines.push(`${ind(4)}${multiSelectExtraFieldMapLiteral},`);
     handlerLines.push(`${ind(4)}${mainConnectedSlug ? jsStringLiteral(mainConnectedSlug) : "undefined"},`);
     handlerLines.push(`${ind(4)}${allFormValuesExpr}`);
     handlerLines.push(`${ind(3)});`);
     handlerLines.push(
-      `${ind(3)}${hasFileFields ? "const res = " : ""}await api.post(${jsStringLiteral(`/page-data/${dataSaveSlug}`)}, buildDataSavePayload({`
+      `${ind(3)}${hasAnyFileUpload ? "const res = " : ""}await api.post(${jsStringLiteral(`/page-data/${dataSaveSlug}`)}, buildDataSavePayload({`
     );
     handlerLines.push(`${ind(4)}dataJson,`);
     handlerLines.push(`${ind(4)}pkKeys,`);
     handlerLines.push(`${ind(4)}templateSlug: ${templateSlugExpr},`);
     if (validationRuleIdsExpr) handlerLines.push(`${ind(4)}validationRuleIds: ${validationRuleIdsExpr},`);
     handlerLines.push(`${ind(3)}}));`);
-    if (hasFileFields) {
+    if (hasAnyFileUpload) {
       handlerLines.push(`${ind(3)}if (allNewIds.length > 0 && res.data.id) {`);
       handlerLines.push(`${ind(4)}await api.patch('/page-files/link', { fileIds: allNewIds, dataId: res.data.id });`);
       handlerLines.push(`${ind(3)}}`);
@@ -206,7 +232,9 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
     const savedVar = `saved${s}`;
     const rowsExpr =
       tw.enableRowSelection === true
-        ? `rows${s}.filter((r) => selectedRowIds${s}.includes(Number(r['_id'])))`
+        ? insidePopup
+          ? `extractTableSelectedRows(selectedRowData${s}, ${jsStringLiteral(tw.widgetId)}, selectedRowIds${s}, rows${s})`
+          : `rows${s}.filter((r) => selectedRowIds${s}.includes(Number(r['_id'])))`
         : `rows${s}`;
     handlerLines.push(`${ind(3)}const ${rowsToSaveVar} = ${rowsExpr};`);
     handlerLines.push(`${ind(3)}if (${rowsToSaveVar}.length === 0) {`);
@@ -223,7 +251,11 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
       handlerLines.push(`${ind(4)}columns: [${colsLiteral}],`);
     }
     handlerLines.push(`${ind(4)}rows: ${rowsToSaveVar},`);
-    handlerLines.push(`${ind(4)}extras: {},`);
+    if (insidePopup && popupExtrasVar) {
+      handlerLines.push(`${ind(4)}extras: ${popupExtrasVar}[${jsStringLiteral(tw.contentKey ?? "")}] ?? {},`);
+    } else {
+      handlerLines.push(`${ind(4)}extras: {},`);
+    }
     handlerLines.push(`${ind(4)}dataSaveSlug: ${jsStringLiteral(dataSaveSlug)},`);
     handlerLines.push(`${ind(4)}templateSlug: ${templateSlugExpr},`);
     if (paramSave) handlerLines.push(`${ind(4)}paramSave: ${jsStringLiteral(paramSave)},`);
@@ -235,6 +267,7 @@ export const emitDataSaveHandler = (o: DataSaveEmitOptions): DataSaveEmitResult 
   const successLines: string[] = [`toast.success(t('common.saved'));`];
   if (leaveCheckNames.includes("markClean")) successLines.push(`markClean();`);
   if (emitGoBack) successLines.push(`router.back();`);
+  if (insidePopup && popupOnSavedFn) successLines.push(`${popupOnSavedFn}();`);
 
   if (tables.length > 0) {
     handlerLines.push(`${ind(3)}if (anySaved) {`);

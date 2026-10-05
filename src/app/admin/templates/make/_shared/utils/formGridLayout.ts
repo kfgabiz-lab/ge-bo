@@ -188,6 +188,26 @@ export function packedRowCount(items: GridSizedItem[], columns: number, dense: b
   return packedRowLayout(items, columns, dense).maxRow;
 }
 
+export interface AutoHeightEligibleItem {
+  rowSpan: number;
+  rowIsAuto?: boolean[];
+}
+
+export function resolveItemAutoHeightFlags(items: AutoHeightEligibleItem[], layout: PackedLayout): boolean[] {
+  return items.map((item, idx) => {
+    const rowIsAuto = item.rowIsAuto;
+    if (!rowIsAuto || rowIsAuto.length === 0) return false;
+    if (!rowIsAuto[rowIsAuto.length - 1]) return false;
+    const lastRow = layout.lastRow[idx];
+    const startRow = lastRow - item.rowSpan + 1;
+    for (let r = startRow; r <= lastRow; r++) {
+      const owners = layout.owners[r] ?? [];
+      if (owners.length !== 1 || owners[0] !== idx) return false;
+    }
+    return true;
+  });
+}
+
 function rowSpanForContentHeight(heightPx: number, rowPitch: number, gap: number): number {
   return Math.max(1, Math.ceil((heightPx + gap) / rowPitch));
 }
@@ -441,4 +461,100 @@ export function normalizeFormItemRowSpans<T extends NormalizableFormContent>(
     rowIsAuto,
     contentAutoTrailing,
   };
+}
+
+export interface GeneratedGridWidgetLike {
+  type: string;
+  align?: string;
+  fields?: FormFieldItem[];
+  title?: string;
+  titleMsgKey?: string;
+  items?: { colSpan?: number; rowSpan?: number }[];
+  tabs?: { contentRowSpan?: number }[];
+  displayMode?: string;
+}
+
+export interface GeneratedGridContentDef {
+  id?: string;
+  colSpan: number;
+  rowSpan: number;
+  widget: GeneratedGridWidgetLike;
+}
+
+export interface GeneratedGridItemDef {
+  colSpan: number;
+  rowSpan: number;
+  contents: GeneratedGridContentDef[];
+}
+
+export interface GeneratedGridContentLayout {
+  visible: boolean;
+  rowSpan: number;
+  heightStyle: Record<string, string>;
+}
+
+export interface GeneratedGridItemLayout {
+  colSpan: number;
+  rowSpan: number;
+  autoHeight: boolean;
+  rowTracks?: string;
+  contents: GeneratedGridContentLayout[];
+}
+
+export function resolveGeneratedGridLayout(
+  items: GeneratedGridItemDef[],
+  contentVisible: boolean[],
+  visibility: FormVisibilityContext
+): GeneratedGridItemLayout[] {
+  let offset = 0;
+  const perItem = items.map((item) => {
+    const visFlags = contentVisible.slice(offset, offset + item.contents.length);
+    offset += item.contents.length;
+    const visibleContents = item.contents.filter((_, i) => visFlags[i]);
+    const normalized = normalizeFormItemRowSpans(
+      item.colSpan,
+      item.rowSpan,
+      visibleContents as unknown as NormalizableFormContent[],
+      visibility
+    );
+    return { item, visFlags, normalized };
+  });
+
+  const pageLayout = packedRowLayout(
+    perItem.map(({ item, normalized }) => ({ colSpan: item.colSpan, rowSpan: normalized.rowSpan })),
+    12,
+    false
+  );
+  const autoHeightFlags = resolveItemAutoHeightFlags(
+    perItem.map(({ normalized }) => ({ rowSpan: normalized.rowSpan, rowIsAuto: normalized.rowIsAuto })),
+    pageLayout
+  );
+
+  return perItem.map(({ item, visFlags, normalized }, itemIdx) => {
+    let visibleIdx = 0;
+    const contents: GeneratedGridContentLayout[] = item.contents.map((c, i): GeneratedGridContentLayout => {
+      if (!visFlags[i]) return { visible: false, rowSpan: c.rowSpan, heightStyle: {} };
+      const normalizedContent = normalized.contents[visibleIdx];
+      const isAutoTrailing = normalized.contentAutoTrailing[visibleIdx] ?? false;
+      visibleIdx += 1;
+      return {
+        visible: true,
+        rowSpan: normalizedContent.rowSpan,
+        heightStyle: isAutoTrailing ? {} : { height: `${normalizedContent.rowSpan * ROW_HEIGHT - GAP_SIZE}px` },
+      };
+    });
+
+    const rowTracks =
+      normalized.rowIsAuto.length > 0
+        ? normalized.rowIsAuto.map((auto) => (auto ? "auto" : `${ROW_HEIGHT - GAP_SIZE}px`)).join(" ")
+        : undefined;
+
+    return {
+      colSpan: item.colSpan,
+      rowSpan: normalized.rowSpan,
+      autoHeight: autoHeightFlags[itemIdx],
+      rowTracks,
+      contents,
+    };
+  });
 }

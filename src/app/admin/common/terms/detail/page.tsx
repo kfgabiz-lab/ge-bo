@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
-import { PageGridContainer } from "@/components/layout/page-grid-container";
+import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheck } from "@/app/admin/templates/make/_shared/hooks/useLeaveCheck";
@@ -20,6 +20,7 @@ import {
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
   initFormDefaultValues,
+  applyUrlParamFormOverrides,
   buildFormValuesFromDataJson,
   validateFormFields,
   buildDataJson,
@@ -39,6 +40,7 @@ import {
   buildFormFileIdsMap,
   persistContentDataJson,
 } from "@/app/admin/templates/make/_shared/utils/contentSave";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 
 const TiptapEditor = dynamic(() => import("@/components/common/tiptap-editor"), { ssr: false });
 const FORM_WIDGET_Form1: FormWidget = {
@@ -111,6 +113,7 @@ export default function GeneratedPage() {
     fetchGroups();
   }, [fetchGroups]);
   const uid = useId();
+  const confirmLeaveStoreSpace1 = useLeaveCheckStore((s) => s.confirmLeave);
   const router = useRouter();
 
   const urlParams = useMemo(() => {
@@ -122,7 +125,9 @@ export default function GeneratedPage() {
     return map;
   }, [searchParams]);
 
-  const allFieldKeyToId = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t).allFieldKeyToId, [t]);
+  const fieldKeyIdAndLabelMaps = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t), [t]);
+  const allFieldKeyToId = fieldKeyIdAndLabelMaps.allFieldKeyToId;
+  const allFieldLabels = fieldKeyIdAndLabelMaps.allFieldLabels;
   const allFormValues = useMemo(() => Object.assign({}, formValuesForm1) as Record<string, string>, [formValuesForm1]);
   const lastGeneratedRef = useRef<Record<string, string>>({});
 
@@ -230,7 +235,11 @@ export default function GeneratedPage() {
   useEffect(() => {
     if (storedId === null) {
       if (!sitesLoaded || !clockReady) return;
-      const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);
+      const defaults = applyUrlParamFormOverrides(
+        initFormDefaultValues(ALL_FORM_WIDGETS, t),
+        ALL_FORM_WIDGETS,
+        searchParams
+      );
       setFormValuesForm1(defaults["qw-form-1780982718770"] ?? {});
       return;
     }
@@ -250,8 +259,9 @@ export default function GeneratedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedId, searchParams, sitesLoaded, clockReady]);
 
-  const visibleFieldsForm1 = FORM_FIELDS_Form1.filter(
-    (f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))
+  const visibleFieldsForm1 = useMemo(
+    () => FORM_FIELDS_Form1.filter((f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))),
+    [evalFieldConditionForm1]
   );
   const fieldRowIsAutoForm1 = calculateFormFieldRowTracks(visibleFieldsForm1, 12, false);
 
@@ -270,7 +280,8 @@ export default function GeneratedPage() {
         {},
         "termsMgmt-data",
         allFormValues,
-        false
+        false,
+        allFieldKeyToId
       );
       await persistContentDataJson({
         connectedSlug: "termsMgmt-data",
@@ -300,140 +311,138 @@ export default function GeneratedPage() {
   };
 
   return (
-    <div className="space-y-3">
-      <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={10} autoHeight>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `auto auto auto auto auto auto auto auto auto auto`,
-              gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-              gridAutoFlow: "row dense",
-              rowGap: `${GAP_SIZE}px`,
-              columnGap: 0,
-            }}
-          >
-            <div style={{ gridColumn: "span 12", gridRow: "span 9" }}>
-              <div
-                className="w-full rounded border border-slate-200"
-                style={{
-                  overflow: "clip",
-                  backgroundColor: "#ffffff",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(12, 1fr)",
-                  gridTemplateRows:
-                    fieldRowIsAutoForm1.length > 0
-                      ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
-                      : undefined,
-                  gridAutoRows: `78px`,
-                  rowGap: `12px`,
-                  columnGap: `12px`,
-                  paddingTop: "10px",
-                  paddingBottom: "10px",
-                }}
-              >
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("terms.label.select")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex items-center gap-4">
-                      {resolveFieldOptions(
-                        FORM_FIELD_BY_ID_Form1["fb_13lpo5xvp"] as unknown as SearchFieldConfig,
-                        groups
-                      ).map((opt) => {
-                        const parsed = parseOpt(opt);
-                        return (
-                          <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name={`${uid}-field-fb_13lpo5xvp`}
-                              disabled={evalFieldConditionForm1("update=1, publish_dttm<today()")}
-                              value={parsed.value}
-                              checked={(formValuesForm1["fb_13lpo5xvp"] ?? "") === parsed.value}
-                              onChange={() => handleFieldChangeForm1("fb_13lpo5xvp", parsed.value)}
-                              className="w-4 h-4 cursor-pointer"
-                            />
-                            <span className="text-sm text-slate-700">{t(parsed.text)}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.publishDttm")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <input
-                      type="date"
-                      disabled={evalFieldConditionForm1("update=1, publish_dttm<today()")}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      value={formValuesForm1["fb_ph3gsmbca"] ?? ""}
-                      min={formatNowBySubType("date") || formatNowBySubType("date")}
-                      onChange={(e) => handleFieldChangeForm1("fb_ph3gsmbca", e.target.value)}
-                      onClick={(e) => e.currentTarget.showPicker?.()}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 6" }}>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <TiptapEditor
-                      initialValue={formValuesForm1["fb_0ng9hx80s"] ?? ""}
-                      onChange={(v: string) => handleFieldChangeForm1("fb_0ng9hx80s", v)}
-                      height="528px"
-                    />
+    <PageLayout mode="live">
+      <GridCell colSpan={12} rowSpan={10} autoHeight>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(12, 1fr)",
+            gridTemplateRows: `auto auto auto auto auto auto auto auto auto auto`,
+            gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+            gridAutoFlow: "row dense",
+            rowGap: `${GAP_SIZE}px`,
+            columnGap: 0,
+          }}
+        >
+          <div style={{ gridColumn: "span 12", gridRow: "span 9" }}>
+            <div
+              className="w-full rounded border border-slate-200"
+              style={{
+                overflow: "clip",
+                backgroundColor: "#ffffff",
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gridTemplateRows:
+                  fieldRowIsAutoForm1.length > 0
+                    ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
+                    : undefined,
+                gridAutoRows: `78px`,
+                rowGap: `12px`,
+                columnGap: `12px`,
+                paddingTop: "10px",
+                paddingBottom: "10px",
+              }}
+            >
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("terms.label.select")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex items-center gap-4">
+                    {resolveFieldOptions(
+                      FORM_FIELD_BY_ID_Form1["fb_13lpo5xvp"] as unknown as SearchFieldConfig,
+                      groups
+                    ).map((opt) => {
+                      const parsed = parseOpt(opt);
+                      return (
+                        <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`${uid}-field-fb_13lpo5xvp`}
+                            disabled={evalFieldConditionForm1("update=1, publish_dttm<today()")}
+                            value={parsed.value}
+                            checked={(formValuesForm1["fb_13lpo5xvp"] ?? "") === parsed.value}
+                            onChange={() => handleFieldChangeForm1("fb_13lpo5xvp", parsed.value)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                          <span className="text-sm text-slate-700">{t(parsed.text)}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-            </div>
-            <div style={{ gridColumn: "span 2", gridRow: "span 1" }}>
-              <div
-                className="w-full rounded"
-                style={{
-                  overflow: "visible",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  rowGap: `${GAP_SIZE}px`,
-                  columnGap: `${GAP_SIZE}px`,
-                }}
-              >
-                <div
-                  className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
-                  style={{ gridColumn: "span 2", gridRow: "span 1" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeave()) return;
-                      router.back();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
-                  >
-                    {t("common.label.list")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm(t("common.confirm.save"))) return;
-                      handleContentActionSpace1_1();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
-                  >
-                    {t("common.btn.save")}
-                  </button>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.publishDttm")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <input
+                    type="date"
+                    disabled={evalFieldConditionForm1("update=1, publish_dttm<today()")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    value={formValuesForm1["fb_ph3gsmbca"] ?? ""}
+                    min={formatNowBySubType("date") || formatNowBySubType("date")}
+                    onChange={(e) => handleFieldChangeForm1("fb_ph3gsmbca", e.target.value)}
+                    onClick={(e) => e.currentTarget.showPicker?.()}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 6" }}>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <TiptapEditor
+                    initialValue={formValuesForm1["fb_0ng9hx80s"] ?? ""}
+                    onChange={(v: string) => handleFieldChangeForm1("fb_0ng9hx80s", v)}
+                    height="528px"
+                  />
                 </div>
               </div>
             </div>
           </div>
-        </GridCell>
-      </PageGridContainer>
-    </div>
+          <div style={{ gridColumn: "span 2", gridRow: "span 1" }}>
+            <div
+              className="w-full rounded"
+              style={{
+                overflow: "visible",
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                rowGap: `${GAP_SIZE}px`,
+                columnGap: `${GAP_SIZE}px`,
+              }}
+            >
+              <div
+                className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
+                style={{ gridColumn: "span 2", gridRow: "span 1" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmLeaveStoreSpace1 && !confirmLeaveStoreSpace1()) return;
+                    router.back();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
+                >
+                  {t("common.label.list")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(t("common.confirm.save"))) return;
+                    handleContentActionSpace1_1();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
+                >
+                  {t("common.btn.save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </GridCell>
+    </PageLayout>
   );
 }

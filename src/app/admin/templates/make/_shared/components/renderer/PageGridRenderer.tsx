@@ -27,7 +27,7 @@ import type { TableWidget } from "../builder/TableBuilder";
 import type { CodeGroupDef } from "../../types";
 import type { FormWidget } from "../builder/FormBuilder";
 import { useNormalizedWidgetItems } from "../../hooks/useNormalizedWidgetItems";
-import { packedRowLayout } from "../../utils/formGridLayout";
+import { packedRowLayout, resolveItemAutoHeightFlags } from "../../utils/formGridLayout";
 
 const RANGE_FIELD_TYPES: readonly string[] = ["dateRange", "yearMonthRange"];
 
@@ -461,20 +461,7 @@ export function PageGridRenderer({
   );
 
   const itemAutoHeightFlags = useMemo(
-    () =>
-      normalizedWidgetItems.map((item, idx) => {
-        const rowIsAuto = item.rowIsAuto;
-        if (!rowIsAuto || rowIsAuto.length === 0) return false;
-        if (!rowIsAuto[rowIsAuto.length - 1]) return false;
-
-        const lastRow = pageLevelPackedLayout.lastRow[idx];
-        const startRow = lastRow - item.rowSpan + 1;
-        for (let r = startRow; r <= lastRow; r++) {
-          const owners = pageLevelPackedLayout.owners[r] ?? [];
-          if (owners.length !== 1 || owners[0] !== idx) return false;
-        }
-        return true;
-      }),
+    () => resolveItemAutoHeightFlags(normalizedWidgetItems, pageLevelPackedLayout),
     [normalizedWidgetItems, pageLevelPackedLayout]
   );
 

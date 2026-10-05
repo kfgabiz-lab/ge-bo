@@ -90,6 +90,14 @@ export function booleanCellClass(boolVal: boolean): string {
   return `text-sm truncate block ${boolVal ? "text-emerald-600 font-medium" : "text-slate-400"}`;
 }
 
+export function inlineEditToggleTrackClass(boolVal: boolean, isPreview: boolean): string {
+  return `relative w-9 h-5 rounded-full transition-colors ${boolVal ? "bg-slate-900" : "bg-slate-300"} ${isPreview ? "cursor-default" : "cursor-pointer"}`;
+}
+
+export function inlineEditToggleKnobClass(boolVal: boolean): string {
+  return `absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${boolVal ? "translate-x-4" : "translate-x-0.5"}`;
+}
+
 export const DATE_CELL_CLS = "text-sm text-slate-700 truncate block";
 export const TEXT_CELL_CLS = "text-sm text-slate-700 truncate block";
 export const BADGE_FALLBACK_TEXT_CLS = "text-sm text-slate-600";
@@ -302,6 +310,10 @@ export function categoryDeleteButtonClass(isPreview: boolean, isSelected: boolea
 export function categoryDescClass(isSelected: boolean): string {
   return `text-[10px] line-clamp-1 ${isSelected ? "text-white/60" : "text-slate-400"}`;
 }
+
+export const CATEGORY_SEARCH_WRAP_CLS = "flex gap-2 w-full";
+export const CATEGORY_SEARCH_SELECT_CLS =
+  "flex-1 h-8 rounded border border-slate-200 bg-white px-2 text-[13px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400";
 
 export const GENERATED_TABLE_SCROLL_MORE_CLS = "py-4 text-center text-xs text-slate-400";
 export const GENERATED_TABLE_UNSUPPORTED_CELL_CLS = "text-slate-300";

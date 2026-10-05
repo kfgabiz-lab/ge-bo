@@ -8,8 +8,10 @@ import {
   emitContainerOpen,
   emitContainerClose,
   GENERATED_PAGE_BASE_CONST,
+  searchVarNames,
+  buildLayerPopupComponentLines,
 } from "../widgetGenerator";
-import { getColumnRelationIds } from "../../utils";
+import { getColumnRelationIds, buildDateRangeStatusSortExpr } from "../../utils";
 import { CUSTOM_ACTION_COLORS } from "../../components/builder/fields/col-types";
 import {
   TABLE_ACTIONS_WRAP_CLS,
@@ -40,6 +42,8 @@ import {
   TEXT_CELL_CLS,
   BADGE_FALLBACK_TEXT_CLS,
   booleanCellClass,
+  inlineEditToggleTrackClass,
+  inlineEditToggleKnobClass,
   TABLE_CONTAINER_CLS,
   TABLE_COUNT_TOTAL_CLS,
   TABLE_COUNT_RANGE_CLS,
@@ -60,9 +64,20 @@ const PHASE1_CELL_TYPES = new Set<CellType>([
   "button",
   "actions",
   "dateRangeStatus",
+  "inlineEdit",
 ]);
 
-const SUPPORTED_ACTIONS = new Set(["edit", "delete"]);
+const SUPPORTED_ACTIONS = new Set(["edit", "delete", "copy"]);
+
+const APPLY_DOT_FIELD_HELPER: string[] = [
+  "function applyDotField(obj: Record<string, unknown>, key: string, value: unknown): Record<string, unknown> {",
+  "    const idx = key.indexOf('.');",
+  "    if (idx === -1) return { ...obj, [key]: value };",
+  "    const head = key.slice(0, idx);",
+  "    const tail = key.slice(idx + 1);",
+  "    return { ...obj, [head]: applyDotField((obj[head] as Record<string, unknown>) ?? {}, tail, value) };",
+  "}",
+];
 
 const FORMAT_CELL_DATE_HELPER: string[] = [
   "function formatCellDate(rawVal: string, format?: string): string {",
@@ -90,6 +105,7 @@ const HANDLED_TABLE_WIDGET_KEYS = new Set([
   "displayMode",
   "sourceFilter",
   "enableRowSelection",
+  "contentRelation",
 ]);
 const IGNORED_TABLE_WIDGET_KEYS = new Map<string, string>([
   [
@@ -128,6 +144,9 @@ const HANDLED_COLUMN_KEYS = new Set([
   "connType",
   "targetType",
   "externalUrl",
+  "externalUrlSourceType",
+  "externalUrlCodeGroup",
+  "externalUrlCode",
   "buttonLabel",
   "buttonLabelMsgKey",
   "buttonColor",
@@ -142,6 +161,11 @@ const HANDLED_COLUMN_KEYS = new Set([
   "inRangeTextMsgKey",
   "afterText",
   "afterTextMsgKey",
+  "inlineEditType",
+  "inlineEditFieldKey",
+  "inlineEditTrueValue",
+  "inlineEditFalseValue",
+  "copyFixedParams",
 ]);
 const IGNORED_COLUMN_KEYS = new Map<string, string>();
 
@@ -213,15 +237,23 @@ const hasRelation = (col: TableColumnConfig): boolean =>
 const hasUnsupportedRelation = (col: TableColumnConfig): boolean => hasRelation(col) && col.cellType !== "text";
 
 const isButtonColumnSupported = (col: TableColumnConfig): boolean =>
-  (col.targetType ?? "slug") === "url" && !!col.externalUrl;
+  (col.targetType ?? "slug") === "url" &&
+  (col.externalUrlSourceType === "code" ? !!(col.externalUrlCodeGroup && col.externalUrlCode) : !!col.externalUrl);
 
 const isActionsColumnSupported = (col: TableColumnConfig): boolean =>
   (col.actions ?? []).some((a) => SUPPORTED_ACTIONS.has(a));
 
-const isColumnSupported = (col: TableColumnConfig): boolean => {
+const isInlineEditColumnSupported = (col: TableColumnConfig, isEntity: boolean): boolean =>
+  !isEntity &&
+  (col.inlineEditType ?? "toggle") === "toggle" &&
+  !!col.inlineEditFieldKey &&
+  col.inlineEditRelationSlugId == null;
+
+const isColumnSupported = (col: TableColumnConfig, isEntity: boolean): boolean => {
   if (!PHASE1_CELL_TYPES.has(col.cellType) || hasUnsupportedRelation(col)) return false;
   if (col.cellType === "button") return isButtonColumnSupported(col);
   if (col.cellType === "actions") return isActionsColumnSupported(col);
+  if (col.cellType === "inlineEdit") return isInlineEditColumnSupported(col, isEntity);
   return true;
 };
 
@@ -288,15 +320,33 @@ const pushHeaderCell = (
   jsxLines.push(`${ind(2)}</th>`);
 };
 
-const unsupportedColumnReason = (col: TableColumnConfig): string => {
+const unsupportedColumnReason = (col: TableColumnConfig, isEntity: boolean): string => {
   if (hasUnsupportedRelation(col)) {
     return `relationSlugId 연동 컬럼은 cellType='text'만 코드 생성이 지원됩니다.`;
   }
   if (col.cellType === "button") {
-    return `button 셀은 targetType='url' + externalUrl 조합만 코드 생성이 지원됩니다. 내부 slug 이동/레이어 팝업은 직접 구현해주세요.`;
+    if ((col.targetType ?? "slug") !== "url") {
+      return `button 셀은 targetType='url'만 코드 생성이 지원됩니다. 내부 slug 이동/레이어 팝업은 직접 구현해주세요.`;
+    }
+    if (col.externalUrlSourceType === "code") {
+      return `button 셀의 공통코드 기반 URL은 externalUrlCodeGroup + externalUrlCode가 모두 설정되어야 코드 생성이 지원됩니다.`;
+    }
+    return `button 셀은 externalUrl이 설정되어야 코드 생성이 지원됩니다.`;
   }
   if (col.cellType === "actions") {
-    return `actions 셀은 edit/delete 프리셋만 코드 생성이 지원됩니다.`;
+    return `actions 셀은 edit/delete/copy 프리셋만 코드 생성이 지원됩니다.`;
+  }
+  if (col.cellType === "inlineEdit") {
+    if (isEntity) {
+      return `inlineEdit 셀은 entity 연결 테이블에서는 아직 코드 생성이 지원되지 않습니다.`;
+    }
+    if (col.inlineEditRelationSlugId != null) {
+      return `inlineEdit 셀은 저장 대상을 연동 slug로 리다이렉트하는 inlineEditRelationSlugId 설정은 아직 코드 생성이 지원되지 않습니다.`;
+    }
+    if ((col.inlineEditType ?? "toggle") !== "toggle") {
+      return `inlineEdit 셀은 toggle 타입만 코드 생성이 지원됩니다. radio/checkbox는 직접 구현해주세요.`;
+    }
+    return `inlineEdit 셀은 inlineEditFieldKey(저장 경로)가 설정되어야 코드 생성이 지원됩니다.`;
   }
   return `cellType='${col.cellType}' 컬럼은 아직 코드 생성이 지원되지 않습니다.`;
 };
@@ -306,15 +356,16 @@ const pushBodyCell = (
   ind: (n: number) => string,
   col: TableColumnConfig,
   suffix: string,
-  colIdx: number
+  colIdx: number,
+  isEntity: boolean
 ): void => {
   const widthStyle = col.width ? `, width: '${col.width}${col.widthUnit || "px"}'` : "";
   jsxLines.push(
     `${ind(3)}<td className=${jsStringLiteral(TABLE_TD_CLS)} style={{ textAlign: '${col.align}'${widthStyle} }}>`
   );
 
-  if (!isColumnSupported(col)) {
-    jsxLines.push(`${ind(4)}{/* TODO(파일빌드): ${unsupportedColumnReason(col)} */}`);
+  if (!isColumnSupported(col, isEntity)) {
+    jsxLines.push(`${ind(4)}{/* TODO(파일빌드): ${unsupportedColumnReason(col, isEntity)} */}`);
     jsxLines.push(`${ind(4)}<span className=${jsStringLiteral(GENERATED_TABLE_UNSUPPORTED_CELL_CLS)}>-</span>`);
     jsxLines.push(`${ind(3)}</td>`);
     return;
@@ -343,6 +394,13 @@ const pushBodyCell = (
         `${ind(5)}<button type="button" onClick={() => handleTableDelete${suffix}(row._id as number)} className=${jsStringLiteral(tableActionButtonClass("delete"))} title={t('common.btn.delete')}>`
       );
       jsxLines.push(`${ind(6)}<Trash2 className=${jsStringLiteral(TABLE_ACTION_ICON_CLS)} />`);
+      jsxLines.push(`${ind(5)}</button>`);
+    }
+    if (actions.includes("copy")) {
+      jsxLines.push(
+        `${ind(5)}<button type="button" onClick={() => handleTableCopy${suffix}(row)} className=${jsStringLiteral(tableActionButtonClass("copy"))} title={t('common.btn.copy')}>`
+      );
+      jsxLines.push(`${ind(6)}<CopyPlus className=${jsStringLiteral(TABLE_ACTION_ICON_CLS)} />`);
       jsxLines.push(`${ind(5)}</button>`);
     }
     jsxLines.push(`${ind(4)}</div>`);
@@ -522,6 +580,27 @@ const pushBodyCell = (
       );
       break;
     }
+    case "inlineEdit": {
+      const hasValueMap = !!col.inlineEditTrueValue && !!col.inlineEditFalseValue;
+      const boolValExpr = hasValueMap
+        ? `String(value) === ${jsStringLiteral(col.inlineEditTrueValue as string)}`
+        : `Boolean(value)`;
+      const nextValueExpr = hasValueMap
+        ? `boolVal ? ${jsStringLiteral(col.inlineEditFalseValue as string)} : ${jsStringLiteral(col.inlineEditTrueValue as string)}`
+        : `!boolVal`;
+      jsxLines.push(`${ind(5)}const boolVal = ${boolValExpr};`);
+      jsxLines.push(`${ind(5)}const nextValue = ${nextValueExpr};`);
+      jsxLines.push(`${ind(5)}return (`);
+      jsxLines.push(
+        `${ind(6)}<button type="button" onClick={() => handleInlineEdit${suffix}(row, ${jsStringLiteral(col.inlineEditFieldKey as string)}, nextValue)} className={boolVal ? ${jsStringLiteral(inlineEditToggleTrackClass(true, false))} : ${jsStringLiteral(inlineEditToggleTrackClass(false, false))}}>`
+      );
+      jsxLines.push(
+        `${ind(7)}<div className={boolVal ? ${jsStringLiteral(inlineEditToggleKnobClass(true))} : ${jsStringLiteral(inlineEditToggleKnobClass(false))}} />`
+      );
+      jsxLines.push(`${ind(6)}</button>`);
+      jsxLines.push(`${ind(5)});`);
+      break;
+    }
     default:
       jsxLines.push(`${ind(5)}return null;`);
       break;
@@ -551,7 +630,7 @@ const buildUnhandled = (widget: TableWidget, supportedColumns: TableColumnConfig
 };
 
 export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): WidgetCodeBlock => {
-  const { suffix, ind, allWidgets, suffixOf, mainConnectedSlug, isEntity, outputModeOf } = ctx;
+  const { suffix, ind, allWidgets, suffixOf, mainConnectedSlug, isEntity, outputModeOf, insidePopup } = ctx;
   const rowsVar = `rows${suffix}`;
   const setRowsVar = `setRows${suffix}`;
   const totalVar = `total${suffix}`;
@@ -570,14 +649,25 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   const fetchFn = `fetchData${suffix}`;
   const selectedRowIdsVar = `selectedRowIds${suffix}`;
   const setSelectedRowIdsVar = `setSelectedRowIds${suffix}`;
+  const selectedRowDataVar = `selectedRowData${suffix}`;
+  const setSelectedRowDataVar = `setSelectedRowData${suffix}`;
+  const handleRowsSelectVar = `handleRowsSelect${suffix}`;
 
   const resolvedSlug = widget.connectedSlug || mainConnectedSlug || "";
   const columns = widget.columns || [];
-  const supportedColumns = columns.filter(isColumnSupported);
+  const supportedColumns = columns.filter((c) => isColumnSupported(c, isEntity));
   const isPagination = widget.displayMode !== "scroll";
   const hasRowSelection = widget.enableRowSelection === true;
+  const usesSelectionCache = hasRowSelection && insidePopup;
   const stateCellColSpan = columns.length + (hasRowSelection ? 1 : 0);
   const needsSort = columns.some((c) => c.sortable);
+  const sortColumnsLiteral = JSON.stringify(
+    columns.map((c) => ({
+      accessor: c.accessor,
+      relationSlugId: c.relationSlugId,
+      relationSlugIds: c.relationSlugIds,
+    }))
+  );
   const needsDateFormat = columns.some((c) => c.cellType === "date");
   const needsDataExpr = supportedColumns.some((c) => !!c.data);
   const needsCodeGroup = supportedColumns.some(
@@ -585,7 +675,9 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   );
   const needsBadge = supportedColumns.some((c) => c.cellType === "badge" && !!c.cellOptions?.length);
   const needsRelationFormat = supportedColumns.some((c) => c.cellType === "text" && hasRelation(c));
-  const sortExprEntries = !isEntity ? columns.filter((c) => c.sortable && !!c.data) : [];
+  const sortExprEntries = !isEntity
+    ? columns.filter((c) => c.sortable && (!!c.data || !!buildDateRangeStatusSortExpr(c)))
+    : [];
   const needsSortExpr = needsSort && sortExprEntries.length > 0;
   const drsKeys = Array.from(
     new Set(
@@ -599,14 +691,25 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   const actionsColumns = supportedColumns.filter((c) => c.cellType === "actions");
   const buttonColumns = columns
     .map((c, colIdx) => ({ col: c, colIdx }))
-    .filter(({ col }) => col.cellType === "button" && isColumnSupported(col));
+    .filter(({ col }) => col.cellType === "button" && isColumnSupported(col, isEntity));
+  const needsGroupsState = needsCodeGroup || buttonColumns.length > 0;
   const needsEditAction = actionsColumns.some((c) => (c.actions ?? []).includes("edit"));
   const needsDeleteAction = actionsColumns.some((c) => (c.actions ?? []).includes("delete"));
+  const needsCopyAction = actionsColumns.some((c) => (c.actions ?? []).includes("copy"));
+  const copyActionsColRaw = columns.find((c) => c.cellType === "actions");
+  const copyFixedParamsValue = copyActionsColRaw?.copyFixedParams;
+  const fileColumnAccessors = columns
+    .filter((c) => c.cellType === "file" && !!c.accessor)
+    .map((c) => c.accessor as string);
+  const needsInlineEdit = supportedColumns.some((c) => c.cellType === "inlineEdit");
   const editRulesColumn = actionsColumns.find((c) => (c.editPageRules ?? []).length > 0);
   const editRules = editRulesColumn?.editPageRules ?? [];
+  const editLayerPlans = (ctx.layerPopupPlans ?? []).filter((p) => p.role === "edit");
   const needsRouter = needsEditAction && editRules.length > 0;
   const needsParseActionParams =
-    (needsEditAction && editRules.length > 0) || buttonColumns.some(({ col }) => !!col.passParam);
+    (needsEditAction && editRules.length > 0) ||
+    buttonColumns.some(({ col }) => !!col.passParam) ||
+    (needsCopyAction && !!copyFixedParamsValue);
 
   const imports: ImportRequirement[] = [
     { module: "@/lib/api", defaultName: "api" },
@@ -618,6 +721,9 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     { module: "@/hooks/use-i18n", named: ["useI18n"] },
   ];
   if (needsSort) imports.push({ module: "lucide-react", named: ["ChevronUp", "ChevronDown", "ChevronsUpDown"] });
+  if (needsSort) {
+    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveFetchSortKey"] });
+  }
   if (isEntity) {
     imports.push({
       module: "@/app/admin/templates/make/_shared/utils/entityApi",
@@ -632,6 +738,8 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   }
   if (needsCodeGroup) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveCodeLabel"] });
+  }
+  if (needsGroupsState) {
     imports.push({ module: "@/store/use-code-store", named: ["useCodeStore"] });
   }
   if (needsDrsKeys) {
@@ -654,12 +762,24 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     imports.push({ module: "lucide-react", named: ["Trash2"] });
     imports.push({ module: "@/lib/api", defaultName: "api", named: ["getApiErrorMessage"] });
   }
+  if (needsCopyAction) {
+    imports.push({ module: "lucide-react", named: ["CopyPlus"] });
+    if (fileColumnAccessors.length > 0) {
+      imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveAccessor"] });
+    }
+  }
+  if (usesSelectionCache) {
+    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["mergeTableSelectedRowCache"] });
+  }
   if (needsRouter) imports.push({ module: "next/navigation", named: ["useRouter"] });
   if (needsParseActionParams) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["parseActionParams"] });
   }
   if (buttonColumns.length > 0) {
-    imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["normalizeExternalUrl"] });
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/utils",
+      named: ["normalizeExternalUrl", "resolveButtonExternalUrl"],
+    });
   }
 
   const searchWidgetIds = new Set(
@@ -674,7 +794,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
 
   const stateLines: string[] = [];
   stateLines.push(`${ind(1)}const { t } = useI18n();`);
-  if (needsCodeGroup) {
+  if (needsGroupsState) {
     stateLines.push(`${ind(1)}const { groups, fetchGroups } = useCodeStore();`);
     stateLines.push(`${ind(1)}useEffect(() => { fetchGroups(); }, [fetchGroups]);`);
   }
@@ -694,12 +814,28 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   if (hasRowSelection) {
     stateLines.push(`${ind(1)}const [${selectedRowIdsVar}, ${setSelectedRowIdsVar}] = useState<number[]>([]);`);
   }
+  if (usesSelectionCache) {
+    stateLines.push(
+      `${ind(1)}const [${selectedRowDataVar}, ${setSelectedRowDataVar}] = useState<Record<string, Record<number, Record<string, unknown>>>>({});`
+    );
+  }
   stateLines.push(`${ind(1)}const ${dataSlugVar} = ${jsStringLiteral(resolvedSlug)};`);
   if (needsRouter) stateLines.push(`${ind(1)}const router = useRouter();`);
+  editLayerPlans.forEach((_, idx) => {
+    stateLines.push(
+      `${ind(1)}const [popupOpenEdit${suffix}_${idx}, setPopupOpenEdit${suffix}_${idx}] = useState(false);`
+    );
+    stateLines.push(
+      `${ind(1)}const [popupEditIdEdit${suffix}_${idx}, setPopupEditIdEdit${suffix}_${idx}] = useState<number | null>(null);`
+    );
+  });
 
   const helperLines = needsDateFormat ? [...FORMAT_CELL_DATE_HELPER] : [];
+  if (needsCopyAction) helperLines.push(...APPLY_DOT_FIELD_HELPER);
   if (needsSortExpr) {
-    const entries = sortExprEntries.map((c) => `${jsStringLiteral(c.accessor)}: ${jsStringLiteral(c.data as string)}`);
+    const entries = sortExprEntries.map(
+      (c) => `${jsStringLiteral(c.accessor)}: ${jsStringLiteral((c.data || buildDateRangeStatusSortExpr(c)) as string)}`
+    );
     helperLines.push(`const ${sortExprMapVar}: Record<string, string> = { ${entries.join(", ")} };`);
   }
   if (needsRouter && editRules.length > 0) {
@@ -717,6 +853,20 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       )};`
     );
   }
+  buttonColumns.forEach(({ col, colIdx }) => {
+    helperLines.push(
+      `const BTN_URL_${suffix}_${colIdx}: { externalUrlSourceType?: 'direct' | 'code'; externalUrlCodeGroup?: string; externalUrlCode?: string; externalUrl?: string } = ${JSON.stringify(
+        {
+          externalUrlSourceType: col.externalUrlSourceType,
+          externalUrlCodeGroup: col.externalUrlCodeGroup,
+          externalUrlCode: col.externalUrlCode,
+          externalUrl: col.externalUrl,
+        },
+        null,
+        4
+      )};`
+    );
+  });
 
   const handlerLines: string[] = [];
   if (brokenSearchIds.length > 0) {
@@ -724,17 +874,37 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       `${ind(1)}/* TODO(파일빌드): Table '${suffix}'에 연결된 Search 위젯(${brokenSearchIds.join(", ")})이 이 페이지에 없습니다. 참조가 끊어졌습니다. */`
     );
   }
+  if (usesSelectionCache) {
+    handlerLines.push(`${ind(1)}const ${handleRowsSelectVar} = (ids: number[]) => {`);
+    handlerLines.push(`${ind(2)}${setSelectedRowIdsVar}(ids);`);
+    handlerLines.push(
+      `${ind(2)}${setSelectedRowDataVar}((prev) => mergeTableSelectedRowCache(prev, ${jsStringLiteral(widget.widgetId)}, ids, ${rowsVar}));`
+    );
+    handlerLines.push(`${ind(1)}};`);
+    handlerLines.push("");
+  }
+  const skipSortCapable = needsSort && (needsInlineEdit || needsDeleteAction);
   handlerLines.push(
-    `${ind(1)}const ${fetchFn} = async (page: number, notify = false, searchOverrides?: Record<string, Record<string, string>>, sortOverride?: { sk: string | null; sd: 'asc' | 'desc' }) => {`
+    `${ind(1)}const ${fetchFn} = async (page: number, notify = false, searchOverrides?: Record<string, Record<string, string>>, sortOverride?: { sk: string | null; sd: 'asc' | 'desc' }${
+      skipSortCapable ? ", skipSort = false" : ""
+    }) => {`
   );
   handlerLines.push(`${ind(2)}if (!${dataSlugVar}) { if (notify) toast.error(t('common.error.load_data')); return; }`);
   handlerLines.push(`${ind(2)}${setLoadingVar}(true);`);
   handlerLines.push(`${ind(2)}try {`);
   if (needsSort) {
-    handlerLines.push(`${ind(3)}const sk = sortOverride ? sortOverride.sk : ${sortKeyVar};`);
-    handlerLines.push(`${ind(3)}const sd = sortOverride ? sortOverride.sd : ${sortDirVar};`);
+    handlerLines.push(
+      `${ind(3)}const sk = sortOverride ? sortOverride.sk : ${
+        skipSortCapable ? `(skipSort ? null : ${sortKeyVar})` : sortKeyVar
+      };`
+    );
+    handlerLines.push(
+      `${ind(3)}const sd = sortOverride ? sortOverride.sd : ${
+        skipSortCapable ? `(skipSort ? 'asc' : ${sortDirVar})` : sortDirVar
+      };`
+    );
     handlerLines.push(`${ind(3)}let ${resolvedSortKeyVar}: string | null = sk;`);
-    handlerLines.push(`${ind(3)}if (sk) {`);
+    handlerLines.push(`${ind(3)}if (sk && sortOverride) {`);
     handlerLines.push(`${ind(4)}for (const r of ${rowsVar}) {`);
     handlerLines.push(`${ind(5)}const pathMap = r._pathMap as Record<string, string> | undefined;`);
     handlerLines.push(`${ind(5)}if (pathMap?.[sk]) { ${resolvedSortKeyVar} = pathMap[sk]; break; }`);
@@ -746,7 +916,9 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   handlerLines.push(`${ind(4)}params: {`);
   handlerLines.push(`${ind(5)}page, size: ${widget.pageSize || 10},`);
   if (needsSort)
-    handlerLines.push(`${ind(5)}...(${resolvedSortKeyVar} ? { sort: ${resolvedSortKeyVar} + ',' + sd } : {}),`);
+    handlerLines.push(
+      `${ind(5)}...(${resolvedSortKeyVar} ? { sort: resolveFetchSortKey(${sortColumnsLiteral}, ${resolvedSortKeyVar}) + ',' + sd } : {}),`
+    );
   if (needsSortExpr)
     handlerLines.push(`${ind(5)}...(sk && ${sortExprMapVar}[sk] ? { sortExpr: ${sortExprMapVar}[sk] } : {}),`);
   if (needsDrsKeys) handlerLines.push(`${ind(5)}drsKeys: ${jsStringLiteral(drsKeys.join(","))},`);
@@ -757,6 +929,15 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   });
   if (widget.sourceFilter && !isEntity)
     handlerLines.push(`${ind(5)}filterExpr: ${jsStringLiteral(widget.sourceFilter)},`);
+  if (widget.contentRelation?.inner) {
+    const innerRelationId = widget.contentRelation.inner.relationId;
+    handlerLines.push(`${ind(5)}innerRel_${innerRelationId}: ${jsStringLiteral(String(innerRelationId))},`);
+  }
+  if (widget.contentRelation?.outer) {
+    handlerLines.push(
+      `${ind(5)}fetchRelationIds: ${jsStringLiteral(widget.contentRelation.outer.relationIds.join(","))},`
+    );
+  }
   handlerLines.push(`${ind(4)}},`);
   handlerLines.push(`${ind(3)}});`);
   if (isEntity) {
@@ -799,7 +980,15 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   handlerLines.push(`${ind(2)}}`);
   handlerLines.push(`${ind(1)}};`);
   handlerLines.push("");
-  handlerLines.push(`${ind(1)}useEffect(() => { ${fetchFn}(0); }, []);`);
+  if (linkedSearchSuffixes.length > 0) {
+    const readyVars = linkedSearchSuffixes.map((searchSuffix) => searchVarNames(searchSuffix).defaultsReady);
+    handlerLines.push(`${ind(1)}useEffect(() => {`);
+    handlerLines.push(`${ind(2)}if (!(${readyVars.join(" && ")})) return;`);
+    handlerLines.push(`${ind(2)}${fetchFn}(0);`);
+    handlerLines.push(`${ind(1)}}, [${readyVars.join(", ")}]);`);
+  } else {
+    handlerLines.push(`${ind(1)}useEffect(() => { ${fetchFn}(0); }, []);`);
+  }
   handlerLines.push("");
 
   if (needsSort) {
@@ -821,8 +1010,13 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       );
     } else {
       const popupRules = editRules.filter((r) => (r.connType ?? "popup") !== "page");
+      const handledLayerPopupSlugs = new Set(editLayerPlans.map((p) => p.slug));
       const layerPopupTargets = [
-        ...new Set(popupRules.filter((r) => outputModeOf(r.pageSlug) === "layerpopup").map((r) => r.pageSlug)),
+        ...new Set(
+          popupRules
+            .filter((r) => outputModeOf(r.pageSlug) === "layerpopup" && !handledLayerPopupSlugs.has(r.pageSlug ?? ""))
+            .map((r) => r.pageSlug)
+        ),
       ];
       const unresolvedTargets = [
         ...new Set(
@@ -849,6 +1043,18 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       );
       handlerLines.push(`${ind(3)}}) ?? EDIT_PAGE_RULES_${suffix}.find((rule) => !rule.conditionParam);`);
       handlerLines.push(`${ind(2)}if (!matched?.pageSlug) return;`);
+      if (editLayerPlans.length > 0) {
+        handlerLines.push(`${ind(2)}if ((matched.connType ?? 'popup') === 'popup') {`);
+        editLayerPlans.forEach((plan, idx) => {
+          const kw = idx === 0 ? "if" : "} else if";
+          handlerLines.push(`${ind(3)}${kw} (matched.pageSlug === ${jsStringLiteral(plan.slug)}) {`);
+          handlerLines.push(`${ind(4)}setPopupEditIdEdit${suffix}_${idx}(row._id as number);`);
+          handlerLines.push(`${ind(4)}setPopupOpenEdit${suffix}_${idx}(true);`);
+          handlerLines.push(`${ind(4)}return;`);
+        });
+        handlerLines.push(`${ind(3)}}`);
+        handlerLines.push(`${ind(2)}}`);
+      }
       handlerLines.push(`${ind(2)}const params = new URLSearchParams();`);
       handlerLines.push(`${ind(2)}if (row._id != null) params.set('id', String(row._id));`);
       handlerLines.push(`${ind(2)}if (matched.passParam) {`);
@@ -864,15 +1070,114 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     handlerLines.push("");
   }
 
+  const editLayerPopupJsx: string[] = [];
+  editLayerPlans.forEach((plan, idx) => {
+    const openVar = `popupOpenEdit${suffix}_${idx}`;
+    const setOpenVar = `setPopupOpenEdit${suffix}_${idx}`;
+    const savedFnVar = `handleLayerPopupSavedEdit${suffix}_${idx}`;
+    const componentName = `LayerPopup_${suffix}_edit_${idx}`;
+
+    handlerLines.push(`${ind(1)}const ${savedFnVar} = () => { ${fetchFn}(${pageVar}); ${setOpenVar}(false); };`);
+    handlerLines.push("");
+
+    const built = buildLayerPopupComponentLines(plan, componentName, ctx.blockOf ?? (() => undefined), suffixOf, true);
+    helperLines.push(built.text);
+    imports.push(...built.imports);
+
+    const titleExpr = plan.layerTitleMsgKey
+      ? `t(${jsStringLiteral(plan.layerTitleMsgKey)})`
+      : jsStringLiteral(plan.layerTitle ?? "");
+    const editIdVar = `popupEditIdEdit${suffix}_${idx}`;
+    if (plan.layerType === "right") {
+      editLayerPopupJsx.push(
+        `${ind(1)}<RightDrawerLayout open={${openVar}} onClose={() => ${setOpenVar}(false)} title={${titleExpr}}>`
+      );
+      editLayerPopupJsx.push(
+        `${ind(2)}<${componentName} onClose={() => ${setOpenVar}(false)} onSaved={${savedFnVar}} extras={{}} editId={${editIdVar}} />`
+      );
+      editLayerPopupJsx.push(`${ind(1)}</RightDrawerLayout>`);
+      imports.push({ module: "@/components/layout/popup/right-drawer-layout", defaultName: "RightDrawerLayout" });
+    } else {
+      editLayerPopupJsx.push(
+        `${ind(1)}<CenterPopupLayout open={${openVar}} onClose={() => ${setOpenVar}(false)} title={${titleExpr}} layerWidth=${jsStringLiteral(plan.layerWidth)}>`
+      );
+      editLayerPopupJsx.push(
+        `${ind(2)}<${componentName} onClose={() => ${setOpenVar}(false)} onSaved={${savedFnVar}} extras={{}} editId={${editIdVar}} />`
+      );
+      editLayerPopupJsx.push(`${ind(1)}</CenterPopupLayout>`);
+      imports.push({ module: "@/components/layout/popup/center-popup-layout", defaultName: "CenterPopupLayout" });
+    }
+  });
+
   if (needsDeleteAction) {
     handlerLines.push(`${ind(1)}const handleTableDelete${suffix} = async (id: number) => {`);
     handlerLines.push(`${ind(2)}if (!confirm(t('common.confirm.delete'))) return;`);
     handlerLines.push(`${ind(2)}try {`);
     handlerLines.push(`${ind(3)}await api.delete(\`/page-data/\${${dataSlugVar}}/\${id}\`);`);
     handlerLines.push(`${ind(3)}toast.success(t('common.deleted'));`);
-    handlerLines.push(`${ind(3)}${fetchFn}(${pageVar});`);
+    handlerLines.push(`${ind(3)}${fetchFn}(0${skipSortCapable ? ", false, undefined, undefined, true" : ""});`);
     handlerLines.push(`${ind(2)}} catch (err) {`);
     handlerLines.push(`${ind(3)}toast.error(getApiErrorMessage(err, t('common.error.delete')));`);
+    handlerLines.push(`${ind(2)}}`);
+    handlerLines.push(`${ind(1)}};`);
+    handlerLines.push("");
+  }
+
+  if (needsCopyAction) {
+    handlerLines.push(`${ind(1)}const handleTableCopy${suffix} = async (row: Record<string, unknown>) => {`);
+    handlerLines.push(`${ind(2)}if (!confirm(t('common.confirm.copy'))) return;`);
+    handlerLines.push(`${ind(2)}const id = row._id as number;`);
+    handlerLines.push(`${ind(2)}if (!id) return;`);
+    handlerLines.push(`${ind(2)}try {`);
+    handlerLines.push(`${ind(3)}const detailRes = await api.get(\`/page-data/\${${dataSlugVar}}/\${id}\`);`);
+    handlerLines.push(`${ind(3)}const originalDataJson = (detailRes.data.dataJson ?? {}) as Record<string, unknown>;`);
+    handlerLines.push(`${ind(3)}let copyDataJson = originalDataJson;`);
+    if (fileColumnAccessors.length > 0) {
+      handlerLines.push(`${ind(3)}${JSON.stringify(fileColumnAccessors)}.forEach((accessor) => {`);
+      handlerLines.push(`${ind(4)}if (resolveAccessor(originalDataJson, accessor) !== undefined) {`);
+      handlerLines.push(`${ind(5)}copyDataJson = applyDotField(copyDataJson, accessor, []);`);
+      handlerLines.push(`${ind(4)}}`);
+      handlerLines.push(`${ind(3)}});`);
+    }
+    if (copyFixedParamsValue) {
+      handlerLines.push(`${ind(3)}const flatOriginal = flattenPageDataItem(detailRes.data);`);
+      handlerLines.push(
+        `${ind(3)}Object.entries(parseActionParams(${jsStringLiteral(copyFixedParamsValue)}, flatOriginal)).forEach(([key, value]) => {`
+      );
+      handlerLines.push(`${ind(4)}copyDataJson = applyDotField(copyDataJson, key, value);`);
+      handlerLines.push(`${ind(3)}});`);
+    }
+    handlerLines.push(`${ind(3)}await api.post(\`/page-data/\${${dataSlugVar}}\`, { dataJson: copyDataJson });`);
+    handlerLines.push(`${ind(3)}toast.success(t('common.copied'));`);
+    handlerLines.push(`${ind(3)}${fetchFn}(${pageVar});`);
+    handlerLines.push(`${ind(2)}} catch (e) {`);
+    handlerLines.push(
+      `${ind(3)}const response = (e as { response?: { status?: number; data?: { message?: string } } })?.response;`
+    );
+    handlerLines.push(`${ind(3)}if (response?.status === 409) {`);
+    handlerLines.push(`${ind(4)}toast.error(response.data?.message || t('common.error.duplicate_key'));`);
+    handlerLines.push(`${ind(3)}} else {`);
+    handlerLines.push(`${ind(4)}toast.error(t('common.error.copy'));`);
+    handlerLines.push(`${ind(3)}}`);
+    handlerLines.push(`${ind(2)}}`);
+    handlerLines.push(`${ind(1)}};`);
+    handlerLines.push("");
+  }
+
+  if (needsInlineEdit) {
+    handlerLines.push(
+      `${ind(1)}const handleInlineEdit${suffix} = async (row: Record<string, unknown>, fieldKey: string, value: unknown) => {`
+    );
+    handlerLines.push(`${ind(2)}const rowId = row._id as number | undefined;`);
+    handlerLines.push(`${ind(2)}if (rowId == null) return;`);
+    handlerLines.push(`${ind(2)}try {`);
+    handlerLines.push(
+      `${ind(3)}await api.patch(\`/page-data/\${${dataSlugVar}}/\${rowId}/field\`, { fieldKey, value });`
+    );
+    handlerLines.push(`${ind(3)}${fetchFn}(0${skipSortCapable ? ", false, undefined, undefined, true" : ""});`);
+    handlerLines.push(`${ind(2)}} catch (err) {`);
+    handlerLines.push(`${ind(3)}console.error('[inlineEdit] 오류:', err);`);
+    handlerLines.push(`${ind(3)}toast.error(t('common.error.update'));`);
     handlerLines.push(`${ind(2)}}`);
     handlerLines.push(`${ind(1)}};`);
     handlerLines.push("");
@@ -882,7 +1187,17 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     const width = col.windowPopupOption?.width ?? 800;
     const height = col.windowPopupOption?.height ?? 600;
     const usesPreviewToken = !!col.usePreviewToken;
+    const isCodeMode = col.externalUrlSourceType === "code";
     handlerLines.push(`${ind(1)}const handleTableButton${suffix}_${colIdx} = (row: Record<string, unknown>) => {`);
+    handlerLines.push(`${ind(2)}const resolvedUrl = resolveButtonExternalUrl(BTN_URL_${suffix}_${colIdx}, groups);`);
+    if (isCodeMode) {
+      handlerLines.push(`${ind(2)}if (!resolvedUrl) {`);
+      handlerLines.push(`${ind(3)}toast.error('연결된 공통코드 값을 찾을 수 없습니다.');`);
+      handlerLines.push(`${ind(3)}return;`);
+      handlerLines.push(`${ind(2)}}`);
+    } else {
+      handlerLines.push(`${ind(2)}if (!resolvedUrl) return;`);
+    }
     if (usesPreviewToken) {
       handlerLines.push(`${ind(2)}const popup = window.open('', '_blank', 'width=${width},height=${height}');`);
       handlerLines.push(`${ind(2)}if (!popup) {`);
@@ -895,9 +1210,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       handlerLines.push(
         `${ind(4)}const res = await api.post<{ token: string }>('/preview-tokens', { slug: ${dataSlugVar}, recordId });`
       );
-      handlerLines.push(
-        `${ind(4)}const normalizedBase = normalizeExternalUrl(${jsStringLiteral(col.externalUrl ?? "")}).replace(/\\/$/, '');`
-      );
+      handlerLines.push(`${ind(4)}const normalizedBase = normalizeExternalUrl(resolvedUrl).replace(/\\/$/, '');`);
       handlerLines.push(`${ind(4)}const detailUrl = new URL(\`\${normalizedBase}/\${recordId}\`);`);
       handlerLines.push(
         `${ind(4)}popup.location.href = \`\${detailUrl.origin}/preview?token=\${encodeURIComponent(res.data.token)}&redirect=\${encodeURIComponent(detailUrl.pathname)}\`;`
@@ -908,9 +1221,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       handlerLines.push(`${ind(3)}}`);
       handlerLines.push(`${ind(2)}})();`);
     } else {
-      handlerLines.push(
-        `${ind(2)}const urlObj = new URL(normalizeExternalUrl(${jsStringLiteral(col.externalUrl ?? "")}));`
-      );
+      handlerLines.push(`${ind(2)}const urlObj = new URL(normalizeExternalUrl(resolvedUrl));`);
       if (col.passParam) {
         handlerLines.push(
           `${ind(2)}Object.entries(parseActionParams(${jsStringLiteral(col.passParam)}, row)).forEach(([k, v]) => urlObj.searchParams.set(k, v));`
@@ -950,7 +1261,14 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
   jsxLines.push(
     `${ind(3)}<thead className=${jsStringLiteral(TABLE_THEAD_CLS)}><tr className=${jsStringLiteral(TABLE_HEADER_ROW_CLS)}>`
   );
-  if (hasRowSelection) pushSelectHeaderCell(jsxLines, ind, rowsVar, selectedRowIdsVar, setSelectedRowIdsVar);
+  if (hasRowSelection)
+    pushSelectHeaderCell(
+      jsxLines,
+      ind,
+      rowsVar,
+      selectedRowIdsVar,
+      usesSelectionCache ? handleRowsSelectVar : setSelectedRowIdsVar
+    );
   columns.forEach((col) => pushHeaderCell(jsxLines, ind, col, suffix));
 
   jsxLines.push(`${ind(3)}</tr></thead>`);
@@ -969,8 +1287,14 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
       ? `${ind(5)}<tr key={idx} className={${selectedRowIdsVar}.includes(row._id as number) ? ${jsStringLiteral(tableSelectableRowClass(true, false))} : ${jsStringLiteral(tableSelectableRowClass(false, false))}}>`
       : `${ind(5)}<tr key={idx} className=${jsStringLiteral(TABLE_TR_CLS)}>`
   );
-  if (hasRowSelection) pushSelectBodyCell(jsxLines, ind, selectedRowIdsVar, setSelectedRowIdsVar);
-  columns.forEach((col, colIdx) => pushBodyCell(jsxLines, ind, col, suffix, colIdx));
+  if (hasRowSelection)
+    pushSelectBodyCell(
+      jsxLines,
+      ind,
+      selectedRowIdsVar,
+      usesSelectionCache ? handleRowsSelectVar : setSelectedRowIdsVar
+    );
+  columns.forEach((col, colIdx) => pushBodyCell(jsxLines, ind, col, suffix, colIdx, isEntity));
   jsxLines.push(`${ind(5)}</tr>`);
   jsxLines.push(`${ind(4)}))}`);
   jsxLines.push(`${ind(3)}</tbody>`);
@@ -997,6 +1321,7 @@ export const generateTableBlock = (widget: TableWidget, ctx: WidgetGenContext): 
     );
   }
   jsxLines.push(emitContainerClose());
+  editLayerPopupJsx.forEach((l) => jsxLines.push(l));
 
   return {
     imports,

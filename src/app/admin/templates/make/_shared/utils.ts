@@ -1710,10 +1710,7 @@ export function buildDataJson(
   const dataJson: Record<string, unknown> = {};
   const pkKeys: string[] = [];
 
-  /* 현재 저장 대상 위젯들의 contentKey 집합 — cross-tab generationKey 판별용
-   * 첫 세그먼트가 이 집합에 없으면 다른 탭 참조(cross-tab) → 저장 단계에서 skip */
   const currentContentKeys = new Set(widgets.map((w) => w.contentKey).filter((k): k is string => !!k));
-  /* generationKey의 첫 세그먼트가 현재 저장 대상 contentKey가 아니면 cross-tab으로 판별 */
   const isCrossTabKey = (generationKey: string): boolean => {
     if (!generationKey.includes(".")) return false;
     if (currentContentKeys.size === 0) return false;
@@ -1793,8 +1790,6 @@ export function buildDataJson(
         if (FILE_FIELD_TYPES.includes(f.type as (typeof FILE_FIELD_TYPES)[number])) return;
         const sourceValue = rawValues[f.id] ?? "";
 
-        /* 단일 generationKey 처리 (기존 호환, 콤마 다중지정 지원)
-         * cross-tab 참조(다른 탭 contentKey)는 UI에서 이미 반영되므로 저장 단계에서 skip */
         if (f.generationKey) {
           const transformed = applyDataGeneration(
             sourceValue,
@@ -1809,7 +1804,6 @@ export function buildDataJson(
           });
         }
 
-        /* 다중 dataGenerations 배열 처리 (콤마 다중지정 지원) */
         (f.dataGenerations ?? []).forEach((dg) => {
           if (!dg.generationKey) return;
           const transformed = applyDataGeneration(
@@ -1821,7 +1815,6 @@ export function buildDataJson(
             dg.stripHtml
           );
           splitGenerationKeys(dg.generationKey).forEach((key) => {
-            /* cross-tab 참조는 저장 단계에서 skip — UI(crossTabFormValues 경로)에서 이미 반영됨 */
             if (isCrossTabKey(key)) return;
             if (dg.onlyIfEmpty && generationTargetKeyToId[key]) return;
             writeToGenerationPath(dataJson, key, transformed);
@@ -2383,6 +2376,41 @@ export function buildRowActionQuery(
   return `?${params.toString()}`;
 }
 
+export function buildParamSaveExtras(
+  initialValues: Record<string, string>,
+  formContentKeys: (string | undefined)[],
+  tableContentKeys: (string | undefined)[],
+  formFieldMeta: { contentKey?: string; fieldKey: string }[]
+): Record<string, unknown> {
+  const extras: Record<string, unknown> = {};
+
+  Object.entries(initialValues).forEach(([key, value]) => {
+    const dotIdx = key.indexOf(".");
+    if (dotIdx !== -1) {
+      const contentKey = key.slice(0, dotIdx);
+      const fieldKey = key.slice(dotIdx + 1);
+      const hasForm = formContentKeys.includes(contentKey);
+      const hasTable = tableContentKeys.includes(contentKey);
+      if (!hasForm && !hasTable) return;
+
+      if (hasTable && !hasForm) {
+        extras[contentKey] = { ...((extras[contentKey] as Record<string, string>) ?? {}), [fieldKey]: value };
+        return;
+      }
+
+      const hasField = formFieldMeta.some((m) => m.contentKey === contentKey && m.fieldKey === fieldKey);
+      if (!hasField) {
+        extras[contentKey] = { ...((extras[contentKey] as Record<string, string>) ?? {}), [fieldKey]: value };
+      }
+    } else {
+      const hasField = formFieldMeta.some((m) => m.fieldKey === key);
+      if (!hasField) extras[key] = value;
+    }
+  });
+
+  return extras;
+}
+
 /**
  * datasave 대상 위젯 유효성 검사 공통 함수 (Form / SubList / MultiSelect / Table)
  * handleDataSave, handlePopupDataSave 양쪽에서 공통 사용
@@ -2796,6 +2824,16 @@ export function resolveSearchFieldLabel(
   }
 
   return resolve(f.label, f.labelMsgKey) || undefined;
+}
+
+export function resolveCategoryDepthLabel(
+  f: Pick<import("./types").SearchFieldConfig, "depthLabels" | "depthLabelMsgKeys">,
+  depthIndex: number,
+  t: (key: string, vars?: Record<string, string>) => string
+): string {
+  const msgKey = f.depthLabelMsgKeys?.[depthIndex];
+  if (msgKey) return t(msgKey);
+  return f.depthLabels?.[depthIndex] || `${depthIndex + 1}depth`;
 }
 
 /**

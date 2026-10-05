@@ -2,6 +2,9 @@ import type { SearchWidget } from "../../components/renderer/types";
 import type { TableWidget } from "../../components/builder/TableBuilder";
 import type { SearchFieldConfig, SearchFieldType } from "../../types";
 import { varName, buildSearchQueryParams, SEARCH_QUERY_PARAM_FIELD_KEYS } from "../../utils";
+
+const SEARCH_FIELD_RANGE_LIMIT_KEYS: (keyof SearchFieldConfig)[] = ["maxRangeValue", "maxRangeUnit"];
+const SEARCH_FIELD_DATA_GENERATION_KEYS: (keyof SearchFieldConfig)[] = ["dataGenerations"];
 import {
   SEARCH_SIMPLE_CONTAINER_CLS,
   SEARCH_RESET_BTN_CLS,
@@ -17,6 +20,8 @@ import {
   emitContainerOpen,
   emitContainerClose,
   emitSlugOptionSelectComponent,
+  emitCategorySearchSelectComponent,
+  searchVarNames,
 } from "../widgetGenerator";
 import { pushFieldMarkup } from "./shared/fieldMarkupEmitter";
 
@@ -30,13 +35,14 @@ const PHASE1_SEARCH_TYPES = new Set<SearchFieldType>([
   "radio",
   "hidden",
   "dateRangeStatus",
+  "category",
 ]);
 
 const HANDLED_WIDGET_KEYS = new Set(["type", "widgetId", "rows", "displayStyle"]);
 const IGNORED_WIDGET_KEYS = new Map<string, string>([
   [
     "contentKey",
-    "생성 코드는 컴포넌트 로컬 state이므로 파라미터 네임스페이스가 필요 없음 — utils.ts:2781 buildSearchQueryParams는 contentKey를 읽지 않음",
+    "생성 코드는 컴포넌트 로컬 state이므로 파라미터 네임스페이스가 필요 없음 — utils.ts:2914 buildSearchQueryParams는 contentKey를 읽지 않음",
   ],
 ]);
 
@@ -63,6 +69,16 @@ const HANDLED_FIELD_KEYS = new Set([
   "excludeFromSearch",
   "defaultStartToday",
   "defaultEndToday",
+  "defaultToday",
+  "defaultDate",
+  "defaultDateOffset",
+  "defaultStartDate",
+  "defaultStartDateOffset",
+  "defaultEndDate",
+  "defaultEndDateOffset",
+  "defaultOptionValue",
+  "maxRangeValue",
+  "maxRangeUnit",
   "joinRelationSlugId",
   "joinSlaveKey",
   "maxLength",
@@ -76,6 +92,21 @@ const HANDLED_FIELD_KEYS = new Set([
   "afterText",
   "afterTextMsgKey",
   "statusDisplayStyle",
+  "relationSlugId",
+  "dbSlug",
+  "maxDepth",
+  "activeDepths",
+  "depthLabels",
+  "depthLabelMsgKeys",
+  "depthValueFields",
+  "depthTextFields",
+  "depthFilters",
+  "depthParentFields",
+  "optionFilterDepth",
+  "optionFilterParentField",
+  "optionFilterExpr",
+  "selectType",
+  "dataGenerations",
 ]);
 
 const SLUG_OPTION_FIELD_KEYS = [
@@ -101,9 +132,9 @@ const TYPE_SCOPED_FIELD_KEY_POLICIES = new Map<string, TypeScopedFieldKeyPolicy>
       handledTypes: new Set<SearchFieldType>(["select"]),
       ignoredTypes: new Set<SearchFieldType>(["date", "dateRange", "yearMonth", "checkbox", "radio", "hidden"]),
       handledReason:
-        "select 전용 — utils.ts:2843 buildSearchQueryParams가 f.type==='select' && f.data?.includes('?') 조건에서 condexpr_/condval_ 파라미터로 조립하고, 산출물은 SEARCH_FIELDS 리터럴(SEARCH_QUERY_PARAM_FIELD_KEYS에 'data' 포함)을 그대로 넘겨 동일 동작을 재현한다. 마크업에는 select 옵션만 방출되며 런타임 FieldRenderer.tsx case 'select'(1151)도 field.data를 읽지 않아 표시 파리티 차이가 없다",
+        "select 전용 — utils.ts:2976 buildSearchQueryParams가 f.type==='select' && f.data?.includes('?') 조건에서 condexpr_/condval_ 파라미터로 조립하고, 산출물은 SEARCH_FIELDS 리터럴(SEARCH_QUERY_PARAM_FIELD_KEYS에 'data' 포함)을 그대로 넘겨 동일 동작을 재현한다. 마크업에는 select 옵션만 방출되며 런타임 FieldRenderer.tsx case 'select'(1101)도 field.data를 읽지 않아 표시 파리티 차이가 없다",
       ignoredReason:
-        "FieldRenderer.tsx의 field.data 참조는 :1030 :1032 :1040 :1057 :1058(case 'input' 1026~1114 내부)과 :1127 :1142 :1143(case 'text' 1115~1150 내부) 8곳뿐이다. 'text'는 PHASE1_SEARCH_TYPES에 없어 supportedFields 진입 자체가 불가하고, utils.ts:2843 조회 파라미터 분기도 f.type==='select' 가드라 date/dateRange/yearMonth/checkbox/radio/hidden 타입에서는 런타임이 f.data를 읽는 지점이 없다(case 'yearMonth'는 :1258에서 case 'date'로 fall-through하며 field.data를 읽지 않는다)",
+        "FieldRenderer.tsx의 field.data 참조는 :980 :982 :990 :1007 :1008(case 'input' 976~1064 내부)과 :1079 :1092 :1093(case 'text' 1067~1098 내부) 8곳뿐이다. 'text'는 PHASE1_SEARCH_TYPES에 없어 supportedFields 진입 자체가 불가하고, utils.ts:2976 조회 파라미터 분기도 f.type==='select' 가드라 date/dateRange/yearMonth/checkbox/radio/hidden 타입에서는 런타임이 f.data를 읽는 지점이 없다(case 'yearMonth'는 :1207에서 case 'date'(1209)로 fall-through하며 field.data를 읽지 않는다)",
     },
   ],
 ]);
@@ -113,9 +144,9 @@ SLUG_OPTION_FIELD_KEYS.forEach((key) => {
     handledTypes: new Set<SearchFieldType>(["select"]),
     ignoredTypes: new Set<SearchFieldType>(["input", "date", "dateRange", "yearMonth", "checkbox", "radio", "hidden"]),
     handledReason:
-      "select 전용 — FieldRenderer.tsx:1218 field.optionSlug && !isPreview 체크가 case 'select'(1152~1255) 내부에서만 실행된다. searchBlock.ts는 SlugOptionSelect 컴포넌트를 산출물에 이식해 동일 SLUG fetch·필터·정렬 로직(utils.ts buildSlugOptRows)을 재현한다",
+      "select 전용 — FieldRenderer.tsx:1167 field.optionSlug && !isPreview 체크가 case 'select'(1101~1204) 내부에서만 실행된다. searchBlock.ts는 SlugOptionSelect 컴포넌트를 산출물에 이식해 동일 SLUG fetch·필터·정렬 로직(utils.ts buildSlugOptRows)을 재현한다",
     ignoredReason:
-      "FieldRenderer.tsx 전문에서 optionSlug 계열 필드는 case 'select'(1152~1255) 내부(1161 SlugAutocompleteInput / 1218 SlugOptionSelect)에서만 읽힌다 — select 이외 타입(input/date/dateRange/yearMonth/checkbox/radio/hidden)에서는 런타임이 이 키를 읽는 지점이 없다",
+      "FieldRenderer.tsx 전문에서 optionSlug 계열 필드는 case 'select'(1101~1204) 내부(1112 SlugAutocompleteInput / 1169 SlugOptionSelect)에서만 읽힌다 — select 이외 타입(input/date/dateRange/yearMonth/checkbox/radio/hidden)에서는 런타임이 이 키를 읽는 지점이 없다",
   });
 });
 
@@ -138,11 +169,11 @@ const typeScopedIgnored = (ownerTypes: string, runtimeRef: string, keys: string[
 const IGNORED_FIELD_KEYS = new Map<string, string>([
   [
     "rowSpan",
-    "검색행은 rowSpan을 사용하지 않음(항상 1행) — SearchRow는 colSpan만 사용, utils.ts:2781 buildSearchQueryParams도 rowSpan을 읽지 않음. FieldRenderer.tsx의 rowSpan 참조(1566/1755/1987/2239/2573)는 file/image/video/media/editor 타입 전용이며 PHASE1_SEARCH_TYPES에 없음",
+    "검색행은 rowSpan을 사용하지 않음(항상 1행) — SearchRow는 colSpan만 사용, utils.ts:2914 buildSearchQueryParams도 rowSpan을 읽지 않음. FieldRenderer.tsx의 rowSpan 참조(1516/1705/1937/2189/2523)는 file/image/video/media/editor 타입 전용이며 PHASE1_SEARCH_TYPES에 없음",
   ],
   [
     "accessor",
-    "utils.ts:2781-2861 buildSearchQueryParams는 f.fieldKey||f.label만 읽고 f.accessor는 읽지 않는 사문화 필드. FieldRenderer.tsx 전문에도 field.accessor 참조 0건",
+    "utils.ts:2914-2994 buildSearchQueryParams는 f.fieldKey||f.label만 읽고 f.accessor는 읽지 않는 사문화 필드. FieldRenderer.tsx 전문에도 field.accessor 참조 0건",
   ],
   [
     "minLength",
@@ -170,7 +201,7 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
   ],
   [
     "multiSelect",
-    "FieldRenderer.tsx:1430이 case 'button' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
+    "FieldRenderer.tsx:1380이 case 'button' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
   ],
   [
     "optionDerivedKeys",
@@ -178,23 +209,23 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
   ],
   [
     "fetchDisplayMode",
-    "FieldRenderer.tsx:1122-1133이 case 'text' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
+    "FieldRenderer.tsx:1080 1084가 case 'text' 안에서만 읽는다 — searchBlock.ts PHASE1_SEARCH_TYPES 미포함 → supportedFields 진입 불가",
   ],
   [
     "isPk",
-    "utils.ts:1746 buildDataJson(Form 저장 경로)에서만 읽는다 — SearchRenderer.tsx/FieldRenderer.tsx 전문에 field.isPk 참조 0건",
+    "utils.ts:1774 buildDataJson(Form 저장 경로)에서만 읽는다 — SearchRenderer.tsx/FieldRenderer.tsx 전문에 field.isPk 참조 0건",
   ],
   [
     "compareExpr",
     "utils.ts:492 validateFormFields/validateSubListRows 공용 검증에서만 읽는다 — 검색 경로는 이 함수들을 호출하지 않고 FieldRenderer.tsx에도 참조 0건",
   ],
-  ...typeScopedIgnored("textarea", "FieldRenderer.tsx:1486 case 'textarea'", [
+  ...typeScopedIgnored("textarea", "FieldRenderer.tsx:1436 case 'textarea'", [
     "content",
     "contentMsgKey",
     "fontSize",
     "bold",
   ]),
-  ...typeScopedIgnored("action-button", "FieldRenderer.tsx:1547 case 'action-button' / SpaceRenderer.tsx:108-176", [
+  ...typeScopedIgnored("action-button", "FieldRenderer.tsx:1497 case 'action-button' / SpaceRenderer.tsx:108-176", [
     "textColor",
     "color",
     "bgColor",
@@ -221,7 +252,7 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
   ]),
   ...typeScopedIgnored(
     "file/image/video/media",
-    "FieldRenderer.tsx:1564 case 'file' / :1753 case 'image' / :1984 case 'video' / :2237 case 'media'",
+    "FieldRenderer.tsx:1514 case 'file' / :1703 case 'image' / :1934 case 'video' / :2187 case 'media'",
     [
       "maxFileCount",
       "maxFileSizeMB",
@@ -237,28 +268,13 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
       "imageMaxHeightPx",
     ]
   ),
-  ...typeScopedIgnored(
-    "category",
-    "FieldRenderer.tsx:2634 case 'category' → useCategoryCascade.ts:129-321 / utils.ts:2826 f.type==='category'",
-    [
-      "dbSlug",
-      "maxDepth",
-      "activeDepths",
-      "depthLabels",
-      "depthLabelMsgKeys",
-      "depthValueFields",
-      "depthTextFields",
-      "depthFilters",
-      "depthParentFields",
-      "optionFilterRelationSlugId",
-      "optionFilterDepth",
-      "optionFilterParentField",
-      "optionFilterExpr",
-    ]
-  ),
-  ...typeScopedIgnored("time", "FieldRenderer.tsx:2611 case 'time' (:2619 timeStep)", ["defaultTime", "timeStep"]),
-  ...typeScopedIgnored("editor", "FieldRenderer.tsx:2571 case 'editor' (:2576 editorType)", ["editorType"]),
-  ...typeScopedIgnored("address", "FieldRenderer.tsx:2700 case 'address' (:2742 addressLanguage)", ["addressLanguage"]),
+  [
+    "optionFilterRelationSlugId",
+    "빌더 UI 전용 입력값 — SearchBuilder.tsx:769 / CategoryField.tsx:164-165(빌더 좌측 패널)에서만 읽고 쓴다. 런타임 useCategoryCascade.ts의 computeOptionPreFilter(:172-254)는 optionFilterDepth/optionFilterExpr/optionFilterParentField만으로 depth별 허용 value 집합을 계산하며 optionFilterRelationSlugId 자체를 조회 파라미터나 필터 조건으로 읽는 지점이 없다(연동 relation이 병합한 _fetchedRel{id} 값은 이미 dataJson에 포함돼 내려오므로 relation id를 다시 참조할 필요가 없다)",
+  ],
+  ...typeScopedIgnored("time", "FieldRenderer.tsx:2561 case 'time' (:2569 timeStep)", ["defaultTime", "timeStep"]),
+  ...typeScopedIgnored("editor", "FieldRenderer.tsx:2521 case 'editor' (:2526 editorType)", ["editorType"]),
+  ...typeScopedIgnored("address", "FieldRenderer.tsx:2650 case 'address' (:2692 addressLanguage)", ["addressLanguage"]),
 ]);
 
 interface ConditionalIgnoredFieldKey {
@@ -316,23 +332,20 @@ const needsI18nOf = (fields: SearchFieldConfig[]): boolean =>
       f.type === "radio" ||
       f.type === "checkbox" ||
       f.type === "dateRangeStatus" ||
+      f.type === "category" ||
       isCodeLabelInput(f)
   ) || fields.some((f) => !!f.labelMsgKey || !!f.label2MsgKey || !!f.placeholderMsgKey || !!f.defaultValueMsgKey);
 
 const wrapHideCondition = (
   f: SearchFieldConfig,
+  id: string,
   ind: (n: number) => string,
   level: number,
-  keyToIdVar: string,
-  paramsVar: string,
+  hiddenMapVar: string,
   innerLines: string[]
 ): string[] => {
   if (!f.hideCondition) return innerLines;
-  return [
-    `${ind(level)}{!evalFieldCondition(${jsStringLiteral(f.hideCondition)}, ${keyToIdVar}, ${paramsVar}) && (`,
-    ...innerLines,
-    `${ind(level)})}`,
-  ];
+  return [`${ind(level)}{!${hiddenMapVar}[${jsStringLiteral(id)}] && (`, ...innerLines, `${ind(level)})}`];
 };
 
 const PROBE_VALUE = "__probe__";
@@ -356,9 +369,26 @@ const withSubstitutedId = (f: SearchFieldConfig, id: string): SearchFieldConfig 
   colSpan: f.colSpan ?? 1,
 });
 
-const buildPrunedFieldLiteral = (f: SearchFieldConfig, id: string): SearchFieldConfig => {
+const SEARCH_FIELD_DEFAULT_VALUE_KEYS: (keyof SearchFieldConfig)[] = [
+  "defaultToday",
+  "defaultDateOffset",
+  "defaultDate",
+  "dateSubType",
+  "defaultStartDateOffset",
+  "defaultStartDate",
+  "defaultEndDateOffset",
+  "defaultEndDate",
+  "defaultOptionValue",
+  "defaultValue",
+];
+
+const buildPrunedFieldLiteral = (
+  f: SearchFieldConfig,
+  id: string,
+  keys: readonly (keyof SearchFieldConfig)[]
+): SearchFieldConfig => {
   const obj: Record<string, unknown> = { colSpan: f.colSpan ?? 1 };
-  SEARCH_QUERY_PARAM_FIELD_KEYS.forEach((k) => {
+  keys.forEach((k) => {
     const raw = (f as unknown as Record<string, unknown>)[k];
     if (raw === undefined) return;
     obj[k] = k === "id" ? id : raw;
@@ -395,6 +425,7 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   const searchParamsFn = `getSearchParams${suffix}`;
   const fieldsLiteralVar = `SEARCH_FIELDS_${suffix}`;
   const keyToIdVar = `searchKeyToId${suffix}`;
+  const hiddenMapVar = `hiddenMap${suffix}`;
 
   const allFields = widget.rows.flatMap((row) => row.fields);
   const supportedFields = allFields.filter((f) => PHASE1_SEARCH_TYPES.has(f.type));
@@ -402,11 +433,22 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   const needsCodeGroup = supportedFields.some((f) => f.codeGroupCode);
   const needsHideCondition = supportedFields.some((f) => f.hideCondition);
   const needsCodeLabel = supportedFields.some(isCodeLabelInput);
-  const needsI18n = isSimple || needsI18nOf(supportedFields);
+  const hasRangeLimit = supportedFields.some(
+    (f) => (f.type === "dateRange" || f.type === "yearMonthRange") && !!f.maxRangeValue
+  );
+  const needsI18n = isSimple || hasRangeLimit || needsI18nOf(supportedFields);
   const hasSlugOptionSelect = supportedFields.some(
     (f) => f.type === "select" && !!f.optionSlug && f.selectType !== "autocomplete"
   );
+  const hasAutocompleteSlugSelect = supportedFields.some(
+    (f) => f.type === "select" && f.selectType === "autocomplete" && !!f.optionSlug
+  );
+  const hasAutocompletePlainSelect = supportedFields.some(
+    (f) => f.type === "select" && f.selectType === "autocomplete" && !f.optionSlug
+  );
+  const needsSlugRowData = hasSlugOptionSelect || hasAutocompleteSlugSelect;
   const slugRowDataVar = `slugOptRowData${suffix}`;
+  const categoryFieldsVar = `CATEGORY_FIELDS_${suffix}`;
 
   const idCandidates = supportedFields.map((f) => fieldVar(f));
   const hasIdCollision = new Set(idCandidates).size !== idCandidates.length;
@@ -415,7 +457,16 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   );
   const idFor = (idx: number): string => substitutedFields[idx].id;
 
-  const prunedFields = substitutedFields.map((f) => buildPrunedFieldLiteral(f, f.id));
+  const categoryFields = substitutedFields.filter((f) => f.type === "category");
+  const hasCategoryField = categoryFields.length > 0;
+
+  const prunedFieldKeys = [
+    ...SEARCH_QUERY_PARAM_FIELD_KEYS,
+    ...SEARCH_FIELD_DEFAULT_VALUE_KEYS,
+    ...SEARCH_FIELD_RANGE_LIMIT_KEYS,
+    ...SEARCH_FIELD_DATA_GENERATION_KEYS,
+  ];
+  const prunedFields = substitutedFields.map((f) => buildPrunedFieldLiteral(f, f.id, prunedFieldKeys));
   const probeSv = buildProbeSv(substitutedFields.map((f) => ({ id: f.id, type: f.type })));
   const fullResult = buildSearchQueryParams(substitutedFields, probeSv);
   const prunedResult = buildSearchQueryParams(prunedFields, probeSv);
@@ -423,8 +474,20 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   const emittedFields = pruneSafe ? prunedFields : substitutedFields;
 
   const imports: ImportRequirement[] = [
-    { module: "@/app/admin/templates/make/_shared/utils", named: ["buildSearchQueryParams", "buildKeyToId"] },
+    {
+      module: "@/app/admin/templates/make/_shared/utils",
+      named: [
+        "buildSearchQueryParams",
+        "buildKeyToId",
+        "buildSearchFieldDefaultValues",
+        "buildDateRangeGenerationPatch",
+        ...(hasRangeLimit ? ["validateSearchDateRange"] : []),
+      ],
+    },
+    { module: "react", named: ["useRef"] },
     { module: "@/app/admin/templates/make/_shared/types", named: ["SearchFieldConfig"] },
+    { module: "@/store/use-site-store", named: ["useSiteStore"] },
+    { module: "@/store/use-server-clock-store", named: ["useServerClockStore"] },
   ];
   if (isSimple) {
     imports.push({ module: "@/components/search", named: ["isEnterSearchTrigger"] });
@@ -437,16 +500,48 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   if (needsI18n) imports.push({ module: "@/hooks/use-i18n", named: ["useI18n"] });
   if (needsHideCondition) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["evalFieldCondition"] });
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/components/renderer/useHiddenSearchFieldReset",
+      named: ["useHiddenSearchFieldReset"],
+    });
   }
   if (needsCodeLabel) {
     imports.push({ module: "@/app/admin/templates/make/_shared/utils", named: ["resolveCodeLabel"] });
   }
-  if (hasSlugOptionSelect) {
+  if (needsSlugRowData) {
     imports.push({ module: "react", named: ["useMemo"] });
+  }
+  if (hasSlugOptionSelect) {
     imports.push({ module: "@/lib/api", defaultName: "api" });
     imports.push({
       module: "@/app/admin/templates/make/_shared/utils",
       named: ["flattenPageDataItem", "buildSlugOptRows"],
+    });
+  }
+  if (hasAutocompleteSlugSelect) {
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/components/renderer/AutocompleteField",
+      named: ["SlugAutocompleteInput"],
+    });
+  }
+  if (hasAutocompletePlainSelect) {
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/components/renderer/AutocompleteField",
+      named: ["AutocompleteInput"],
+    });
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/utils",
+      named: ["resolveFieldOptions"],
+    });
+  }
+  if (hasCategoryField) {
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/components/renderer/useCategoryCascade",
+      named: ["useCategoryCascade"],
+    });
+    imports.push({
+      module: "@/app/admin/templates/make/_shared/utils",
+      named: ["resolveCategoryDepthLabel"],
     });
   }
 
@@ -467,6 +562,13 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
     helperLines.push("");
     emitSlugOptionSelectComponent().forEach((l) => helperLines.push(l));
   }
+  if (hasCategoryField) {
+    const categoryFieldsLiteral = Object.fromEntries(categoryFields.map((f) => [f.id, f]));
+    const categoryFieldsJson = JSON.stringify(categoryFieldsLiteral, (_key, v) => (v === null ? "" : v), 4);
+    helperLines.push(`const ${categoryFieldsVar}: Record<string, SearchFieldConfig> = ${categoryFieldsJson};`);
+    helperLines.push("");
+    emitCategorySearchSelectComponent().forEach((l) => helperLines.push(l));
+  }
 
   const stateLines: string[] = [];
   if (needsI18n) stateLines.push(`${ind(1)}const { t } = useI18n();`);
@@ -486,18 +588,68 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
       initEntries.push(`'${f.id}': ${defaultValueExprOf(f)}`);
     }
   });
-  stateLines.push(`${ind(1)}const ${initialParamsVar}: Record<string, string> = { ${initEntries.join(", ")} };`);
+  const initialParamsRefVar = `${initialParamsVar}Ref`;
+  const searchNames = searchVarNames(suffix);
+  stateLines.push(`${ind(1)}const sitesLoaded = useSiteStore((s) => s.sitesLoaded);`);
   stateLines.push(
-    `${ind(1)}const [${paramsVar}, ${setParamsVar}] = useState<Record<string, string>>(${initialParamsVar});`
+    `${ind(1)}const clockReady = useServerClockStore((s) => s.status === 'synced' || s.status === 'failed');`
   );
+  stateLines.push(
+    `${ind(1)}const ${initialParamsRefVar} = useRef<Record<string, string>>({ ${initEntries.join(", ")} });`
+  );
+  stateLines.push(
+    `${ind(1)}const [${paramsVar}, ${setParamsVar}] = useState<Record<string, string>>(${initialParamsRefVar}.current);`
+  );
+  stateLines.push(`${ind(1)}const [${searchNames.defaultsReady}, ${searchNames.setDefaultsReady}] = useState(false);`);
+  const defaultsReadyEffectLines: string[] = [];
+  defaultsReadyEffectLines.push(`${ind(1)}useEffect(() => {`);
+  defaultsReadyEffectLines.push(`${ind(2)}if (!sitesLoaded || !clockReady) return;`);
+  defaultsReadyEffectLines.push(`${ind(2)}const baseSnapshot = { ...${initialParamsRefVar}.current };`);
+  defaultsReadyEffectLines.push(`${ind(2)}const computed: Record<string, string> = {};`);
+  defaultsReadyEffectLines.push(
+    `${ind(2)}${fieldsLiteralVar}.forEach((f) => { Object.assign(computed, buildSearchFieldDefaultValues(f)); });`
+  );
+  defaultsReadyEffectLines.push(`${ind(2)}const snapshot = { ...computed };`);
+  defaultsReadyEffectLines.push(`${ind(2)}${fieldsLiteralVar}.forEach((f) => {`);
+  defaultsReadyEffectLines.push(`${ind(3)}if (f.type !== 'dateRange' && f.type !== 'yearMonthRange') return;`);
+  defaultsReadyEffectLines.push(`${ind(3)}(['from', 'to'] as const).forEach((part) => {`);
+  defaultsReadyEffectLines.push(`${ind(4)}const sourceValue = snapshot[\`\${f.id}_\${part}\`];`);
+  defaultsReadyEffectLines.push(`${ind(4)}if (!sourceValue) return;`);
+  defaultsReadyEffectLines.push(
+    `${ind(4)}Object.assign(computed, buildDateRangeGenerationPatch(${fieldsLiteralVar}, f.id, part, sourceValue));`
+  );
+  defaultsReadyEffectLines.push(`${ind(3)}});`);
+  defaultsReadyEffectLines.push(`${ind(2)}});`);
+  defaultsReadyEffectLines.push(
+    `${ind(2)}${initialParamsRefVar}.current = { ...${initialParamsRefVar}.current, ...computed };`
+  );
+  defaultsReadyEffectLines.push(`${ind(2)}${setParamsVar}((prev) => {`);
+  defaultsReadyEffectLines.push(`${ind(3)}const merged = { ...prev };`);
+  defaultsReadyEffectLines.push(`${ind(3)}Object.keys(computed).forEach((k) => {`);
+  defaultsReadyEffectLines.push(`${ind(4)}if (prev[k] === baseSnapshot[k]) merged[k] = computed[k];`);
+  defaultsReadyEffectLines.push(`${ind(3)}});`);
+  defaultsReadyEffectLines.push(`${ind(3)}return merged;`);
+  defaultsReadyEffectLines.push(`${ind(2)}});`);
+  defaultsReadyEffectLines.push(`${ind(2)}${searchNames.setDefaultsReady}(true);`);
+  defaultsReadyEffectLines.push(`${ind(1)}}, [sitesLoaded, clockReady]);`);
+  defaultsReadyEffectLines.push("");
+  if (needsHideCondition) {
+    stateLines.push(`${ind(1)}const ${hiddenMapVar}: Record<string, boolean> = {};`);
+    stateLines.push(
+      `${ind(1)}${fieldsLiteralVar}.forEach((f) => { ${hiddenMapVar}[f.id] = !!f.hideCondition && !!f.fieldKey && evalFieldCondition(f.hideCondition, ${keyToIdVar}, ${paramsVar}); });`
+    );
+    stateLines.push(
+      `${ind(1)}useHiddenSearchFieldReset({ isPreview: false, fields: ${fieldsLiteralVar}, hiddenMap: ${hiddenMapVar}, values: ${paramsVar}, onChangeValues: (key, value) => ${setParamsVar}((prev) => ({ ...prev, [key]: value })) });`
+    );
+  }
 
-  const handlerLines: string[] = [];
+  const handlerLines: string[] = [...defaultsReadyEffectLines];
   handlerLines.push(
     `${ind(1)}const ${searchParamsFn} = (sv: Record<string, string> = ${paramsVar}): Record<string, string> => buildSearchQueryParams(${fieldsLiteralVar}, sv);`
   );
   handlerLines.push("");
 
-  if (hasSlugOptionSelect) {
+  if (needsSlugRowData) {
     handlerLines.push(
       `${ind(1)}const ${slugRowDataVar} = useMemo(() => { const map: Record<string, unknown> = {}; ${fieldsLiteralVar}.forEach((f) => { if (f.fieldKey) map[f.fieldKey] = ${paramsVar}[f.id] ?? ''; }); return map; }, [${paramsVar}]);`
     );
@@ -509,13 +661,17 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
     .map((t) => suffixOf(t.widgetId));
 
   handlerLines.push(`${ind(1)}const handleReset${suffix} = () => {`);
-  handlerLines.push(`${ind(2)}${setParamsVar}(${initialParamsVar});`);
+  handlerLines.push(`${ind(2)}const cleared: Record<string, string> = {};`);
+  handlerLines.push(
+    `${ind(2)}Object.keys({ ...${initialParamsRefVar}.current, ...${paramsVar} }).forEach((k) => { cleared[k] = ''; });`
+  );
+  handlerLines.push(`${ind(2)}${setParamsVar}(cleared);`);
   if (connectedTableSuffixes.length === 0) {
     handlerLines.push(`${ind(2)}/* TODO(파일빌드): 이 검색폼에 연결된 Table 위젯이 없습니다. */`);
   } else {
     connectedTableSuffixes.forEach((tableSuffix) => {
       handlerLines.push(
-        `${ind(2)}fetchData${tableSuffix}(0, true, { ${jsStringLiteral(suffix)}: ${initialParamsVar} }, { sk: null, sd: 'asc' });`
+        `${ind(2)}fetchData${tableSuffix}(0, true, { ${jsStringLiteral(suffix)}: cleared }, { sk: null, sd: 'asc' });`
       );
     });
   }
@@ -523,6 +679,9 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
   handlerLines.push("");
 
   handlerLines.push(`${ind(1)}const handleSearch${suffix} = () => {`);
+  if (hasRangeLimit) {
+    handlerLines.push(`${ind(2)}if (!validateSearchDateRange(${fieldsLiteralVar}, ${paramsVar}, t)) return;`);
+  }
   if (connectedTableSuffixes.length === 0) {
     handlerLines.push(`${ind(2)}/* TODO(파일빌드): 이 검색폼에 연결된 Table 위젯이 없습니다. */`);
   } else {
@@ -555,9 +714,20 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
       const colSpanCls = searchSimpleColSpanClass(f.colSpan ?? 1, cols);
       const fieldLines: string[] = [];
       fieldLines.push(`${ind(2)}<div className=${jsStringLiteral(colSpanCls)}>`);
-      pushFieldMarkup({ jsxLines: fieldLines, ind, level: 3, field: f, id, paramsVar, setParamsVar, slugRowDataVar });
+      pushFieldMarkup({
+        jsxLines: fieldLines,
+        ind,
+        level: 3,
+        field: f,
+        id,
+        paramsVar,
+        setParamsVar,
+        slugRowDataVar,
+        categoryFieldsVar,
+        fieldsLiteralVar,
+      });
       fieldLines.push(`${ind(2)}</div>`);
-      wrapHideCondition(f, ind, 2, keyToIdVar, paramsVar, fieldLines).forEach((l) => jsxLines.push(l));
+      wrapHideCondition(f, id, ind, 2, hiddenMapVar, fieldLines).forEach((l) => jsxLines.push(l));
     });
     jsxLines.push(`${ind(1)}</div>`);
     jsxLines.push(`${ind(1)}<button`);
@@ -597,9 +767,20 @@ export const generateSearchBlock = (widget: SearchWidget, ctx: WidgetGenContext)
         const reqProp = f.required ? " required" : "";
         const fieldLines: string[] = [];
         fieldLines.push(`${ind(2)}<SearchField label={${searchLabelExprOf(f)}}${colProp}${reqProp}>`);
-        pushFieldMarkup({ jsxLines: fieldLines, ind, level: 3, field: f, id, paramsVar, setParamsVar, slugRowDataVar });
+        pushFieldMarkup({
+          jsxLines: fieldLines,
+          ind,
+          level: 3,
+          field: f,
+          id,
+          paramsVar,
+          setParamsVar,
+          slugRowDataVar,
+          categoryFieldsVar,
+          fieldsLiteralVar,
+        });
         fieldLines.push(`${ind(2)}</SearchField>`);
-        wrapHideCondition(f, ind, 2, keyToIdVar, paramsVar, fieldLines).forEach((l) => jsxLines.push(l));
+        wrapHideCondition(f, id, ind, 2, hiddenMapVar, fieldLines).forEach((l) => jsxLines.push(l));
       });
       jsxLines.push(`${ind(1)}</SearchRow>`);
     });

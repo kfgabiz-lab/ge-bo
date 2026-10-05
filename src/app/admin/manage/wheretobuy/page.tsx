@@ -14,12 +14,8 @@ import {
   nextSortDir,
   pageGroupRange,
   resolveFetchSortKey,
-  evalColumnDataExpr,
-  resolveEvalExprI18n,
   resolveCodeLabel,
   parseActionParams,
-  normalizeExternalUrl,
-  resolveButtonExternalUrl,
 } from "@/app/admin/templates/make/_shared/utils";
 import { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
 import { useSiteStore } from "@/store/use-site-store";
@@ -34,29 +30,21 @@ import { toast } from "sonner";
 const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   {
     colSpan: 1,
-    id: "blog.is_visible",
+    id: "agency.is_visible",
     type: "select",
-    fieldKey: "blog.is_visible",
+    fieldKey: "agency.is_visible",
     label: "공ㄱ",
   },
   {
-    colSpan: 1,
-    id: "status",
-    type: "select",
-    fieldKey: "status",
-    label: "",
-    data: "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
-  },
-  {
-    colSpan: 3,
-    id: "blog.title",
+    colSpan: 4,
+    id: "agency.agency_name",
     type: "input",
-    fieldKey: "blog.title",
+    fieldKey: "agency.agency_name",
     label: "",
   },
 ];
 const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
-const DETAIL_PAGE_PATH = "/admin/company/blog/detail";
+const DETAIL_PAGE_PATH = "/admin/manage/wheretobuy/detail";
 function formatCellDate(rawVal: string, format?: string): string {
   if (!rawVal) return "-";
   if (!format) return rawVal;
@@ -76,32 +64,21 @@ function formatCellDate(rawVal: string, format?: string): string {
     .replace("mm", mm)
     .replace("ss", ss);
 }
-const SORT_EXPRTable1: Record<string, string> = {
-  publishStatus: "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
-};
 const EDIT_PAGE_RULES_Table1: { connType?: string; pageSlug?: string; passParam?: string; conditionParam?: string }[] =
   [
     {
       connType: "page",
-      pageSlug: "blog-basicInfo",
-      passParam: "update=1",
+      pageSlug: "wheretobuy-agency-detail",
+      passParam: "",
       conditionParam: "",
     },
   ];
-const BTN_URL_Table1_7: {
-  externalUrlSourceType?: "direct" | "code";
-  externalUrlCodeGroup?: string;
-  externalUrlCode?: string;
-  externalUrl?: string;
-} = {
-  externalUrl: "https://nahpdev-web.ls-electric.com/company/blog/detail/",
-};
 
 export default function GeneratedPage() {
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
   const { t } = useI18n();
   useEffect(() => {
-    setPageTitle(t("common.label.blog"));
+    setPageTitle(t("wheretobuy.agency.title"));
   }, [setPageTitle, t]);
   const { groups, fetchGroups } = useCodeStore();
   useEffect(() => {
@@ -109,11 +86,7 @@ export default function GeneratedPage() {
   }, [fetchGroups]);
   const sitesLoaded = useSiteStore((s) => s.sitesLoaded);
   const clockReady = useServerClockStore((s) => s.status === "synced" || s.status === "failed");
-  const initialParamsSearch1Ref = useRef<Record<string, string>>({
-    "blog.is_visible": "",
-    status: "",
-    "blog.title": "",
-  });
+  const initialParamsSearch1Ref = useRef<Record<string, string>>({ "agency.is_visible": "", "agency.agency_name": "" });
   const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1Ref.current);
   const [searchDefaultsReadySearch1, setSearchDefaultsReadySearch1] = useState(false);
   const router = useRouter();
@@ -124,7 +97,7 @@ export default function GeneratedPage() {
   const [totalPagesTable1, setTotalPagesTable1] = useState(0);
   const [sortKeyTable1, setSortKeyTable1] = useState<string | null>(null);
   const [sortDirTable1, setSortDirTable1] = useState<"asc" | "desc">("asc");
-  const dataSlugTable1 = "blog-data";
+  const dataSlugTable1 = "wheretobuy-agency-data";
 
   useEffect(() => {
     if (!sitesLoaded || !clockReady) return;
@@ -181,7 +154,7 @@ export default function GeneratedPage() {
       const sk = sortOverride ? sortOverride.sk : skipSort ? null : sortKeyTable1;
       const sd = sortOverride ? sortOverride.sd : skipSort ? "asc" : sortDirTable1;
       let resolvedSortKeyTable1: string | null = sk;
-      if (sk) {
+      if (sk && sortOverride) {
         for (const r of rowsTable1) {
           const pathMap = r._pathMap as Record<string, string> | undefined;
           if (pathMap?.[sk]) {
@@ -199,14 +172,10 @@ export default function GeneratedPage() {
                 sort:
                   resolveFetchSortKey(
                     [
-                      { accessor: "title" },
-                      { accessor: "count" },
-                      { accessor: "is_visible" },
-                      { accessor: "publishStatus" },
-                      { accessor: "publish_dttm" },
+                      { accessor: "agency.agency_name" },
+                      { accessor: "agency.is_visible" },
                       { accessor: "updatedAt" },
                       { accessor: "updatedBy" },
-                      { accessor: "preView" },
                       { accessor: "actions" },
                     ],
                     resolvedSortKeyTable1
@@ -215,7 +184,6 @@ export default function GeneratedPage() {
                   sd,
               }
             : {}),
-          ...(sk && SORT_EXPRTable1[sk] ? { sortExpr: SORT_EXPRTable1[sk] } : {}),
           ...getSearchParamsSearch1(searchOverrides?.["Search1"]),
         },
       });
@@ -286,28 +254,6 @@ export default function GeneratedPage() {
     }
   };
 
-  const handleTableButtonTable1_7 = (row: Record<string, unknown>) => {
-    const resolvedUrl = resolveButtonExternalUrl(BTN_URL_Table1_7, groups);
-    if (!resolvedUrl) return;
-    const popup = window.open("", "_blank", "width=800,height=600");
-    if (!popup) {
-      toast.error("팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.");
-      return;
-    }
-    const recordId = String(row._id ?? "");
-    (async () => {
-      try {
-        const res = await api.post<{ token: string }>("/preview-tokens", { slug: dataSlugTable1, recordId });
-        const normalizedBase = normalizeExternalUrl(resolvedUrl).replace(/\/$/, "");
-        const detailUrl = new URL(`${normalizedBase}/${recordId}`);
-        popup.location.href = `${detailUrl.origin}/preview?token=${encodeURIComponent(res.data.token)}&redirect=${encodeURIComponent(detailUrl.pathname)}`;
-      } catch {
-        popup.close();
-        toast.error("미리보기 토큰 발급에 실패했습니다.");
-      }
-    })();
-  };
-
   return (
     <PageLayout mode="live">
       <GridCell colSpan={12} rowSpan={12} autoHeight>
@@ -336,8 +282,8 @@ export default function GeneratedPage() {
                 <div className="col-span-1">
                   <div className="relative">
                     <select
-                      value={String(paramsSearch1["blog.is_visible"] ?? "")}
-                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["blog.is_visible"]: e.target.value }))}
+                      value={String(paramsSearch1["agency.is_visible"] ?? "")}
+                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["agency.is_visible"]: e.target.value }))}
                       className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                     >
                       <option value="">{t("common.label.isVisible")}</option>
@@ -361,34 +307,12 @@ export default function GeneratedPage() {
                     </svg>
                   </div>
                 </div>
-                <div className="col-span-1">
-                  <div className="relative">
-                    <select
-                      value={String(paramsSearch1["status"] ?? "")}
-                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["status"]: e.target.value }))}
-                      className="w-full appearance-none border border-slate-200 rounded-md px-3 py-2 pr-8 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white cursor-pointer disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                    >
-                      <option value="">{t("common.label.publishStatus")}</option>
-                      <option value={"{common.label.publish}"}>{t("common.label.publish")}</option>
-                      <option value={"{common.label.unPublish}"}>{t("common.label.unPublish")}</option>
-                    </select>
-                    <svg
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="col-span-3">
+                <div className="col-span-4">
                   <input
                     type="text"
-                    value={String(paramsSearch1["blog.title"] ?? "")}
-                    onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["blog.title"]: e.target.value }))}
-                    placeholder={t("common.placeholder.title")}
+                    value={String(paramsSearch1["agency.agency_name"] ?? "")}
+                    onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["agency.agency_name"]: e.target.value }))}
+                    placeholder={t("wheretobuy.agency.placeholder.agencyNm")}
                     className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
                   />
                 </div>
@@ -427,11 +351,11 @@ export default function GeneratedPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    router.push(`${DETAIL_PAGE_PATH}`);
+                    router.push(DETAIL_PAGE_PATH);
                   }}
                   className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
                 >
-                  {t("blog.btn.add")}
+                  {t("wheretobuy.agency.label.regist")}
                 </button>
               </div>
             </div>
@@ -460,13 +384,13 @@ export default function GeneratedPage() {
                         style={{ textAlign: "center", width: "150px" }}
                       >
                         <button
-                          onClick={() => handleSortTable1("title")}
+                          onClick={() => handleSortTable1("agency.agency_name")}
                           className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                         >
-                          {t("common.label.title")}
-                          {(sortKeyTable1 === "title" ? sortDirTable1 : false) === "asc" ? (
+                          {t("wheretobuy.agency.label.agencyNm")}
+                          {(sortKeyTable1 === "agency.agency_name" ? sortDirTable1 : false) === "asc" ? (
                             <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "title" ? sortDirTable1 : false) === "desc" ? (
+                          ) : (sortKeyTable1 === "agency.agency_name" ? sortDirTable1 : false) === "desc" ? (
                             <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                           ) : (
                             <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -478,67 +402,13 @@ export default function GeneratedPage() {
                         style={{ textAlign: "center", width: "150px" }}
                       >
                         <button
-                          onClick={() => handleSortTable1("count")}
-                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                        >
-                          {t("common.label.views")}
-                          {(sortKeyTable1 === "count" ? sortDirTable1 : false) === "asc" ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "count" ? sortDirTable1 : false) === "desc" ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (
-                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                          )}
-                        </button>
-                      </th>
-                      <th
-                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "150px" }}
-                      >
-                        <button
-                          onClick={() => handleSortTable1("is_visible")}
+                          onClick={() => handleSortTable1("agency.is_visible")}
                           className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
                         >
                           {t("common.label.isVisible")}
-                          {(sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "asc" ? (
+                          {(sortKeyTable1 === "agency.is_visible" ? sortDirTable1 : false) === "asc" ? (
                             <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "is_visible" ? sortDirTable1 : false) === "desc" ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (
-                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                          )}
-                        </button>
-                      </th>
-                      <th
-                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "150px" }}
-                      >
-                        <button
-                          onClick={() => handleSortTable1("publishStatus")}
-                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                        >
-                          {t("common.label.publishStatus")}
-                          {(sortKeyTable1 === "publishStatus" ? sortDirTable1 : false) === "asc" ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "publishStatus" ? sortDirTable1 : false) === "desc" ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (
-                            <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
-                          )}
-                        </button>
-                      </th>
-                      <th
-                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "150px" }}
-                      >
-                        <button
-                          onClick={() => handleSortTable1("publish_dttm")}
-                          className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
-                        >
-                          {t("common.label.publishDttm")}
-                          {(sortKeyTable1 === "publish_dttm" ? sortDirTable1 : false) === "asc" ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
-                          ) : (sortKeyTable1 === "publish_dttm" ? sortDirTable1 : false) === "desc" ? (
+                          ) : (sortKeyTable1 === "agency.is_visible" ? sortDirTable1 : false) === "desc" ? (
                             <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
                           ) : (
                             <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
@@ -583,12 +453,6 @@ export default function GeneratedPage() {
                       </th>
                       <th
                         className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
-                        style={{ textAlign: "center", width: "150px" }}
-                      >
-                        <span className="flex items-center justify-center gap-1">{t("common.label.preview")}</span>
-                      </th>
-                      <th
-                        className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
                         style={{ textAlign: "center", width: "120px" }}
                       >
                         <span className="flex items-center justify-center gap-1">{t("common.label.action")}</span>
@@ -598,13 +462,13 @@ export default function GeneratedPage() {
                   <tbody>
                     {loadingTable1 ? (
                       <tr>
-                        <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
+                        <td colSpan={5} className="py-16 text-center text-sm text-slate-400">
                           {t("common.table.loading")}
                         </td>
                       </tr>
                     ) : rowsTable1.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
+                        <td colSpan={5} className="py-16 text-center text-sm text-slate-400">
                           {t("common.table.no_data")}
                         </td>
                       </tr>
@@ -619,7 +483,7 @@ export default function GeneratedPage() {
                             style={{ textAlign: "center", width: "150px" }}
                           >
                             {(() => {
-                              const value = row["title"];
+                              const value = row["agency.agency_name"];
                               const strVal = value == null || typeof value === "object" ? "" : String(value);
                               const displayVal = strVal;
                               return (
@@ -634,64 +498,12 @@ export default function GeneratedPage() {
                             style={{ textAlign: "center", width: "150px" }}
                           >
                             {(() => {
-                              const value = row["count"];
-                              const strVal = value == null || typeof value === "object" ? "" : String(value);
-                              const displayVal = strVal;
-                              return (
-                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                  {displayVal}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td
-                            className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "150px" }}
-                          >
-                            {(() => {
-                              const value = row["is_visible"];
+                              const value = row["agency.is_visible"];
                               const strVal = value == null || typeof value === "object" ? "" : String(value);
                               const displayVal = resolveCodeLabel(strVal, "VISIBILITY", "text", groups, t);
                               return (
                                 <span className="text-sm text-slate-700 truncate block" title={displayVal}>
                                   {displayVal}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td
-                            className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "150px" }}
-                          >
-                            {(() => {
-                              const value = !Array.isArray(row["publishStatus"])
-                                ? resolveEvalExprI18n(
-                                    evalColumnDataExpr(
-                                      "is_visible=001,publish_dttm<=today()?{common.label.publish}:{common.label.unPublish}",
-                                      row
-                                    ),
-                                    t
-                                  )
-                                : row["publishStatus"];
-                              const strVal = value == null || typeof value === "object" ? "" : String(value);
-                              const displayVal = strVal;
-                              return (
-                                <span className="text-sm text-slate-700 truncate block" title={displayVal}>
-                                  {displayVal}
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          <td
-                            className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "150px" }}
-                          >
-                            {(() => {
-                              const value = row["publish_dttm"];
-                              const dateVal = formatCellDate(String(value ?? ""), "YYYY-MM-DD HH:mm");
-                              return (
-                                <span className="text-sm text-slate-700 truncate block" title={dateVal}>
-                                  {dateVal}
                                 </span>
                               );
                             })()}
@@ -724,20 +536,6 @@ export default function GeneratedPage() {
                                 </span>
                               );
                             })()}
-                          </td>
-                          <td
-                            className="px-4 py-3 max-w-[200px] overflow-hidden"
-                            style={{ textAlign: "center", width: "150px" }}
-                          >
-                            <div className="flex justify-center">
-                              <button
-                                type="button"
-                                onClick={() => handleTableButtonTable1_7(row)}
-                                className="px-2.5 py-1 rounded text-[11px] font-medium transition-all bg-slate-500 hover:bg-slate-600 text-white"
-                              >
-                                {t("common.label.preview")}
-                              </button>
-                            </div>
                           </td>
                           <td
                             className="px-4 py-3 max-w-[200px] overflow-hidden"

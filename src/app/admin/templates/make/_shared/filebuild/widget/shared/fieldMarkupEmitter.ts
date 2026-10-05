@@ -20,7 +20,12 @@ import {
   SEARCH_DATE_RANGE_WRAP_CLS,
   SEARCH_DATE_RANGE_INPUT_WRAP_CLS,
 } from "../../../components/renderer/rendererStyles";
-import { jsStringLiteral, slugOptionFieldLiteral, emitSelectArrow } from "../../widgetGenerator";
+import {
+  jsStringLiteral,
+  slugOptionFieldLiteral,
+  slugAutocompleteFieldLiteral,
+  emitSelectArrow,
+} from "../../widgetGenerator";
 
 type IndFn = (n: number) => string;
 
@@ -35,6 +40,11 @@ const selectAllOptionExprOf = (f: SearchFieldConfig): string => {
   if (f.placeholder?.trim() === SELECT_ALL_PLACEHOLDER) return `t(${jsStringLiteral(SELECT_ALL_MSG_KEY)})`;
   if (f.placeholder) return jsStringLiteral(f.placeholder);
   return `t('common.select.placeholder')`;
+};
+
+const optsArrayExprOf = (f: SearchFieldConfig): string => {
+  const literal = JSON.stringify({ options: f.options ?? [], codeGroupCode: f.codeGroupCode });
+  return `resolveFieldOptions(${literal} as SearchFieldConfig, ${f.codeGroupCode ? "groups" : "[]"})`;
 };
 
 const pushOptions = (
@@ -64,11 +74,25 @@ export interface PushFieldMarkupOptions {
   paramsVar: string;
   setParamsVar: string;
   slugRowDataVar: string;
+  categoryFieldsVar: string;
+  fieldsLiteralVar: string;
   radioNameExpr?: string;
 }
 
 export const pushFieldMarkup = (o: PushFieldMarkupOptions): void => {
-  const { jsxLines, ind, level, field: f, id, paramsVar, setParamsVar, slugRowDataVar, radioNameExpr } = o;
+  const {
+    jsxLines,
+    ind,
+    level,
+    field: f,
+    id,
+    paramsVar,
+    setParamsVar,
+    slugRowDataVar,
+    categoryFieldsVar,
+    fieldsLiteralVar,
+    radioNameExpr,
+  } = o;
   const l0 = level;
   const l1 = level + 1;
   const l2 = level + 2;
@@ -108,7 +132,19 @@ export const pushFieldMarkup = (o: PushFieldMarkupOptions): void => {
       break;
     }
     case "select":
-      if (f.optionSlug && f.selectType !== "autocomplete") {
+      if (f.selectType === "autocomplete" && f.optionSlug) {
+        jsxLines.push(
+          `${ind(l0)}<SlugAutocompleteInput field={${JSON.stringify(slugAutocompleteFieldLiteral(f))} as unknown as SearchFieldConfig} value={${readExpr}} onChange={(v) => ${setParamsVar}(prev => ({ ...prev, [${idLit}]: v }))} isDisabled={false} isReadOnly={false} placeholder={${selectAllOptionExprOf(f)}} rowData={${slugRowDataVar}} />`
+        );
+        break;
+      }
+      if (f.selectType === "autocomplete") {
+        jsxLines.push(
+          `${ind(l0)}<AutocompleteInput value={${readExpr}} onChange={(v) => ${setParamsVar}(prev => ({ ...prev, [${idLit}]: v }))} opts={${optsArrayExprOf(f)}} placeholder={${selectAllOptionExprOf(f)}} isDisabled={false} isReadOnly={false} />`
+        );
+        break;
+      }
+      if (f.optionSlug) {
         jsxLines.push(
           `${ind(l0)}<SlugOptionSelect field={${JSON.stringify(slugOptionFieldLiteral(f))}} value={${readExpr}} onChange={(v) => ${setParamsVar}(prev => ({ ...prev, [${idLit}]: v }))} disabled={false} placeholder={${selectAllOptionExprOf(f)}} className=${jsStringLiteral(selectCls)} rowData={${slugRowDataVar}} />`
         );
@@ -149,13 +185,15 @@ export const pushFieldMarkup = (o: PushFieldMarkupOptions): void => {
       const readExprEnd = `String(${paramsVar}[${endKeyLit}] ?? '')`;
       const rangeInputCls = jsStringLiteral(`${inputCls} ${fieldDateRangeInputPadCls}`);
       const rangeWrapCls = jsStringLiteral(SEARCH_DATE_RANGE_INPUT_WRAP_CLS);
+      const onStartChange = `e => { const v = e.target.value; ${setParamsVar}(prev => ({ ...prev, [${startKeyLit}]: v })); Object.entries(buildDateRangeGenerationPatch(${fieldsLiteralVar}, ${idLit}, 'from', v)).forEach(([k, val]) => ${setParamsVar}(prev => ({ ...prev, [k]: val }))); }`;
+      const onEndChange = `e => { const v = e.target.value; ${setParamsVar}(prev => ({ ...prev, [${endKeyLit}]: v })); Object.entries(buildDateRangeGenerationPatch(${fieldsLiteralVar}, ${idLit}, 'to', v)).forEach(([k, val]) => ${setParamsVar}(prev => ({ ...prev, [k]: val }))); }`;
       jsxLines.push(`${ind(l0)}<div className=${jsStringLiteral(SEARCH_DATE_RANGE_WRAP_CLS)}>`);
       jsxLines.push(
-        `${ind(l1)}<div className=${rangeWrapCls}><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprStart}} onChange={e => ${setParamsVar}(prev => ({ ...prev, [${startKeyLit}]: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
+        `${ind(l1)}<div className=${rangeWrapCls}><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprStart}} onChange={${onStartChange}} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
       );
       jsxLines.push(`${ind(l1)}<span className=${jsStringLiteral(SEARCH_DATE_RANGE_SEP_CLS)}>~</span>`);
       jsxLines.push(
-        `${ind(l1)}<div className=${rangeWrapCls}><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprEnd}} onChange={e => ${setParamsVar}(prev => ({ ...prev, [${endKeyLit}]: e.target.value }))} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
+        `${ind(l1)}<div className=${rangeWrapCls}><Calendar className=${jsStringLiteral(SEARCH_DATE_ICON_CLS)} /><input type="date" value={${readExprEnd}} onChange={${onEndChange}} onClick={e => e.currentTarget.showPicker?.()} className=${rangeInputCls} /></div>`
       );
       jsxLines.push(`${ind(l0)}</div>`);
       break;
@@ -246,6 +284,11 @@ export const pushFieldMarkup = (o: PushFieldMarkupOptions): void => {
       jsxLines.push(`${ind(l0)}</div>`);
       break;
     }
+    case "category":
+      jsxLines.push(
+        `${ind(l0)}<CategorySearchSelect field={${categoryFieldsVar}[${idLit}]} value={${readExpr}} onChange={(v) => ${setParamsVar}(prev => ({ ...prev, [${idLit}]: v }))} />`
+      );
+      break;
     default:
       break;
   }

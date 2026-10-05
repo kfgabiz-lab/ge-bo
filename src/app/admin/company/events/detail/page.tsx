@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
 import { PageGridContainer } from "@/components/layout/page-grid-container";
+import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheck } from "@/app/admin/templates/make/_shared/hooks/useLeaveCheck";
@@ -24,6 +25,7 @@ import {
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
   initFormDefaultValues,
+  applyUrlParamFormOverrides,
   buildFormValuesFromDataJson,
   findSection,
   validateFormFields,
@@ -512,7 +514,11 @@ export default function GeneratedPage() {
   useEffect(() => {
     if (storedId === null) {
       if (!sitesLoaded || !clockReady) return;
-      const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);
+      const defaults = applyUrlParamFormOverrides(
+        initFormDefaultValues(ALL_FORM_WIDGETS, t),
+        ALL_FORM_WIDGETS,
+        searchParams
+      );
       setFormValuesForm1(defaults["w_8mchlsfnn"] ?? {});
       setFormValuesForm2(defaults["w_d2w7qx0ca"] ?? {});
       return;
@@ -718,520 +724,517 @@ export default function GeneratedPage() {
   };
 
   return (
-    <div className="space-y-3">
-      <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={22} autoHeight>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto`,
-              gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-              gridAutoFlow: "row dense",
-              rowGap: `${GAP_SIZE}px`,
-              columnGap: 0,
-            }}
-          >
-            <div style={{ gridColumn: "span 12", gridRow: "span 15" }}>
-              {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:rangeSubType,defaultStartToday). 필요 시 직접 구현해주세요. */}
-              <div
-                className="w-full rounded border border-slate-200"
-                style={{
-                  overflow: "clip",
-                  backgroundColor: "#ffffff",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(12, 1fr)",
-                  gridTemplateRows:
-                    fieldRowIsAutoForm1.length > 0
-                      ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
-                      : undefined,
-                  gridAutoRows: `78px`,
-                  rowGap: `12px`,
-                  columnGap: `12px`,
-                  paddingTop: "10px",
-                  paddingBottom: "10px",
-                }}
-              >
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("events.info.title")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("events.placeholder.title")}
-                        maxLength={150}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm1["fb_926blopy2"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm1("fb_926blopy2", e.target.value)}
-                        onBlur={() => handleFieldBlurForm1("fb_926blopy2")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm1["fb_926blopy2"] ?? "").length}/{150}
-                      </span>
-                    </div>
+    <PageLayout mode="live">
+      <GridCell colSpan={12} rowSpan={22} autoHeight>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(12, 1fr)",
+            gridTemplateRows: `auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto`,
+            gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+            gridAutoFlow: "row dense",
+            rowGap: `${GAP_SIZE}px`,
+            columnGap: 0,
+          }}
+        >
+          <div style={{ gridColumn: "span 12", gridRow: "span 15" }}>
+            {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:defaultStartToday). 필요 시 직접 구현해주세요. */}
+            <div
+              className="w-full rounded border border-slate-200"
+              style={{
+                overflow: "clip",
+                backgroundColor: "#ffffff",
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gridTemplateRows:
+                  fieldRowIsAutoForm1.length > 0
+                    ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
+                    : undefined,
+                gridAutoRows: `78px`,
+                rowGap: `12px`,
+                columnGap: `12px`,
+                paddingTop: "10px",
+                paddingBottom: "10px",
+              }}
+            >
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("events.info.title")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={false}
+                      placeholder={t("events.placeholder.title")}
+                      maxLength={150}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm1["fb_926blopy2"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_926blopy2", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_926blopy2")}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm1["fb_926blopy2"] ?? "").length}/{150}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.image")}
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("events.description.image")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    {(() => {
-                      const maxCount = 1;
-                      const existingList = existingFileMetaForm1["fb_i96wuphru"] ?? [];
-                      const newList = fileValuesForm1["fb_i96wuphru"] ?? [];
-                      const currentCount = existingList.length + newList.length;
-                      const canAdd = currentCount < maxCount;
-                      const handleImgSelect = async (selected: File[]) => {
-                        const { valid, rejected } = filterByAccept(selected, ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp");
-                        if (rejected.length > 0)
-                          alert(`${t("common.field.invalid_file_type")}\n${rejected.join("\n")}`);
-                        if (valid.length === 0) return;
-                        const passed: File[] = [];
-                        for (const file of valid) {
-                          if (file.size > 3 * unitToBytes("MB")) {
-                            toast.warning(
-                              t("common.field.file_size_limit", { type: t("common.label.image"), mb: "3MB" })
-                            );
-                            continue;
-                          }
-                          const naturalSize = await getImageNaturalSize(file);
-                          const violation = checkImagePixelLimit(naturalSize, 708, 445);
-                          if (violation === "width") {
-                            toast.warning(t("common.field.image_width_limit", { label: file.name, px: "708" }));
-                            continue;
-                          }
-                          if (violation === "height") {
-                            toast.warning(t("common.field.image_height_limit", { label: file.name, px: "445" }));
-                            continue;
-                          }
-                          passed.push(file);
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.image")}
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("events.description.image")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  {(() => {
+                    const maxCount = 1;
+                    const existingList = existingFileMetaForm1["fb_i96wuphru"] ?? [];
+                    const newList = fileValuesForm1["fb_i96wuphru"] ?? [];
+                    const currentCount = existingList.length + newList.length;
+                    const canAdd = currentCount < maxCount;
+                    const handleImgSelect = async (selected: File[]) => {
+                      const { valid, rejected } = filterByAccept(selected, ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp");
+                      if (rejected.length > 0) alert(`${t("common.field.invalid_file_type")}\n${rejected.join("\n")}`);
+                      if (valid.length === 0) return;
+                      const passed: File[] = [];
+                      for (const file of valid) {
+                        if (file.size > 3 * unitToBytes("MB")) {
+                          toast.warning(
+                            t("common.field.file_size_limit", { type: t("common.label.image"), mb: "3MB" })
+                          );
+                          continue;
                         }
-                        if (passed.length > 0)
-                          handleFileChangeForm1("fb_i96wuphru", [...newList, ...passed].slice(0, maxCount));
-                      };
-                      const imgPlaceholder = (
-                        <>
-                          <ImageIcon className="w-6 h-6" />
-                          <span className="text-xs font-medium">{t("common.field.image_add")}</span>
-                          <span className="text-[10px] text-center leading-relaxed">
-                            {t("common.field.image_format_info", { count: String(maxCount) })}
-                          </span>
-                        </>
-                      );
-                      const displayItems: (
-                        | { kind: "existing"; meta: { id: number; origName: string; fileSize: number } }
-                        | { kind: "new"; file: File; idx: number }
-                        | { kind: "add" }
-                      )[] = [
-                        ...existingList.map((m) => ({ kind: "existing" as const, meta: m })),
-                        ...newList.map((f, i) => ({ kind: "new" as const, file: f, idx: i })),
-                        ...(canAdd ? [{ kind: "add" as const }] : []),
-                      ];
-                      const cols = Math.max(1, Math.ceil(Math.sqrt(displayItems.length)));
-                      const rows = Math.max(1, Math.ceil(displayItems.length / cols));
-                      const cellH = Math.floor((218 - 8 - 4 * (rows - 1)) / rows);
-                      return (
-                        <div
-                          style={{ height: "218px" }}
-                          className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
-                          onDragOver={canAdd ? (e) => e.preventDefault() : undefined}
-                          onDrop={
-                            canAdd
-                              ? (e) => {
-                                  e.preventDefault();
-                                  const files = Array.from(e.dataTransfer.files);
-                                  if (files.length > 0) handleImgSelect(files);
-                                }
-                              : undefined
-                          }
-                        >
-                          {currentCount === 0 ? (
-                            canAdd ? (
-                              <FileInput
-                                accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp"
-                                multiple={maxCount > 1}
-                                onChange={handleImgSelect}
-                                renderTrigger={(inputRef) => (
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => inputRef.current?.click()}
-                                    onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-                                    className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
-                                  >
-                                    {imgPlaceholder}
-                                  </div>
-                                )}
-                              />
-                            ) : (
-                              <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
-                                {imgPlaceholder}
-                              </div>
-                            )
+                        const naturalSize = await getImageNaturalSize(file);
+                        const violation = checkImagePixelLimit(naturalSize, 708, 445);
+                        if (violation === "width") {
+                          toast.warning(t("common.field.image_width_limit", { label: file.name, px: "708" }));
+                          continue;
+                        }
+                        if (violation === "height") {
+                          toast.warning(t("common.field.image_height_limit", { label: file.name, px: "445" }));
+                          continue;
+                        }
+                        passed.push(file);
+                      }
+                      if (passed.length > 0)
+                        handleFileChangeForm1("fb_i96wuphru", [...newList, ...passed].slice(0, maxCount));
+                    };
+                    const imgPlaceholder = (
+                      <>
+                        <ImageIcon className="w-6 h-6" />
+                        <span className="text-xs font-medium">{t("common.field.image_add")}</span>
+                        <span className="text-[10px] text-center leading-relaxed">
+                          {t("common.field.image_format_info", { count: String(maxCount) })}
+                        </span>
+                      </>
+                    );
+                    const displayItems: (
+                      | { kind: "existing"; meta: { id: number; origName: string; fileSize: number } }
+                      | { kind: "new"; file: File; idx: number }
+                      | { kind: "add" }
+                    )[] = [
+                      ...existingList.map((m) => ({ kind: "existing" as const, meta: m })),
+                      ...newList.map((f, i) => ({ kind: "new" as const, file: f, idx: i })),
+                      ...(canAdd ? [{ kind: "add" as const }] : []),
+                    ];
+                    const cols = Math.max(1, Math.ceil(Math.sqrt(displayItems.length)));
+                    const rows = Math.max(1, Math.ceil(displayItems.length / cols));
+                    const cellH = Math.floor((218 - 8 - 4 * (rows - 1)) / rows);
+                    return (
+                      <div
+                        style={{ height: "218px" }}
+                        className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
+                        onDragOver={canAdd ? (e) => e.preventDefault() : undefined}
+                        onDrop={
+                          canAdd
+                            ? (e) => {
+                                e.preventDefault();
+                                const files = Array.from(e.dataTransfer.files);
+                                if (files.length > 0) handleImgSelect(files);
+                              }
+                            : undefined
+                        }
+                      >
+                        {currentCount === 0 ? (
+                          canAdd ? (
+                            <FileInput
+                              accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp"
+                              multiple={maxCount > 1}
+                              onChange={handleImgSelect}
+                              renderTrigger={(inputRef) => (
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => inputRef.current?.click()}
+                                  onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+                                  className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 cursor-pointer hover:text-slate-600 hover:bg-slate-50 transition-all"
+                                >
+                                  {imgPlaceholder}
+                                </div>
+                              )}
+                            />
                           ) : (
-                            <div className="p-1 overflow-hidden" style={{ height: "218px" }}>
-                              <div
-                                className="grid gap-1"
-                                style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: `${cellH}px` }}
-                              >
-                                {displayItems.map((item, i) => {
-                                  if (item.kind === "existing") {
-                                    return (
-                                      <div
-                                        key={item.meta.id}
-                                        className="relative rounded-md overflow-hidden border border-slate-200 group flex flex-col"
-                                      >
-                                        <div className="relative flex-1 min-h-0">
-                                          {imgBlobUrls[item.meta.id] ? (
-                                            <img
-                                              src={imgBlobUrls[item.meta.id]}
-                                              alt={item.meta.origName}
-                                              className="w-full h-full object-contain"
-                                            />
-                                          ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                                              <ImageIcon className="w-5 h-5 text-slate-300" />
-                                            </div>
-                                          )}
-                                          <button
-                                            type="button"
-                                            onClick={() => handleRemoveExistingForm1("fb_i96wuphru", item.meta.id)}
-                                            className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                          >
-                                            <X className="w-2.5 h-2.5 text-white" />
-                                          </button>
-                                        </div>
-                                        <FileInfoBar
-                                          name={item.meta.origName}
-                                          size={item.meta.fileSize}
-                                          onDownload={() =>
-                                            downloadStoredFile(
-                                              item.meta.id,
-                                              item.meta.origName,
-                                              t("common.error.file_download")
+                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 text-slate-400 pointer-events-none">
+                              {imgPlaceholder}
+                            </div>
+                          )
+                        ) : (
+                          <div className="p-1 overflow-hidden" style={{ height: "218px" }}>
+                            <div
+                              className="grid gap-1"
+                              style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: `${cellH}px` }}
+                            >
+                              {displayItems.map((item, i) => {
+                                if (item.kind === "existing") {
+                                  return (
+                                    <div
+                                      key={item.meta.id}
+                                      className="relative rounded-md overflow-hidden border border-slate-200 group flex flex-col"
+                                    >
+                                      <div className="relative flex-1 min-h-0">
+                                        {imgBlobUrls[item.meta.id] ? (
+                                          <img
+                                            src={imgBlobUrls[item.meta.id]}
+                                            alt={item.meta.origName}
+                                            className="w-full h-full object-contain"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center bg-slate-100">
+                                            <ImageIcon className="w-5 h-5 text-slate-300" />
+                                          </div>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveExistingForm1("fb_i96wuphru", item.meta.id)}
+                                          className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                          <X className="w-2.5 h-2.5 text-white" />
+                                        </button>
+                                      </div>
+                                      <FileInfoBar
+                                        name={item.meta.origName}
+                                        size={item.meta.fileSize}
+                                        onDownload={() =>
+                                          downloadStoredFile(
+                                            item.meta.id,
+                                            item.meta.origName,
+                                            t("common.error.file_download")
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  );
+                                }
+                                if (item.kind === "new") {
+                                  return (
+                                    <div
+                                      key={`new-${item.idx}`}
+                                      className="relative rounded-md overflow-hidden border border-blue-200 group flex flex-col"
+                                    >
+                                      <div className="relative flex-1 min-h-0">
+                                        <FileImagePreview file={item.file} className="w-full h-full object-contain" />
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleFileChangeForm1(
+                                              "fb_i96wuphru",
+                                              newList.filter((_, fi) => fi !== item.idx)
                                             )
                                           }
-                                        />
-                                      </div>
-                                    );
-                                  }
-                                  if (item.kind === "new") {
-                                    return (
-                                      <div
-                                        key={`new-${item.idx}`}
-                                        className="relative rounded-md overflow-hidden border border-blue-200 group flex flex-col"
-                                      >
-                                        <div className="relative flex-1 min-h-0">
-                                          <FileImagePreview file={item.file} className="w-full h-full object-contain" />
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              handleFileChangeForm1(
-                                                "fb_i96wuphru",
-                                                newList.filter((_, fi) => fi !== item.idx)
-                                              )
-                                            }
-                                            className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                          >
-                                            <X className="w-2.5 h-2.5 text-white" />
-                                          </button>
-                                        </div>
-                                        <FileInfoBar
-                                          name={item.file.name}
-                                          size={item.file.size}
-                                          onDownload={() => downloadLocalFile(item.file)}
-                                        />
-                                      </div>
-                                    );
-                                  }
-                                  return (
-                                    <FileInput
-                                      key={`add-${i}`}
-                                      accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp"
-                                      multiple={maxCount > 1}
-                                      onChange={handleImgSelect}
-                                      renderTrigger={(inputRef) => (
-                                        <div
-                                          role="button"
-                                          tabIndex={0}
-                                          onClick={() => inputRef.current?.click()}
-                                          onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-                                          className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
+                                          className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
-                                          <Plus className="w-4 h-4" />
-                                          <span className="text-[10px] mt-0.5">{t("common.btn.add")}</span>
-                                        </div>
-                                      )}
-                                    />
+                                          <X className="w-2.5 h-2.5 text-white" />
+                                        </button>
+                                      </div>
+                                      <FileInfoBar
+                                        name={item.file.name}
+                                        size={item.file.size}
+                                        onDownload={() => downloadLocalFile(item.file)}
+                                      />
+                                    </div>
                                   );
-                                })}
-                              </div>
+                                }
+                                return (
+                                  <FileInput
+                                    key={`add-${i}`}
+                                    accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp"
+                                    multiple={maxCount > 1}
+                                    onChange={handleImgSelect}
+                                    renderTrigger={(inputRef) => (
+                                      <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => inputRef.current?.click()}
+                                        onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+                                        className="flex flex-col items-center justify-center border border-dashed border-slate-300 rounded-md cursor-pointer text-slate-400 hover:border-slate-500 hover:text-slate-600 transition-all"
+                                      >
+                                        <Plus className="w-4 h-4" />
+                                        <span className="text-[10px] mt-0.5">{t("common.btn.add")}</span>
+                                      </div>
+                                    )}
+                                  />
+                                );
+                              })}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("events.label.location")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("events.placeholder.title")}
-                        maxLength={100}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm1["fb_iuer3vw65"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm1("fb_iuer3vw65", e.target.value)}
-                        onBlur={() => handleFieldBlurForm1("fb_iuer3vw65")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm1["fb_iuer3vw65"] ?? "").length}/{100}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("events.label.period")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                          type="date"
-                          disabled={false}
-                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
-                          value={formValuesForm1["fb_encm1xsl6_from"] ?? ""}
-                          onChange={(e) => handleFieldChangeForm1("fb_encm1xsl6_from", e.target.value)}
-                          onClick={(e) => e.currentTarget.showPicker?.()}
-                        />
+                          </div>
+                        )}
                       </div>
-                      <span className="text-sm text-slate-400 flex-shrink-0">~</span>
-                      <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                          type="date"
-                          disabled={false}
-                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
-                          value={formValuesForm1["fb_encm1xsl6_to"] ?? ""}
-                          onChange={(e) => handleFieldChangeForm1("fb_encm1xsl6_to", e.target.value)}
-                          onClick={(e) => e.currentTarget.showPicker?.()}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 6" }}>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <TiptapEditor
-                      initialValue={formValuesForm1["fb_lfepbt1s7"] ?? ""}
-                      onChange={(v: string) => handleFieldChangeForm1("fb_lfepbt1s7", v)}
-                      height="528px"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.publishDttm")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("events.label.location")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
                     <input
-                      type="datetime-local"
-                      disabled={evalFieldConditionForm1("publish_dttm<today(), update=1")}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      value={formValuesForm1["fb_wqv0iit76"] ?? ""}
-                      min={formatNowBySubType("datetime") || formatNowBySubType("datetime")}
-                      onChange={(e) => handleFieldChangeForm1("fb_wqv0iit76", e.target.value)}
-                      onClick={(e) => e.currentTarget.showPicker?.()}
+                      type="text"
+                      disabled={false}
+                      placeholder={t("events.placeholder.title")}
+                      maxLength={100}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm1["fb_iuer3vw65"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_iuer3vw65", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_iuer3vw65")}
                     />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm1["fb_iuer3vw65"] ?? "").length}/{100}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.isVisible")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex items-center gap-4">
-                      {resolveFieldOptions(
-                        FORM_FIELD_BY_ID_Form1["fb_wc9un3qwz"] as unknown as SearchFieldConfig,
-                        groups
-                      ).map((opt) => {
-                        const parsed = parseOpt(opt);
-                        return (
-                          <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name={`${uid}-field-fb_wc9un3qwz`}
-                              disabled={false}
-                              value={parsed.value}
-                              checked={(formValuesForm1["fb_wc9un3qwz"] ?? "") === parsed.value}
-                              onChange={() => handleFieldChangeForm1("fb_wc9un3qwz", parsed.value)}
-                              className="w-4 h-4 cursor-pointer"
-                            />
-                            <span className="text-sm text-slate-700">{t(parsed.text)}</span>
-                          </label>
-                        );
-                      })}
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("events.label.period")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        type="date"
+                        disabled={false}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
+                        value={formValuesForm1["fb_encm1xsl6_from"] ?? ""}
+                        onChange={(e) => handleFieldChangeForm1("fb_encm1xsl6_from", e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker?.()}
+                      />
+                    </div>
+                    <span className="text-sm text-slate-400 flex-shrink-0">~</span>
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        type="date"
+                        disabled={false}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
+                        value={formValuesForm1["fb_encm1xsl6_to"] ?? ""}
+                        onChange={(e) => handleFieldChangeForm1("fb_encm1xsl6_to", e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker?.()}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div style={{ gridColumn: "span 12", gridRow: "span 6" }}>
-              <div
-                className="w-full rounded border border-slate-200"
-                style={{
-                  overflow: "clip",
-                  backgroundColor: "#ffffff",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(12, 1fr)",
-                  gridTemplateRows:
-                    fieldRowIsAutoForm2.length > 0
-                      ? fieldRowIsAutoForm2.map((a) => (a ? "auto" : "78px")).join(" ")
-                      : undefined,
-                  gridAutoRows: `78px`,
-                  rowGap: `12px`,
-                  columnGap: `12px`,
-                  paddingTop: "10px",
-                  paddingBottom: "10px",
-                }}
-              >
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.lable.seo.slug")}
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("common.description.seo.slug")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("common.placeholder.seo.slug")}
-                        maxLength={150}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm2["fb_ogcligloe"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm2("fb_ogcligloe", e.target.value)}
-                        onBlur={() => handleFieldBlurForm2("fb_ogcligloe")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm2["fb_ogcligloe"] ?? "").length}/{150}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.seo.metaTitle")}
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("common.description.seo.metaTitle")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("common.input.placeholder")}
-                        maxLength={150}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm2["fb_47m39xuy5"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm2("fb_47m39xuy5", e.target.value)}
-                        onBlur={() => handleFieldBlurForm2("fb_47m39xuy5")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm2["fb_47m39xuy5"] ?? "").length}/{150}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.seo.metaDescription")}
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("common.description.seo.metaDescription")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex flex-col h-full">
-                      <textarea
-                        disabled={false}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 resize-none flex-1 min-h-0"
-                        value={formValuesForm2["fb_roibxaxq4"] ?? ""}
-                        maxLength={180}
-                        placeholder={t("common.placeholder.seo.metaDescription")}
-                        onChange={(e) => handleFieldChangeForm2("fb_roibxaxq4", e.target.value)}
-                      />
-                      <div className="text-right text-[10px] text-slate-400 mt-0.5">
-                        {(formValuesForm2["fb_roibxaxq4"] ?? "").length}/{180}
-                      </div>
-                    </div>
-                  </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 6" }}>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <TiptapEditor
+                    initialValue={formValuesForm1["fb_lfepbt1s7"] ?? ""}
+                    onChange={(v: string) => handleFieldChangeForm1("fb_lfepbt1s7", v)}
+                    height="528px"
+                  />
                 </div>
               </div>
-            </div>
-            <div style={{ gridColumn: "span 12", gridRow: "span 1" }}>
-              <div
-                className="w-full rounded"
-                style={{
-                  overflow: "visible",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(12, 1fr)",
-                  gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  rowGap: `${GAP_SIZE}px`,
-                  columnGap: `${GAP_SIZE}px`,
-                }}
-              >
-                <div
-                  className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
-                  style={{ gridColumn: "span 2", gridRow: "span 1" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeave()) return;
-                      router.back();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
-                  >
-                    {t("common.label.list")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm(t("common.confirm.save"))) return;
-                      handleContentActionSpace1_1();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
-                  >
-                    {t("common.btn.save")}
-                  </button>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.publishDttm")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <input
+                    type="datetime-local"
+                    disabled={evalFieldConditionForm1("publish_dttm<today(), update=1")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    value={formValuesForm1["fb_wqv0iit76"] ?? ""}
+                    min={formatNowBySubType("datetime") || formatNowBySubType("datetime")}
+                    onChange={(e) => handleFieldChangeForm1("fb_wqv0iit76", e.target.value)}
+                    onClick={(e) => e.currentTarget.showPicker?.()}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.isVisible")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex items-center gap-4">
+                    {resolveFieldOptions(
+                      FORM_FIELD_BY_ID_Form1["fb_wc9un3qwz"] as unknown as SearchFieldConfig,
+                      groups
+                    ).map((opt) => {
+                      const parsed = parseOpt(opt);
+                      return (
+                        <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`${uid}-field-fb_wc9un3qwz`}
+                            disabled={false}
+                            value={parsed.value}
+                            checked={(formValuesForm1["fb_wc9un3qwz"] ?? "") === parsed.value}
+                            onChange={() => handleFieldChangeForm1("fb_wc9un3qwz", parsed.value)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                          <span className="text-sm text-slate-700">{t(parsed.text)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </GridCell>
-      </PageGridContainer>
-    </div>
+          <div style={{ gridColumn: "span 12", gridRow: "span 6" }}>
+            <div
+              className="w-full rounded border border-slate-200"
+              style={{
+                overflow: "clip",
+                backgroundColor: "#ffffff",
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gridTemplateRows:
+                  fieldRowIsAutoForm2.length > 0
+                    ? fieldRowIsAutoForm2.map((a) => (a ? "auto" : "78px")).join(" ")
+                    : undefined,
+                gridAutoRows: `78px`,
+                rowGap: `12px`,
+                columnGap: `12px`,
+                paddingTop: "10px",
+                paddingBottom: "10px",
+              }}
+            >
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.lable.seo.slug")}
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("common.description.seo.slug")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={false}
+                      placeholder={t("common.placeholder.seo.slug")}
+                      maxLength={150}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm2["fb_ogcligloe"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm2("fb_ogcligloe", e.target.value)}
+                      onBlur={() => handleFieldBlurForm2("fb_ogcligloe")}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm2["fb_ogcligloe"] ?? "").length}/{150}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.seo.metaTitle")}
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("common.description.seo.metaTitle")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={false}
+                      placeholder={t("common.input.placeholder")}
+                      maxLength={150}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm2["fb_47m39xuy5"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm2("fb_47m39xuy5", e.target.value)}
+                      onBlur={() => handleFieldBlurForm2("fb_47m39xuy5")}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm2["fb_47m39xuy5"] ?? "").length}/{150}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.seo.metaDescription")}
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("common.description.seo.metaDescription")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex flex-col h-full">
+                    <textarea
+                      disabled={false}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 resize-none flex-1 min-h-0"
+                      value={formValuesForm2["fb_roibxaxq4"] ?? ""}
+                      maxLength={180}
+                      placeholder={t("common.placeholder.seo.metaDescription")}
+                      onChange={(e) => handleFieldChangeForm2("fb_roibxaxq4", e.target.value)}
+                    />
+                    <div className="text-right text-[10px] text-slate-400 mt-0.5">
+                      {(formValuesForm2["fb_roibxaxq4"] ?? "").length}/{180}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ gridColumn: "span 12", gridRow: "span 1" }}>
+            <div
+              className="w-full rounded"
+              style={{
+                overflow: "visible",
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                rowGap: `${GAP_SIZE}px`,
+                columnGap: `${GAP_SIZE}px`,
+              }}
+            >
+              <div
+                className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
+                style={{ gridColumn: "span 2", gridRow: "span 1" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirmLeave()) return;
+                    router.back();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
+                >
+                  {t("common.label.list")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(t("common.confirm.save"))) return;
+                    handleContentActionSpace1_1();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
+                >
+                  {t("common.btn.save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </GridCell>
+    </PageLayout>
   );
 }

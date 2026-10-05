@@ -57,8 +57,8 @@ import { createIdGenerator, toSlug } from "../_shared/utils";
 import { buildFormFromEntity } from "../_shared/utils/entityBuild";
 import { normalizeFormItemRowSpans } from "../_shared/utils/formGridLayout";
 import { stampConnectedSlug } from "../_shared/hooks/useWidgetPageState";
-import { buildWidgetTsxFile } from "../_shared/generators/widgetGenerator";
-import type { NestedPageConfig } from "../_shared/generators/widgetGenerator";
+import { buildWidgetTsxFile } from "../_shared/filebuild/widgetGenerator";
+import type { NestedPageConfig } from "../_shared/filebuild/widgetGenerator";
 import { fetchTemplateConfig } from "../_shared/templateApi";
 import type { SlugEntityFieldItem } from "@/components/slug-entity/EntityList";
 import type { SlugOption } from "../_shared/components/builder/fields/SlugSelectField";
@@ -347,6 +347,8 @@ const loadNestedPageConfigs = async (
           outputMode: fetched.outputMode,
           layerType: fetched.layerType,
           layerWidth: fetched.layerWidth,
+          layerTitle: fetched.layerTitle,
+          layerTitleMsgKey: fetched.layerTitleMsgKey,
         };
         loaded.set(slug, config);
       } catch {

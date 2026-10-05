@@ -22,6 +22,8 @@ import { useI18n } from "@/hooks/use-i18n";
 import type { SearchFieldConfig } from "../../types";
 import type { RendererMode } from "./types";
 import { useCategoryCascade, type CategoryItem } from "./useCategoryCascade";
+import { CATEGORY_SEARCH_SELECT_CLS, CATEGORY_SEARCH_WRAP_CLS } from "./rendererStyles";
+import { resolveCategoryDepthLabel } from "../../utils";
 
 interface CategorySearchFieldProps {
   mode: RendererMode;
@@ -38,17 +40,11 @@ const PREVIEW_OPTIONS: CategoryItem[] = [
   { value: "3", text: "샘플 항목 3" },
 ];
 
-/** selectbox 공통 클래스 */
-const SELECT_CLS =
-  "flex-1 h-8 rounded border border-slate-200 bg-white px-2 text-[13px] text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:bg-slate-50 disabled:text-slate-400";
-
 export function CategorySearchField({ mode, field, value = "", onChange, isDisabled }: CategorySearchFieldProps) {
   const { t } = useI18n();
   const isPreview = mode === "preview";
   /* 화면에 노출할 depth 번호 배열 — 미설정 시(레거시 데이터) maxDepth로부터 [1..maxDepth] 파생 (하위호환) */
   const activeDepths = field.activeDepths ?? Array.from({ length: field.maxDepth ?? 1 }, (_, i) => i + 1);
-  const depthLabels = field.depthLabels ?? [];
-  const depthLabelMsgKeys = field.depthLabelMsgKeys ?? [];
 
   /* 로드·선택 로직은 훅이 전담 — 컴포넌트는 반환값으로 그리기만 함.
      value는 검색폼 "초기화" 등 외부 리셋을 감지하는 데 사용된다(useCategoryCascade 참고) */
@@ -58,15 +54,11 @@ export function CategorySearchField({ mode, field, value = "", onChange, isDisab
   /* ── preview 모드: 샘플 selectbox (disabled) ── */
   if (isPreview) {
     return (
-      <div className="flex gap-2 w-full">
+      <div className={CATEGORY_SEARCH_WRAP_CLS}>
         {activeDepths.map((_, i) => (
-          <select key={i} disabled className={SELECT_CLS}>
+          <select key={i} disabled className={CATEGORY_SEARCH_SELECT_CLS}>
             <option value="">
-              {depthLabelMsgKeys[i]
-                ? depthLabelMsgKeys[i]
-                : depthLabels[i]
-                  ? `${depthLabels[i]} 선택`
-                  : `${i + 1}depth 선택`}
+              {t("common.category.label_select", { label: resolveCategoryDepthLabel(field, i, t) })}
             </option>
             {PREVIEW_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -81,7 +73,7 @@ export function CategorySearchField({ mode, field, value = "", onChange, isDisab
 
   /* ── live 모드: API 연동 selectbox ── */
   return (
-    <div className="flex gap-2 w-full">
+    <div className={CATEGORY_SEARCH_WRAP_CLS}>
       {activeDepths.map((_, i) => {
         const options = depthOptions[i];
         const loading = depthLoading[i];
@@ -92,8 +84,8 @@ export function CategorySearchField({ mode, field, value = "", onChange, isDisab
         /* placeholder 텍스트: msgKey > 라벨 > 기본값 순 (기본값 "{n}depth"는 설정 누락 시의 식별자성 표기라 번역 대상 아님)
                    옵션 사전필터 설정 누락(configErrorDepths)이면 다른 상태보다 우선해서 원인을 바로 알 수 있게 안내한다 —
                    실제 데이터가 없어서 0건인지, 빌더 설정이 빠져서 0건인지 사용자가 구분할 수 있게 하는 최소한의 신호 */
-        const labelText = depthLabelMsgKeys[i] || depthLabels[i] || `${i + 1}depth`;
-        const prevLabelText = depthLabelMsgKeys[i - 1] || depthLabels[i - 1] || `${i}depth`;
+        const labelText = resolveCategoryDepthLabel(field, i, t);
+        const prevLabelText = resolveCategoryDepthLabel(field, i - 1, t);
         const placeholder = configErrorDepths[i]
           ? "설정 오류 — 상위 부모 ID 경로를 확인하세요"
           : loading
@@ -108,7 +100,7 @@ export function CategorySearchField({ mode, field, value = "", onChange, isDisab
             value={selectedVal}
             disabled={isDisabled || isFieldDisabled || loading}
             onChange={(e) => handleSelect(i, e.target.value)}
-            className={SELECT_CLS}
+            className={CATEGORY_SEARCH_SELECT_CLS}
           >
             <option value="">{placeholder}</option>
             {options.map((opt) => (

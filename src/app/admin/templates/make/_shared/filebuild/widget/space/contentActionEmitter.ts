@@ -5,9 +5,11 @@ import {
   jsStringLiteral,
   formVarNames,
   multiSelectVarNames,
+  sublistVarNames,
   pageVar,
   hasMultiSelectExtraFields,
 } from "../../widgetGenerator";
+import { hasSubListFileColumns } from "../sublistBlock";
 import { FILE_FIELD_TYPES } from "../../../constants";
 
 const UTILS_MODULE = "@/app/admin/templates/make/_shared/utils";
@@ -50,16 +52,6 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
     };
   }
 
-  const subLists = targetWidgets.filter((w) => w.type === "sublist");
-  if (subLists.length > 0) {
-    return {
-      handlerLines: [],
-      helperLines: [],
-      imports: [],
-      todo: `SubList 위젯이 연결된 저장은 아직 코드 생성이 지원되지 않습니다. 직접 구현해주세요.`,
-    };
-  }
-
   const slugs = new Set(targetWidgets.map((w) => (w as ContentWidget).connectedSlug).filter((s): s is string => !!s));
   const resolvedSlug = mainConnectedSlug || [...slugs][0] || "";
   if (!resolvedSlug) {
@@ -81,11 +73,16 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
 
   const forms = targetWidgets.filter((w) => w.type === "form") as FormWidget[];
   const multiSelects = targetWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
+  const subLists = targetWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
 
   const helperLines: string[] = [
     `const ${widgetsConstName}: ContentSaveWidget[] = [${targetWidgets
       .map((w) =>
-        w.type === "form" ? formVarNames(suffixOf(w.widgetId)).widget : multiSelectVarNames(suffixOf(w.widgetId)).widget
+        w.type === "form"
+          ? formVarNames(suffixOf(w.widgetId)).widget
+          : w.type === "sublist"
+            ? sublistVarNames(suffixOf(w.widgetId)).widget
+            : multiSelectVarNames(suffixOf(w.widgetId)).widget
       )
       .join(", ")}];`,
   ];
@@ -150,8 +147,23 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
     forms.length > 0 ? `[${forms.map((fw) => `...${formVarNames(suffixOf(fw.widgetId)).fields}`).join(", ")}]` : "[]";
   const validationRuleIds = [...new Set(targetWidgets.flatMap((w) => o.contentValidationRuleIds?.[w.widgetId] ?? []))];
 
+  const subListRowsMapLiteral = `{ ${subLists
+    .map((sw) => `${jsStringLiteral(sw.widgetId)}: ${sublistVarNames(suffixOf(sw.widgetId)).rows}`)
+    .join(", ")} }`;
+  const subListsWithFiles = subLists.filter((sw) => hasSubListFileColumns(sw));
+  const subListFileMapLiteral = `{ ${subListsWithFiles
+    .map((sw) => `${jsStringLiteral(sw.widgetId)}: ${sublistVarNames(suffixOf(sw.widgetId)).fileMap}`)
+    .join(", ")} }`;
+
   handlerLines.push(`${ind(1)}const ${fnName} = async () => {`);
-  handlerLines.push(`${ind(2)}const isUpdate = storedId !== null;`);
+  if (ctx.tabSharedIdVars) {
+    handlerLines.push(
+      `${ind(2)}const targetId = storedId ?? ${ctx.tabSharedIdVars.map}[${jsStringLiteral(resolvedSlug)}] ?? null;`
+    );
+    handlerLines.push(`${ind(2)}const isUpdate = targetId !== null;`);
+  } else {
+    handlerLines.push(`${ind(2)}const isUpdate = storedId !== null;`);
+  }
   forms.forEach((fw) => {
     const n = formVarNames(suffixOf(fw.widgetId));
     const hasFiles = (fw.fields ?? []).some((f) => (FILE_FIELD_TYPES as readonly string[]).includes(f.type));
@@ -159,6 +171,12 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
       `${ind(2)}if (!validateFormFields(${n.fields}, ${n.values}, ${hasFiles ? n.files : "{}"}, ${hasFiles ? n.existingMeta : "{}"}, ${pageVar("allFormValues")}, ${pageVar("allFieldKeyToId")}, t)) return;`
     );
   });
+  if (subLists.length > 0) {
+    imports.push({ module: UTILS_MODULE, named: ["validateSubListRows"] });
+    handlerLines.push(
+      `${ind(2)}if (!validateSubListRows(${widgetsConstName} as Parameters<typeof validateSubListRows>[0], ${subListRowsMapLiteral}, ${subListFileMapLiteral}, ${pageVar("allFormValues")}, ${pageVar("allFieldKeyToId")}, ${pageVar("allFieldLabels")}, t)) return;`
+    );
+  }
   if (multiSelects.length > 0) {
     imports.push({ module: UTILS_MODULE, named: ["findMissingRequiredMultiSelect"] });
     handlerLines.push(
@@ -175,6 +193,12 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
   handlerLines.push(
     `${ind(3)}const newFileIdsByFieldId = await uploadContentFormFiles(${widgetsConstName}, ${fileValuesMapLiteral}, ${jsStringLiteral(resolvedSlug)}, ${isEntity});`
   );
+  if (subLists.length > 0) {
+    imports.push({ module: CONTENT_SAVE_MODULE, named: ["uploadContentSubListFiles"] });
+    handlerLines.push(
+      `${ind(3)}const processedSubListRowsMap = await uploadContentSubListFiles(${widgetsConstName}, ${subListRowsMapLiteral}, ${subListFileMapLiteral}, ${jsStringLiteral(resolvedSlug)}, newFileIdsByFieldId);`
+    );
+  }
   handlerLines.push(
     `${ind(3)}const formFileIdsMap = buildFormFileIdsMap(${widgetsConstName}, ${existingMetaMapLiteral}, newFileIdsByFieldId);`
   );
@@ -182,12 +206,13 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
   handlerLines.push(`${ind(4)}${widgetsConstName} as Parameters<typeof buildDataJson>[0],`);
   handlerLines.push(`${ind(4)}${formValuesMapLiteral},`);
   handlerLines.push(`${ind(4)}formFileIdsMap,`);
-  handlerLines.push(`${ind(4)}{},`);
+  handlerLines.push(`${ind(4)}${subLists.length > 0 ? "processedSubListRowsMap" : "{}"},`);
   handlerLines.push(`${ind(4)}${multiSelectMapLiteral},`);
   handlerLines.push(`${ind(4)}${multiSelectExtraFieldMapLiteral},`);
   handlerLines.push(`${ind(4)}${mainConnectedSlug ? jsStringLiteral(mainConnectedSlug) : "undefined"},`);
   handlerLines.push(`${ind(4)}allFormValues,`);
-  handlerLines.push(`${ind(4)}${isEntity}`);
+  handlerLines.push(`${ind(4)}${isEntity},`);
+  handlerLines.push(`${ind(4)}${pageVar("allFieldKeyToId")}`);
   handlerLines.push(`${ind(3)});`);
   handlerLines.push(`${ind(3)}await persistContentDataJson({`);
   handlerLines.push(`${ind(4)}connectedSlug: ${jsStringLiteral(resolvedSlug)},`);
@@ -195,8 +220,13 @@ export const emitContentActionHandler = (o: ContentActionEmitOptions): ContentAc
   handlerLines.push(`${ind(4)}pkKeys,`);
   handlerLines.push(`${ind(4)}templateSlug: ${pageSlug ? jsStringLiteral(pageSlug) : "undefined"},`);
   handlerLines.push(`${ind(4)}groupId: undefined,`);
-  handlerLines.push(`${ind(4)}storedId,`);
+  handlerLines.push(ctx.tabSharedIdVars ? `${ind(4)}storedId: targetId,` : `${ind(4)}storedId,`);
   handlerLines.push(`${ind(4)}storedGroupId: null,`);
+  if (ctx.tabSharedIdVars) {
+    handlerLines.push(
+      `${ind(4)}onDataIdCreated: (slug, id) => ${ctx.tabSharedIdVars.setMap}((prev) => ({ ...prev, [slug]: id })),`
+    );
+  }
   handlerLines.push(`${ind(4)}validationRuleIds: [${validationRuleIds.join(", ")}],`);
   handlerLines.push(`${ind(4)}isEntity: ${isEntity},`);
   handlerLines.push(`${ind(4)}entityDateFields: ${entityDateFieldsExpr},`);

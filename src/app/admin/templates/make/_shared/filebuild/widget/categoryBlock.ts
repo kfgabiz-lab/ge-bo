@@ -1,6 +1,18 @@
 import type { CategoryWidget } from "../../components/renderer/types";
-import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
-import { jsStringLiteral, collectUnhandledKeys, emitContainerOpen, emitContainerClose } from "../widgetGenerator";
+import type {
+  ImportRequirement,
+  WidgetCodeBlock,
+  WidgetGenContext,
+  UnhandledConfigKeys,
+  LayerPopupPlan,
+} from "../widgetGenerator";
+import {
+  jsStringLiteral,
+  collectUnhandledKeys,
+  emitContainerOpen,
+  emitContainerClose,
+  buildLayerPopupComponentLines,
+} from "../widgetGenerator";
 import {
   CATEGORY_OUTER_WRAP_CLS,
   CATEGORY_CONTAINER_CLS,
@@ -107,6 +119,19 @@ const categoryVarNames = (suffix: string) => ({
   fieldKeys: `CATEGORY_FIELD_KEYS_${suffix}`,
   brokenParentSel: `selectedParent${suffix}`,
   dbSlug: `categoryDbSlug${suffix}`,
+  popupOpen: { create: `popupOpenCreate${suffix}`, edit: `popupOpenEdit${suffix}` },
+  setPopupOpen: {
+    setCreate: `setPopupOpenCreate${suffix}`,
+    setEdit: `setPopupOpenEdit${suffix}`,
+  },
+  popupExtras: { create: `popupExtrasCreate${suffix}`, edit: `popupExtrasEdit${suffix}` },
+  setPopupExtras: {
+    setCreate: `setPopupExtrasCreate${suffix}`,
+    setEdit: `setPopupExtrasEdit${suffix}`,
+  },
+  popupSaved: { create: `handleLayerPopupSavedCreate${suffix}`, edit: `handleLayerPopupSavedEdit${suffix}` },
+  popupEditId: `popupEditIdEdit${suffix}`,
+  setPopupEditId: `setPopupEditIdEdit${suffix}`,
 });
 
 const CATEGORY_ITEM_INTERFACE_LINES: string[] = [
@@ -220,6 +245,11 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
       (widget.editConnType === "path" && !!widget.editPath));
   const editMode: "popup" | "path" | undefined = editEnabled ? widget.editConnType : undefined;
 
+  const createLayerPlan: LayerPopupPlan | undefined =
+    createMode === "popup" ? ctx.layerPopupPlans?.find((p) => p.role === "create") : undefined;
+  const editLayerPlan: LayerPopupPlan | undefined =
+    editMode === "popup" ? ctx.layerPopupPlans?.find((p) => p.role === "edit") : undefined;
+
   const detailEnabled =
     !!widget.allowDetail &&
     ((widget.detailConnType === "popup" && !!widget.detailPopupSlug) ||
@@ -250,7 +280,9 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
       named: [
         "flattenPageDataItem",
         ...(createEnabled && createMode !== "inline" ? ["parseActionParams"] : []),
+        ...(editMode === "popup" && editLayerPlan ? ["parseActionParams"] : []),
         ...(editEnabled || detailEnabled ? ["buildRowActionQuery"] : []),
+        ...(createLayerPlan || editLayerPlan ? ["buildParamSaveExtras"] : []),
       ],
     },
   ];
@@ -261,9 +293,9 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
   helperLines.push(CATEGORY_FETCH_SIZE_LINE);
 
   const routingConsts: { mode: "create" | "edit" | "detail"; resolved: ResolvedPagePath }[] = [];
-  if (createMode === "popup")
+  if (createMode === "popup" && !createLayerPlan)
     routingConsts.push({ mode: "create", resolved: resolvePagePath(widget.createPopupSlug as string, ctx) });
-  if (editMode === "popup")
+  if (editMode === "popup" && !editLayerPlan)
     routingConsts.push({ mode: "edit", resolved: resolvePagePath(widget.editPopupSlug as string, ctx) });
   if (detailMode === "popup")
     routingConsts.push({ mode: "detail", resolved: resolvePagePath(widget.detailPopupSlug as string, ctx) });
@@ -289,6 +321,19 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
   if (createEnabled && createMode === "inline") {
     stateLines.push(`${ind(1)}const [${names.inputName}, ${names.setInputName}] = useState('');`);
     stateLines.push(`${ind(1)}const [${names.showInput}, ${names.setShowInput}] = useState(false);`);
+  }
+  if (createLayerPlan) {
+    stateLines.push(`${ind(1)}const [${names.popupOpen.create}, ${names.setPopupOpen.setCreate}] = useState(false);`);
+    stateLines.push(
+      `${ind(1)}const [${names.popupExtras.create}, ${names.setPopupExtras.setCreate}] = useState<Record<string, Record<string, string>>>({});`
+    );
+  }
+  if (editLayerPlan) {
+    stateLines.push(`${ind(1)}const [${names.popupOpen.edit}, ${names.setPopupOpen.setEdit}] = useState(false);`);
+    stateLines.push(
+      `${ind(1)}const [${names.popupExtras.edit}, ${names.setPopupExtras.setEdit}] = useState<Record<string, Record<string, string>>>({});`
+    );
+    stateLines.push(`${ind(1)}const [${names.popupEditId}, ${names.setPopupEditId}] = useState<number | null>(null);`);
   }
   stateLines.push(`${ind(1)}const ${names.dragIndexRef} = useRef<number | null>(null);`);
   stateLines.push(`${ind(1)}const [${names.dropIndex}, ${names.setDropIndex}] = useState<number | null>(null);`);
@@ -375,6 +420,25 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
     if (createMode === "inline") {
       handlerLines.push(`${ind(2)}${names.setShowInput}((v) => !v);`);
       handlerLines.push(`${ind(2)}${names.setInputName}('');`);
+    } else if (createMode === "popup" && createLayerPlan) {
+      handlerLines.push(
+        `${ind(2)}const rowForParams = ${parentSelExpr != null ? `${parentSelExpr} != null ? { id: String(${parentSelExpr}) } : {}` : "{}"};`
+      );
+      handlerLines.push(
+        `${ind(2)}const staticParams = parseActionParams(${jsStringLiteral(widget.createParams ?? "")}, rowForParams);`
+      );
+      handlerLines.push(
+        `${ind(2)}const dynamicParams: Record<string, string> = ${parentSelExpr != null ? `${parentSelExpr} != null ? { parentId: String(${parentSelExpr}) } : {}` : "{}"};`
+      );
+      handlerLines.push(`${ind(2)}const initialValues = { ...staticParams, ...dynamicParams };`);
+      if (widget.createParamSave) {
+        handlerLines.push(
+          `${ind(2)}${names.setPopupExtras.setCreate}(buildParamSaveExtras(initialValues, [${createLayerPlan.formContentKeys.map((k) => jsStringLiteral(k)).join(", ")}], [${createLayerPlan.tableContentKeys.map((k) => jsStringLiteral(k)).join(", ")}], ${JSON.stringify(createLayerPlan.formFieldMeta)}) as Record<string, Record<string, string>>);`
+        );
+      } else {
+        handlerLines.push(`${ind(2)}${names.setPopupExtras.setCreate}({});`);
+      }
+      handlerLines.push(`${ind(2)}${names.setPopupOpen.setCreate}(true);`);
     } else if (createMode === "popup") {
       const resolved = routingConsts.find((r) => r.mode === "create")!.resolved;
       if (resolved.todoLine) handlerLines.push(`${ind(2)}/* TODO(파일빌드): ${resolved.todoLine} */`);
@@ -446,7 +510,20 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
   if (editEnabled) {
     const editQueryExpr = `buildRowActionQuery(item.id, ${jsStringLiteral(widget.editParams ?? "")}, item._flatJson ?? {}${widget.editParamSave ? ", true" : ""})`;
     handlerLines.push(`${ind(1)}const ${names.edit} = (item: CategoryItem) => {`);
-    if (editMode === "popup") {
+    if (editMode === "popup" && editLayerPlan) {
+      handlerLines.push(
+        `${ind(2)}const editParams = parseActionParams(${jsStringLiteral(widget.editParams ?? "")}, item._flatJson ?? {});`
+      );
+      if (widget.editParamSave) {
+        handlerLines.push(
+          `${ind(2)}${names.setPopupExtras.setEdit}(buildParamSaveExtras(editParams, [${editLayerPlan.formContentKeys.map((k) => jsStringLiteral(k)).join(", ")}], [${editLayerPlan.tableContentKeys.map((k) => jsStringLiteral(k)).join(", ")}], ${JSON.stringify(editLayerPlan.formFieldMeta)}) as Record<string, Record<string, string>>);`
+        );
+      } else {
+        handlerLines.push(`${ind(2)}${names.setPopupExtras.setEdit}({});`);
+      }
+      handlerLines.push(`${ind(2)}${names.setPopupEditId}(item.id);`);
+      handlerLines.push(`${ind(2)}${names.setPopupOpen.setEdit}(true);`);
+    } else if (editMode === "popup") {
       const resolved = routingConsts.find((r) => r.mode === "edit")!.resolved;
       if (resolved.todoLine) handlerLines.push(`${ind(2)}/* TODO(파일빌드): ${resolved.todoLine} */`);
       handlerLines.push(`${ind(2)}router.push(\`\${${resolved.constName}}\${${editQueryExpr}}\`);`);
@@ -533,6 +610,61 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
   handlerLines.push(`${ind(2)}}`);
   handlerLines.push(`${ind(1)}};`);
   handlerLines.push("");
+
+  const layerPopupJsxByRole = new Map<"create" | "edit", string[]>();
+  ([["create", createLayerPlan] as const, ["edit", editLayerPlan] as const] as const).forEach(([role, plan]) => {
+    if (!plan) return;
+    const openVar = names.popupOpen[role];
+    const setOpenVar = names.setPopupOpen[role === "create" ? "setCreate" : "setEdit"];
+    const extrasVar = names.popupExtras[role];
+    const savedFnVar = names.popupSaved[role];
+    const componentName = `LayerPopup_${suffix}_${role}`;
+
+    handlerLines.push(
+      `${ind(1)}const ${savedFnVar} = () => { ${names.fetch}(${parentSelExpr ?? "null"}); ${setOpenVar}(false); };`
+    );
+    handlerLines.push("");
+
+    const includeEditId = role === "edit";
+    const built = buildLayerPopupComponentLines(
+      plan,
+      componentName,
+      ctx.blockOf ?? (() => undefined),
+      ctx.suffixOf,
+      includeEditId
+    );
+    helperLines.push(built.text);
+    imports.push(...built.imports);
+    const editIdProp = includeEditId ? ` editId={${names.popupEditId}}` : "";
+
+    const titleExpr = plan.layerTitleMsgKey
+      ? `t(${jsStringLiteral(plan.layerTitleMsgKey)})`
+      : jsStringLiteral(plan.layerTitle ?? "");
+    const layoutJsx: string[] = [];
+    if (plan.layerType === "right") {
+      layoutJsx.push(
+        `${ind(1)}<RightDrawerLayout open={${openVar}} onClose={() => ${setOpenVar}(false)} title={${titleExpr}}>`
+      );
+      layoutJsx.push(
+        `${ind(2)}<${componentName} onClose={() => ${setOpenVar}(false)} onSaved={${savedFnVar}} extras={${extrasVar}}${editIdProp} />`
+      );
+      layoutJsx.push(`${ind(1)}</RightDrawerLayout>`);
+    } else {
+      layoutJsx.push(
+        `${ind(1)}<CenterPopupLayout open={${openVar}} onClose={() => ${setOpenVar}(false)} title={${titleExpr}} layerWidth=${jsStringLiteral(plan.layerWidth)}>`
+      );
+      layoutJsx.push(
+        `${ind(2)}<${componentName} onClose={() => ${setOpenVar}(false)} onSaved={${savedFnVar}} extras={${extrasVar}}${editIdProp} />`
+      );
+      layoutJsx.push(`${ind(1)}</CenterPopupLayout>`);
+    }
+    layerPopupJsxByRole.set(role, layoutJsx);
+
+    imports.push({ module: "@/components/layout/popup/center-popup-layout", defaultName: "CenterPopupLayout" });
+    if (plan.layerType === "right") {
+      imports.push({ module: "@/components/layout/popup/right-drawer-layout", defaultName: "RightDrawerLayout" });
+    }
+  });
 
   const jsxLines: string[] = [];
   jsxLines.push(`<div className=${jsStringLiteral(CATEGORY_OUTER_WRAP_CLS)}>`);
@@ -720,6 +852,7 @@ export const generateCategoryBlock = (widget: CategoryWidget, ctx: WidgetGenCont
   jsxLines.push(`${ind(2)}</div>`);
 
   jsxLines.push(`${ind(1)}${emitContainerClose()}`);
+  layerPopupJsxByRole.forEach((lines) => lines.forEach((l) => jsxLines.push(l)));
   jsxLines.push(`</div>`);
 
   return { imports, helperLines, stateLines, handlerLines, jsxLines, unhandled: buildUnhandled(widget, parentBroken) };

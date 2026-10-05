@@ -1,5 +1,5 @@
 import type { FormWidget, FormFieldItem } from "../../components/builder/FormBuilder";
-import type { MultiSelectWidget } from "../../components/renderer/types";
+import type { MultiSelectWidget, SubListWidget } from "../../components/renderer/types";
 import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
 import {
   jsStringLiteral,
@@ -9,6 +9,7 @@ import {
   emitSlugOptionSelectComponent,
   formVarNames,
   multiSelectVarNames,
+  sublistVarNames,
   pageVar,
   hasMultiSelectExtraFields,
 } from "../widgetGenerator";
@@ -37,6 +38,7 @@ const UTILS_MODULE = "@/app/admin/templates/make/_shared/utils";
 const CONTENT_SAVE_MODULE = "@/app/admin/templates/make/_shared/utils/contentSave";
 const FORM_BUILDER_MODULE = "@/app/admin/templates/make/_shared/components/builder/FormBuilder";
 const FORM_GRID_MODULE = "@/app/admin/templates/make/_shared/utils/formGridLayout";
+const AUTOCOMPLETE_FIELD_MODULE = "@/app/admin/templates/make/_shared/components/renderer/AutocompleteField";
 
 const HANDLED_WIDGET_KEYS = new Set([
   "type",
@@ -85,6 +87,16 @@ const HANDLED_FIELD_KEYS = new Set([
   "disablePast",
   "dateSubType",
   "rangeSubType",
+  "compareExpr",
+  "defaultStartDateOffset",
+  "defaultStartDate",
+  "disableStartPast",
+  "defaultStartToday",
+  "defaultEndDateOffset",
+  "defaultEndDate",
+  "disableEndPast",
+  "defaultEndToday",
+  "addressLanguage",
   "disableCondition",
   "hideCondition",
   "dataGenerations",
@@ -113,6 +125,8 @@ const HANDLED_FIELD_KEYS = new Set([
   "optionFilter",
   "optionOrderKey",
   "optionOrderDir",
+  "optionDerivedKeys",
+  "selectType",
   "mediaImageMaxSizeMB",
   "mediaVideoMaxSizeMB",
   "mediaImageMaxSizeUnit",
@@ -129,11 +143,15 @@ const IGNORED_FIELD_KEYS = new Map<string, string>([
   ],
   [
     "disablePastDates",
-    "date 필드 과거일 차단은 FieldRenderer.tsx:1282 dateMin 계산이 field.disablePast만 읽어서 처리한다 — field.disablePastDates는 SearchFieldConfig(types.ts)에 없고 DateField.tsx 빌더 편집기에도 대응 입력이 없어 런타임에서 읽는 지점이 전혀 없는 사문화 값",
+    "date 필드 과거일 차단은 FieldRenderer.tsx:808 dateMin 계산이 field.disablePast만 읽어서 처리한다 — field.disablePastDates는 SearchFieldConfig(types.ts)에 없고 DateField.tsx 빌더 편집기에도 대응 입력이 없어 런타임에서 읽는 지점이 전혀 없는 사문화 값",
   ],
   [
     "minDate",
-    "date 필드 최소값(dateMin)은 FieldRenderer.tsx:1282가 disablePast+defaultToday/defaultDateOffset/defaultDate 조합으로만 계산한다 — field.minDate는 SearchFieldConfig(types.ts)에 없고 DateField.tsx 빌더 편집기에도 대응 입력이 없어 런타임에서 읽는 지점이 전혀 없는 사문화 값",
+    "date 필드 최소값(dateMin)은 FieldRenderer.tsx:808이 disablePast+defaultToday/defaultDateOffset/defaultDate 조합으로만 계산한다 — field.minDate는 SearchFieldConfig(types.ts)에 없고 DateField.tsx 빌더 편집기에도 대응 입력이 없어 런타임에서 읽는 지점이 전혀 없는 사문화 값",
+  ],
+  [
+    "singleDateRange",
+    "singleDateRange=true는 utils.ts:2942 buildSearchQueryParams의 검색 경로에서만 읽혀 단일 date 컬럼 범위 필터용 _gte/_lte 파라미터를 만드는 값이다 — Form 경로(FieldRenderer.tsx·FormRenderer.tsx·hooks/useWidgetPageState.ts)에는 참조가 0건이라 런타임에서도 읽는 지점이 없고, 검색 위젯 쪽은 searchBlock.ts:49 HANDLED_FIELD_KEYS가 이미 정상 처리한다",
   ],
 ]);
 
@@ -172,13 +190,26 @@ const buildUnhandled = (widget: FormWidget): UnhandledConfigKeys[] => {
 };
 
 export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): WidgetCodeBlock => {
-  const { ind, suffix, contentColSpan, allWidgets, suffixOf, isEntity } = ctx;
+  const {
+    ind,
+    suffix,
+    contentColSpan,
+    allWidgets,
+    scopeWidgets,
+    suffixOf,
+    isEntity,
+    crossTab,
+    tabSharedIdVars,
+    insideTab,
+  } = ctx;
   const names = formVarNames(suffix);
   const fields = widget.fields ?? [];
 
-  const allForms = allWidgets.filter((w) => w.type === "form") as FormWidget[];
+  const pageWidgets = ctx.insideTab || ctx.insidePopup ? scopeWidgets : allWidgets;
+  const allForms = pageWidgets.filter((w) => w.type === "form") as FormWidget[];
   const isPrimary = allForms[0] === widget;
-  const allMultiSelects = allWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
+  const allMultiSelects = pageWidgets.filter((w) => w.type === "multiselect") as MultiSelectWidget[];
+  const allSubLists = pageWidgets.filter((w) => w.type === "sublist") as SubListWidget[];
 
   const hasFileFields = fields.some((f) => (FILE_FIELD_TYPES as readonly string[]).includes(f.type));
   const pageHasFileFields = allForms.some((fw) =>
@@ -190,6 +221,8 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   const hasTitleBlock = !!(widget.titleMsgKey || widget.title);
   const bgColor = widget.bgColor && widget.bgColor !== "none" ? widget.bgColor : undefined;
   const mainSlug = widget.connectedSlug || ctx.mainConnectedSlug || "";
+  const anyMultiSelectHideCondition = allMultiSelects.some((mw) => !!mw.hideCondition);
+  const emitRecordLoaded = isPrimary && !!mainSlug && anyMultiSelectHideCondition;
 
   const needs = createFormFieldNeeds();
   const imports: ImportRequirement[] = [];
@@ -233,7 +266,25 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     stateLines.push(
       `${ind(1)}const clockReady = useServerClockStore((s) => s.status === 'synced' || s.status === 'failed');`
     );
-    stateLines.push(`${ind(1)}const storedId = searchParams.get('id') ? Number(searchParams.get('id')) : null;`);
+    const urlIdExpr = "searchParams.get('id') ? Number(searchParams.get('id')) : null";
+    const sharedIdSlugs = tabSharedIdVars
+      ? [
+          ...new Set(
+            pageWidgets
+              .filter((w) => w.type === "form" || w.type === "sublist" || w.type === "multiselect")
+              .map((w) => (w as unknown as { connectedSlug?: string }).connectedSlug)
+              .filter((s): s is string => !!s)
+          ),
+        ]
+      : [];
+    const storedIdExpr = sharedIdSlugs.reduceRight((fallback, slug) => {
+      const lookup = `${tabSharedIdVars!.map}[${jsStringLiteral(slug)}]`;
+      return `${lookup} !== undefined ? ${lookup} : (${fallback})`;
+    }, urlIdExpr);
+    stateLines.push(`${ind(1)}const storedId = ${storedIdExpr};`);
+    if (emitRecordLoaded) {
+      stateLines.push(`${ind(1)}const [recordLoaded, setRecordLoaded] = useState(false);`);
+    }
     imports.push({ module: "next/navigation", named: ["useSearchParams"] });
     imports.push({ module: "@/store/use-site-store", named: ["useSiteStore"] });
     imports.push({ module: "@/store/use-server-clock-store", named: ["useServerClockStore"] });
@@ -245,6 +296,16 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
       stateLines.push(
         `${ind(1)}const [${pageVar("fetchRelData")}, ${pageVar("setFetchRelData")}] = useState<Record<string, unknown>>({});`
       );
+    }
+    if (crossTab) {
+      const pendingInitExpr = mainSlug ? "storedId !== null" : "false";
+      stateLines.push(`${ind(1)}const generationBaselineRef = useRef<Record<string, string>>({});`);
+      stateLines.push(`${ind(1)}const generationBaselinePendingRef = useRef<boolean>(false);`);
+      stateLines.push(
+        `${ind(1)}const [generationBaselinePending, setGenerationBaselinePending] = useState<boolean>(${pendingInitExpr});`
+      );
+      stateLines.push(`${ind(1)}const appliedGeneratedSeqRef = useRef<Record<string, number>>({});`);
+      stateLines.push(`${ind(1)}const [formDefaultsReady, setFormDefaultsReady] = useState<boolean>(false);`);
     }
   }
 
@@ -330,6 +391,25 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     helperLines.push("");
     emitSlugOptionSelectComponent().forEach((l) => helperLines.push(l));
   }
+  if (needs.autocompleteInput) {
+    imports.push({ module: AUTOCOMPLETE_FIELD_MODULE, named: ["AutocompleteInput"] });
+  }
+  if (needs.slugAutocompleteInput) {
+    imports.push({ module: AUTOCOMPLETE_FIELD_MODULE, named: ["SlugAutocompleteInput"] });
+  }
+  if (needs.addressAutocompleteInput) {
+    imports.push({ module: AUTOCOMPLETE_FIELD_MODULE, named: ["AddressAutocompleteInput"] });
+  }
+  if (needs.derivedChange) {
+    handlerLines.push(
+      `${ind(1)}const ${names.derivedChange} = useCallback((fieldKey: string, derived: Record<string, string>) => {`
+    );
+    handlerLines.push(`${ind(2)}Object.entries(derived).forEach(([derivedKey, v]) => {`);
+    handlerLines.push(`${ind(3)}${names.setValues}((prev) => ({ ...prev, [\`\${fieldKey}.\${derivedKey}\`]: v }));`);
+    handlerLines.push(`${ind(2)}});`);
+    handlerLines.push(`${ind(1)}}, []);`);
+    handlerLines.push("");
+  }
 
   if (isPrimary) {
     handlerLines.push(`${ind(1)}const urlParams = useMemo(() => {`);
@@ -340,8 +420,10 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     handlerLines.push(`${ind(1)}}, [searchParams]);`);
     handlerLines.push("");
     handlerLines.push(
-      `${ind(1)}const allFieldKeyToId = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t).allFieldKeyToId, [t]);`
+      `${ind(1)}const fieldKeyIdAndLabelMaps = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t), [t]);`
     );
+    handlerLines.push(`${ind(1)}const ${pageVar("allFieldKeyToId")} = fieldKeyIdAndLabelMaps.allFieldKeyToId;`);
+    handlerLines.push(`${ind(1)}const ${pageVar("allFieldLabels")} = fieldKeyIdAndLabelMaps.allFieldLabels;`);
     const allValueVars = allForms.map((fw) => formVarNames(suffixOf(fw.widgetId)).values);
     handlerLines.push(
       `${ind(1)}const allFormValues = useMemo(() => Object.assign({}, ${allValueVars.join(", ")}) as Record<string, string>, [${allValueVars.join(", ")}]);`
@@ -369,9 +451,18 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     );
     handlerLines.push(`${ind(3)}splitGenerationKeys(sourceField.generationKey).forEach((key) => {`);
     handlerLines.push(`${ind(4)}const targetFieldId = resolveTargetFieldId(key);`);
-    handlerLines.push(
-      `${ind(4)}if (targetFieldId && targetFieldId !== fieldId) writeFormValue(targetFieldId, transformed);`
-    );
+    if (crossTab) {
+      handlerLines.push(`${ind(4)}if (targetFieldId && targetFieldId !== fieldId) {`);
+      handlerLines.push(`${ind(5)}writeFormValue(targetFieldId, transformed);`);
+      handlerLines.push(`${ind(4)}} else if (!targetFieldId) {`);
+      handlerLines.push(`${ind(5)}${crossTab.onFormChange}(key, transformed);`);
+      handlerLines.push(`${ind(5)}${crossTab.onGeneratedChange}(key, transformed);`);
+      handlerLines.push(`${ind(4)}}`);
+    } else {
+      handlerLines.push(
+        `${ind(4)}if (targetFieldId && targetFieldId !== fieldId) writeFormValue(targetFieldId, transformed);`
+      );
+    }
     handlerLines.push(`${ind(3)}});`);
     handlerLines.push(`${ind(2)}}`);
     handlerLines.push(`${ind(2)}(sourceField.dataGenerations ?? []).forEach((dg) => {`);
@@ -385,27 +476,72 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     handlerLines.push(`${ind(3)}const nextValue = sourceIsBlank ? '' : transformed;`);
     handlerLines.push(`${ind(3)}for (const key of splitGenerationKeys(dg.generationKey)) {`);
     handlerLines.push(`${ind(4)}const targetFieldId = resolveTargetFieldId(key);`);
-    handlerLines.push(`${ind(4)}if (!targetFieldId || targetFieldId === fieldId) continue;`);
-    handlerLines.push(`${ind(4)}if (dg.onlyIfEmpty && !sourceIsBlank) {`);
-    handlerLines.push(`${ind(5)}const currentTargetValue = allFormValues[targetFieldId] ?? '';`);
-    handlerLines.push(
-      `${ind(5)}if (currentTargetValue !== '' && currentTargetValue !== lastGeneratedRef.current[targetFieldId]) continue;`
-    );
-    handlerLines.push(`${ind(4)}}`);
-    handlerLines.push(`${ind(4)}writeFormValue(targetFieldId, nextValue);`);
-    handlerLines.push(`${ind(4)}if (dg.onlyIfEmpty) lastGeneratedRef.current[targetFieldId] = nextValue;`);
+    if (crossTab) {
+      handlerLines.push(`${ind(4)}if (targetFieldId && targetFieldId !== fieldId) {`);
+      handlerLines.push(`${ind(5)}if (dg.onlyIfEmpty && !sourceIsBlank) {`);
+      handlerLines.push(`${ind(6)}const currentTargetValue = allFormValues[targetFieldId] ?? '';`);
+      handlerLines.push(
+        `${ind(6)}if (currentTargetValue !== '' && currentTargetValue !== lastGeneratedRef.current[targetFieldId]) continue;`
+      );
+      handlerLines.push(`${ind(5)}}`);
+      handlerLines.push(`${ind(5)}writeFormValue(targetFieldId, nextValue);`);
+      handlerLines.push(`${ind(5)}if (dg.onlyIfEmpty) lastGeneratedRef.current[targetFieldId] = nextValue;`);
+      handlerLines.push(`${ind(4)}} else if (!targetFieldId) {`);
+      handlerLines.push(`${ind(5)}if (dg.onlyIfEmpty && !sourceIsBlank) {`);
+      handlerLines.push(`${ind(6)}if (generationBaselinePendingRef.current) continue;`);
+      handlerLines.push(
+        `${ind(6)}const currentTargetValue = ${crossTab.formValues}[key] ?? resolveGenerationBaselineValue(generationBaselineRef.current, key) ?? '';`
+      );
+      handlerLines.push(
+        `${ind(6)}if (currentTargetValue !== '' && currentTargetValue !== lastGeneratedRef.current[key]) continue;`
+      );
+      handlerLines.push(`${ind(5)}}`);
+      handlerLines.push(`${ind(5)}${crossTab.onFormChange}(key, nextValue);`);
+      handlerLines.push(`${ind(5)}${crossTab.onGeneratedChange}(key, nextValue);`);
+      handlerLines.push(`${ind(5)}if (dg.onlyIfEmpty) lastGeneratedRef.current[key] = nextValue;`);
+      handlerLines.push(`${ind(4)}}`);
+    } else {
+      handlerLines.push(`${ind(4)}if (!targetFieldId || targetFieldId === fieldId) continue;`);
+      handlerLines.push(`${ind(4)}if (dg.onlyIfEmpty && !sourceIsBlank) {`);
+      handlerLines.push(`${ind(5)}const currentTargetValue = allFormValues[targetFieldId] ?? '';`);
+      handlerLines.push(
+        `${ind(5)}if (currentTargetValue !== '' && currentTargetValue !== lastGeneratedRef.current[targetFieldId]) continue;`
+      );
+      handlerLines.push(`${ind(4)}}`);
+      handlerLines.push(`${ind(4)}writeFormValue(targetFieldId, nextValue);`);
+      handlerLines.push(`${ind(4)}if (dg.onlyIfEmpty) lastGeneratedRef.current[targetFieldId] = nextValue;`);
+    }
     handlerLines.push(`${ind(3)}}`);
     handlerLines.push(`${ind(2)}});`);
-    handlerLines.push(`${ind(1)}}, [allFormValues, writeFormValue]);`);
+    handlerLines.push(
+      `${ind(1)}}, [allFormValues, writeFormValue${crossTab ? `, ${crossTab.onFormChange}, ${crossTab.onGeneratedChange}, ${crossTab.formValues}` : ""}]);`
+    );
     handlerLines.push("");
     imports.push({
       module: UTILS_MODULE,
       named: ["buildFieldKeyIdAndLabelMaps", "applyDataGeneration", "splitGenerationKeys"],
     });
+    if (crossTab) imports.push({ module: UTILS_MODULE, named: ["resolveGenerationBaselineValue"] });
+    if (crossTab) {
+      handlerLines.push(`${ind(1)}useEffect(() => {`);
+      handlerLines.push(`${ind(2)}if (generationBaselinePending) return;`);
+      handlerLines.push(`${ind(2)}if (!formDefaultsReady) return;`);
+      handlerLines.push(`${ind(2)}Object.entries(${crossTab.generatedValues}).forEach(([key, entry]) => {`);
+      handlerLines.push(`${ind(3)}if (appliedGeneratedSeqRef.current[key] === entry.seq) return;`);
+      handlerLines.push(`${ind(3)}const targetFieldId = allFieldKeyToId[key];`);
+      handlerLines.push(`${ind(3)}if (!targetFieldId) return;`);
+      handlerLines.push(`${ind(3)}appliedGeneratedSeqRef.current[key] = entry.seq;`);
+      handlerLines.push(`${ind(3)}writeFormValue(targetFieldId, entry.value);`);
+      handlerLines.push(`${ind(2)}});`);
+      handlerLines.push(
+        `${ind(1)}}, [${crossTab.generatedValues}, generationBaselinePending, formDefaultsReady, allFieldKeyToId, writeFormValue]);`
+      );
+      handlerLines.push("");
+    }
   }
 
   handlerLines.push(
-    `${ind(1)}const ${names.evalCondition} = useCallback((condition: string): boolean => evalConditionExpr(condition, buildFieldConditionResolver({ ...allFieldKeyToId, ...${names.keyToId} }, { ...allFormValues, ...${names.values} }, urlParams, undefined)), [allFieldKeyToId, allFormValues, ${names.values}, urlParams]);`
+    `${ind(1)}const ${names.evalCondition} = useCallback((condition: string): boolean => evalConditionExpr(condition, buildFieldConditionResolver({ ...allFieldKeyToId, ...${names.keyToId} }, { ...allFormValues, ...${names.values} }, urlParams, ${crossTab ? crossTab.formValues : "undefined"})), [allFieldKeyToId, allFormValues, ${names.values}, urlParams${crossTab ? `, ${crossTab.formValues}` : ""}]);`
   );
   handlerLines.push(
     `${ind(1)}const resolveTargetFieldId${suffix} = useCallback((key: string): string | undefined => (key.includes('.') ? allFieldKeyToId[key] : (${names.keyToId}[key] ?? allFieldKeyToId[key])), [allFieldKeyToId]);`
@@ -416,6 +552,16 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   handlerLines.push(`${ind(2)}markDirty();`);
   handlerLines.push(`${ind(2)}const sourceField = ${names.fieldById}[fieldId];`);
   handlerLines.push(`${ind(2)}if (!sourceField) return;`);
+  if (crossTab) {
+    handlerLines.push(`${ind(2)}if (sourceField.fieldKey) {`);
+    handlerLines.push(`${ind(3)}${crossTab.onFormChange}(sourceField.fieldKey, value);`);
+    if (widget.contentKey) {
+      handlerLines.push(
+        `${ind(3)}${crossTab.onFormChange}(${jsStringLiteral(`${widget.contentKey}.`)} + sourceField.fieldKey, value);`
+      );
+    }
+    handlerLines.push(`${ind(2)}}`);
+  }
   handlerLines.push(`${ind(2)}if (sourceField.fieldKey && (${names.values}[fieldId] ?? '') !== value) {`);
   handlerLines.push(
     `${ind(3)}findOptionFilterResetTargetIds(${names.fields}, sourceField.fieldKey).forEach((targetFieldId) => {`
@@ -471,14 +617,178 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     handlerLines.push("");
   }
 
-  if (isPrimary) {
+  const pushDefaultsEffect = (): void => {
+    handlerLines.push(`${ind(1)}useEffect(() => {`);
+    handlerLines.push(
+      `${ind(2)}const defaults = applyUrlParamFormOverrides(initFormDefaultValues(ALL_FORM_WIDGETS, t), ALL_FORM_WIDGETS, searchParams);`
+    );
+    handlerLines.push(`${ind(2)}if (Object.values(defaults).every((v) => Object.keys(v).length === 0)) {`);
+    if (crossTab) handlerLines.push(`${ind(3)}setFormDefaultsReady(true);`);
+    handlerLines.push(`${ind(3)}return;`);
+    handlerLines.push(`${ind(2)}}`);
+    allForms.forEach((fw) => {
+      const n = formVarNames(suffixOf(fw.widgetId));
+      handlerLines.push(
+        `${ind(2)}${n.setValues}((prev) => ({ ...prev, ...(defaults[${jsStringLiteral(fw.widgetId)}] ?? {}) }));`
+      );
+    });
+    if (crossTab) handlerLines.push(`${ind(2)}setFormDefaultsReady(true);`);
+    handlerLines.push(`${ind(2)}// eslint-disable-next-line react-hooks/exhaustive-deps`);
+    handlerLines.push(`${ind(1)}}, [searchParams]);`);
+    handlerLines.push("");
+    imports.push({ module: UTILS_MODULE, named: ["initFormDefaultValues", "applyUrlParamFormOverrides"] });
+  };
+
+  const pushFetchEffect = (depsExpr: string): void => {
+    handlerLines.push(`${ind(1)}useEffect(() => {`);
+    if (emitRecordLoaded) {
+      handlerLines.push(`${ind(2)}setRecordLoaded(false);`);
+    }
+    handlerLines.push(`${ind(2)}if (storedId === null) {`);
+    if (crossTab) {
+      handlerLines.push(`${ind(3)}generationBaselinePendingRef.current = false;`);
+      handlerLines.push(`${ind(3)}setGenerationBaselinePending(false);`);
+    }
+    handlerLines.push(`${ind(3)}return;`);
+    handlerLines.push(`${ind(2)}}`);
+    if (crossTab) {
+      handlerLines.push(`${ind(2)}generationBaselinePendingRef.current = true;`);
+      handlerLines.push(`${ind(2)}setGenerationBaselinePending(true);`);
+    }
+    handlerLines.push(`${ind(2)}let cancelled = false;`);
+    handlerLines.push(`${ind(2)}api`);
+    handlerLines.push(`${ind(3)}.get(\`/page-data/${mainSlug}/\${storedId}\`)`);
+    handlerLines.push(`${ind(3)}.then(async (res) => {`);
+    handlerLines.push(`${ind(4)}if (cancelled) return;`);
+    handlerLines.push(`${ind(4)}const dataJson = (res.data.dataJson || {}) as Record<string, unknown>;`);
+    if (crossTab) {
+      handlerLines.push(`${ind(4)}generationBaselineRef.current = buildGenerationBaselineValues(dataJson);`);
+    }
+    handlerLines.push(`${ind(4)}const valuesByWidgetId = buildFormValuesFromDataJson(dataJson, ALL_FORM_WIDGETS, t);`);
+    if (pageHasTextFields) {
+      handlerLines.push(`${ind(4)}${pageVar("setFetchRelData")}(extractFetchRelData(dataJson));`);
+    }
+    allForms.forEach((fw) => {
+      const n = formVarNames(suffixOf(fw.widgetId));
+      handlerLines.push(
+        `${ind(4)}${n.setValues}((prev) => ({ ...prev, ...(valuesByWidgetId[${jsStringLiteral(fw.widgetId)}] ?? {}) }));`
+      );
+    });
+    if (crossTab) {
+      handlerLines.push(`${ind(4)}generationBaselinePendingRef.current = false;`);
+      handlerLines.push(`${ind(4)}setGenerationBaselinePending(false);`);
+    }
+    allMultiSelects.forEach((mw) => {
+      const mn = multiSelectVarNames(suffixOf(mw.widgetId));
+      handlerLines.push(
+        `${ind(4)}const selection${suffixOf(mw.widgetId)} = extractMultiSelectSelection(dataJson, ${jsStringLiteral(mw.contentKey)}, ${jsStringLiteral(mw.connectedSlug ?? "")});`
+      );
+      handlerLines.push(
+        `${ind(4)}if (selection${suffixOf(mw.widgetId)}.kind !== 'none') ${mn.setIds}(selection${suffixOf(mw.widgetId)}.ids);`
+      );
+      if (hasMultiSelectExtraFields(mw)) {
+        handlerLines.push(
+          `${ind(4)}if (selection${suffixOf(mw.widgetId)}.kind === 'objects') ${mn.setExtraFieldValues}(selection${suffixOf(mw.widgetId)}.extraFieldValues);`
+        );
+      }
+    });
+    allSubLists.forEach((sw) => {
+      const sn = sublistVarNames(suffixOf(sw.widgetId));
+      handlerLines.push(`${ind(4)}${sn.setRows}(extractSubListRows(dataJson, ${jsStringLiteral(sw.contentKey)}));`);
+    });
+    if (emitRecordLoaded) {
+      handlerLines.push(`${ind(4)}setRecordLoaded(true);`);
+    }
+    if (pageHasFileFields) {
+      handlerLines.push(`${ind(4)}const fileIds = collectFileIdsDeep(dataJson);`);
+      handlerLines.push(`${ind(4)}if (fileIds.length === 0) return;`);
+      handlerLines.push(`${ind(4)}const metaList = await fetchFileMetaByIds(fileIds, ${isEntity ? "true" : "false"});`);
+      allForms.forEach((fw) => {
+        const n = formVarNames(suffixOf(fw.widgetId));
+        const hasFiles = (fw.fields ?? []).some((f) => (FILE_FIELD_TYPES as readonly string[]).includes(f.type));
+        if (!hasFiles) return;
+        handlerLines.push(
+          `${ind(4)}const section${suffixOf(fw.widgetId)} = findSection(dataJson, ${jsStringLiteral(fw.contentKey)});`
+        );
+        handlerLines.push(
+          `${ind(4)}const metaByFieldId${suffixOf(fw.widgetId)}: Record<string, { id: number; origName: string; fileSize: number }[]> = {};`
+        );
+        handlerLines.push(`${ind(4)}${n.fields}.forEach((f) => {`);
+        handlerLines.push(`${ind(5)}if (!f.fieldKey || !FILE_FIELD_TYPE_SET.has(f.type)) return;`);
+        handlerLines.push(`${ind(5)}const ids = section${suffixOf(fw.widgetId)}[f.fieldKey];`);
+        handlerLines.push(`${ind(5)}if (!Array.isArray(ids)) return;`);
+        handlerLines.push(
+          `${ind(5)}metaByFieldId${suffixOf(fw.widgetId)}[f.id] = (ids as number[]).map((id) => metaList.find((m) => m.id === id)).filter((m): m is { id: number; origName: string; fileSize: number } => !!m);`
+        );
+        handlerLines.push(`${ind(5)}if (f.type === 'image' || f.type === 'video' || f.type === 'media') {`);
+        handlerLines.push(`${ind(6)}(ids as number[]).forEach((id) => {`);
+        handlerLines.push(
+          `${ind(7)}fetchFileBlobUrl(id, ${isEntity ? "true" : "false"}).then((url) => setImgBlobUrls((prev) => ({ ...prev, [id]: url }))).catch(() => {});`
+        );
+        handlerLines.push(`${ind(6)}});`);
+        handlerLines.push(`${ind(5)}}`);
+        handlerLines.push(`${ind(4)}});`);
+        handlerLines.push(`${ind(4)}${n.setExistingMeta}(metaByFieldId${suffixOf(fw.widgetId)});`);
+      });
+    }
+    handlerLines.push(`${ind(3)}})`);
+    if (crossTab) {
+      handlerLines.push(`${ind(3)}.catch(() => {`);
+      handlerLines.push(`${ind(4)}generationBaselineRef.current = {};`);
+      handlerLines.push(`${ind(4)}generationBaselinePendingRef.current = false;`);
+      handlerLines.push(`${ind(4)}setGenerationBaselinePending(false);`);
+      handlerLines.push(`${ind(3)}});`);
+    } else {
+      handlerLines.push(`${ind(3)}.catch(() => toast.error(t('common.error.load_existing_data')));`);
+    }
+    handlerLines.push(`${ind(2)}return () => { cancelled = true; };`);
+    handlerLines.push(`${ind(2)}// eslint-disable-next-line react-hooks/exhaustive-deps`);
+    handlerLines.push(`${ind(1)}}, [${depsExpr}]);`);
+    handlerLines.push("");
+    imports.push({ module: UTILS_MODULE, named: ["buildFormValuesFromDataJson"] });
+    if (pageHasTextFields) imports.push({ module: UTILS_MODULE, named: ["extractFetchRelData"] });
+    if (crossTab) imports.push({ module: UTILS_MODULE, named: ["buildGenerationBaselineValues"] });
+    imports.push({ module: "@/lib/api", defaultName: "api" });
+    imports.push({ module: "sonner", named: ["toast"] });
+    if (allMultiSelects.length > 0) {
+      imports.push({ module: UTILS_MODULE, named: ["extractMultiSelectSelection"] });
+    }
+    if (allSubLists.length > 0) {
+      imports.push({ module: UTILS_MODULE, named: ["extractSubListRows"] });
+    }
+    if (pageHasFileFields) {
+      imports.push({ module: UTILS_MODULE, named: ["findSection"] });
+      imports.push({
+        module: CONTENT_SAVE_MODULE,
+        named: ["collectFileIdsDeep", "fetchFileMetaByIds", "fetchFileBlobUrl"],
+      });
+    }
+  };
+
+  if (isPrimary && insideTab) {
+    pushDefaultsEffect();
+    if (!mainSlug) {
+      handlerLines.push(
+        `${ind(1)}/* TODO(파일빌드): 연결 slug를 찾을 수 없어 수정 모드 데이터 복원을 방출하지 못했습니다. */`
+      );
+    } else {
+      pushFetchEffect("storedId");
+    }
+  } else if (isPrimary) {
     if (!mainSlug) {
       handlerLines.push(
         `${ind(1)}/* TODO(파일빌드): 연결 slug를 찾을 수 없어 수정 모드 데이터 복원을 방출하지 못했습니다. */`
       );
     } else {
       handlerLines.push(`${ind(1)}useEffect(() => {`);
+      if (emitRecordLoaded) {
+        handlerLines.push(`${ind(2)}setRecordLoaded(false);`);
+      }
       handlerLines.push(`${ind(2)}if (storedId === null) {`);
+      if (crossTab) {
+        handlerLines.push(`${ind(3)}generationBaselinePendingRef.current = false;`);
+        handlerLines.push(`${ind(3)}setGenerationBaselinePending(false);`);
+      }
       handlerLines.push(`${ind(3)}if (!sitesLoaded || !clockReady) return;`);
       handlerLines.push(
         `${ind(3)}const defaults = applyUrlParamFormOverrides(initFormDefaultValues(ALL_FORM_WIDGETS, t), ALL_FORM_WIDGETS, searchParams);`
@@ -487,14 +797,24 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
         const n = formVarNames(suffixOf(fw.widgetId));
         handlerLines.push(`${ind(3)}${n.setValues}(defaults[${jsStringLiteral(fw.widgetId)}] ?? {});`);
       });
+      if (emitRecordLoaded) {
+        handlerLines.push(`${ind(3)}setRecordLoaded(true);`);
+      }
       handlerLines.push(`${ind(3)}return;`);
       handlerLines.push(`${ind(2)}}`);
+      if (crossTab) {
+        handlerLines.push(`${ind(2)}generationBaselinePendingRef.current = true;`);
+        handlerLines.push(`${ind(2)}setGenerationBaselinePending(true);`);
+      }
       handlerLines.push(`${ind(2)}let cancelled = false;`);
       handlerLines.push(`${ind(2)}api`);
       handlerLines.push(`${ind(3)}.get(\`/page-data/${mainSlug}/\${storedId}\`)`);
       handlerLines.push(`${ind(3)}.then(async (res) => {`);
       handlerLines.push(`${ind(4)}if (cancelled) return;`);
       handlerLines.push(`${ind(4)}const dataJson = (res.data.dataJson || {}) as Record<string, unknown>;`);
+      if (crossTab) {
+        handlerLines.push(`${ind(4)}generationBaselineRef.current = buildGenerationBaselineValues(dataJson);`);
+      }
       handlerLines.push(
         `${ind(4)}const valuesByWidgetId = buildFormValuesFromDataJson(dataJson, ALL_FORM_WIDGETS, t);`
       );
@@ -507,6 +827,10 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
           `${ind(4)}${n.setValues}((prev) => ({ ...prev, ...(valuesByWidgetId[${jsStringLiteral(fw.widgetId)}] ?? {}) }));`
         );
       });
+      if (crossTab) {
+        handlerLines.push(`${ind(4)}generationBaselinePendingRef.current = false;`);
+        handlerLines.push(`${ind(4)}setGenerationBaselinePending(false);`);
+      }
       allMultiSelects.forEach((mw) => {
         const mn = multiSelectVarNames(suffixOf(mw.widgetId));
         handlerLines.push(
@@ -521,6 +845,13 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
           );
         }
       });
+      allSubLists.forEach((sw) => {
+        const sn = sublistVarNames(suffixOf(sw.widgetId));
+        handlerLines.push(`${ind(4)}${sn.setRows}(extractSubListRows(dataJson, ${jsStringLiteral(sw.contentKey)}));`);
+      });
+      if (emitRecordLoaded) {
+        handlerLines.push(`${ind(4)}setRecordLoaded(true);`);
+      }
       if (pageHasFileFields) {
         handlerLines.push(`${ind(4)}const fileIds = collectFileIdsDeep(dataJson);`);
         handlerLines.push(`${ind(4)}if (fileIds.length === 0) return;`);
@@ -556,7 +887,15 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
         });
       }
       handlerLines.push(`${ind(3)}})`);
-      handlerLines.push(`${ind(3)}.catch(() => toast.error(t('common.error.load_existing_data')));`);
+      if (crossTab) {
+        handlerLines.push(`${ind(3)}.catch(() => {`);
+        handlerLines.push(`${ind(4)}generationBaselineRef.current = {};`);
+        handlerLines.push(`${ind(4)}generationBaselinePendingRef.current = false;`);
+        handlerLines.push(`${ind(4)}setGenerationBaselinePending(false);`);
+        handlerLines.push(`${ind(3)}});`);
+      } else {
+        handlerLines.push(`${ind(3)}.catch(() => toast.error(t('common.error.load_existing_data')));`);
+      }
       handlerLines.push(`${ind(2)}return () => { cancelled = true; };`);
       handlerLines.push(`${ind(2)}// eslint-disable-next-line react-hooks/exhaustive-deps`);
       handlerLines.push(`${ind(1)}}, [storedId, searchParams, sitesLoaded, clockReady]);`);
@@ -566,10 +905,14 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
         named: ["initFormDefaultValues", "applyUrlParamFormOverrides", "buildFormValuesFromDataJson"],
       });
       if (pageHasTextFields) imports.push({ module: UTILS_MODULE, named: ["extractFetchRelData"] });
+      if (crossTab) imports.push({ module: UTILS_MODULE, named: ["buildGenerationBaselineValues"] });
       imports.push({ module: "@/lib/api", defaultName: "api" });
       imports.push({ module: "sonner", named: ["toast"] });
       if (allMultiSelects.length > 0) {
         imports.push({ module: UTILS_MODULE, named: ["extractMultiSelectSelection"] });
+      }
+      if (allSubLists.length > 0) {
+        imports.push({ module: UTILS_MODULE, named: ["extractSubListRows"] });
       }
       if (pageHasFileFields) {
         imports.push({ module: UTILS_MODULE, named: ["findSection"] });
@@ -582,7 +925,7 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
   }
 
   handlerLines.push(
-    `${ind(1)}const ${names.visibleFields} = ${names.fields}.filter((f) => !(f.hideCondition && ${names.evalCondition}(f.hideCondition)));`
+    `${ind(1)}const ${names.visibleFields} = useMemo(() => ${names.fields}.filter((f) => !(f.hideCondition && ${names.evalCondition}(f.hideCondition))), [${names.evalCondition}]);`
   );
   handlerLines.push(
     `${ind(1)}const ${names.rowIsAuto} = calculateFormFieldRowTracks(${names.visibleFields}, ${contentColSpan}, ${hasTitleBlock});`
@@ -596,7 +939,15 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
     );
     jsxLines.push(emitContainerOpen({ showBorder: widget.showBorder !== false, bgColor, fillHeight: false }));
     jsxLines.push(emitContainerClose());
-    return { imports, helperLines, stateLines, handlerLines, jsxLines, unhandled: buildUnhandled(widget) };
+    return {
+      imports,
+      helperLines,
+      stateLines,
+      handlerLines,
+      jsxLines,
+      unhandled: buildUnhandled(widget),
+      emitsRecordLoaded: isPrimary && emitRecordLoaded,
+    };
   }
 
   jsxLines.push(
@@ -666,5 +1017,13 @@ export const generateFormBlock = (widget: FormWidget, ctx: WidgetGenContext): Wi
 
   jsxLines.push(emitContainerClose());
 
-  return { imports, helperLines, stateLines, handlerLines, jsxLines, unhandled: buildUnhandled(widget) };
+  return {
+    imports,
+    helperLines,
+    stateLines,
+    handlerLines,
+    jsxLines,
+    unhandled: buildUnhandled(widget),
+    emitsRecordLoaded: isPrimary && emitRecordLoaded,
+  };
 };

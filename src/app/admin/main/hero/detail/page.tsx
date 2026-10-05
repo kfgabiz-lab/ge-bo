@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
-import { PageGridContainer } from "@/components/layout/page-grid-container";
+import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheck } from "@/app/admin/templates/make/_shared/hooks/useLeaveCheck";
@@ -20,6 +20,7 @@ import {
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
   initFormDefaultValues,
+  applyUrlParamFormOverrides,
   buildFormValuesFromDataJson,
   findSection,
   validateFormFields,
@@ -42,6 +43,7 @@ import {
 } from "@/app/admin/templates/make/_shared/utils/contentSave";
 import { calculateFormFieldRowTracks } from "@/app/admin/templates/make/_shared/utils/formGridLayout";
 import type { ContentSaveWidget } from "@/app/admin/templates/make/_shared/utils/contentSave";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 
 const FORM_WIDGET_Form1: FormWidget = {
   type: "form",
@@ -70,7 +72,6 @@ const FORM_WIDGET_Form1: FormWidget = {
       colSpan: 8,
       rowSpan: 1,
       labelMsgKey: "common.label.period",
-      label2MsgKey: "common.labe.endDt",
       required: true,
       rangeSubType: "datetime",
     },
@@ -307,6 +308,7 @@ export default function GeneratedPage() {
   const [existingFileMetaForm1, setExistingFileMetaForm1] = useState<
     Record<string, { id: number; origName: string; fileSize: number }[]>
   >({});
+  const confirmLeaveStoreSpace1 = useLeaveCheckStore((s) => s.confirmLeave);
   const router = useRouter();
 
   const urlParams = useMemo(() => {
@@ -318,7 +320,9 @@ export default function GeneratedPage() {
     return map;
   }, [searchParams]);
 
-  const allFieldKeyToId = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t).allFieldKeyToId, [t]);
+  const fieldKeyIdAndLabelMaps = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t), [t]);
+  const allFieldKeyToId = fieldKeyIdAndLabelMaps.allFieldKeyToId;
+  const allFieldLabels = fieldKeyIdAndLabelMaps.allFieldLabels;
   const allFormValues = useMemo(() => Object.assign({}, formValuesForm1) as Record<string, string>, [formValuesForm1]);
   const lastGeneratedRef = useRef<Record<string, string>>({});
 
@@ -466,7 +470,11 @@ export default function GeneratedPage() {
   useEffect(() => {
     if (storedId === null) {
       if (!sitesLoaded || !clockReady) return;
-      const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);
+      const defaults = applyUrlParamFormOverrides(
+        initFormDefaultValues(ALL_FORM_WIDGETS, t),
+        ALL_FORM_WIDGETS,
+        searchParams
+      );
       setFormValuesForm1(defaults["w_yt9dhtwsc"] ?? {});
       return;
     }
@@ -507,8 +515,9 @@ export default function GeneratedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedId, searchParams, sitesLoaded, clockReady]);
 
-  const visibleFieldsForm1 = FORM_FIELDS_Form1.filter(
-    (f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))
+  const visibleFieldsForm1 = useMemo(
+    () => FORM_FIELDS_Form1.filter((f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))),
+    [evalFieldConditionForm1]
   );
   const fieldRowIsAutoForm1 = calculateFormFieldRowTracks(visibleFieldsForm1, 12, false);
 
@@ -547,7 +556,8 @@ export default function GeneratedPage() {
         {},
         "hero-data",
         allFormValues,
-        false
+        false,
+        allFieldKeyToId
       );
       await persistContentDataJson({
         connectedSlug: "hero-data",
@@ -609,429 +619,425 @@ export default function GeneratedPage() {
   };
 
   return (
-    <div className="space-y-3">
-      <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={13} autoHeight>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `auto auto auto auto auto auto auto auto auto auto auto auto auto`,
-              gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-              gridAutoFlow: "row dense",
-              rowGap: `${GAP_SIZE}px`,
-              columnGap: 0,
-            }}
-          >
-            <div style={{ gridColumn: "span 12", gridRow: "span 12" }}>
-              {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (field:label2MsgKey,rangeSubType). 필요 시 직접 구현해주세요. */}
-              <div
-                className="w-full rounded border border-slate-200"
-                style={{
-                  overflow: "clip",
-                  backgroundColor: "#ffffff",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(12, 1fr)",
-                  gridTemplateRows:
-                    fieldRowIsAutoForm1.length > 0
-                      ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
-                      : undefined,
-                  gridAutoRows: `78px`,
-                  rowGap: `12px`,
-                  columnGap: `12px`,
-                  paddingTop: "10px",
-                  paddingBottom: "10px",
-                }}
-              >
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.title")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("common.placeholder.titleEdit")}
-                        maxLength={100}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm1["fb_1296bsy5c"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm1("fb_1296bsy5c", e.target.value)}
-                        onBlur={() => handleFieldBlurForm1("fb_1296bsy5c")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm1["fb_1296bsy5c"] ?? "").length}/{100}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.period")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                          type="datetime-local"
-                          disabled={false}
-                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
-                          value={formValuesForm1["fb_49tf2vhw1_from"] ?? ""}
-                          onChange={(e) => handleFieldChangeForm1("fb_49tf2vhw1_from", e.target.value)}
-                          onClick={(e) => e.currentTarget.showPicker?.()}
-                        />
-                      </div>
-                      <span className="text-sm text-slate-400 flex-shrink-0">~</span>
-                      <div className="relative flex-1">
-                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                          type="datetime-local"
-                          disabled={false}
-                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
-                          value={formValuesForm1["fb_49tf2vhw1_to"] ?? ""}
-                          onChange={(e) => handleFieldChangeForm1("fb_49tf2vhw1_to", e.target.value)}
-                          onClick={(e) => e.currentTarget.showPicker?.()}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 2" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("hero.label.titleText")}
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <textarea
-                      disabled={false}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 resize-none h-full"
-                      value={formValuesForm1["fb_caxvpckip"] ?? ""}
-                      placeholder={t("hero.text.desc")}
-                      onChange={(e) => handleFieldChangeForm1("fb_caxvpckip", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("hero.label.subTitle")}
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("hero.subTitle.desc")}
-                        maxLength={100}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm1["fb_djrenjnqi"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm1("fb_djrenjnqi", e.target.value)}
-                        onBlur={() => handleFieldBlurForm1("fb_djrenjnqi")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm1["fb_djrenjnqi"] ?? "").length}/{100}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("hero.label.button")}
-                  </label>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("hero.button.desc")}
-                        maxLength={20}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm1["fb_0ylbbdwtk"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm1("fb_0ylbbdwtk", e.target.value)}
-                        onBlur={() => handleFieldBlurForm1("fb_0ylbbdwtk")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm1["fb_0ylbbdwtk"] ?? "").length}/{20}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("hero.label.buttonSub")}
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("hero.button.subDesc")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+    <PageLayout mode="live">
+      <GridCell colSpan={12} rowSpan={13} autoHeight>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(12, 1fr)",
+            gridTemplateRows: `auto auto auto auto auto auto auto auto auto auto auto auto auto`,
+            gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+            gridAutoFlow: "row dense",
+            rowGap: `${GAP_SIZE}px`,
+            columnGap: 0,
+          }}
+        >
+          <div style={{ gridColumn: "span 12", gridRow: "span 12" }}>
+            <div
+              className="w-full rounded border border-slate-200"
+              style={{
+                overflow: "clip",
+                backgroundColor: "#ffffff",
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gridTemplateRows:
+                  fieldRowIsAutoForm1.length > 0
+                    ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
+                    : undefined,
+                gridAutoRows: `78px`,
+                rowGap: `12px`,
+                columnGap: `12px`,
+                paddingTop: "10px",
+                paddingBottom: "10px",
+              }}
+            >
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.title")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
                     <input
                       type="text"
                       disabled={false}
-                      placeholder={t("main.placeholder.url")}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      value={formValuesForm1["fb_d118ud3el"] ?? ""}
-                      onChange={(e) => handleFieldChangeForm1("fb_d118ud3el", e.target.value)}
-                      onBlur={() => handleFieldBlurForm1("fb_d118ud3el")}
+                      placeholder={t("common.placeholder.titleEdit")}
+                      maxLength={100}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm1["fb_1296bsy5c"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_1296bsy5c", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_1296bsy5c")}
                     />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm1["fb_1296bsy5c"] ?? "").length}/{100}
+                    </span>
                   </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.sortOrder")}
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("hero.sortOrder.desc")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <input
-                      type="text"
-                      disabled={false}
-                      placeholder={t("banner.placeholder.sortOrder")}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      value={formValuesForm1["fb_zfs1cscci"] ?? ""}
-                      onChange={(e) => handleFieldChangeForm1("fb_zfs1cscci", e.target.value)}
-                      onBlur={() => handleFieldBlurForm1("fb_zfs1cscci")}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("hero.label.contentUpload")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("hero.contentUpload.desc")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    {(() => {
-                      const imgExts = ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp".split(",");
-                      const isImageFile = (name: string) => {
-                        const ext = "." + (name.split(".").pop() ?? "").toLowerCase();
-                        return imgExts.includes(ext);
-                      };
-                      const existingList = existingFileMetaForm1["fb_aa8s9hnkc"] ?? [];
-                      const newList = fileValuesForm1["fb_aa8s9hnkc"] ?? [];
-                      const existingMedia = existingList[0] ?? null;
-                      const hasFile = newList.length > 0 || !!existingMedia;
-                      const canAdd = !hasFile;
-                      const mediaPlaceholder = (
-                        <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">
-                          <span className="text-xs font-medium">{t("common.field.media_upload")}</span>
-                          <div className="text-[10px] text-center leading-relaxed">
-                            <p>
-                              {t("common.field.media_image_info", {
-                                label: "jpg, jpeg, png, gif, webp, svg, bmp",
-                                size: "3MB",
-                              })}
-                            </p>
-                            <p>
-                              {t("common.field.media_video_info", {
-                                label: "mp4, mov, avi, mkv, webm, wmv, flv, m4v",
-                                mb: "20",
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                      const handleMediaSelect = async (selected: File[]) => {
-                        const { valid, rejected } = filterByAccept(
-                          selected,
-                          ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v"
-                        );
-                        if (rejected.length > 0)
-                          alert(`${t("common.field.invalid_file_type")}\n${rejected.join("\n")}`);
-                        if (valid.length === 0) return;
-                        const file = valid[0];
-                        const isImg = isImageFile(file.name);
-                        const maxMB = isImg ? 3 : 20;
-                        const unit = isImg ? "MB" : "MB";
-                        if (file.size > maxMB * unitToBytes(unit)) {
-                          toast.warning(
-                            t("common.field.file_size_limit", {
-                              type: isImg ? t("common.label.image") : t("common.label.video"),
-                              mb: `${maxMB}${unit}`,
-                            })
-                          );
-                          return;
-                        }
-                        if (isImg) {
-                          const naturalSize = await getImageNaturalSize(file);
-                          const violation = checkImagePixelLimit(naturalSize, 1920, 1080);
-                          if (violation === "width") {
-                            toast.warning(t("common.field.image_width_limit", { label: file.name, px: "1920" }));
-                            return;
-                          }
-                          if (violation === "height") {
-                            toast.warning(t("common.field.image_height_limit", { label: file.name, px: "1080" }));
-                            return;
-                          }
-                        }
-                        handleFileChangeForm1("fb_aa8s9hnkc", [file]);
-                      };
-                      return (
-                        <div
-                          style={{ height: "218px", isolation: "isolate" }}
-                          className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
-                          onDragOver={canAdd ? (e) => e.preventDefault() : undefined}
-                          onDrop={
-                            canAdd
-                              ? (e) => {
-                                  e.preventDefault();
-                                  const files = Array.from(e.dataTransfer.files);
-                                  if (files.length > 0) handleMediaSelect(files);
-                                }
-                              : undefined
-                          }
-                        >
-                          {!hasFile ? (
-                            canAdd ? (
-                              <FileInput
-                                accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v"
-                                multiple={false}
-                                onChange={handleMediaSelect}
-                                renderTrigger={(inputRef) => (
-                                  <div
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => inputRef.current?.click()}
-                                    onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
-                                    className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all"
-                                  >
-                                    {mediaPlaceholder}
-                                  </div>
-                                )}
-                              />
-                            ) : (
-                              <div className="flex-1 flex flex-col items-center justify-center pointer-events-none">
-                                {mediaPlaceholder}
-                              </div>
-                            )
-                          ) : existingMedia ? (
-                            <>
-                              <div className="flex-1 min-h-0 relative overflow-hidden">
-                                {isImageFile(existingMedia.origName) ? (
-                                  imgBlobUrls[existingMedia.id] ? (
-                                    <img
-                                      src={imgBlobUrls[existingMedia.id]}
-                                      alt={existingMedia.origName}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                                      <ImageIcon className="w-6 h-6 text-slate-300" />
-                                    </div>
-                                  )
-                                ) : imgBlobUrls[existingMedia.id] ? (
-                                  <video
-                                    src={imgBlobUrls[existingMedia.id]}
-                                    controls
-                                    playsInline
-                                    preload="auto"
-                                    style={{ width: "100%", height: "100%", display: "block" }}
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
-                                    <Film className="w-6 h-6 text-slate-300" />
-                                    <span className="text-[10px] text-slate-400">{t("common.loading")}</span>
-                                  </div>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveExistingForm1("fb_aa8s9hnkc", existingMedia.id)}
-                                  className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-                                >
-                                  <X className="w-3 h-3 text-white" />
-                                </button>
-                              </div>
-                              <FileInfoBar
-                                name={existingMedia.origName}
-                                size={existingMedia.fileSize}
-                                onDownload={() =>
-                                  downloadStoredFile(
-                                    existingMedia.id,
-                                    existingMedia.origName,
-                                    t("common.error.file_download")
-                                  )
-                                }
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex-1 min-h-0 relative overflow-hidden">
-                                {isImageFile(newList[0].name) ? (
-                                  <FileImagePreview file={newList[0]} className="w-full h-full object-contain" />
-                                ) : (
-                                  <FileVideoPreview file={newList[0]} cellHeight={218 - 26} />
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleFileChangeForm1("fb_aa8s9hnkc", [])}
-                                  className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-                                >
-                                  <X className="w-3 h-3 text-white" />
-                                </button>
-                              </div>
-                              <FileInfoBar
-                                name={newList[0].name}
-                                size={newList[0].size}
-                                onDownload={() => downloadLocalFile(newList[0])}
-                              />
-                            </>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 1", gridRow: "span 1" }}>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe"></div>
                 </div>
               </div>
-            </div>
-            <div style={{ gridColumn: "span 2", gridRow: "span 1" }}>
-              <div
-                className="w-full rounded"
-                style={{
-                  overflow: "visible",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  rowGap: `${GAP_SIZE}px`,
-                  columnGap: `${GAP_SIZE}px`,
-                }}
-              >
-                <div
-                  className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
-                  style={{ gridColumn: "span 2", gridRow: "span 1" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeave()) return;
-                      router.back();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
-                  >
-                    {t("common.label.list")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm(t("common.confirm.save"))) return;
-                      handleContentActionSpace1_1();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
-                  >
-                    {t("common.btn.save")}
-                  </button>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.period")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        type="datetime-local"
+                        disabled={false}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
+                        value={formValuesForm1["fb_49tf2vhw1_from"] ?? ""}
+                        onChange={(e) => handleFieldChangeForm1("fb_49tf2vhw1_from", e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker?.()}
+                      />
+                    </div>
+                    <span className="text-sm text-slate-400 flex-shrink-0">~</span>
+                    <div className="relative flex-1">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                      <input
+                        type="datetime-local"
+                        disabled={false}
+                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pl-9"
+                        value={formValuesForm1["fb_49tf2vhw1_to"] ?? ""}
+                        onChange={(e) => handleFieldChangeForm1("fb_49tf2vhw1_to", e.target.value)}
+                        onClick={(e) => e.currentTarget.showPicker?.()}
+                      />
+                    </div>
+                  </div>
                 </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 2" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("hero.label.titleText")}
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <textarea
+                    disabled={false}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 resize-none h-full"
+                    value={formValuesForm1["fb_caxvpckip"] ?? ""}
+                    placeholder={t("hero.text.desc")}
+                    onChange={(e) => handleFieldChangeForm1("fb_caxvpckip", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("hero.label.subTitle")}
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={false}
+                      placeholder={t("hero.subTitle.desc")}
+                      maxLength={100}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm1["fb_djrenjnqi"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_djrenjnqi", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_djrenjnqi")}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm1["fb_djrenjnqi"] ?? "").length}/{100}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("hero.label.button")}
+                </label>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={false}
+                      placeholder={t("hero.button.desc")}
+                      maxLength={20}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm1["fb_0ylbbdwtk"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_0ylbbdwtk", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_0ylbbdwtk")}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm1["fb_0ylbbdwtk"] ?? "").length}/{20}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("hero.label.buttonSub")}
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("hero.button.subDesc")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <input
+                    type="text"
+                    disabled={false}
+                    placeholder={t("main.placeholder.url")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    value={formValuesForm1["fb_d118ud3el"] ?? ""}
+                    onChange={(e) => handleFieldChangeForm1("fb_d118ud3el", e.target.value)}
+                    onBlur={() => handleFieldBlurForm1("fb_d118ud3el")}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.sortOrder")}
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("hero.sortOrder.desc")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <input
+                    type="text"
+                    disabled={false}
+                    placeholder={t("banner.placeholder.sortOrder")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    value={formValuesForm1["fb_zfs1cscci"] ?? ""}
+                    onChange={(e) => handleFieldChangeForm1("fb_zfs1cscci", e.target.value)}
+                    onBlur={() => handleFieldBlurForm1("fb_zfs1cscci")}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("hero.label.contentUpload")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("hero.contentUpload.desc")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  {(() => {
+                    const imgExts = ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp".split(",");
+                    const isImageFile = (name: string) => {
+                      const ext = "." + (name.split(".").pop() ?? "").toLowerCase();
+                      return imgExts.includes(ext);
+                    };
+                    const existingList = existingFileMetaForm1["fb_aa8s9hnkc"] ?? [];
+                    const newList = fileValuesForm1["fb_aa8s9hnkc"] ?? [];
+                    const existingMedia = existingList[0] ?? null;
+                    const hasFile = newList.length > 0 || !!existingMedia;
+                    const canAdd = !hasFile;
+                    const mediaPlaceholder = (
+                      <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400">
+                        <span className="text-xs font-medium">{t("common.field.media_upload")}</span>
+                        <div className="text-[10px] text-center leading-relaxed">
+                          <p>
+                            {t("common.field.media_image_info", {
+                              label: "jpg, jpeg, png, gif, webp, svg, bmp",
+                              size: "3MB",
+                            })}
+                          </p>
+                          <p>
+                            {t("common.field.media_video_info", {
+                              label: "mp4, mov, avi, mkv, webm, wmv, flv, m4v",
+                              mb: "20",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                    const handleMediaSelect = async (selected: File[]) => {
+                      const { valid, rejected } = filterByAccept(
+                        selected,
+                        ".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v"
+                      );
+                      if (rejected.length > 0) alert(`${t("common.field.invalid_file_type")}\n${rejected.join("\n")}`);
+                      if (valid.length === 0) return;
+                      const file = valid[0];
+                      const isImg = isImageFile(file.name);
+                      const maxMB = isImg ? 3 : 20;
+                      const unit = isImg ? "MB" : "MB";
+                      if (file.size > maxMB * unitToBytes(unit)) {
+                        toast.warning(
+                          t("common.field.file_size_limit", {
+                            type: isImg ? t("common.label.image") : t("common.label.video"),
+                            mb: `${maxMB}${unit}`,
+                          })
+                        );
+                        return;
+                      }
+                      if (isImg) {
+                        const naturalSize = await getImageNaturalSize(file);
+                        const violation = checkImagePixelLimit(naturalSize, 1920, 1080);
+                        if (violation === "width") {
+                          toast.warning(t("common.field.image_width_limit", { label: file.name, px: "1920" }));
+                          return;
+                        }
+                        if (violation === "height") {
+                          toast.warning(t("common.field.image_height_limit", { label: file.name, px: "1080" }));
+                          return;
+                        }
+                      }
+                      handleFileChangeForm1("fb_aa8s9hnkc", [file]);
+                    };
+                    return (
+                      <div
+                        style={{ height: "218px", isolation: "isolate" }}
+                        className="flex flex-col border border-dashed border-slate-200 rounded-md overflow-hidden"
+                        onDragOver={canAdd ? (e) => e.preventDefault() : undefined}
+                        onDrop={
+                          canAdd
+                            ? (e) => {
+                                e.preventDefault();
+                                const files = Array.from(e.dataTransfer.files);
+                                if (files.length > 0) handleMediaSelect(files);
+                              }
+                            : undefined
+                        }
+                      >
+                        {!hasFile ? (
+                          canAdd ? (
+                            <FileInput
+                              accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.mp4,.mov,.avi,.mkv,.webm,.wmv,.flv,.m4v"
+                              multiple={false}
+                              onChange={handleMediaSelect}
+                              renderTrigger={(inputRef) => (
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => inputRef.current?.click()}
+                                  onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+                                  className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-all"
+                                >
+                                  {mediaPlaceholder}
+                                </div>
+                              )}
+                            />
+                          ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center pointer-events-none">
+                              {mediaPlaceholder}
+                            </div>
+                          )
+                        ) : existingMedia ? (
+                          <>
+                            <div className="flex-1 min-h-0 relative overflow-hidden">
+                              {isImageFile(existingMedia.origName) ? (
+                                imgBlobUrls[existingMedia.id] ? (
+                                  <img
+                                    src={imgBlobUrls[existingMedia.id]}
+                                    alt={existingMedia.origName}
+                                    className="w-full h-full object-contain"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                    <ImageIcon className="w-6 h-6 text-slate-300" />
+                                  </div>
+                                )
+                              ) : imgBlobUrls[existingMedia.id] ? (
+                                <video
+                                  src={imgBlobUrls[existingMedia.id]}
+                                  controls
+                                  playsInline
+                                  preload="auto"
+                                  style={{ width: "100%", height: "100%", display: "block" }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-500">
+                                  <Film className="w-6 h-6 text-slate-300" />
+                                  <span className="text-[10px] text-slate-400">{t("common.loading")}</span>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveExistingForm1("fb_aa8s9hnkc", existingMedia.id)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                              >
+                                <X className="w-3 h-3 text-white" />
+                              </button>
+                            </div>
+                            <FileInfoBar
+                              name={existingMedia.origName}
+                              size={existingMedia.fileSize}
+                              onDownload={() =>
+                                downloadStoredFile(
+                                  existingMedia.id,
+                                  existingMedia.origName,
+                                  t("common.error.file_download")
+                                )
+                              }
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex-1 min-h-0 relative overflow-hidden">
+                              {isImageFile(newList[0].name) ? (
+                                <FileImagePreview file={newList[0]} className="w-full h-full object-contain" />
+                              ) : (
+                                <FileVideoPreview file={newList[0]} cellHeight={218 - 26} />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleFileChangeForm1("fb_aa8s9hnkc", [])}
+                                className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+                              >
+                                <X className="w-3 h-3 text-white" />
+                              </button>
+                            </div>
+                            <FileInfoBar
+                              name={newList[0].name}
+                              size={newList[0].size}
+                              onDownload={() => downloadLocalFile(newList[0])}
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 1", gridRow: "span 1" }}>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe"></div>
               </div>
             </div>
           </div>
-        </GridCell>
-      </PageGridContainer>
-    </div>
+          <div style={{ gridColumn: "span 2", gridRow: "span 1" }}>
+            <div
+              className="w-full rounded"
+              style={{
+                overflow: "visible",
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                rowGap: `${GAP_SIZE}px`,
+                columnGap: `${GAP_SIZE}px`,
+              }}
+            >
+              <div
+                className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
+                style={{ gridColumn: "span 2", gridRow: "span 1" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmLeaveStoreSpace1 && !confirmLeaveStoreSpace1()) return;
+                    router.back();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
+                >
+                  {t("common.label.list")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(t("common.confirm.save"))) return;
+                    handleContentActionSpace1_1();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
+                >
+                  {t("common.btn.save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </GridCell>
+    </PageLayout>
   );
 }

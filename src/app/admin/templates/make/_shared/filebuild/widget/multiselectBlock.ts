@@ -1,4 +1,5 @@
 import type { MultiSelectWidget, MultiSelectExtraField } from "../../components/renderer/types";
+import type { FormWidget } from "../../components/builder/FormBuilder";
 import type { ImportRequirement, WidgetCodeBlock, WidgetGenContext, UnhandledConfigKeys } from "../widgetGenerator";
 import {
   jsStringLiteral,
@@ -7,6 +8,7 @@ import {
   emitContainerClose,
   multiSelectVarNames,
   hasMultiSelectExtraFields,
+  formVarNames,
 } from "../widgetGenerator";
 import { pushFieldMarkup } from "./shared/fieldMarkupEmitter";
 import { multiSelectExtraFieldToConfig } from "../../utils";
@@ -66,6 +68,8 @@ const HANDLED_WIDGET_KEYS = new Set([
   "fieldAlign",
   "dedupeByText",
   "extraFields",
+  "hideCondition",
+  "contentRelation",
 ]);
 
 const IGNORED_WIDGET_KEYS = new Map<string, string>();
@@ -91,7 +95,8 @@ const textExprOf = (text: string | undefined, msgKey: string | undefined): strin
   msgKey ? `t(${jsStringLiteral(msgKey)})` : jsStringLiteral(text ?? "");
 
 export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetGenContext): WidgetCodeBlock => {
-  const { ind, suffix, leaveCheckNames, allWidgets } = ctx;
+  const { ind, suffix, leaveCheckNames, allWidgets, scopeWidgets, suffixOf, mainConnectedSlug } = ctx;
+  const pageWidgets = ctx.insideTab || ctx.insidePopup ? scopeWidgets : allWidgets;
   const names = multiSelectVarNames(suffix);
   const openVar = `multiSelectOpen${suffix}`;
   const setOpenVar = `setMultiSelectOpen${suffix}`;
@@ -108,6 +113,11 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
 
   const sourceMode = widget.sourceMode ?? "call";
   const canMarkDirty = leaveCheckNames.includes("markDirty");
+  const outerRelationIds = widget.contentRelation?.outer?.relationIds;
+  const innerRelationId = widget.contentRelation?.inner?.relationId;
+  const outerRelationIdsExpr =
+    outerRelationIds && outerRelationIds.length > 0 ? `[${outerRelationIds.join(", ")}]` : "undefined";
+  const innerRelationIdExpr = innerRelationId !== undefined ? String(innerRelationId) : "undefined";
 
   const imports: ImportRequirement[] = [
     { module: RENDERER_TYPES_MODULE, named: ["MultiSelectWidget"], typeOnly: true },
@@ -146,21 +156,104 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
       `sourceMode='${sourceMode}'는 빌더 훅(useSlugRelations) 의존이라 파일빌드에서 지원하지 않습니다. 옵션 목록이 비어 있게 됩니다.`
     );
   }
-  if (!allWidgets.some((w) => w.type === "form")) {
+  const allForms = pageWidgets.filter((w) => w.type === "form") as FormWidget[];
+  const hasFormWidget = allForms.length > 0;
+  const primaryFormMainSlug = allForms.length > 0 ? allForms[0].connectedSlug || mainConnectedSlug || "" : "";
+  if (!hasFormWidget) {
     unsupportedNotes.push(
       `이 페이지에는 Form 위젯이 없어 수정 모드 선택값 복원(extractMultiSelectSelection) 코드가 방출되지 않습니다. 저장된 선택 항목이 화면에 복원되지 않으므로 직접 구현해주세요.`
     );
   }
-  if (widget.contentRelation) {
+  if (widget.hideCondition && !hasFormWidget) {
     unsupportedNotes.push(
-      `contentRelation(inner/outer)은 파일빌드에서 조회 파라미터로 방출하지 않습니다. 라벨 경로가 런타임과 달라질 수 있습니다.`
+      `hideCondition(위젯 단위 숨김)은 이 페이지에 Form 위젯이 없어 평가할 수 없습니다. 항상 표시됩니다.`
     );
   }
-  if (widget.hideCondition) {
-    unsupportedNotes.push(`hideCondition(위젯 단위 숨김)은 아직 코드 생성이 지원되지 않습니다. 항상 표시됩니다.`);
+  const hideConditionGuardExpr =
+    widget.hideCondition && hasFormWidget
+      ? `!evalWidgetHideCondition(${jsStringLiteral(widget.hideCondition)}, allFieldKeyToId, allFormValues)`
+      : undefined;
+  if (hideConditionGuardExpr) {
+    imports.push({ module: UTILS_MODULE, named: ["evalWidgetHideCondition"] });
+  }
+
+  if (widget.hideCondition && hasFormWidget) {
+    const recordLoadedAvailable = !!primaryFormMainSlug;
+    const prevHiddenRef = `multiSelectPrevHidden${suffix}`;
+    const allFormValuesVar = `multiSelectAllFormValues${suffix}`;
+    const allFieldKeyToIdVar = `multiSelectAllFieldKeyToId${suffix}`;
+    const formValuesVars = allForms.map((fw) => formVarNames(suffixOf(fw.widgetId)).values);
+    const keyToIdVars = allForms.map((fw) => formVarNames(suffixOf(fw.widgetId)).keyToId);
+
+    handlerLines.push(`${ind(1)}const ${prevHiddenRef} = useRef<boolean | undefined>(undefined);`);
+    handlerLines.push(
+      `${ind(1)}const ${allFormValuesVar} = useMemo(() => Object.assign({}${formValuesVars.map((v) => `, ${v}`).join("")}) as Record<string, string>, [${formValuesVars.join(", ")}]);`
+    );
+    handlerLines.push(
+      `${ind(1)}const ${allFieldKeyToIdVar} = useMemo(() => Object.assign({}${keyToIdVars.map((v) => `, ${v}`).join("")}) as Record<string, string>, []);`
+    );
+    handlerLines.push(`${ind(1)}useEffect(() => {`);
+    if (recordLoadedAvailable) {
+      handlerLines.push(`${ind(2)}if (!recordLoaded || storedId === null) return;`);
+    }
+    handlerLines.push(
+      `${ind(2)}const isHidden = evalWidgetHideCondition(${jsStringLiteral(widget.hideCondition)}, ${allFieldKeyToIdVar}, ${allFormValuesVar});`
+    );
+    handlerLines.push(`${ind(2)}const wasHidden = ${prevHiddenRef}.current;`);
+    handlerLines.push(`${ind(2)}if (wasHidden === undefined) {`);
+    handlerLines.push(`${ind(3)}${prevHiddenRef}.current = isHidden;`);
+    handlerLines.push(`${ind(3)}return;`);
+    handlerLines.push(`${ind(2)}}`);
+    handlerLines.push(`${ind(2)}if (!wasHidden && isHidden) {`);
+    handlerLines.push(`${ind(3)}${names.setIds}([]);`);
+    if (canMarkDirty) handlerLines.push(`${ind(3)}markDirty();`);
+    if (widgetHasExtraFields) {
+      handlerLines.push(`${ind(3)}${names.setExtraFieldValues}((prev) => {`);
+      handlerLines.push(`${ind(4)}const next: Record<number, Record<string, string>> = {};`);
+      handlerLines.push(`${ind(4)}Object.entries(prev).forEach(([itemId, fields]) => {`);
+      handlerLines.push(`${ind(5)}const resetFields: Record<string, string> = {};`);
+      handlerLines.push(`${ind(5)}Object.keys(fields).forEach((fieldKey) => { resetFields[fieldKey] = ''; });`);
+      handlerLines.push(`${ind(5)}next[Number(itemId)] = resetFields;`);
+      handlerLines.push(`${ind(4)}});`);
+      handlerLines.push(`${ind(4)}return next;`);
+      handlerLines.push(`${ind(3)}});`);
+    }
+    handlerLines.push(`${ind(2)}}`);
+    handlerLines.push(`${ind(2)}${prevHiddenRef}.current = isHidden;`);
+    const effectDeps = [
+      ...(recordLoadedAvailable ? ["recordLoaded", "storedId"] : []),
+      allFieldKeyToIdVar,
+      allFormValuesVar,
+      ...(widgetHasExtraFields ? [names.extraFieldValues] : []),
+      ...(canMarkDirty ? ["markDirty"] : []),
+    ];
+    handlerLines.push(`${ind(1)}}, [${effectDeps.join(", ")}]);`);
+    handlerLines.push("");
+  }
+
+  const visibleVar = `multiSelectVisible${suffix}`;
+  const visibilityKeyToIdVar = `multiSelectVisibilityKeyToId${suffix}`;
+  const gateFetchByVisibility = !!hideConditionGuardExpr && sourceMode === "call" && !!widget.sourceSlug;
+  if (gateFetchByVisibility) {
+    const formWidgetVars = allForms.map((fw) => formVarNames(suffixOf(fw.widgetId)).widget);
+    imports.push({ module: UTILS_MODULE, named: ["buildFieldKeyIdAndLabelMaps"] });
+    handlerLines.push(
+      `${ind(1)}const ${visibilityKeyToIdVar} = useMemo(() => buildFieldKeyIdAndLabelMaps([${formWidgetVars.join(", ")}]).allFieldKeyToId, []);`
+    );
+    handlerLines.push(
+      `${ind(1)}const ${visibleVar} = !evalWidgetHideCondition(${jsStringLiteral(widget.hideCondition!)}, ${visibilityKeyToIdVar}, multiSelectAllFormValues${suffix});`
+    );
   }
 
   handlerLines.push(`${ind(1)}useEffect(() => {`);
+  if (gateFetchByVisibility) {
+    handlerLines.push(`${ind(2)}if (!${visibleVar}) {`);
+    handlerLines.push(`${ind(3)}${setOptionsVar}((prev) => (prev.length > 0 ? [] : prev));`);
+    handlerLines.push(`${ind(3)}${setSearchVar}('');`);
+    handlerLines.push(`${ind(3)}${setOpenVar}(false);`);
+    handlerLines.push(`${ind(3)}return;`);
+    handlerLines.push(`${ind(2)}}`);
+  }
   if (sourceMode !== "call" || !widget.sourceSlug) {
     handlerLines.push(
       `${ind(2)}/* TODO(파일빌드): 옵션 조회 대상 slug를 생성 시점에 확정할 수 없어 목록을 불러오지 않습니다. */`
@@ -169,7 +262,7 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
   } else {
     handlerLines.push(`${ind(2)}let cancelled = false;`);
     handlerLines.push(
-      `${ind(2)}fetchMultiSelectSourceRows(${jsStringLiteral(widget.sourceSlug)}, undefined, undefined, undefined, undefined, ${widget.sourceFilter ? jsStringLiteral(widget.sourceFilter) : "undefined"})`
+      `${ind(2)}fetchMultiSelectSourceRows(${jsStringLiteral(widget.sourceSlug)}, undefined, undefined, ${outerRelationIdsExpr}, ${innerRelationIdExpr}, ${widget.sourceFilter ? jsStringLiteral(widget.sourceFilter) : "undefined"})`
     );
     handlerLines.push(`${ind(3)}.then((rows) => {`);
     handlerLines.push(`${ind(4)}if (cancelled) return;`);
@@ -191,7 +284,7 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
       `${ind(3)}.catch((err) => console.warn('[${suffix}] ' + ${jsStringLiteral(widget.sourceSlug)}, err));`
     );
     handlerLines.push(`${ind(2)}return () => { cancelled = true; };`);
-    handlerLines.push(`${ind(1)}}, []);`);
+    handlerLines.push(`${ind(1)}}, [${gateFetchByVisibility ? visibleVar : ""}]);`);
   }
   handlerLines.push("");
 
@@ -235,8 +328,7 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
     handlerLines.push(
       `${ind(2)}${names.setExtraFieldValues}((prev) => ({ ...prev, [itemId]: upd(prev[itemId] ?? {}) }));`
     );
-    if (canMarkDirty) handlerLines.push(`${ind(2)}markDirty();`);
-    handlerLines.push(`${ind(1)}}, [${canMarkDirty ? "markDirty" : ""}]);`);
+    handlerLines.push(`${ind(1)}}, []);`);
   }
   handlerLines.push("");
 
@@ -348,6 +440,8 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
         paramsVar: `(${names.extraFieldValues}[opt.id] ?? {})`,
         setParamsVar: `${names.updateExtraField}(opt.id)`,
         slugRowDataVar: "undefined",
+        categoryFieldsVar: "undefined",
+        fieldsLiteralVar: "[]",
         radioNameExpr: `\`${suffix}-ef-\${opt.id}-\${pathIdx}-\` + ${jsStringLiteral(ef.key)}`,
       });
       jsxLines.push(`${ind(8)}</div>`);
@@ -378,5 +472,13 @@ export const generateMultiSelectBlock = (widget: MultiSelectWidget, ctx: WidgetG
   jsxLines.push(`${ind(1)}</div>`);
   jsxLines.push(emitContainerClose());
 
-  return { imports, helperLines, stateLines, handlerLines, jsxLines, unhandled: buildUnhandled(widget) };
+  return {
+    imports,
+    helperLines,
+    stateLines,
+    handlerLines,
+    jsxLines,
+    unhandled: buildUnhandled(widget),
+    visibilityExpr: hideConditionGuardExpr,
+  };
 };

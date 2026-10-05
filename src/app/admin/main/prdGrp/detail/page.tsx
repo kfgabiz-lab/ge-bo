@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
-import { PageGridContainer } from "@/components/layout/page-grid-container";
 import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
@@ -19,6 +18,7 @@ import {
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
   initFormDefaultValues,
+  applyUrlParamFormOverrides,
   buildFormValuesFromDataJson,
   extractMultiSelectSelection,
   flattenPageDataItem,
@@ -48,6 +48,7 @@ import {
   buildFormFileIdsMap,
   persistContentDataJson,
 } from "@/app/admin/templates/make/_shared/utils/contentSave";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 
 const FORM_WIDGET_Form1: FormWidget = {
   type: "form",
@@ -166,6 +167,7 @@ export default function GeneratedPage() {
   const [multiSelectExtraFieldValuesMultiSelect1, setMultiSelectExtraFieldValuesMultiSelect1] = useState<
     Record<number, Record<string, string>>
   >({});
+  const confirmLeaveStoreSpace1 = useLeaveCheckStore((s) => s.confirmLeave);
   const router = useRouter();
 
   const urlParams = useMemo(() => {
@@ -177,7 +179,9 @@ export default function GeneratedPage() {
     return map;
   }, [searchParams]);
 
-  const allFieldKeyToId = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t).allFieldKeyToId, [t]);
+  const fieldKeyIdAndLabelMaps = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t), [t]);
+  const allFieldKeyToId = fieldKeyIdAndLabelMaps.allFieldKeyToId;
+  const allFieldLabels = fieldKeyIdAndLabelMaps.allFieldLabels;
   const allFormValues = useMemo(() => Object.assign({}, formValuesForm1) as Record<string, string>, [formValuesForm1]);
   const lastGeneratedRef = useRef<Record<string, string>>({});
 
@@ -301,7 +305,11 @@ export default function GeneratedPage() {
   useEffect(() => {
     if (storedId === null) {
       if (!sitesLoaded || !clockReady) return;
-      const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);
+      const defaults = applyUrlParamFormOverrides(
+        initFormDefaultValues(ALL_FORM_WIDGETS, t),
+        ALL_FORM_WIDGETS,
+        searchParams
+      );
       setFormValuesForm1(defaults["w_1d3q60j83"] ?? {});
       return;
     }
@@ -325,8 +333,9 @@ export default function GeneratedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedId, searchParams, sitesLoaded, clockReady]);
 
-  const visibleFieldsForm1 = FORM_FIELDS_Form1.filter(
-    (f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))
+  const visibleFieldsForm1 = useMemo(
+    () => FORM_FIELDS_Form1.filter((f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))),
+    [evalFieldConditionForm1]
   );
   const fieldRowIsAutoForm1 = calculateFormFieldRowTracks(visibleFieldsForm1, 12, false);
 
@@ -391,9 +400,8 @@ export default function GeneratedPage() {
   const updateMultiSelectExtraFieldMultiSelect1 = useCallback(
     (itemId: number) => (upd: (prev: Record<string, string>) => Record<string, string>) => {
       setMultiSelectExtraFieldValuesMultiSelect1((prev) => ({ ...prev, [itemId]: upd(prev[itemId] ?? {}) }));
-      markDirty();
     },
-    [markDirty]
+    []
   );
 
   const handleContentActionSpace1_1 = async () => {
@@ -422,7 +430,8 @@ export default function GeneratedPage() {
         { w_keho1en58: multiSelectExtraFieldValuesMultiSelect1 },
         undefined,
         allFormValues,
-        false
+        false,
+        allFieldKeyToId
       );
       await persistContentDataJson({
         connectedSlug: "prdGrp-data",
@@ -704,7 +713,7 @@ export default function GeneratedPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (!confirmLeave()) return;
+                    if (confirmLeaveStoreSpace1 && !confirmLeaveStoreSpace1()) return;
                     router.back();
                   }}
                   className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"

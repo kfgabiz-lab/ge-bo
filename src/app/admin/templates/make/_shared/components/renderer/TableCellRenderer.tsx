@@ -48,6 +48,8 @@ import {
   BADGE_FALLBACK_TEXT_CLS,
   tableActionButtonClass,
   tableCellJustifyClass,
+  inlineEditToggleTrackClass,
+  inlineEditToggleKnobClass,
 } from "./rendererStyles";
 
 interface TableCellRendererProps {
@@ -336,11 +338,9 @@ export function TableCellRenderer({
             onClick={
               !isPreview && col.inlineEditFieldKey ? () => handlers?.onInlineEdit?.(col, row, nextValue) : undefined
             }
-            className={`relative w-9 h-5 rounded-full transition-colors ${boolVal ? "bg-slate-900" : "bg-slate-300"} ${isPreview ? "cursor-default" : "cursor-pointer"}`}
+            className={inlineEditToggleTrackClass(boolVal, isPreview)}
           >
-            <div
-              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${boolVal ? "translate-x-4" : "translate-x-0.5"}`}
-            />
+            <div className={inlineEditToggleKnobClass(boolVal)} />
           </button>
         );
       }

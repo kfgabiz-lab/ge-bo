@@ -71,7 +71,7 @@ import { SaveModal, GenerateModal } from "../_shared/components/TemplateModals";
 import { SearchBuilder } from "../_shared/components/SearchBuilder";
 import { TableBuilder, TableWidget } from "../_shared/components/builder/TableBuilder";
 
-import { buildListTsxFile } from "../_shared/generators/listGenerator";
+import { buildListTsxFile } from "../_shared/filebuild/listGenerator";
 
 /* ══════════════════════════════════════════ */
 /*  타입 정의                                  */

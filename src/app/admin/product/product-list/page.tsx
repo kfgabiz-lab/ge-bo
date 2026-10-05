@@ -1,21 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
-import { PageGridContainer } from "@/components/layout/page-grid-container";
 import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
 import {
   buildSearchQueryParams,
   buildKeyToId,
+  buildSearchFieldDefaultValues,
+  buildDateRangeGenerationPatch,
   flattenPageDataItem,
   nextSortDir,
   pageGroupRange,
+  resolveFetchSortKey,
   resolveCodeLabel,
   parseActionParams,
 } from "@/app/admin/templates/make/_shared/utils";
 import { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
+import { useSiteStore } from "@/store/use-site-store";
+import { useServerClockStore } from "@/store/use-server-clock-store";
 import { isEnterSearchTrigger } from "@/components/search";
 import { RotateCcw, Search, ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
 import { useCodeStore } from "@/store/use-code-store";
@@ -40,7 +44,7 @@ const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
   },
 ];
 const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
-const GENERATED_PAGE_BASE = "/admin/product";
+const DETAIL_PAGE_PATH = "/admin/product/product-detail";
 function formatCellDate(rawVal: string, format?: string): string {
   if (!rawVal) return "-";
   if (!format) return rawVal;
@@ -80,8 +84,11 @@ export default function GeneratedPage() {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
-  const initialParamsSearch1: Record<string, string> = { is_visible: "", product_name: "" };
-  const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1);
+  const sitesLoaded = useSiteStore((s) => s.sitesLoaded);
+  const clockReady = useServerClockStore((s) => s.status === "synced" || s.status === "failed");
+  const initialParamsSearch1Ref = useRef<Record<string, string>>({ is_visible: "", product_name: "" });
+  const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1Ref.current);
+  const [searchDefaultsReadySearch1, setSearchDefaultsReadySearch1] = useState(false);
   const router = useRouter();
   const [rowsTable1, setRowsTable1] = useState<Record<string, unknown>[]>([]);
   const [totalTable1, setTotalTable1] = useState(0);
@@ -92,12 +99,39 @@ export default function GeneratedPage() {
   const [sortDirTable1, setSortDirTable1] = useState<"asc" | "desc">("asc");
   const dataSlugTable1 = "product-data";
 
+  useEffect(() => {
+    if (!sitesLoaded || !clockReady) return;
+    const baseSnapshot = { ...initialParamsSearch1Ref.current };
+    const computed: Record<string, string> = {};
+    SEARCH_FIELDS_Search1.forEach((f) => {
+      Object.assign(computed, buildSearchFieldDefaultValues(f));
+    });
+    const snapshot = { ...computed };
+    SEARCH_FIELDS_Search1.forEach((f) => {
+      if (f.type !== "dateRange" && f.type !== "yearMonthRange") return;
+      (["from", "to"] as const).forEach((part) => {
+        const sourceValue = snapshot[`${f.id}_${part}`];
+        if (!sourceValue) return;
+        Object.assign(computed, buildDateRangeGenerationPatch(SEARCH_FIELDS_Search1, f.id, part, sourceValue));
+      });
+    });
+    initialParamsSearch1Ref.current = { ...initialParamsSearch1Ref.current, ...computed };
+    setParamsSearch1((prev) => {
+      const merged = { ...prev };
+      Object.keys(computed).forEach((k) => {
+        if (prev[k] === baseSnapshot[k]) merged[k] = computed[k];
+      });
+      return merged;
+    });
+    setSearchDefaultsReadySearch1(true);
+  }, [sitesLoaded, clockReady]);
+
   const getSearchParamsSearch1 = (sv: Record<string, string> = paramsSearch1): Record<string, string> =>
     buildSearchQueryParams(SEARCH_FIELDS_Search1, sv);
 
   const handleResetSearch1 = () => {
-    setParamsSearch1(initialParamsSearch1);
-    fetchDataTable1(0, true, { Search1: initialParamsSearch1 }, { sk: null, sd: "asc" });
+    setParamsSearch1(initialParamsSearch1Ref.current);
+    fetchDataTable1(0, true, { Search1: initialParamsSearch1Ref.current }, { sk: null, sd: "asc" });
   };
 
   const handleSearchSearch1 = () => {
@@ -108,7 +142,8 @@ export default function GeneratedPage() {
     page: number,
     notify = false,
     searchOverrides?: Record<string, Record<string, string>>,
-    sortOverride?: { sk: string | null; sd: "asc" | "desc" }
+    sortOverride?: { sk: string | null; sd: "asc" | "desc" },
+    skipSort = false
   ) => {
     if (!dataSlugTable1) {
       if (notify) toast.error(t("common.error.load_data"));
@@ -116,8 +151,8 @@ export default function GeneratedPage() {
     }
     setLoadingTable1(true);
     try {
-      const sk = sortOverride ? sortOverride.sk : sortKeyTable1;
-      const sd = sortOverride ? sortOverride.sd : sortDirTable1;
+      const sk = sortOverride ? sortOverride.sk : skipSort ? null : sortKeyTable1;
+      const sd = sortOverride ? sortOverride.sd : skipSort ? "asc" : sortDirTable1;
       let resolvedSortKeyTable1: string | null = sk;
       if (sk) {
         for (const r of rowsTable1) {
@@ -132,7 +167,23 @@ export default function GeneratedPage() {
         params: {
           page,
           size: 10,
-          ...(resolvedSortKeyTable1 ? { sort: resolvedSortKeyTable1 + "," + sd } : {}),
+          ...(resolvedSortKeyTable1
+            ? {
+                sort:
+                  resolveFetchSortKey(
+                    [
+                      { accessor: "product.product_name" },
+                      { accessor: "product.is_visible" },
+                      { accessor: "updatedAt" },
+                      { accessor: "updatedBy" },
+                      { accessor: "actions" },
+                    ],
+                    resolvedSortKeyTable1
+                  ) +
+                  "," +
+                  sd,
+              }
+            : {}),
           ...getSearchParamsSearch1(searchOverrides?.["Search1"]),
         },
       });
@@ -164,8 +215,9 @@ export default function GeneratedPage() {
   };
 
   useEffect(() => {
+    if (!searchDefaultsReadySearch1) return;
     fetchDataTable1(0);
-  }, []);
+  }, [searchDefaultsReadySearch1]);
 
   const handleSortTable1 = (accessor: string) => {
     const isCurrentCol = sortKeyTable1 === accessor;
@@ -174,7 +226,6 @@ export default function GeneratedPage() {
   };
 
   const handleTableEditTable1 = (row: Record<string, unknown>) => {
-    /* TODO(파일빌드): connType='popup' 규칙도 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */
     const matched =
       EDIT_PAGE_RULES_Table1.find((rule) => {
         if (!rule.conditionParam) return false;
@@ -189,8 +240,7 @@ export default function GeneratedPage() {
       Object.entries(parseActionParams(matched.passParam, row)).forEach(([k, v]) => params.set(k, v));
     }
     const qs = params.toString() ? `?${params.toString()}` : "";
-    /* TODO(파일빌드): 이동 대상 산출물이 아직 생성되지 않았다면 404가 납니다. */
-    router.push(`${GENERATED_PAGE_BASE}/${matched.pageSlug}${qs}`);
+    router.push(`${DETAIL_PAGE_PATH}${qs}`);
   };
 
   const handleTableDeleteTable1 = async (id: number) => {
@@ -198,7 +248,7 @@ export default function GeneratedPage() {
     try {
       await api.delete(`/page-data/${dataSlugTable1}/${id}`);
       toast.success(t("common.deleted"));
-      fetchDataTable1(pageTable1);
+      fetchDataTable1(0, false, undefined, undefined, true);
     } catch (err) {
       toast.error(getApiErrorMessage(err, t("common.error.delete")));
     }
@@ -302,8 +352,7 @@ export default function GeneratedPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    /* TODO(파일빌드): 연결 대상(product-detail)이 빌더에서 레이어 팝업으로 설정돼 있어도 산출물은 페이지 이동으로 동작합니다. 산출물이 아직 생성되지 않았다면 404가 납니다. */
-                    router.push(`${GENERATED_PAGE_BASE}/product-detail`);
+                    router.push(`${DETAIL_PAGE_PATH}`);
                   }}
                   className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
                 >
@@ -313,7 +362,6 @@ export default function GeneratedPage() {
             </div>
           </div>
           <div style={{ gridColumn: "span 12", gridRow: "span 10" }}>
-            {/* TODO(파일빌드): 처리되지 않은 설정 값이 있습니다 (widget:enableRowSelection). 필요 시 직접 구현해주세요. */}
             <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
               <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
                 <p className="text-xs text-slate-500">

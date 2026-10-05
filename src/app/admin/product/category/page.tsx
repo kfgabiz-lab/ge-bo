@@ -6,11 +6,43 @@ import { PageGridContainer } from "@/components/layout/page-grid-container";
 import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
-import api from "@/lib/api";
+import api, { getApiErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, GripVertical } from "lucide-react";
-import { flattenPageDataItem, parseActionParams, buildRowActionQuery } from "@/app/admin/templates/make/_shared/utils";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  GripVertical,
+  RotateCcw,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
+} from "lucide-react";
+import {
+  flattenPageDataItem,
+  parseActionParams,
+  buildRowActionQuery,
+  buildSearchQueryParams,
+  buildKeyToId,
+  buildSearchFieldDefaultValues,
+  buildDateRangeGenerationPatch,
+  nextSortDir,
+  pageGroupRange,
+  resolveFetchSortKey,
+  mergeTableSelectedRowCache,
+  validateDataSaveWidgets,
+  saveTableRows,
+  extractTableSelectedRows,
+  buildParamSaveExtras,
+} from "@/app/admin/templates/make/_shared/utils";
 import { useRouter } from "next/navigation";
+import { SearchFieldConfig } from "@/app/admin/templates/make/_shared/types";
+import { useSiteStore } from "@/store/use-site-store";
+import { useServerClockStore } from "@/store/use-server-clock-store";
+import { isEnterSearchTrigger } from "@/components/search";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
+import CenterPopupLayout from "@/components/layout/popup/center-popup-layout";
 
 interface CategoryItem {
   id: number;
@@ -46,7 +78,6 @@ const CATEGORY_FIELD_KEYS_Category2 = {
   title: "category.title",
   desc: "category.sub_title",
 };
-const PRODUCT_SEARCH_POPUP_PAGE_PATH = "/admin/widgetSub/product-search-popup";
 const PRODUCT_DETAIL_PAGE_PATH = "/admin/product/product-detail";
 const CATEGORY_FIELD_KEYS_Category3 = {
   id: "id",
@@ -54,6 +85,497 @@ const CATEGORY_FIELD_KEYS_Category3 = {
   title: "_fetchedRel18.product.product_name",
   desc: "_fetchedRel18.product.product_description",
 };
+function LayerPopup_Category3_create(props: {
+  onClose: () => void;
+  onSaved: () => void;
+  extras: Record<string, Record<string, string>>;
+}) {
+  const { onClose, onSaved, extras } = props;
+  const SEARCH_FIELDS_Search1: SearchFieldConfig[] = [
+    {
+      colSpan: 5,
+      id: "product_name",
+      type: "input",
+      fieldKey: "product_name",
+      label: "",
+    },
+  ];
+  const searchKeyToIdSearch1 = buildKeyToId(SEARCH_FIELDS_Search1);
+
+  const { t } = useI18n();
+  const sitesLoaded = useSiteStore((s) => s.sitesLoaded);
+  const clockReady = useServerClockStore((s) => s.status === "synced" || s.status === "failed");
+  const initialParamsSearch1Ref = useRef<Record<string, string>>({ product_name: "" });
+  const [paramsSearch1, setParamsSearch1] = useState<Record<string, string>>(initialParamsSearch1Ref.current);
+  const [searchDefaultsReadySearch1, setSearchDefaultsReadySearch1] = useState(false);
+  const [rowsTable1, setRowsTable1] = useState<Record<string, unknown>[]>([]);
+  const [totalTable1, setTotalTable1] = useState(0);
+  const [pageTable1, setPageTable1] = useState(0);
+  const [loadingTable1, setLoadingTable1] = useState(false);
+  const [totalPagesTable1, setTotalPagesTable1] = useState(0);
+  const [sortKeyTable1, setSortKeyTable1] = useState<string | null>(null);
+  const [sortDirTable1, setSortDirTable1] = useState<"asc" | "desc">("asc");
+  const [selectedRowIdsTable1, setSelectedRowIdsTable1] = useState<number[]>([]);
+  const [selectedRowDataTable1, setSelectedRowDataTable1] = useState<
+    Record<string, Record<number, Record<string, unknown>>>
+  >({});
+  const dataSlugTable1 = "product-data";
+  const confirmLeaveStoreSpace1 = useLeaveCheckStore((s) => s.confirmLeave);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!sitesLoaded || !clockReady) return;
+    const baseSnapshot = { ...initialParamsSearch1Ref.current };
+    const computed: Record<string, string> = {};
+    SEARCH_FIELDS_Search1.forEach((f) => {
+      Object.assign(computed, buildSearchFieldDefaultValues(f));
+    });
+    const snapshot = { ...computed };
+    SEARCH_FIELDS_Search1.forEach((f) => {
+      if (f.type !== "dateRange" && f.type !== "yearMonthRange") return;
+      (["from", "to"] as const).forEach((part) => {
+        const sourceValue = snapshot[`${f.id}_${part}`];
+        if (!sourceValue) return;
+        Object.assign(computed, buildDateRangeGenerationPatch(SEARCH_FIELDS_Search1, f.id, part, sourceValue));
+      });
+    });
+    initialParamsSearch1Ref.current = { ...initialParamsSearch1Ref.current, ...computed };
+    setParamsSearch1((prev) => {
+      const merged = { ...prev };
+      Object.keys(computed).forEach((k) => {
+        if (prev[k] === baseSnapshot[k]) merged[k] = computed[k];
+      });
+      return merged;
+    });
+    setSearchDefaultsReadySearch1(true);
+  }, [sitesLoaded, clockReady]);
+
+  const getSearchParamsSearch1 = (sv: Record<string, string> = paramsSearch1): Record<string, string> =>
+    buildSearchQueryParams(SEARCH_FIELDS_Search1, sv);
+
+  const handleResetSearch1 = () => {
+    setParamsSearch1(initialParamsSearch1Ref.current);
+    fetchDataTable1(0, true, { Search1: initialParamsSearch1Ref.current }, { sk: null, sd: "asc" });
+  };
+
+  const handleSearchSearch1 = () => {
+    fetchDataTable1(0, true);
+  };
+
+  const handleRowsSelectTable1 = (ids: number[]) => {
+    setSelectedRowIdsTable1(ids);
+    setSelectedRowDataTable1((prev) =>
+      mergeTableSelectedRowCache(prev, "w_4wwj7ykuz_popup_create_w_q8eohvr60", ids, rowsTable1)
+    );
+  };
+
+  const fetchDataTable1 = async (
+    page: number,
+    notify = false,
+    searchOverrides?: Record<string, Record<string, string>>,
+    sortOverride?: { sk: string | null; sd: "asc" | "desc" }
+  ) => {
+    if (!dataSlugTable1) {
+      if (notify) toast.error(t("common.error.load_data"));
+      return;
+    }
+    setLoadingTable1(true);
+    try {
+      const sk = sortOverride ? sortOverride.sk : sortKeyTable1;
+      const sd = sortOverride ? sortOverride.sd : sortDirTable1;
+      let resolvedSortKeyTable1: string | null = sk;
+      if (sk) {
+        for (const r of rowsTable1) {
+          const pathMap = r._pathMap as Record<string, string> | undefined;
+          if (pathMap?.[sk]) {
+            resolvedSortKeyTable1 = pathMap[sk];
+            break;
+          }
+        }
+      }
+      const res = await api.get("/page-data/" + dataSlugTable1, {
+        params: {
+          page,
+          size: 5,
+          ...(resolvedSortKeyTable1
+            ? {
+                sort:
+                  resolveFetchSortKey(
+                    [{ accessor: "product.product_code" }, { accessor: "product.product_name" }],
+                    resolvedSortKeyTable1
+                  ) +
+                  "," +
+                  sd,
+              }
+            : {}),
+          ...getSearchParamsSearch1(searchOverrides?.["Search1"]),
+        },
+      });
+      const items = (
+        res.data.content as {
+          id: number;
+          groupId?: string | null;
+          dataJson: Record<string, unknown>;
+          createdAt?: string | null;
+          createdBy?: string | null;
+          updatedAt?: string | null;
+          updatedBy?: string | null;
+        }[]
+      ).map(flattenPageDataItem);
+      setRowsTable1(items);
+      setTotalTable1(res.data.totalElements ?? items.length);
+      setTotalPagesTable1(res.data.totalPages ?? 1);
+      setPageTable1(page);
+      if (sortOverride) {
+        setSortKeyTable1(sortOverride.sk);
+        if (sortOverride.sk !== null) setSortDirTable1(sortOverride.sd);
+      }
+    } catch (err) {
+      console.error("데이터 조회 오류:", err);
+      toast.error(t("common.error.load_data"));
+    } finally {
+      setLoadingTable1(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!searchDefaultsReadySearch1) return;
+    fetchDataTable1(0);
+  }, [searchDefaultsReadySearch1]);
+
+  const handleSortTable1 = (accessor: string) => {
+    const isCurrentCol = sortKeyTable1 === accessor;
+    const dir = nextSortDir(isCurrentCol, isCurrentCol ? sortDirTable1 : null);
+    fetchDataTable1(0, false, undefined, { sk: dir === null ? null : accessor, sd: dir ?? "asc" });
+  };
+
+  const handleDataSaveSpace1_1 = async () => {
+    const dataSaveTargets: Parameters<typeof validateDataSaveWidgets>[0]["targetWidgets"] = [
+      {
+        type: "table",
+        widgetId: "w_4wwj7ykuz_popup_create_w_q8eohvr60",
+        contentKey: "product",
+        enableRowSelection: true,
+      },
+    ];
+    if (
+      !validateDataSaveWidgets({
+        targetWidgets: dataSaveTargets,
+        formValuesMap: {},
+        fileValuesMap: {},
+        existingFileMetaMap: {},
+        subListRowsMap: {},
+        subListFileMap: {},
+        multiSelectValuesMap: {},
+        tableSelectedRowsMap: { w_4wwj7ykuz_popup_create_w_q8eohvr60: selectedRowIdsTable1 },
+        t,
+      })
+    )
+      return;
+    try {
+      let anySaved = false;
+      const rowsToSaveTable1 = extractTableSelectedRows(
+        selectedRowDataTable1,
+        "w_4wwj7ykuz_popup_create_w_q8eohvr60",
+        selectedRowIdsTable1,
+        rowsTable1
+      );
+      if (rowsToSaveTable1.length === 0) {
+        toast.warning(t("common.table.no_save_data"));
+        return;
+      }
+      const savedTable1 = await saveTableRows({
+        contentKey: "product",
+        rows: rowsToSaveTable1,
+        extras: extras["product"] ?? {},
+        dataSaveSlug: "category-data",
+        templateSlug: "category-all-list",
+        paramSave: "product.id,product.product_name,product.product_code,product.product_type,product.order_method",
+        validationRuleIds: [6],
+      });
+      if (savedTable1 > 0) anySaved = true;
+      if (anySaved) {
+        toast.success(t("common.saved"));
+        onSaved();
+      }
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, t("common.error.save")));
+    }
+  };
+
+  return (
+    <div className="px-4 pb-4">
+      <PageGridContainer>
+        <GridCell colSpan={12} rowSpan={7} autoHeight>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(12, 1fr)",
+              gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px auto auto auto auto auto auto`,
+              gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+              gridAutoFlow: "row dense",
+              rowGap: `${GAP_SIZE}px`,
+              columnGap: 0,
+            }}
+          >
+            <div style={{ gridColumn: "span 12", gridRow: "span 1", height: `${1 * ROW_HEIGHT - GAP_SIZE}px` }}>
+              <div
+                className="h-full w-full rounded border border-slate-200 flex items-center gap-3 bg-white px-4"
+                style={{ overflow: "clip" }}
+              >
+                <div
+                  className="flex-1 grid grid-cols-5 gap-4"
+                  onKeyDown={(e) => {
+                    if (isEnterSearchTrigger(e)) handleSearchSearch1();
+                  }}
+                >
+                  <div className="col-span-5">
+                    <input
+                      type="text"
+                      value={String(paramsSearch1["product_name"] ?? "")}
+                      onChange={(e) => setParamsSearch1((prev) => ({ ...prev, ["product_name"]: e.target.value }))}
+                      placeholder={t("common.placeholder.productName")}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleResetSearch1}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-xs font-medium rounded-md hover:bg-white transition-all"
+                >
+                  <RotateCcw className="w-3 h-3" /> {t("common.btn.reset")}
+                </button>
+                <button
+                  onClick={handleSearchSearch1}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-md shadow-sm transition-all"
+                >
+                  <Search className="w-3 h-3" /> {t("common.btn.search")}
+                </button>
+              </div>
+            </div>
+            <div style={{ gridColumn: "span 12", gridRow: "span 5" }}>
+              <div className="h-full w-full rounded border border-slate-200 bg-white" style={{ overflow: "clip" }}>
+                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    {t("common.pagination.total", { count: totalTable1.toLocaleString() })}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {totalTable1 > 0
+                      ? t("common.pagination.showing", {
+                          start: String(pageTable1 * 5 + 1),
+                          end: String(Math.min((pageTable1 + 1) * 5, totalTable1)),
+                        })
+                      : ""}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10">
+                      <tr className="border-b border-slate-200 bg-slate-50/80">
+                        <th className="w-10 px-2 py-3 text-center flex-shrink-0 sticky left-0 z-20 bg-slate-50/80">
+                          <input
+                            type="checkbox"
+                            checked={
+                              rowsTable1.length > 0 &&
+                              rowsTable1.every((row) => selectedRowIdsTable1.includes(row._id as number))
+                            }
+                            onChange={(e) =>
+                              handleRowsSelectTable1(
+                                e.target.checked ? rowsTable1.map((row) => row._id as number).filter(Boolean) : []
+                              )
+                            }
+                            className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer disabled:cursor-default"
+                          />
+                        </th>
+                        <th
+                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                          style={{ textAlign: "center", width: "30%" }}
+                        >
+                          <button
+                            onClick={() => handleSortTable1("product.product_code")}
+                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                          >
+                            {t("product.label.productCode")}
+                            {(sortKeyTable1 === "product.product_code" ? sortDirTable1 : false) === "asc" ? (
+                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                            ) : (sortKeyTable1 === "product.product_code" ? sortDirTable1 : false) === "desc" ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                            ) : (
+                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                            )}
+                          </button>
+                        </th>
+                        <th
+                          className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap"
+                          style={{ textAlign: "center", width: "60%" }}
+                        >
+                          <button
+                            onClick={() => handleSortTable1("product.product_name")}
+                            className="flex items-center justify-center gap-1 w-full transition-colors hover:text-slate-900"
+                          >
+                            {t("common.label.productName")}
+                            {(sortKeyTable1 === "product.product_name" ? sortDirTable1 : false) === "asc" ? (
+                              <ChevronUp className="w-3.5 h-3.5 text-blue-500" />
+                            ) : (sortKeyTable1 === "product.product_name" ? sortDirTable1 : false) === "desc" ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+                            ) : (
+                              <ChevronsUpDown className="w-3.5 h-3.5 text-gray-300" />
+                            )}
+                          </button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingTable1 ? (
+                        <tr>
+                          <td colSpan={3} className="py-16 text-center text-sm text-slate-400">
+                            {t("common.table.loading")}
+                          </td>
+                        </tr>
+                      ) : rowsTable1.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="py-16 text-center text-sm text-slate-400">
+                            {t("common.table.no_data")}
+                          </td>
+                        </tr>
+                      ) : (
+                        rowsTable1.map((row, idx) => (
+                          <tr
+                            key={idx}
+                            className={
+                              selectedRowIdsTable1.includes(row._id as number)
+                                ? "border-b border-slate-100 last:border-0 transition-all bg-slate-50"
+                                : "border-b border-slate-100 last:border-0 transition-all hover:bg-slate-50/50"
+                            }
+                          >
+                            <td className="w-10 px-2 py-3 text-center sticky left-0 bg-inherit">
+                              <input
+                                type="checkbox"
+                                checked={selectedRowIdsTable1.includes(row._id as number)}
+                                onChange={(e) =>
+                                  handleRowsSelectTable1(
+                                    e.target.checked
+                                      ? [...selectedRowIdsTable1, row._id as number]
+                                      : selectedRowIdsTable1.filter((id) => id !== (row._id as number))
+                                  )
+                                }
+                                className="w-3.5 h-3.5 rounded border-slate-300 accent-slate-900 cursor-pointer"
+                              />
+                            </td>
+                            <td
+                              className="px-4 py-3 max-w-[200px] overflow-hidden"
+                              style={{ textAlign: "center", width: "30%" }}
+                            >
+                              {(() => {
+                                const value = row["product.product_code"];
+                                const strVal = value == null || typeof value === "object" ? "" : String(value);
+                                const displayVal = strVal;
+                                return (
+                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                    {displayVal}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td
+                              className="px-4 py-3 max-w-[200px] overflow-hidden"
+                              style={{ textAlign: "left", width: "60%" }}
+                            >
+                              {(() => {
+                                const value = row["product.product_name"];
+                                const strVal = value == null || typeof value === "object" ? "" : String(value);
+                                const displayVal = strVal;
+                                return (
+                                  <span className="text-sm text-slate-700 truncate block" title={displayVal}>
+                                    {displayVal}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {totalPagesTable1 >= 1 && (
+                  <div className="flex-shrink-0 flex items-center justify-center gap-1 px-4 py-3 border-t border-slate-100">
+                    <button
+                      disabled={pageTable1 === 0}
+                      onClick={() => fetchDataTable1(pageTable1 - 1)}
+                      className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      {t("common.btn.prev")}
+                    </button>
+                    {pageGroupRange(pageTable1, totalPagesTable1).map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => fetchDataTable1(p)}
+                        className={
+                          pageTable1 === p
+                            ? "px-2.5 py-1.5 text-xs rounded border transition-all bg-slate-900 text-white border-slate-900"
+                            : "px-2.5 py-1.5 text-xs rounded border transition-all border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }
+                      >
+                        {p + 1}
+                      </button>
+                    ))}
+                    <button
+                      disabled={pageTable1 >= totalPagesTable1 - 1}
+                      onClick={() => fetchDataTable1(pageTable1 + 1)}
+                      className="px-2.5 py-1.5 text-xs rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      {t("common.btn.next")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ gridColumn: "5 / span 4", gridRow: "span 1" }}>
+              <div
+                className="w-full rounded"
+                style={{
+                  overflow: "visible",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                  gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                  rowGap: `${GAP_SIZE}px`,
+                  columnGap: `${GAP_SIZE}px`,
+                }}
+              >
+                <div
+                  className="flex items-center-safe gap-2 px-3 min-w-0 justify-center"
+                  style={{ gridColumn: "span 4", gridRow: "span 1" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirmLeaveStoreSpace1 && !confirmLeaveStoreSpace1()) return;
+                      onClose();
+                    }}
+                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
+                  >
+                    {t("common.btn.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDataSaveSpace1_1();
+                    }}
+                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
+                  >
+                    {t("common.btn.save")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </GridCell>
+      </PageGridContainer>
+    </div>
+  );
+}
 
 export default function GeneratedPage() {
   const setPageTitle = usePageTitleStore((s) => s.setPageTitle);
@@ -78,6 +600,10 @@ export default function GeneratedPage() {
   const [categoryItemsCategory3, setCategoryItemsCategory3] = useState<CategoryItem[]>([]);
   const [categoryLoadingCategory3, setCategoryLoadingCategory3] = useState(false);
   const [selectedIdCategory3, setSelectedIdCategory3] = useState<number | null>(null);
+  const [popupOpenCreateCategory3, setPopupOpenCreateCategory3] = useState(false);
+  const [popupExtrasCreateCategory3, setPopupExtrasCreateCategory3] = useState<Record<string, Record<string, string>>>(
+    {}
+  );
   const categoryDragIndexRefCategory3 = useRef<number | null>(null);
   const [categoryDropIndexCategory3, setCategoryDropIndexCategory3] = useState<number | null>(null);
 
@@ -358,16 +884,18 @@ export default function GeneratedPage() {
       toast.warning(t("common.category.select_parent_warning"));
       return;
     }
-    /* TODO(파일빌드): 연결 대상(product-search-popup)이 LayerPopup 모드입니다. 산출물에서는 페이지 이동으로 동작합니다(레이어 팝업 미지원). */
     const rowForParams = selectedIdCategory2 != null ? { id: String(selectedIdCategory2) } : {};
-    const parsed = parseActionParams(
+    const staticParams = parseActionParams(
       "product.depth=3,product.parentId=id,product.is_training_category=true",
       rowForParams
     );
-    if (selectedIdCategory2 != null) parsed["parentId"] = String(selectedIdCategory2);
-    parsed["_paramSave"] = "true";
-    const qs = Object.keys(parsed).length > 0 ? `?${new URLSearchParams(parsed).toString()}` : "";
-    router.push(`${PRODUCT_SEARCH_POPUP_PAGE_PATH}${qs}`);
+    const dynamicParams: Record<string, string> =
+      selectedIdCategory2 != null ? { parentId: String(selectedIdCategory2) } : {};
+    const initialValues = { ...staticParams, ...dynamicParams };
+    setPopupExtrasCreateCategory3(
+      buildParamSaveExtras(initialValues, [], ["product"], []) as Record<string, Record<string, string>>
+    );
+    setPopupOpenCreateCategory3(true);
   };
 
   const handleCategoryEditCategory3 = (item: CategoryItem) => {
@@ -425,6 +953,11 @@ export default function GeneratedPage() {
       toast.error(t("common.error.sort"));
       fetchCategoryCategory3(selectedIdCategory2);
     }
+  };
+
+  const handleLayerPopupSavedCreateCategory3 = () => {
+    fetchCategoryCategory3(selectedIdCategory2);
+    setPopupOpenCreateCategory3(false);
   };
 
   return (
@@ -893,6 +1426,18 @@ export default function GeneratedPage() {
                   )}
                 </div>
               </div>
+              <CenterPopupLayout
+                open={popupOpenCreateCategory3}
+                onClose={() => setPopupOpenCreateCategory3(false)}
+                title={t("productGrp.label.prd")}
+                layerWidth="md"
+              >
+                <LayerPopup_Category3_create
+                  onClose={() => setPopupOpenCreateCategory3(false)}
+                  onSaved={handleLayerPopupSavedCreateCategory3}
+                  extras={popupExtrasCreateCategory3}
+                />
+              </CenterPopupLayout>
             </div>
           </div>
         </div>

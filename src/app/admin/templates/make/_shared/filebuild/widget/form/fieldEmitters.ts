@@ -50,7 +50,13 @@ import {
   SEARCH_DATE_RANGE_INPUT_WRAP_CLS,
 } from "../../../components/renderer/rendererStyles";
 import { FILE_TYPE_PRESETS, FILE_TYPE_LABELS } from "../../../constants";
-import { jsStringLiteral, emitSelectArrow, slugOptionFieldLiteral, type formVarNames } from "../../widgetGenerator";
+import {
+  jsStringLiteral,
+  emitSelectArrow,
+  slugOptionFieldLiteral,
+  slugAutocompleteFieldLiteral,
+  type formVarNames,
+} from "../../widgetGenerator";
 
 export interface FormFieldNeeds {
   codeGroups: boolean;
@@ -67,6 +73,10 @@ export interface FormFieldNeeds {
   fetchRel: boolean;
   fetchRelDataExpr: boolean;
   slugOptionSelect: boolean;
+  autocompleteInput: boolean;
+  slugAutocompleteInput: boolean;
+  addressAutocompleteInput: boolean;
+  derivedChange: boolean;
   icons: Set<string>;
 }
 
@@ -85,6 +95,10 @@ export const createFormFieldNeeds = (): FormFieldNeeds => ({
   fetchRel: false,
   fetchRelDataExpr: false,
   slugOptionSelect: false,
+  autocompleteInput: false,
+  slugAutocompleteInput: false,
+  addressAutocompleteInput: false,
+  derivedChange: false,
   icons: new Set<string>(),
 });
 
@@ -111,6 +125,7 @@ export const FORM_SUPPORTED_FIELD_TYPES = new Set<string>([
   "text",
   "hidden",
   "dateRange",
+  "address",
 ]);
 
 const textExprOf = (text: string | undefined, msgKey: string | undefined): string =>
@@ -265,9 +280,52 @@ const emitSlugSelect = (o: FormFieldEmitOptions, selectAllPlaceholder: string, s
   ];
 };
 
+const optionsSourceExprNoParseOpt = (o: FormFieldEmitOptions): string => {
+  o.needs.resolveFieldOptions = true;
+  o.needs.searchFieldConfigType = true;
+  if (o.field.codeGroupCode) o.needs.codeGroups = true;
+  return `resolveFieldOptions(${o.names.fieldById}[${jsStringLiteral(o.field.id)}] as unknown as SearchFieldConfig, ${o.field.codeGroupCode ? "groups" : "[]"})`;
+};
+
+const emitAutocompleteSelect = (
+  o: FormFieldEmitOptions,
+  selectAllPlaceholder: string,
+  selectAllMsgKey: string
+): string[] => {
+  const { ind, level, field } = o;
+  const isReadOnly = !!field.readonly;
+  const disabledExpr = isReadOnly ? "true" : o.disabledExpr;
+  const isReadOnlyExpr = isReadOnly ? "true" : "false";
+  const placeholderExpr = selectPlaceholderExpr(field, selectAllPlaceholder, selectAllMsgKey);
+
+  if (field.optionSlug) {
+    o.needs.slugAutocompleteInput = true;
+    o.needs.fetchRel = true;
+    o.needs.searchFieldConfigType = true;
+    const fieldLiteral = `${JSON.stringify(slugAutocompleteFieldLiteral(field))} as unknown as SearchFieldConfig`;
+    let onDerivedChangeAttr = "";
+    if (field.fieldKey && field.optionDerivedKeys) {
+      o.needs.derivedChange = true;
+      onDerivedChangeAttr = ` onDerivedChange={(derived) => ${o.names.derivedChange}(${jsStringLiteral(field.fieldKey)}, derived)}`;
+    }
+    return [
+      `${ind(level)}<SlugAutocompleteInput field={${fieldLiteral}} value={${fieldValueExpr(o)}} onChange={(v) => ${changeCall(o, "v")}}${onDerivedChangeAttr} isDisabled={${disabledExpr}} isReadOnly={${isReadOnlyExpr}} placeholder={${placeholderExpr}} rowData={${o.names.rowData}} />`,
+    ];
+  }
+
+  o.needs.autocompleteInput = true;
+  const optsExpr = optionsSourceExprNoParseOpt(o);
+  return [
+    `${ind(level)}<AutocompleteInput value={${fieldValueExpr(o)}} onChange={(v) => ${changeCall(o, "v")}} opts={${optsExpr}} placeholder={${placeholderExpr}} isDisabled={${disabledExpr}} isReadOnly={${isReadOnlyExpr}} />`,
+  ];
+};
+
 const emitSelect = (o: FormFieldEmitOptions, selectAllPlaceholder: string, selectAllMsgKey: string): string[] => {
   const { field } = o;
-  if (field.optionSlug && field.selectType !== "autocomplete") {
+  if (field.selectType === "autocomplete") {
+    return emitAutocompleteSelect(o, selectAllPlaceholder, selectAllMsgKey);
+  }
+  if (field.optionSlug) {
     return emitSlugSelect(o, selectAllPlaceholder, selectAllMsgKey);
   }
   const { ind, level } = o;
@@ -324,6 +382,23 @@ const emitDateRangeSide = (o: FormFieldEmitOptions, suffix: "_from" | "_to", inp
   const subType = field.rangeSubType ?? "date";
   const isReadOnly = !!field.readonly;
   const cls = `${inputCls} ${fieldDateRangeInputPadCls}${isReadOnly ? readonlyFieldCls : ""}`;
+  const isStart = suffix === "_from";
+  const disablePastFlag = isStart ? field.disableStartPast : field.disableEndPast;
+  const offset = isStart ? field.defaultStartDateOffset : field.defaultEndDateOffset;
+  const defaultDate = isStart ? field.defaultStartDate : field.defaultEndDate;
+  let minAttr = "";
+  if (disablePastFlag) {
+    o.needs.dateDefault = true;
+    const hasOffset = offset !== undefined && offset !== 0;
+    const nowExpr = `formatNowBySubType('${subType}')`;
+    if (hasOffset) {
+      minAttr = `min={calcDateOffset(${offset}, '${subType}') || ${nowExpr}}`;
+    } else if (defaultDate) {
+      minAttr = `min={${jsStringLiteral(defaultDate)} || ${nowExpr}}`;
+    } else {
+      minAttr = `min={${nowExpr}}`;
+    }
+  }
   const attrs = [
     `type="${inputType}"`,
     ...(subType === "timeSec" ? ["step={1}"] : []),
@@ -331,6 +406,7 @@ const emitDateRangeSide = (o: FormFieldEmitOptions, suffix: "_from" | "_to", inp
     ...(isReadOnly ? ["readOnly"] : []),
     `className=${jsStringLiteral(cls)}`,
     `value={${dateRangeValueExpr(o, suffix)}}`,
+    ...(minAttr ? [minAttr] : []),
     ...(isReadOnly
       ? []
       : [
@@ -356,6 +432,20 @@ const emitDateRange = (o: FormFieldEmitOptions): string[] => {
     `${ind(level + 1)}<span className=${jsStringLiteral(SEARCH_DATE_RANGE_SEP_CLS)}>~</span>`,
     ...emitDateRangeSide({ ...o, level: level + 1 }, "_to", inputType),
     `${ind(level)}</div>`,
+  ];
+};
+
+const emitAddress = (o: FormFieldEmitOptions): string[] => {
+  const { ind, level, field } = o;
+  o.needs.addressAutocompleteInput = true;
+  const isReadOnly = !!field.readonly;
+  const isReadOnlyExpr = isReadOnly ? "true" : "false";
+  const placeholderExpr = inputPlaceholderExpr(field);
+  const languageExpr = jsStringLiteral(field.addressLanguage ?? "en");
+  const latChangeCall = `${o.names.change}(${jsStringLiteral(field.id + "_lat")}, String(lat))`;
+  const lngChangeCall = `${o.names.change}(${jsStringLiteral(field.id + "_lng")}, String(lng))`;
+  return [
+    `${ind(level)}<AddressAutocompleteInput value={${fieldValueExpr(o)}} onAddressSelect={(address, lat, lng) => { ${changeCall(o, "address")}; ${latChangeCall}; ${lngChangeCall}; }} placeholder={${placeholderExpr}} isDisabled={${o.disabledExpr}} isReadOnly={${isReadOnlyExpr}} language={${languageExpr}} />`,
   ];
 };
 
@@ -920,6 +1010,8 @@ export const emitFormField = (
       return emitDate(o);
     case "dateRange":
       return emitDateRange(o);
+    case "address":
+      return emitAddress(o);
     case "radio":
       return emitRadio(o);
     case "checkbox":

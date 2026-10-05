@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
-import { PageGridContainer } from "@/components/layout/page-grid-container";
 import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
@@ -48,6 +47,7 @@ import {
 } from "@/app/admin/templates/make/_shared/utils/contentSave";
 import { calculateFormFieldRowTracks } from "@/app/admin/templates/make/_shared/utils/formGridLayout";
 import type { ContentSaveWidget } from "@/app/admin/templates/make/_shared/utils/contentSave";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 
 const FORM_WIDGET_Form1: FormWidget = {
   type: "form",
@@ -341,6 +341,7 @@ export default function GeneratedPage() {
   }, [fetchGroups]);
   const uid = useId();
   const [formValuesForm2, setFormValuesForm2] = useState<Record<string, string>>({});
+  const confirmLeaveStoreSpace1 = useLeaveCheckStore((s) => s.confirmLeave);
   const router = useRouter();
 
   const urlParams = useMemo(() => {
@@ -352,7 +353,9 @@ export default function GeneratedPage() {
     return map;
   }, [searchParams]);
 
-  const allFieldKeyToId = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t).allFieldKeyToId, [t]);
+  const fieldKeyIdAndLabelMaps = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t), [t]);
+  const allFieldKeyToId = fieldKeyIdAndLabelMaps.allFieldKeyToId;
+  const allFieldLabels = fieldKeyIdAndLabelMaps.allFieldLabels;
   const allFormValues = useMemo(
     () => Object.assign({}, formValuesForm1, formValuesForm2) as Record<string, string>,
     [formValuesForm1, formValuesForm2]
@@ -555,8 +558,9 @@ export default function GeneratedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedId, searchParams, sitesLoaded, clockReady]);
 
-  const visibleFieldsForm1 = FORM_FIELDS_Form1.filter(
-    (f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))
+  const visibleFieldsForm1 = useMemo(
+    () => FORM_FIELDS_Form1.filter((f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))),
+    [evalFieldConditionForm1]
   );
   const fieldRowIsAutoForm1 = calculateFormFieldRowTracks(visibleFieldsForm1, 12, false);
 
@@ -615,8 +619,9 @@ export default function GeneratedPage() {
     [resolveTargetFieldIdForm2]
   );
 
-  const visibleFieldsForm2 = FORM_FIELDS_Form2.filter(
-    (f) => !(f.hideCondition && evalFieldConditionForm2(f.hideCondition))
+  const visibleFieldsForm2 = useMemo(
+    () => FORM_FIELDS_Form2.filter((f) => !(f.hideCondition && evalFieldConditionForm2(f.hideCondition))),
+    [evalFieldConditionForm2]
   );
   const fieldRowIsAutoForm2 = calculateFormFieldRowTracks(visibleFieldsForm2, 12, false);
 
@@ -656,7 +661,8 @@ export default function GeneratedPage() {
         {},
         "currMgmt-data",
         allFormValues,
-        false
+        false,
+        allFieldKeyToId
       );
       await persistContentDataJson({
         connectedSlug: "currMgmt-data",
@@ -1215,7 +1221,7 @@ export default function GeneratedPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (!confirmLeave()) return;
+                    if (confirmLeaveStoreSpace1 && !confirmLeaveStoreSpace1()) return;
                     router.back();
                   }}
                   className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"

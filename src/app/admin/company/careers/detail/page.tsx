@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import { GridCell, ROW_HEIGHT, GAP_SIZE } from "@/components/layout/grid-cell";
-import { PageGridContainer } from "@/components/layout/page-grid-container";
+import PageLayout from "@/components/layout/page-layout";
 import { usePageTitleStore } from "@/store/use-page-title-store";
 import { useI18n } from "@/hooks/use-i18n";
 import { useLeaveCheck } from "@/app/admin/templates/make/_shared/hooks/useLeaveCheck";
@@ -18,6 +18,7 @@ import {
   buildFieldConditionResolver,
   findOptionFilterResetTargetIds,
   initFormDefaultValues,
+  applyUrlParamFormOverrides,
   buildFormValuesFromDataJson,
   validateFormFields,
   buildDataJson,
@@ -36,6 +37,7 @@ import {
   buildFormFileIdsMap,
   persistContentDataJson,
 } from "@/app/admin/templates/make/_shared/utils/contentSave";
+import { useLeaveCheckStore } from "@/store/use-leave-check-store";
 
 const FORM_WIDGET_Form1: FormWidget = {
   type: "form",
@@ -129,6 +131,7 @@ export default function GeneratedPage() {
     fetchGroups();
   }, [fetchGroups]);
   const uid = useId();
+  const confirmLeaveStoreSpace1 = useLeaveCheckStore((s) => s.confirmLeave);
   const router = useRouter();
 
   const urlParams = useMemo(() => {
@@ -140,7 +143,9 @@ export default function GeneratedPage() {
     return map;
   }, [searchParams]);
 
-  const allFieldKeyToId = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t).allFieldKeyToId, [t]);
+  const fieldKeyIdAndLabelMaps = useMemo(() => buildFieldKeyIdAndLabelMaps(ALL_FORM_WIDGETS, t), [t]);
+  const allFieldKeyToId = fieldKeyIdAndLabelMaps.allFieldKeyToId;
+  const allFieldLabels = fieldKeyIdAndLabelMaps.allFieldLabels;
   const allFormValues = useMemo(() => Object.assign({}, formValuesForm1) as Record<string, string>, [formValuesForm1]);
   const lastGeneratedRef = useRef<Record<string, string>>({});
 
@@ -264,7 +269,11 @@ export default function GeneratedPage() {
   useEffect(() => {
     if (storedId === null) {
       if (!sitesLoaded || !clockReady) return;
-      const defaults = initFormDefaultValues(ALL_FORM_WIDGETS, t);
+      const defaults = applyUrlParamFormOverrides(
+        initFormDefaultValues(ALL_FORM_WIDGETS, t),
+        ALL_FORM_WIDGETS,
+        searchParams
+      );
       setFormValuesForm1(defaults["w_vfco59rj7"] ?? {});
       return;
     }
@@ -284,8 +293,9 @@ export default function GeneratedPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storedId, searchParams, sitesLoaded, clockReady]);
 
-  const visibleFieldsForm1 = FORM_FIELDS_Form1.filter(
-    (f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))
+  const visibleFieldsForm1 = useMemo(
+    () => FORM_FIELDS_Form1.filter((f) => !(f.hideCondition && evalFieldConditionForm1(f.hideCondition))),
+    [evalFieldConditionForm1]
   );
   const fieldRowIsAutoForm1 = calculateFormFieldRowTracks(visibleFieldsForm1, 12, false);
 
@@ -304,7 +314,8 @@ export default function GeneratedPage() {
         {},
         "careers-data",
         allFormValues,
-        false
+        false,
+        allFieldKeyToId
       );
       await persistContentDataJson({
         connectedSlug: "careers-data",
@@ -334,187 +345,185 @@ export default function GeneratedPage() {
   };
 
   return (
-    <div className="space-y-3">
-      <PageGridContainer>
-        <GridCell colSpan={12} rowSpan={8} autoHeight>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(12, 1fr)",
-              gridTemplateRows: `auto auto auto auto auto auto auto auto`,
-              gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-              gridAutoFlow: "row dense",
-              rowGap: `${GAP_SIZE}px`,
-              columnGap: 0,
-            }}
-          >
-            <div style={{ gridColumn: "span 12", gridRow: "span 7" }}>
-              <div
-                className="w-full rounded border border-slate-200"
-                style={{
-                  overflow: "clip",
-                  backgroundColor: "#ffffff",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(12, 1fr)",
-                  gridTemplateRows:
-                    fieldRowIsAutoForm1.length > 0
-                      ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
-                      : undefined,
-                  gridAutoRows: `78px`,
-                  rowGap: `12px`,
-                  columnGap: `12px`,
-                  paddingTop: "10px",
-                  paddingBottom: "10px",
-                }}
-              >
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.title")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("careers.description.title")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        disabled={false}
-                        placeholder={t("common.create.placeholder.title")}
-                        maxLength={100}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
-                        value={formValuesForm1["fb_mcdg5gs74"] ?? ""}
-                        onChange={(e) => handleFieldChangeForm1("fb_mcdg5gs74", e.target.value)}
-                        onBlur={() => handleFieldBlurForm1("fb_mcdg5gs74")}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
-                        {(formValuesForm1["fb_mcdg5gs74"] ?? "").length}/{100}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.description")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("careers.description.desc")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex flex-col h-full">
-                      <textarea
-                        disabled={false}
-                        className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 resize-none flex-1 min-h-0"
-                        value={formValuesForm1["fb_f6xgw9esd"] ?? ""}
-                        maxLength={1000}
-                        placeholder={t("common.input.textarea_placeholder")}
-                        onChange={(e) => handleFieldChangeForm1("fb_f6xgw9esd", e.target.value)}
-                      />
-                      <div className="text-right text-[10px] text-slate-400 mt-0.5">
-                        {(formValuesForm1["fb_f6xgw9esd"] ?? "").length}/{1000}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.sortOrder")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("careers.description.sort")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+    <PageLayout mode="live">
+      <GridCell colSpan={12} rowSpan={8} autoHeight>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(12, 1fr)",
+            gridTemplateRows: `auto auto auto auto auto auto auto auto`,
+            gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+            gridAutoFlow: "row dense",
+            rowGap: `${GAP_SIZE}px`,
+            columnGap: 0,
+          }}
+        >
+          <div style={{ gridColumn: "span 12", gridRow: "span 7" }}>
+            <div
+              className="w-full rounded border border-slate-200"
+              style={{
+                overflow: "clip",
+                backgroundColor: "#ffffff",
+                display: "grid",
+                gridTemplateColumns: "repeat(12, 1fr)",
+                gridTemplateRows:
+                  fieldRowIsAutoForm1.length > 0
+                    ? fieldRowIsAutoForm1.map((a) => (a ? "auto" : "78px")).join(" ")
+                    : undefined,
+                gridAutoRows: `78px`,
+                rowGap: `12px`,
+                columnGap: `12px`,
+                paddingTop: "10px",
+                paddingBottom: "10px",
+              }}
+            >
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.title")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("careers.description.title")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="relative">
                     <input
                       type="text"
                       disabled={false}
-                      placeholder={t("banner.placeholder.sortOrder")}
-                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
-                      value={formValuesForm1["fb_yi71yhsil"] ?? ""}
-                      onChange={(e) => handleFieldChangeForm1("fb_yi71yhsil", e.target.value)}
-                      onBlur={() => handleFieldBlurForm1("fb_yi71yhsil")}
+                      placeholder={t("common.create.placeholder.title")}
+                      maxLength={100}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 pr-20"
+                      value={formValuesForm1["fb_mcdg5gs74"] ?? ""}
+                      onChange={(e) => handleFieldChangeForm1("fb_mcdg5gs74", e.target.value)}
+                      onBlur={() => handleFieldBlurForm1("fb_mcdg5gs74")}
                     />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">
+                      {(formValuesForm1["fb_mcdg5gs74"] ?? "").length}/{100}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
-                  <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
-                    {t("common.label.isVisible")}
-                    <span className="text-red-500 ml-0.5">*</span>
-                  </label>
-                  <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
-                    {t("common.description.invisible")}
-                  </p>
-                  <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
-                    <div className="flex items-center gap-4">
-                      {resolveFieldOptions(
-                        FORM_FIELD_BY_ID_Form1["fb_8ovl5kpla"] as unknown as SearchFieldConfig,
-                        groups
-                      ).map((opt) => {
-                        const parsed = parseOpt(opt);
-                        return (
-                          <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name={`${uid}-field-fb_8ovl5kpla`}
-                              disabled={false}
-                              value={parsed.value}
-                              checked={(formValuesForm1["fb_8ovl5kpla"] ?? "") === parsed.value}
-                              onChange={() => handleFieldChangeForm1("fb_8ovl5kpla", parsed.value)}
-                              className="w-4 h-4 cursor-pointer"
-                            />
-                            <span className="text-sm text-slate-700">{t(parsed.text)}</span>
-                          </label>
-                        );
-                      })}
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 3" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.description")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("careers.description.desc")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex flex-col h-full">
+                    <textarea
+                      disabled={false}
+                      className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200 resize-none flex-1 min-h-0"
+                      value={formValuesForm1["fb_f6xgw9esd"] ?? ""}
+                      maxLength={1000}
+                      placeholder={t("common.input.textarea_placeholder")}
+                      onChange={(e) => handleFieldChangeForm1("fb_f6xgw9esd", e.target.value)}
+                    />
+                    <div className="text-right text-[10px] text-slate-400 mt-0.5">
+                      {(formValuesForm1["fb_f6xgw9esd"] ?? "").length}/{1000}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div style={{ gridColumn: "span 3", gridRow: "span 1" }}>
-              <div
-                className="w-full rounded"
-                style={{
-                  overflow: "visible",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
-                  rowGap: `${GAP_SIZE}px`,
-                  columnGap: `${GAP_SIZE}px`,
-                }}
-              >
-                <div
-                  className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
-                  style={{ gridColumn: "span 2", gridRow: "span 1" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirmLeave()) return;
-                      router.back();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
-                  >
-                    {t("common.label.list")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm(t("common.confirm.save"))) return;
-                      handleContentActionSpace1_1();
-                    }}
-                    className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
-                  >
-                    {t("common.btn.save")}
-                  </button>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.sortOrder")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("careers.description.sort")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <input
+                    type="text"
+                    disabled={false}
+                    placeholder={t("banner.placeholder.sortOrder")}
+                    className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:border-slate-200"
+                    value={formValuesForm1["fb_yi71yhsil"] ?? ""}
+                    onChange={(e) => handleFieldChangeForm1("fb_yi71yhsil", e.target.value)}
+                    onBlur={() => handleFieldBlurForm1("fb_yi71yhsil")}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col px-3 min-w-0" style={{ gridColumn: "span 8", gridRow: "span 1" }}>
+                <label className="block text-sm font-medium text-slate-700 flex-shrink-0">
+                  {t("common.label.isVisible")}
+                  <span className="text-red-500 ml-0.5">*</span>
+                </label>
+                <p className="text-sm text-slate-400 mb-0.5 flex-shrink-0 leading-tight whitespace-nowrap overflow-x-auto min-h-[18px]">
+                  {t("common.description.invisible")}
+                </p>
+                <div className="flex-1 min-h-0 flex flex-col justify-center-safe">
+                  <div className="flex items-center gap-4">
+                    {resolveFieldOptions(
+                      FORM_FIELD_BY_ID_Form1["fb_8ovl5kpla"] as unknown as SearchFieldConfig,
+                      groups
+                    ).map((opt) => {
+                      const parsed = parseOpt(opt);
+                      return (
+                        <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`${uid}-field-fb_8ovl5kpla`}
+                            disabled={false}
+                            value={parsed.value}
+                            checked={(formValuesForm1["fb_8ovl5kpla"] ?? "") === parsed.value}
+                            onChange={() => handleFieldChangeForm1("fb_8ovl5kpla", parsed.value)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                          <span className="text-sm text-slate-700">{t(parsed.text)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </GridCell>
-      </PageGridContainer>
-    </div>
+          <div style={{ gridColumn: "span 3", gridRow: "span 1" }}>
+            <div
+              className="w-full rounded"
+              style={{
+                overflow: "visible",
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gridTemplateRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                gridAutoRows: `${ROW_HEIGHT - GAP_SIZE}px`,
+                rowGap: `${GAP_SIZE}px`,
+                columnGap: `${GAP_SIZE}px`,
+              }}
+            >
+              <div
+                className="flex items-center-safe gap-2 px-3 min-w-0 justify-start"
+                style={{ gridColumn: "span 2", gridRow: "span 1" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmLeaveStoreSpace1 && !confirmLeaveStoreSpace1()) return;
+                    router.back();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-400 text-white"
+                >
+                  {t("common.label.list")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(t("common.confirm.save"))) return;
+                    handleContentActionSpace1_1();
+                  }}
+                  className="text-xs px-4 py-2.5 rounded-md font-bold transition-all shadow-sm flex items-center justify-center min-h-[40px] whitespace-nowrap flex-shrink-0 hover:opacity-90 disabled:cursor-default bg-slate-900 text-white"
+                >
+                  {t("common.btn.save")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </GridCell>
+    </PageLayout>
   );
 }
